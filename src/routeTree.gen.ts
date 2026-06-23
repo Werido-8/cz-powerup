@@ -26,6 +26,7 @@ import { Route as TrainingExamRouteImport } from './routes/training.exam'
 import { Route as ScenarioPeakRouteImport } from './routes/scenario.peak'
 import { Route as ScenarioFaultRouteImport } from './routes/scenario.fault'
 import { Route as ScenarioTypicalIndexRouteImport } from './routes/scenario.typical.index'
+import { Route as ScenarioFaultIndexRouteImport } from './routes/scenario.fault.index'
 import { Route as TrainingSessionIdRouteImport } from './routes/training.session.$id'
 import { Route as TrainingResultIdRouteImport } from './routes/training.result.$id'
 import { Route as LearnTopicIdRouteImport } from './routes/learn.topic.$id'
@@ -121,6 +122,11 @@ const ScenarioTypicalIndexRoute = ScenarioTypicalIndexRouteImport.update({
   path: '/scenario/typical/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ScenarioFaultIndexRoute = ScenarioFaultIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ScenarioFaultRoute,
+} as any)
 const TrainingSessionIdRoute = TrainingSessionIdRouteImport.update({
   id: '/training/session/$id',
   path: '/training/session/$id',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/learn/topic/$id': typeof LearnTopicIdRoute
   '/training/result/$id': typeof TrainingResultIdRoute
   '/training/session/$id': typeof TrainingSessionIdRoute
+  '/scenario/fault/': typeof ScenarioFaultIndexRoute
   '/scenario/typical/': typeof ScenarioTypicalIndexRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
@@ -204,7 +211,6 @@ export interface FileRoutesByTo {
   '/governance': typeof GovernanceRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
-  '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
@@ -218,6 +224,7 @@ export interface FileRoutesByTo {
   '/learn/topic/$id': typeof LearnTopicIdRoute
   '/training/result/$id': typeof TrainingResultIdRoute
   '/training/session/$id': typeof TrainingSessionIdRoute
+  '/scenario/fault': typeof ScenarioFaultIndexRoute
   '/scenario/typical': typeof ScenarioTypicalIndexRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
@@ -247,6 +254,7 @@ export interface FileRoutesById {
   '/learn/topic/$id': typeof LearnTopicIdRoute
   '/training/result/$id': typeof TrainingResultIdRoute
   '/training/session/$id': typeof TrainingSessionIdRoute
+  '/scenario/fault/': typeof ScenarioFaultIndexRoute
   '/scenario/typical/': typeof ScenarioTypicalIndexRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
@@ -277,6 +285,7 @@ export interface FileRouteTypes {
     | '/learn/topic/$id'
     | '/training/result/$id'
     | '/training/session/$id'
+    | '/scenario/fault/'
     | '/scenario/typical/'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
@@ -291,7 +300,6 @@ export interface FileRouteTypes {
     | '/governance'
     | '/scene'
     | '/search'
-    | '/scenario/fault'
     | '/scenario/peak'
     | '/training/exam'
     | '/training/growth'
@@ -305,6 +313,7 @@ export interface FileRouteTypes {
     | '/learn/topic/$id'
     | '/training/result/$id'
     | '/training/session/$id'
+    | '/scenario/fault'
     | '/scenario/typical'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
@@ -333,6 +342,7 @@ export interface FileRouteTypes {
     | '/learn/topic/$id'
     | '/training/result/$id'
     | '/training/session/$id'
+    | '/scenario/fault/'
     | '/scenario/typical/'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
@@ -487,6 +497,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScenarioTypicalIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/scenario/fault/': {
+      id: '/scenario/fault/'
+      path: '/'
+      fullPath: '/scenario/fault/'
+      preLoaderRoute: typeof ScenarioFaultIndexRouteImport
+      parentRoute: typeof ScenarioFaultRoute
+    }
     '/training/session/$id': {
       id: '/training/session/$id'
       path: '/training/session/$id'
@@ -565,10 +582,12 @@ const AssetsRouteWithChildren =
   AssetsRoute._addFileChildren(AssetsRouteChildren)
 
 interface ScenarioFaultRouteChildren {
+  ScenarioFaultIndexRoute: typeof ScenarioFaultIndexRoute
   ScenarioFaultResultIdRoute: typeof ScenarioFaultResultIdRoute
 }
 
 const ScenarioFaultRouteChildren: ScenarioFaultRouteChildren = {
+  ScenarioFaultIndexRoute: ScenarioFaultIndexRoute,
   ScenarioFaultResultIdRoute: ScenarioFaultResultIdRoute,
 }
 
@@ -616,3 +635,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

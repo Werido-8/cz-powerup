@@ -3,6 +3,41 @@ import { Link } from "@tanstack/react-router";
 import { ChevronRight, X, FileText, BookOpen, Sparkles, ArrowRight } from "lucide-react";
 import type { ScenarioCard, ScenarioEvidence } from "@/lib/mock/scenario";
 
+/** scenario result 页面区块统一边框与圆角 */
+export const scenarioResultBlockClass =
+  "rounded-[14px] border border-[#EEEFF2] bg-card";
+
+export const scenarioResultInnerBlockClass =
+  "rounded-[14px] border border-[#EEEFF2] bg-background";
+
+/** scenario result 区块标题左侧图标容器 */
+export function ScenarioSectionHeader({
+  icon,
+  iconWrapClassName,
+  title,
+  titleClassName,
+  className,
+}: {
+  icon: ReactNode;
+  iconWrapClassName: string;
+  title: string;
+  titleClassName?: string;
+  className?: string;
+}) {
+  return (
+    <header className={`flex items-center gap-2.5 ${className ?? "mb-3"}`}>
+      <span
+        className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${iconWrapClassName}`}
+      >
+        {icon}
+      </span>
+      <h3 className={`text-[15px] font-semibold tracking-tight ${titleClassName ?? ""}`}>
+        {title}
+      </h3>
+    </header>
+  );
+}
+
 export function SelectedConditionBar({
   items,
   onRemove,
@@ -54,7 +89,7 @@ export function StepCard({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <span className="grid h-6 w-6 place-items-center rounded-md bg-primary-soft text-[12px] font-semibold text-primary">
           {step}
@@ -111,7 +146,7 @@ export function ResultCardShell({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center justify-between">
         <h3 className="text-[15px] font-semibold tracking-tight">{title}</h3>
         {badge && (

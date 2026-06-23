@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
-import { ScenarioBreadcrumb } from "@/components/scenario/parts";
+import { ScenarioBreadcrumb, scenarioResultBlockClass } from "@/components/scenario/parts";
 
 export const Route = createFileRoute("/scenario/peak/result/$id")({
   component: PeakResult,
@@ -158,7 +158,7 @@ function HeaderActions({ onFavorite }: { onFavorite: () => void }) {
 
 function ScopeCard() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <Info className="h-4 w-4 text-[#2F80ED]" />
         <h3 className="text-[15px] font-semibold tracking-tight">适用场景说明</h3>
@@ -195,7 +195,7 @@ function StageCard() {
 
 function JudgeCard({ onPickEvidence }: { onPickEvidence: (id: string) => void }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-1 flex items-center gap-2">
         <ListChecks className="h-4 w-4 text-primary" />
         <h3 className="text-[15px] font-semibold tracking-tight">核心判断思路</h3>
@@ -227,7 +227,7 @@ function JudgeCard({ onPickEvidence }: { onPickEvidence: (id: string) => void })
 
 function HandlingCard() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <Gauge className="h-4 w-4 text-warning-foreground" />
         <h3 className="text-[15px] font-semibold tracking-tight">参考处置思路</h3>
@@ -251,7 +251,7 @@ function HandlingCard() {
 
 function RiskCard() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <AlertOctagon className="h-4 w-4 text-destructive" />
         <h3 className="text-[15px] font-semibold tracking-tight">风险点与注意事项</h3>
@@ -280,7 +280,7 @@ function RiskCard() {
 
 function HistoryCard({ onPickEvidence }: { onPickEvidence: (id: string) => void }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <BookOpen className="h-4 w-4 text-[#2F80ED]" />
         <h3 className="text-[15px] font-semibold tracking-tight">历史案例参考</h3>
@@ -305,7 +305,7 @@ function HistoryCard({ onPickEvidence }: { onPickEvidence: (id: string) => void 
 
 function EvidenceListCard({ activeId, onPick }: { activeId?: string; onPick: (id: string) => void }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-1 flex items-center gap-2">
         <BookOpen className="h-4 w-4 text-primary" />
         <h3 className="text-[15px] font-semibold tracking-tight">原文依据</h3>
@@ -462,7 +462,7 @@ function SourcePanel({ evidence }: { evidence: Evidence }) {
 
 function RightSidebar({ mode, setMode, evidence }: { mode: "chat" | "source"; setMode: (m: "chat" | "source") => void; evidence?: Evidence }) {
   return (
-    <aside className={`sticky top-20 flex h-[calc(100vh-7rem)] shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card transition-[width] duration-200 ${mode === "source" ? "w-[560px]" : "w-[380px]"}`}>
+    <aside className={`sticky top-20 flex h-[calc(100vh-7rem)] shrink-0 flex-col overflow-hidden ${scenarioResultBlockClass} transition-[width] duration-200 ${mode === "source" ? "w-[560px]" : "w-[380px]"}`}>
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           {mode === "chat" ? <MessagesSquare className="h-4 w-4 text-primary" /> : <BookOpen className="h-4 w-4 text-primary" />}
@@ -498,7 +498,7 @@ function PeakResult() {
         ]}
       />
 
-      <div className="mt-3 rounded-lg border border-border bg-card p-5">
+      <div className={`mt-3 ${scenarioResultBlockClass} p-5`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-[20px] font-semibold tracking-tight">660MW 超超临界机组低负荷稳燃深调辅助</h1>

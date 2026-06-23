@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Bell, ChevronDown } from "lucide-react";
-import platformLogo from "@/assets/platform-logo.png.asset.json";
+import logo from "@/assets/logo.png";
 
 interface MenuItem {
   label: string;
@@ -122,7 +122,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-[1760px] items-center gap-8 px-8">
         <Link to="/" className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-white ring-1 ring-border">
-            <img src={platformLogo.url} alt="平台 Logo" className="h-9 w-9 object-contain" />
+            <img src={logo} alt="平台 Logo" className="h-11 w-11 object-contain" />
           </div>
           <div className="leading-tight">
             <div className="text-[15px] font-semibold tracking-tight text-foreground">

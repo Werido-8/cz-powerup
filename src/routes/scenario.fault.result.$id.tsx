@@ -10,6 +10,7 @@ import {
   AlertOctagon,
   BookOpen,
   FileText,
+  Focus,
   MessagesSquare,
   Send,
   ChevronLeft,
@@ -20,11 +21,12 @@ import {
   ListChecks,
   Wrench,
   History,
+  CheckCircle2,
   ShieldAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
-import { ScenarioBreadcrumb } from "@/components/scenario/parts";
+import { ScenarioBreadcrumb, scenarioResultBlockClass, scenarioResultInnerBlockClass, ScenarioSectionHeader } from "@/components/scenario/parts";
 import { getScenario, type ScenarioTemplate } from "@/lib/mock/scenario";
 import { useMockStore } from "@/lib/mock/store";
 
@@ -37,7 +39,7 @@ export const Route = createFileRoute("/scenario/fault/result/$id")({
   component: FaultResult,
   notFoundComponent: () => (
     <PageShell>
-      <div className="rounded-lg border border-border bg-card p-10 text-center text-muted-foreground">
+      <div className={`${scenarioResultBlockClass} p-10 text-center text-muted-foreground`}>
         未找到该故障处置场景
       </div>
     </PageShell>
@@ -226,29 +228,25 @@ const EVIDENCES: Evidence[] = [
 
 // ---- sub components ----
 function HeaderActions({ onFavorite }: { onFavorite: () => void }) {
+  const btnOutline =
+    "inline-flex items-center gap-1 rounded-lg border border-[#EEEFF2] bg-background px-3 py-1.5 text-[12.5px] text-foreground/85 transition-colors hover:bg-[#F7F8FA]";
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Link
-        to="/scenario/fault"
-        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-[12.5px] hover:bg-muted"
-      >
+      <Link to="/scenario/fault" className={btnOutline}>
         <Pencil className="h-3.5 w-3.5" /> 修改条件
       </Link>
       <button
         onClick={() => toast.success("已基于当前条件重新生成处置辅助")}
-        className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-3 py-1.5 text-[12.5px] hover:bg-muted"
+        className={btnOutline}
       >
         <RefreshCw className="h-3.5 w-3.5" /> 重新生成
       </button>
-      <button
-        onClick={onFavorite}
-        className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary-soft/60 px-3 py-1.5 text-[12.5px] font-medium text-primary hover:bg-primary-soft"
-      >
-        <Star className="h-3.5 w-3.5 fill-primary" /> 收藏
+      <button onClick={onFavorite} className={btnOutline}>
+        <Star className="h-3.5 w-3.5" /> 收藏
       </button>
       <button
         onClick={() => toast.message("已导出为 PDF(占位)")}
-        className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+        className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
       >
         <Download className="h-3.5 w-3.5" /> 导出
       </button>
@@ -258,21 +256,29 @@ function HeaderActions({ onFavorite }: { onFavorite: () => void }) {
 
 function ScopeCard() {
   const colorMap = {
-    red: { dot: "bg-destructive", icon: <AlertTriangle className="h-4 w-4 text-destructive" /> },
-    orange: { dot: "bg-warning", icon: <AlertTriangle className="h-4 w-4 text-warning-foreground" /> },
-    blue: { dot: "bg-[#2F80ED]", icon: <Info className="h-4 w-4 text-[#2F80ED]" /> },
+    red: { icon: <CheckCircle2 className="h-4 w-4 text-[#E53935]" /> },
+    orange: { icon: <AlertTriangle className="h-4 w-4 text-[#F5A623]" /> },
+    blue: { icon: <Info className="h-4 w-4 text-[#2F80ED]" /> },
+  };
+  const textMap = {
+    red: "text-foreground/90",
+    orange: "text-[#C47A00]",
+    blue: "text-[#2F80ED]",
   };
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <header className="mb-3 flex items-center gap-2">
-        <Info className="h-4 w-4 text-destructive" />
-        <h3 className="text-[15px] font-semibold tracking-tight">适用场景说明</h3>
-      </header>
-      <ul className="space-y-2">
+    <section className={`${scenarioResultBlockClass} p-5`}>
+      <ScenarioSectionHeader
+        icon={<Info className="h-4 w-4 text-[#E53935]" />}
+        iconWrapClassName="bg-[#FEECEC]"
+        title="适用场景说明"
+      />
+      <ul className="space-y-2.5 pl-[0.375rem]">
         {SCOPE.map((it, i) => (
-          <li key={i} className="flex items-start gap-2 text-[13px] leading-6">
-            {colorMap[it.kind].icon}
-            <span className="text-foreground/90">{it.text}</span>
+          <li key={i} className={`flex gap-2.5 text-[13px] leading-6 ${textMap[it.kind]}`}>
+            <span className="flex h-6 w-4 shrink-0 items-center justify-center">
+              {colorMap[it.kind].icon}
+            </span>
+            <span className="min-w-0 flex-1">{it.text}</span>
           </li>
         ))}
       </ul>
@@ -282,26 +288,26 @@ function ScopeCard() {
 
 function StageCard() {
   return (
-    <section className="rounded-lg border border-destructive/30 bg-destructive/[0.05] p-5">
-      <header className="mb-3 flex items-center gap-2">
-        <ShieldAlert className="h-4 w-4 text-destructive" />
-        <h3 className="text-[15px] font-semibold tracking-tight text-destructive">
-          当前处置阶段:紧急隔离与安全控制
-        </h3>
-      </header>
-      <dl className="space-y-2 text-[12.5px] leading-6">
+    <section className="rounded-[14px] border border-[#EEEFF2] bg-[#FFF6F6] p-5">
+      <ScenarioSectionHeader
+        icon={<ShieldAlert className="h-4 w-4 text-white" />}
+        iconWrapClassName="bg-[#E53935]"
+        title="当前处置阶段:紧急隔离与安全控制"
+        titleClassName="text-[#C62828]"
+      />
+      <dl className="space-y-2.5 text-[12.5px] leading-6">
         <div className="flex gap-3">
-          <dt className="w-16 shrink-0 font-medium text-foreground">阶段目标:</dt>
+          <dt className="w-16 shrink-0 font-semibold text-destructive">阶段目标:</dt>
           <dd className="text-foreground/85">立即控制人身与设备风险,防止事故扩大,确保现场安全。</dd>
         </div>
         <div className="flex gap-3">
-          <dt className="w-16 shrink-0 font-medium text-foreground">优先事项:</dt>
+          <dt className="w-16 shrink-0 font-semibold text-destructive">优先事项:</dt>
           <dd className="text-foreground/85">
             1.确认#1主变各侧开关已全部分闸; 2.检查CT爆炸着火点及周边设备有无进一步损坏或火灾蔓延迹象; 3.确保现场人员安全,防止触电与爆炸风险
           </dd>
         </div>
         <div className="flex gap-3">
-          <dt className="w-16 shrink-0 font-medium text-foreground">禁止动作:</dt>
+          <dt className="w-16 shrink-0 font-semibold text-destructive">禁止动作:</dt>
           <dd className="text-foreground/85">本阶段禁止未经确认直接试送电或靠近故障点进行非必要操作</dd>
         </div>
       </dl>
@@ -311,38 +317,41 @@ function StageCard() {
 
 function JudgeCard({ onPickEvidence }: { onPickEvidence: (id: string) => void }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <header className="mb-1 flex items-center gap-2">
-        <ListChecks className="h-4 w-4 text-primary" />
-        <h3 className="text-[15px] font-semibold tracking-tight">核心判断思路</h3>
-      </header>
-      <p className="mb-3 text-[12px] text-muted-foreground">
+    <section className={`${scenarioResultBlockClass} p-5`}>
+      <ScenarioSectionHeader
+        icon={<ListChecks className="h-4 w-4 text-primary" />}
+        iconWrapClassName="bg-primary/10"
+        title="核心判断思路"
+        className="mb-1"
+      />
+      <p className="mb-3 pl-[calc(1.75rem+0.625rem)] text-[12px] leading-5 text-muted-foreground">
         应优先确认故障点位置、保护动作逻辑与开关状态一致性,避免误判为线路故障或误操作导致的跳闸。
       </p>
       <ol className="space-y-2.5">
         {JUDGE_STEPS.map((s) => (
-          <li key={s.no} className="rounded-lg border border-border bg-background p-3.5">
-            <div className="flex items-start gap-3">
-              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[12.5px] font-semibold text-primary-foreground">
-                {s.no}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13.5px] font-semibold text-foreground">{s.title}</div>
-                <p className="mt-1 text-[12.5px] leading-6 text-muted-foreground">{s.desc}</p>
-                <p className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-5 text-destructive/90">
-                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                  <span>误判风险:{s.risk}</span>
-                </p>
-              </div>
-              <button
-                onClick={() => onPickEvidence(s.refId)}
-                className="ml-2 inline-flex shrink-0 items-center gap-1 self-start rounded-md border border-primary/30 bg-primary-soft/60 px-2 py-1 text-[11.5px] font-medium text-primary hover:bg-primary-soft"
-                title="查看依据原文"
-              >
-                依据:{s.refId}
-                <FileText className="h-3 w-3" />
-              </button>
+          <li
+            key={s.no}
+            className={`${scenarioResultInnerBlockClass} flex items-center gap-3 p-3.5`}
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[12.5px] font-semibold text-primary-foreground">
+              {s.no}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13.5px] font-semibold text-foreground">{s.title}</div>
+              <p className="mt-1 text-[12.5px] leading-6 text-foreground/80">{s.desc}</p>
+              <p className="mt-1.5 flex items-start gap-1.5 text-[12px] leading-5 text-destructive">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#F5A623]" />
+                <span>误判风险:{s.risk}</span>
+              </p>
             </div>
+            <button
+              onClick={() => onPickEvidence(s.refId)}
+              className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11.5px] font-medium text-primary transition-colors hover:bg-primary/15"
+              title="查看依据原文"
+            >
+              依据:{s.refId}
+              <Focus className="h-3 w-3" />
+            </button>
           </li>
         ))}
       </ol>
@@ -352,14 +361,15 @@ function JudgeCard({ onPickEvidence }: { onPickEvidence: (id: string) => void })
 
 function HandlingCard() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <header className="mb-3 flex items-center gap-2">
-        <Wrench className="h-4 w-4 text-warning-foreground" />
-        <h3 className="text-[15px] font-semibold tracking-tight">参考处置思路</h3>
-      </header>
+    <section className={`${scenarioResultBlockClass} p-5`}>
+      <ScenarioSectionHeader
+        icon={<Wrench className="h-4 w-4 text-[#E67E22]" />}
+        iconWrapClassName="bg-[#FFF4E6]"
+        title="参考处置思路"
+      />
       <ol className="space-y-2">
         {HANDLING_STEPS.map((s) => (
-          <li key={s.no} className="rounded-lg border border-border bg-background p-3">
+          <li key={s.no} className={`${scenarioResultInnerBlockClass} p-3`}>
             <div className="flex items-start gap-2">
               <span className="inline-flex shrink-0 items-center rounded bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">
                 步骤{s.no}
@@ -378,11 +388,12 @@ function HandlingCard() {
 
 function RiskCard() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <header className="mb-3 flex items-center gap-2">
-        <AlertOctagon className="h-4 w-4 text-destructive" />
-        <h3 className="text-[15px] font-semibold tracking-tight">风险点与注意事项</h3>
-      </header>
+    <section className={`${scenarioResultBlockClass} p-5`}>
+      <ScenarioSectionHeader
+        icon={<AlertOctagon className="h-4 w-4 text-[#E53935]" />}
+        iconWrapClassName="bg-[#FEECEC]"
+        title="风险点与注意事项"
+      />
       <ul className="space-y-2">
         {RISKS.map((r, i) => {
           const isSpecial = r.level === "special";
@@ -418,11 +429,12 @@ function RiskCard() {
 
 function HistoryCard({ onPickEvidence }: { onPickEvidence: (id: string) => void }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <header className="mb-3 flex items-center gap-2">
-        <History className="h-4 w-4 text-[#2F80ED]" />
-        <h3 className="text-[15px] font-semibold tracking-tight">历史案例参考</h3>
-      </header>
+    <section className={`${scenarioResultBlockClass} p-5`}>
+      <ScenarioSectionHeader
+        icon={<History className="h-4 w-4 text-[#2F80ED]" />}
+        iconWrapClassName="bg-[#E8F1FD]"
+        title="历史案例参考"
+      />
       <div className="rounded-lg border border-[#2F80ED]/30 bg-[#2F80ED]/[0.04] p-4">
         <div className="text-[13.5px] font-semibold text-foreground">
           2019-06-02 芜湖站1000千伏T062开关B相合闸电阻气室故障
@@ -453,11 +465,13 @@ function HistoryCard({ onPickEvidence }: { onPickEvidence: (id: string) => void 
 function EvidenceListCard({ activeId, onPick }: { activeId?: string; onPick: (id: string) => void }) {
   const FOUR = EVIDENCES.slice(0, 4);
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
-      <header className="mb-1 flex items-center gap-2">
-        <BookOpen className="h-4 w-4 text-primary" />
-        <h3 className="text-[15px] font-semibold tracking-tight">原文依据</h3>
-      </header>
+    <section className={`${scenarioResultBlockClass} p-5`}>
+      <ScenarioSectionHeader
+        icon={<BookOpen className="h-4 w-4 text-primary" />}
+        iconWrapClassName="bg-primary/10"
+        title="原文依据"
+        className="mb-1"
+      />
       <p className="mb-4 text-[12px] text-muted-foreground">点击正文中的依据标签可定位到对应条目</p>
       <div className="grid gap-3 sm:grid-cols-2">
         {FOUR.map((e) => {
@@ -466,8 +480,8 @@ function EvidenceListCard({ activeId, onPick }: { activeId?: string; onPick: (id
             <div
               key={e.id}
               id={`ev-${e.id}`}
-              className={`rounded-lg border p-4 transition-colors ${
-                active ? "border-primary bg-primary-soft/40" : "border-border bg-background hover:border-primary/40"
+              className={`rounded-[14px] border p-4 transition-colors ${
+                active ? "border-primary bg-primary-soft/40" : "border-[#EEEFF2] bg-background hover:border-primary/40"
               }`}
             >
               <div className="mb-2 flex items-center gap-2">
@@ -638,7 +652,7 @@ function RightSidebar({
   mode, setMode, evidence,
 }: { mode: "chat" | "source"; setMode: (m: "chat" | "source") => void; evidence?: Evidence }) {
   return (
-    <aside className={`sticky top-20 flex h-[calc(100vh-7rem)] shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card transition-[width] duration-200 ${mode === "source" ? "w-[560px]" : "w-[380px]"}`}>
+    <aside className={`sticky top-20 flex h-[calc(100vh-7rem)] shrink-0 flex-col overflow-hidden ${scenarioResultBlockClass} transition-[width] duration-200 ${mode === "source" ? "w-[560px]" : "w-[380px]"}`}>
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           {mode === "chat" ? <MessagesSquare className="h-4 w-4 text-primary" /> : <BookOpen className="h-4 w-4 text-primary" />}
@@ -693,16 +707,21 @@ function FaultResult() {
         ]}
       />
 
-      <div className="mt-3 rounded-lg border border-border bg-card p-5">
+      <div className={`mt-3 ${scenarioResultBlockClass} p-5`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-[20px] font-semibold tracking-tight">500kV #1主变配套开关 CT 爆炸着火并联跳故障处置辅助</h1>
-            <p className="mt-1 text-[12.5px] text-muted-foreground">生成时间:2026-04-01 17:40:31</p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <h1 className="text-[22px] font-semibold leading-snug tracking-tight text-foreground">
+              500kV #1主变配套开关 CT 爆炸着火并联跳故障处置辅助
+            </h1>
+            <p className="mt-1.5 text-[12.5px] text-muted-foreground">生成时间: 2026-04-01 17:40:31</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               {TAGS.map((t) => (
-                <span key={t.label} className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11.5px]">
+                <span
+                  key={t.label}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#F4F5F7] px-2.5 py-1 text-[11.5px]"
+                >
                   <span className="text-muted-foreground">{t.label}:</span>
-                  <span className="font-medium text-foreground">{t.value}</span>
+                  <span className="font-medium text-[#2F80ED]">{t.value}</span>
                 </span>
               ))}
             </div>

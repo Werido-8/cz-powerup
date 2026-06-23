@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
-import { ScenarioBreadcrumb } from "@/components/scenario/parts";
+import { ScenarioBreadcrumb, scenarioResultBlockClass } from "@/components/scenario/parts";
 import { getScenario, type ScenarioTemplate } from "@/lib/mock/scenario";
 import { useMockStore } from "@/lib/mock/store";
 
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/scenario/typical/result/$id")({
   component: TypicalResult,
   notFoundComponent: () => (
     <PageShell>
-      <div className="rounded-lg border border-border bg-card p-10 text-center text-muted-foreground">
+      <div className={`${scenarioResultBlockClass} p-10 text-center text-muted-foreground`}>
         未找到该典型操作场景
       </div>
     </PageShell>
@@ -268,7 +268,7 @@ function HeaderActions({ onFavorite }: { onFavorite: () => void }) {
 
 function ScopeCard() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <Info className="h-4 w-4 text-primary" />
         <h3 className="text-[15px] font-semibold tracking-tight">适用场景说明</h3>
@@ -294,7 +294,7 @@ function ScopeCard() {
 
 function StepsCard({ onPickEvidence }: { onPickEvidence: (id: string) => void }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-4 flex items-center gap-2">
         <ListChecks className="h-4 w-4 text-primary" />
         <h3 className="text-[15px] font-semibold tracking-tight">关键步骤提示</h3>
@@ -359,7 +359,7 @@ function RiskCard() {
     forbid: "border-border bg-muted/30",
   };
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <AlertOctagon className="h-4 w-4 text-destructive" />
         <h3 className="text-[15px] font-semibold tracking-tight">风险点与禁止项</h3>
@@ -383,7 +383,7 @@ function RiskCard() {
 
 function StopReportCard() {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-3 flex items-center gap-2">
         <Shield className="h-4 w-4 text-warning-foreground" />
         <h3 className="text-[15px] font-semibold tracking-tight">异常停止与汇报提示</h3>
@@ -421,7 +421,7 @@ function StopReportCard() {
 
 function EvidenceListCard({ activeId, onPick }: { activeId?: string; onPick: (id: string) => void }) {
   return (
-    <section className="rounded-lg border border-border bg-card p-5">
+    <section className={`${scenarioResultBlockClass} p-5`}>
       <header className="mb-1 flex items-center gap-2">
         <BookOpen className="h-4 w-4 text-primary" />
         <h3 className="text-[15px] font-semibold tracking-tight">原文依据</h3>
@@ -705,7 +705,7 @@ function RightSidebar({
 }) {
   return (
     <aside
-      className={`sticky top-20 flex h-[calc(100vh-7rem)] shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-card transition-[width] duration-200 ${
+      className={`sticky top-20 flex h-[calc(100vh-7rem)] shrink-0 flex-col overflow-hidden ${scenarioResultBlockClass} transition-[width] duration-200 ${
         mode === "source" ? "w-[560px]" : "w-[380px]"
       }`}
     >
@@ -783,7 +783,7 @@ function TypicalResult() {
       />
 
       {/* Title block */}
-      <div className="mt-3 rounded-lg border border-border bg-card p-5">
+      <div className={`mt-3 ${scenarioResultBlockClass} p-5`}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-[20px] font-semibold tracking-tight text-foreground">220kV #1 主变停役典型操作辅助</h1>
