@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SceneRouteImport } from './routes/scene'
+import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as GovernanceRouteImport } from './routes/governance'
 import { Route as ExamAdminRouteImport } from './routes/exam-admin'
 import { Route as ChatRouteImport } from './routes/chat'
@@ -45,6 +46,11 @@ const SearchRoute = SearchRouteImport.update({
 const SceneRoute = SceneRouteImport.update({
   id: '/scene',
   path: '/scene',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeRoute = KnowledgeRouteImport.update({
+  id: '/knowledge',
+  path: '/knowledge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GovernanceRoute = GovernanceRouteImport.update({
@@ -180,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/chat': typeof ChatRoute
   '/exam-admin': typeof ExamAdminRoute
   '/governance': typeof GovernanceRoute
+  '/knowledge': typeof KnowledgeRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/chat': typeof ChatRoute
   '/exam-admin': typeof ExamAdminRoute
   '/governance': typeof GovernanceRoute
+  '/knowledge': typeof KnowledgeRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
@@ -238,6 +246,7 @@ export interface FileRoutesById {
   '/chat': typeof ChatRoute
   '/exam-admin': typeof ExamAdminRoute
   '/governance': typeof GovernanceRoute
+  '/knowledge': typeof KnowledgeRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
@@ -269,6 +278,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/exam-admin'
     | '/governance'
+    | '/knowledge'
     | '/scene'
     | '/search'
     | '/scenario/fault'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/exam-admin'
     | '/governance'
+    | '/knowledge'
     | '/scene'
     | '/search'
     | '/scenario/peak'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/chat'
     | '/exam-admin'
     | '/governance'
+    | '/knowledge'
     | '/scene'
     | '/search'
     | '/scenario/fault'
@@ -356,6 +368,7 @@ export interface RootRouteChildren {
   ChatRoute: typeof ChatRoute
   ExamAdminRoute: typeof ExamAdminRoute
   GovernanceRoute: typeof GovernanceRoute
+  KnowledgeRoute: typeof KnowledgeRoute
   SceneRoute: typeof SceneRoute
   SearchRoute: typeof SearchRoute
   ScenarioFaultRoute: typeof ScenarioFaultRouteWithChildren
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       path: '/scene'
       fullPath: '/scene'
       preLoaderRoute: typeof SceneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/knowledge': {
+      id: '/knowledge'
+      path: '/knowledge'
+      fullPath: '/knowledge'
+      preLoaderRoute: typeof KnowledgeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/governance': {
@@ -613,6 +633,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChatRoute: ChatRoute,
   ExamAdminRoute: ExamAdminRoute,
   GovernanceRoute: GovernanceRoute,
+  KnowledgeRoute: KnowledgeRoute,
   SceneRoute: SceneRoute,
   SearchRoute: SearchRoute,
   ScenarioFaultRoute: ScenarioFaultRouteWithChildren,

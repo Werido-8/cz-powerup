@@ -806,18 +806,31 @@ export const KNOWLEDGE_CATEGORIES = [
 ] as const;
 
 // ---------- Conversations (mock chat) ----------
-export type AnswerCitation = { docId: string; section: string; quote: string };
+export type AnswerCitation = {
+  docId: string;
+  section: string;
+  quote: string;
+  label?: string;
+  position?: string;
+};
 export type AnswerCard = {
   summary: string;
+  body?: string;
   citations: AnswerCitation[];
   scope: string;
   uncertainty?: string;
 };
 export type ChatMsg =
-  | { role: "user"; text: string }
-  | { role: "assistant"; card: AnswerCard };
+  | { role: "user"; text: string; time?: string }
+  | { role: "assistant"; card: AnswerCard; time?: string };
 
-export type Conversation = { id: string; title: string; updatedAt: string; messages: ChatMsg[] };
+export type Conversation = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  messages: ChatMsg[];
+  pinned?: boolean;
+};
 
 export const CONVERSATIONS: Conversation[] = [
   {
@@ -825,19 +838,139 @@ export const CONVERSATIONS: Conversation[] = [
     title: "AGC 考核依据哪些规程?",
     updatedAt: "今天 14:08",
     messages: [
-      { role: "user", text: "AGC 考核主要依据哪些文件?" },
+      { role: "user", text: "AGC 考核主要依据哪些文件?", time: "今天 14:08" },
       {
         role: "assistant",
+        time: "今天 14:08",
         card: {
           summary:
-            "AGC 考核主要依据《并网发电厂辅助服务管理实施细则》(俗称「两细则」)[1]、《厂站运行规程》[2] 以及厂家提供的 AGC 控制器 SOP 配置说明 [3]。三类资料层级不同,适用时建议优先厂站资料。",
+            "AGC 考核主要依据《并网发电厂辅助服务管理实施细则》[1]、《厂站运行规程》[2] 以及厂家提供的 AGC 控制器 SOP 配置说明 [3]。不同地区的细则口径可能存在差异，实际应以当地调度发布版本为准。",
           citations: [
-            { docId: "d1", section: "二、AGC 考核三项指标", quote: "调节速率、调节精度、响应时间三项指标..." },
-            { docId: "d4", section: "1 总则", quote: "厂站资料优先适用,通用规程作为补充。" },
-            { docId: "d6", section: "1 死区参数", quote: "推荐 ≤1MW,过大会导致考核分降低。" },
+            {
+              docId: "d1",
+              section: "二、AGC 考核三项指标",
+              quote: "调节速率、调节精度、响应时间可作为考核关注指标……",
+              label: "题库",
+              position: "二、AGC 考核三项指标",
+            },
+            {
+              docId: "d4",
+              section: "1 总则",
+              quote: "厂站资料优先适用，通用规程作为补充……",
+              label: "厂站",
+              position: "1 总则",
+            },
+            {
+              docId: "d6",
+              section: "1 死区参数",
+              quote: "推荐 ≤ 1MW，过大会导致考核响应降低……",
+              label: "SOP",
+              position: "1 死区参数",
+            },
           ],
-          scope: "适用厂站:接入辅助服务市场的并网发电厂;岗位:运行值班、技术管理。",
-          uncertainty: "各区域细则版本差异,具体计算公式以本区域最新发布版本为准。",
+          scope: "适用厂站：接入辅助服务市场的并网发电厂；岗位：运行值班、技术管理。",
+          uncertainty: "各区域细则版本差异，具体计算公式以本区域最新发布版本为准。",
+        },
+      },
+      { role: "user", text: "三项指标具体怎么理解？K 值和考核有什么关系？", time: "今天 14:12" },
+      {
+        role: "assistant",
+        time: "今天 14:12",
+        card: {
+          summary:
+            "三项指标分别衡量调节速率、调节精度与响应时间 [1]。K 值法将三项综合为月度考核系数 [2]，任一项未达标均可能拉低综合 K 值。厂站侧应重点关注死区设置与指令跟踪偏差 [3]。",
+          citations: [
+            {
+              docId: "d1",
+              section: "二、AGC 考核三项指标",
+              quote: "调节速率、调节精度、响应时间三项指标综合反映 AGC 调节性能,任一项未达标的均纳入考核。",
+              label: "题库",
+              position: "二、AGC 考核三项指标",
+            },
+            {
+              docId: "d1",
+              section: "三、补偿与考核计算",
+              quote: "K 值法综合三项指标按月统计,具体公式参见附录 A。",
+              label: "题库",
+              position: "三、补偿与考核计算",
+            },
+            {
+              docId: "d6",
+              section: "1 死区参数",
+              quote: "推荐 ≤ 1MW，过大会导致考核响应降低……",
+              label: "SOP",
+              position: "1 死区参数",
+            },
+          ],
+          scope: "适用对象：AGC 运行值班与技术管理人员。",
+          uncertainty: "不同区域 K 值计算公式存在版本差异，以本区域细则附录为准。",
+        },
+      },
+      { role: "user", text: "厂站日常巡检 AGC 要关注哪些点？", time: "今天 14:18" },
+      {
+        role: "assistant",
+        time: "今天 14:18",
+        card: {
+          summary:
+            "建议建立日常巡检机制 [1]：① 控制模式与投退状态；② 指令跟踪与死区设置 [2]；③ 异常上报与记录归档。出现响应迟缓时优先核对 SOP 参数与通信状态 [3]。",
+          citations: [
+            {
+              docId: "d1",
+              section: "四、厂站侧执行要点",
+              quote: "应建立 AGC 日常巡检和异常上报机制,关注控制策略和死区设置。",
+              label: "题库",
+              position: "四、厂站侧执行要点",
+            },
+            {
+              docId: "d6",
+              section: "1 死区参数",
+              quote: "推荐 ≤ 1MW，过大会导致考核响应降低……",
+              label: "SOP",
+              position: "1 死区参数",
+            },
+            {
+              docId: "d4",
+              section: "1 总则",
+              quote: "厂站资料优先适用，通用规程作为补充……",
+              label: "厂站",
+              position: "1 总则",
+            },
+          ],
+          scope: "适用场景：并网发电厂 AGC 日常运行管理。",
+        },
+      },
+      { role: "user", text: "如果本月 K 值偏低，可以从哪些方面改进？", time: "今天 14:25" },
+      {
+        role: "assistant",
+        time: "今天 14:25",
+        card: {
+          summary:
+            "可从三方面改进：① 优化控制策略，减小死区与响应滞后 [1][2]；② 加强运行人员培训，规范指令确认与异常处置 [3]；③ 对照历史考核数据做专项复盘，识别反复失分时段。",
+          citations: [
+            {
+              docId: "d6",
+              section: "1 死区参数",
+              quote: "推荐 ≤ 1MW，过大会导致考核响应降低……",
+              label: "SOP",
+              position: "1 死区参数",
+            },
+            {
+              docId: "d1",
+              section: "二、AGC 考核三项指标",
+              quote: "调节速率、调节精度、响应时间三项指标综合反映 AGC 调节性能,任一项未达标的均纳入考核。",
+              label: "题库",
+              position: "二、AGC 考核三项指标",
+            },
+            {
+              docId: "d1",
+              section: "四、厂站侧执行要点",
+              quote: "应建立 AGC 日常巡检和异常上报机制,关注控制策略和死区设置。",
+              label: "题库",
+              position: "四、厂站侧执行要点",
+            },
+          ],
+          scope: "适用厂站：已接入辅助服务市场、存在 AGC 考核压力的并网电厂。",
+          uncertainty: "改进措施需结合本厂 DCS/AGC 系统实际情况，重大参数调整应履行审批程序。",
         },
       },
     ],
@@ -866,7 +999,7 @@ export const CONVERSATIONS: Conversation[] = [
   {
     id: "c-diff",
     title: "差动保护误动如何复盘?",
-    updatedAt: "前天 10:21",
+    updatedAt: "20 天前",
     messages: [
       { role: "user", text: "差动保护误动后,复盘思路是什么?" },
       {
@@ -884,6 +1017,30 @@ export const CONVERSATIONS: Conversation[] = [
         },
       },
     ],
+  },
+  {
+    id: "c-rules",
+    title: "交易类型与方式",
+    updatedAt: "5 天前",
+    messages: [],
+  },
+  {
+    id: "c-avc",
+    title: "双碳目标及电力作用",
+    updatedAt: "6 天前",
+    messages: [],
+  },
+  {
+    id: "c-relay",
+    title: "继电保护动作逻辑",
+    updatedAt: "18 天前",
+    messages: [],
+  },
+  {
+    id: "c-deep",
+    title: "深度调峰低负荷稳燃",
+    updatedAt: "25 天前",
+    messages: [],
   },
 ];
 

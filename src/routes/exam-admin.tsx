@@ -15,7 +15,6 @@ import {
   Ban,
   GitMerge,
   CheckCircle2,
-  Undo2,
   FileSearch,
   Users,
   History,
@@ -233,14 +232,19 @@ function ReviewModule() {
   const [evidenceOf, setEvidenceOf] = useState<ReviewItem | null>(null);
   const [editOf, setEditOf] = useState<ReviewItem | null>(null);
   const [approveOf, setApproveOf] = useState<ReviewItem | null>(null);
-  const [returnOf, setReturnOf] = useState<ReviewItem | null>(null);
+  const [deleteOf, setDeleteOf] = useState<ReviewItem | null>(null);
   const [mergeOf, setMergeOf] = useState<ReviewItem | null>(null);
 
   const [batchApproveOpen, setBatchApproveOpen] = useState(false);
-  const [batchReturnOpen, setBatchReturnOpen] = useState(false);
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
   const updateStatus = (ids: string[], status: ReviewItem["status"]) => {
     setRows((rs) => rs.map((r) => (ids.includes(r.id) ? { ...r, status } : r)));
+    setSelected(new Set());
+  };
+
+  const removeRows = (ids: string[]) => {
+    setRows((rs) => rs.filter((r) => !ids.includes(r.id)));
     setSelected(new Set());
   };
 
@@ -283,10 +287,10 @@ function ReviewModule() {
           </button>
           <button
             disabled={selected.size === 0}
-            onClick={() => setBatchReturnOpen(true)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] disabled:opacity-40 hover:bg-muted"
+            onClick={() => setBatchDeleteOpen(true)}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-destructive disabled:opacity-40 hover:bg-destructive/10"
           >
-            <Undo2 className="h-3.5 w-3.5" /> 批量退回
+            <Trash2 className="h-3.5 w-3.5" /> 批量删除
           </button>
           <button
             disabled={selected.size === 0}
@@ -355,7 +359,7 @@ function ReviewModule() {
                       {!done && (
                         <>
                           <ActionBtn icon={CheckCircle2} label="通过入库" tone="primary" onClick={() => setApproveOf(q)} />
-                          <ActionBtn icon={Undo2} label="退回修改" onClick={() => setReturnOf(q)} />
+                          <ActionBtn icon={Trash2} label="删除" tone="danger" onClick={() => setDeleteOf(q)} />
                           <ActionBtn icon={GitMerge} label="合并相似题" onClick={() => setMergeOf(q)} />
                         </>
                       )}
@@ -386,10 +390,10 @@ function ReviewModule() {
         onConfirm={(r) => { updateStatus([r.id], "已入库"); setApproveOf(null); toast.success("已通过并入库"); }}
         onViewSimilar={(r) => { setApproveOf(null); setMergeOf(r); }}
       />
-      <ReturnDialog
-        q={returnOf}
-        onClose={() => setReturnOf(null)}
-        onConfirm={(r) => { updateStatus([r.id], "退回修改"); setReturnOf(null); toast.success("已退回修改"); }}
+      <DeleteDialog
+        q={deleteOf}
+        onClose={() => setDeleteOf(null)}
+        onConfirm={(r) => { removeRows([r.id]); setDeleteOf(null); toast.success("已删除题目"); }}
       />
       <MergeDrawer
         q={mergeOf}
@@ -429,20 +433,19 @@ function ReviewModule() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={batchReturnOpen} onOpenChange={setBatchReturnOpen}>
+      <Dialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>批量退回修改</DialogTitle>
-            <DialogDescription>共 {selectedRows.length} 道题将退回修改</DialogDescription>
+            <DialogTitle>批量删除题目</DialogTitle>
+            <DialogDescription>共 {selectedRows.length} 道题将被永久删除,此操作不可恢复。</DialogDescription>
           </DialogHeader>
-          <Textarea rows={3} placeholder="请填写统一的修改意见" className="text-[13px]" />
           <DialogFooter>
-            <button onClick={() => setBatchReturnOpen(false)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
+            <button onClick={() => setBatchDeleteOpen(false)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
             <button
-              onClick={() => { updateStatus(selectedRows.map((r) => r.id), "退回修改"); setBatchReturnOpen(false); toast.success("已批量退回"); }}
-              className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+              onClick={() => { removeRows(selectedRows.map((r) => r.id)); setBatchDeleteOpen(false); toast.success("已批量删除"); }}
+              className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90"
             >
-              确认退回
+              确认删除
             </button>
           </DialogFooter>
         </DialogContent>
@@ -756,7 +759,7 @@ function ApproveDialog({
   );
 }
 
-function ReturnDialog({
+function DeleteDialog({
   q,
   onClose,
   onConfirm,
@@ -765,41 +768,19 @@ function ReturnDialog({
   onClose: () => void;
   onConfirm: (r: ReviewItem) => void;
 }) {
-  const [reason, setReason] = useState<string>("题干表述不清");
   return (
     <Dialog open={!!q} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         {q && (
           <>
             <DialogHeader>
-              <DialogTitle>返回修改</DialogTitle>
-              <DialogDescription>请说明退回原因,题目将回到出题人处</DialogDescription>
+              <DialogTitle>删除题目</DialogTitle>
+              <DialogDescription>删除后不可恢复,请确认是否删除该待审核题目。</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <ReviewSummary q={q} />
-              <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">退回原因</div>
-                <Select value={reason} onValueChange={setReason}>
-                  <SelectTrigger className="text-[13px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(["题干表述不清","答案不唯一","解析不完整","依据不足","难度不匹配","与已有题目重复","其他"] as const).map((r) => (
-                      <SelectItem key={r} value={r}>{r}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">修改意见</div>
-                <Textarea
-                  rows={3}
-                  placeholder="请说明需要修改的地方,例如:题干中'响应慢'表述不够准确,建议改为'AGC 响应速率不满足考核要求'。"
-                  className="text-[13px]"
-                />
-              </div>
-            </div>
+            <ReviewSummary q={q} />
             <DialogFooter>
               <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-              <button onClick={() => onConfirm(q)} className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">确认退回</button>
+              <button onClick={() => onConfirm(q)} className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90">确认删除</button>
             </DialogFooter>
           </>
         )}
@@ -1803,10 +1784,10 @@ function PaperModule({
                     <div className="flex flex-wrap justify-end gap-0.5">
                       <ActionBtn icon={Eye} label="试卷详情" onClick={() => onPreview(p)} />
                       <ActionBtn icon={Pencil} label="编辑" onClick={() => onEdit(p)} />
-                      <ActionBtn icon={Wand2} label="智能优化" tone="primary" onClick={() => onOptimize(p)} />
+                      {/* <ActionBtn icon={Wand2} label="智能优化" tone="primary" onClick={() => onOptimize(p)} /> */}
                       <ActionBtn icon={Send} label="下发" tone="primary" onClick={() => onAssign(p)} />
                       <ActionBtn icon={History} label="下发记录" onClick={() => onRecords(p)} />
-                      <ActionBtn icon={Copy} label="复制" onClick={() => onCopy(p)} />
+                      {/* <ActionBtn icon={Copy} label="复制" onClick={() => onCopy(p)} /> */}
                     </div>
                   </Td>
                 </tr>
@@ -2396,11 +2377,11 @@ function RecordsDrawer({ paper, onClose }: { paper: Paper | null; onClose: () =>
                   </div>
                 )}
 
-                {shuffled && (
+                {/* {shuffled && (
                   <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-[11.5px] font-medium text-primary">
                     <ShieldCheck className="h-3.5 w-3.5" /> 该记录为个人乱序卷面,已映射回标准卷统计。
                   </div>
-                )}
+                )} */}
 
                 {record.status === "已提交" && record.answers.length > 0 ? (
                   <AnswerList items={record.answers} />
