@@ -33,9 +33,12 @@ import {
   Power,
   PlusCircle,
   ListChecks,
+  Clock,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
+import { PageHeader, StatCard, ModuleTabs, ModulePanel } from "@/components/learning/ui";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -147,28 +150,30 @@ function riskClass(r: string) {
         : "bg-muted text-muted-foreground";
 }
 
-// ---------- Stat cards ----------
+const EXAM_STAT_ICONS: Record<string, React.ReactNode> = {
+  pending: <ClipboardCheck className="h-[18px] w-[18px]" />,
+  bank: <Library className="h-[18px] w-[18px]" />,
+  issued: <FileText className="h-[18px] w-[18px]" />,
+  finish: <ListChecks className="h-[18px] w-[18px]" />,
+  correct: <TrendingUp className="h-[18px] w-[18px]" />,
+  time: <Clock className="h-[18px] w-[18px]" />,
+};
+
 function StatCards() {
-  const toneMap: Record<string, string> = {
-    warning: "text-warning-foreground",
-    success: "text-success",
-    primary: "text-primary",
-  };
   return (
-    <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      {EXAM_STATS.map((s) => (
-        <div
+    <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      {EXAM_STATS.map((s, i) => (
+        <StatCard
           key={s.key}
-          className="rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]"
-        >
-          <div className="text-[11.5px] text-muted-foreground">{s.label}</div>
-          <div className={`mt-1.5 text-[24px] font-semibold tracking-tight ${toneMap[s.tone]}`}>
-            {s.value}
-          </div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">{s.hint}</div>
-        </div>
+          label={s.label}
+          value={s.value}
+          hint={s.hint}
+          icon={EXAM_STAT_ICONS[s.key]}
+          tint={i}
+          emphasis={s.tone === "warning" ? "remind" : s.tone === "success" ? "default" : "primary"}
+        />
       ))}
-    </div>
+    </section>
   );
 }
 
@@ -185,23 +190,32 @@ function ActionBtn({
   label,
   onClick,
   tone = "default",
+  variant = "ghost",
 }: {
   icon: typeof Eye;
   label: string;
   onClick?: () => void;
   tone?: "default" | "danger" | "primary";
+  variant?: "ghost" | "text";
 }) {
   const cls =
-    tone === "danger"
-      ? "text-destructive hover:bg-destructive/10"
-      : tone === "primary"
-        ? "text-primary hover:bg-primary-soft"
-        : "text-muted-foreground hover:bg-muted hover:text-foreground";
+    variant === "text"
+      ? tone === "danger"
+        ? "text-destructive hover:text-destructive/80"
+        : tone === "primary"
+          ? "text-primary hover:text-primary/80"
+          : "text-muted-foreground hover:text-primary"
+      : tone === "danger"
+        ? "text-destructive hover:bg-destructive/10"
+        : tone === "primary"
+          ? "text-primary hover:bg-primary-soft"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground";
+  const base =
+    variant === "text"
+      ? "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-1 py-0.5 text-[12px] font-medium transition-colors"
+      : "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[12px] transition-colors";
   return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] transition-colors ${cls}`}
-    >
+    <button type="button" onClick={onClick} className={`${base} ${cls}`}>
       <Icon className="h-3.5 w-3.5" />
       {label}
     </button>
@@ -1713,28 +1727,28 @@ function PaperModule({
 }) {
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={onGenerate}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
         >
-          <Sparkles className="h-4 w-4" /> 智能组卷
+          <Sparkles className="h-3.5 w-3.5" /> 智能组卷
         </button>
         <button
           onClick={onNew}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium hover:bg-muted"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3.5 py-1.5 text-[12.5px] font-medium text-foreground hover:border-primary/25 hover:bg-muted/70"
         >
-          <Plus className="h-4 w-4" /> 新建试卷
+          <Plus className="h-3.5 w-3.5" /> 新建试卷
         </button>
         <button
           onClick={() => toast.info("批量下发已选试卷")}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium hover:bg-muted"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3.5 py-1.5 text-[12.5px] font-medium text-foreground hover:border-primary/25 hover:bg-muted/70"
         >
-          <Send className="h-4 w-4" /> 批量下发
+          <Send className="h-3.5 w-3.5" /> 批量下发
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full whitespace-nowrap text-[13px]">
           <thead className="bg-muted/40 text-[12px] text-muted-foreground">
             <tr>
@@ -1753,14 +1767,14 @@ function PaperModule({
               <Th><span title="按每人最新一次已提交记录计算">平均分</span></Th>
               <Th><span title="按每人最新一次已提交记录计算">平均用时</span></Th>
               <Th>状态</Th>
-              <Th className="text-right">操作</Th>
+              <Th className="sticky right-0 z-10 min-w-[340px] bg-muted/40 text-right">操作</Th>
             </tr>
           </thead>
           <tbody>
             {PAPERS.map((p) => {
               const finishRate = p.assigned ? Math.round((p.finished / p.assigned) * 100) : 0;
               return (
-                <tr key={p.id} className="border-t border-border">
+                <tr key={p.id} className="group border-t border-border hover:bg-primary-soft/10">
                   <Td className="font-medium">{p.name}</Td>
                   <Td><Badge variant="secondary" className="font-normal">{p.goal}</Badge></Td>
                   <Td className="text-muted-foreground">{p.category}</Td>
@@ -1780,13 +1794,13 @@ function PaperModule({
                       {p.status}
                     </span>
                   </Td>
-                  <Td>
-                    <div className="flex flex-wrap justify-end gap-0.5">
-                      <ActionBtn icon={Eye} label="试卷详情" onClick={() => onPreview(p)} />
-                      <ActionBtn icon={Pencil} label="编辑" onClick={() => onEdit(p)} />
-                      {/* <ActionBtn icon={Wand2} label="智能优化" tone="primary" onClick={() => onOptimize(p)} /> */}
-                      <ActionBtn icon={Send} label="下发" tone="primary" onClick={() => onAssign(p)} />
-                      <ActionBtn icon={History} label="下发记录" onClick={() => onRecords(p)} />
+                  <Td className="sticky right-0 z-[1] whitespace-nowrap bg-card text-right shadow-[-6px_0_10px_-8px_rgba(15,35,45,0.12)] group-hover:bg-primary-soft/10">
+                    <div className="inline-flex flex-nowrap items-center justify-end gap-2">
+                      <ActionBtn variant="text" icon={Eye} label="试卷详情" onClick={() => onPreview(p)} />
+                      <ActionBtn variant="text" icon={Pencil} label="编辑" onClick={() => onEdit(p)} />
+                      {/* <ActionBtn variant="text" icon={Wand2} label="智能优化" tone="primary" onClick={() => onOptimize(p)} /> */}
+                      <ActionBtn variant="text" icon={Send} label="下发" tone="primary" onClick={() => onAssign(p)} />
+                      <ActionBtn variant="text" icon={History} label="下发记录" onClick={() => onRecords(p)} />
                       {/* <ActionBtn icon={Copy} label="复制" onClick={() => onCopy(p)} /> */}
                     </div>
                   </Td>
@@ -3170,44 +3184,26 @@ function ExamAdminPage() {
 
   return (
     <PageShell>
-      <div className="mb-6 flex items-center gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-lg bg-primary-soft text-primary">
-          <ClipboardCheck className="h-5.5 w-5.5" />
-        </div>
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">考试管理</h1>
-          <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-            题目审核、题库维护、智能组卷、试卷下发与答题跟踪。
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="考试管理"
+        subtitle="题目审核、题库维护、智能组卷、试卷下发与答题跟踪。"
+        size="md"
+      />
 
       <StatCards />
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-left transition-all ${
-                active
-                  ? "border-primary/40 bg-primary-soft"
-                  : "border-border bg-card hover:border-primary/30"
-              }`}
-            >
-              <Icon className={`h-4.5 w-4.5 ${active ? "text-primary" : "text-muted-foreground"}`} />
-              <div>
-                <div className={`text-[13.5px] font-medium ${active ? "text-primary" : ""}`}>{t.label}</div>
-                <div className="text-[11px] text-muted-foreground">{t.desc}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
+      <ModulePanel>
+        <ModuleTabs
+          tabs={TABS.map((t) => ({
+            key: t.key,
+            label: t.label,
+            desc: t.desc,
+            icon: <t.icon className="h-4 w-4" />,
+          }))}
+          value={tab}
+          onChange={setTab}
+        />
+        <div className="p-4">
       {tab === "review" && <ReviewModule />}
       {tab === "bank" && <BankModule />}
       {tab === "paper" && (
@@ -3222,6 +3218,8 @@ function ExamAdminPage() {
           onNew={() => openEditor(null)}
         />
       )}
+        </div>
+      </ModulePanel>
 
       <PaperEditor open={editorOpen} onClose={() => setEditorOpen(false)} paper={editorPaper} />
       <GenerateDrawer open={genOpen} onOpenChange={setGenOpen} />

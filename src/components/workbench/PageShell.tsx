@@ -19,7 +19,7 @@ export function PageShell({
         className={
           compact
             ? "mx-auto min-h-0 w-full max-w-[1760px] flex-1 overflow-hidden px-4 py-3"
-            : "mx-auto max-w-[1760px] px-8 py-8"
+            : "mx-auto w-full max-w-[1760px] px-6 py-7 lg:px-8"
         }
       >
         {children}

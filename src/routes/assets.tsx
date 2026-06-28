@@ -1,37 +1,129 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   Star,
   NotebookPen,
   BookMarked,
-  RotateCcw,
   BookOpen,
-  ChevronRight,
   Trash2,
   Pencil,
   Plus,
-  ExternalLink,
-  Search,
-  Award,
-  Clock,
-  CalendarCheck,
+  Sparkles,
+  ListChecks,
+  RotateCcw,
+  FileText,
   FolderOpen,
+  Clock,
+  TrendingUp,
+  MessageSquare,
+  FileSearch,
+  Eye,
 } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
+import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/workbench/PageShell";
-import { DOCS, QUESTIONS, TODAY_REVIEW, ACHIEVEMENTS } from "@/lib/mock/data";
+import { DOCS } from "@/lib/mock/data";
 import { useMockStore, type NoteItem } from "@/lib/mock/store";
 import { NoteEditor } from "@/components/common/NoteEditor";
+import {
+  QUIZ_SETS,
+  PRACTICE_RECORDS,
+  WRONG_QUESTION_DETAILS,
+  FAVORITE_META,
+  NOTE_META,
+  GROWTH_REMINDER,
+  PERSONAL_OVERVIEW,
+} from "@/lib/mock/learning-hub";
+import {
+  PageHeader,
+  OverviewStatCard,
+  ModuleTabs,
+  ModulePanel,
+  SearchBar,
+  PillSelect,
+  PersonalAssetCard,
+  ListCard,
+  RecordRow,
+  RECORDS_TABLE_GRID,
+  listActionClass,
+  Tag,
+  LinkButton,
+  ActionButton,
+  EmptyState,
+} from "@/components/learning/ui";
 
-export const Route = createFileRoute("/assets")({
-  component: AssetsPage,
-  head: () => ({ meta: [{ title: "个人沉淀 · 涉网运行 AI 训练平台" }] }),
+const assetsSearchSchema = z.object({
+  tab: z
+    .enum(["fav", "note", "quizsets", "wrong", "records"])
+    .optional()
+    .catch(undefined),
 });
 
-type Tab = "fav" | "note" | "wrong" | "review" | "badge";
+export const Route = createFileRoute("/assets")({
+  validateSearch: assetsSearchSchema,
+  component: AssetsPage,
+  head: () => ({ meta: [{ title: "个人沉淀 · 涉网运行能力智能提升平台" }] }),
+});
+
+type Tab = "fav" | "note" | "quizsets" | "wrong" | "records";
+
+const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
+  fav: [
+    { value: "all", label: "全部" },
+    { value: "规程", label: "规程" },
+    { value: "SOP", label: "SOP" },
+    { value: "案例", label: "案例" },
+    { value: "问答", label: "问答" },
+    { value: "题单", label: "题单" },
+  ],
+  note: [
+    { value: "all", label: "全部" },
+    { value: "AGC", label: "AGC/两细则" },
+    { value: "主变", label: "主变/操作" },
+    { value: "继电保护", label: "继电保护" },
+  ],
+  quizsets: [
+    { value: "all", label: "全部" },
+    { value: "未开始", label: "未开始" },
+    { value: "进行中", label: "进行中" },
+    { value: "已完成", label: "已完成" },
+  ],
+  wrong: [
+    { value: "all", label: "全部" },
+    { value: "AGC", label: "AGC" },
+    { value: "典型操作", label: "典型操作" },
+    { value: "继电保护", label: "继电保护" },
+    { value: "AVC", label: "AVC" },
+  ],
+  records: [
+    { value: "all", label: "全部" },
+    { value: "智能问答生成", label: "智能问答" },
+    { value: "知识学习生成", label: "知识学习" },
+    { value: "错题本", label: "错题本" },
+    { value: "模拟考试", label: "模拟考试" },
+  ],
+};
+
+const SEARCH_PLACEHOLDERS: Record<Tab, string> = {
+  fav: "搜索收藏资料标题或专题",
+  note: "搜索笔记标题或内容",
+  quizsets: "搜索题单名称",
+  wrong: "搜索错题题干或知识点",
+  records: "搜索练习名称",
+};
+
+const ASSET_TABS: { key: Tab; label: string; desc: string; icon: typeof Star }[] = [
+  { key: "fav", label: "我的收藏", desc: "规程、SOP 与案例资料", icon: Star },
+  { key: "note", label: "我的笔记", desc: "学习要点与关联资料", icon: NotebookPen },
+  { key: "quizsets", label: "我的题单", desc: "AI 智能生成练习题单", icon: Sparkles },
+  { key: "wrong", label: "错题本", desc: "错题收集与针对性复习", icon: BookMarked },
+  { key: "records", label: "练习记录", desc: "历次训练结果与统计", icon: ListChecks },
+];
 
 function AssetsPage() {
   const navigate = useNavigate();
+  const search = useSearch({ from: "/assets" });
   const {
     state,
     removeFavorite,
@@ -39,60 +131,164 @@ function AssetsPage() {
     updateNote,
     removeNote,
     removeWrong,
-    setReview,
     resetAll,
     createCollection,
     addToCollection,
   } = useMockStore();
-  const [tab, setTab] = useState<Tab>("fav");
-  const [query, setQuery] = useState("");
+
+  const [tab, setTab] = useState<Tab>(search.tab ?? "fav");
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [tabFilters, setTabFilters] = useState<Record<Tab, string>>({
+    fav: "all",
+    note: "all",
+    quizsets: "all",
+    wrong: "all",
+    records: "all",
+  });
   const [editor, setEditor] = useState<{ open: boolean; note?: NoteItem }>({ open: false });
-  const [activeFolder, setActiveFolder] = useState<string>("all"); // "all" | "none" | collectionId
+  const [activeFolder, setActiveFolder] = useState<string>("all");
 
-  const completedReviews = state.reviews.filter((r) => r.done).map((r) => r.id);
-  const todayList = TODAY_REVIEW.filter((r) => !completedReviews.includes(r.id));
-  const wrongInline = state.wrong.slice(0, 5);
+  const activeFilter = tabFilters[tab];
+  const setActiveFilter = (value: string) => {
+    setTabFilters((prev) => ({ ...prev, [tab]: value }));
+  };
 
-  const filteredFavorites = useMemo(
-    () =>
-      state.favorites
-        .map((id) => DOCS.find((d) => d.id === id))
-        .filter((d): d is (typeof DOCS)[number] => !!d)
-        .filter((d) => !query || d.title.includes(query) || d.docType.includes(query)),
-    [state.favorites, query],
-  );
+  useEffect(() => {
+    if (search.tab) setTab(search.tab);
+  }, [search.tab]);
 
-  const filteredNotes = useMemo(
-    () =>
-      state.notes
-        .filter((n) => {
-          if (activeFolder === "all") return true;
-          if (activeFolder === "none") return !n.collectionIds || n.collectionIds.length === 0;
-          return n.collectionIds?.includes(activeFolder);
-        })
-        .filter(
-          (n) =>
-            !query || n.title.includes(query) || (n.tag ?? "").includes(query) || n.body.includes(query),
-        ),
-    [state.notes, query, activeFolder],
-  );
+  const setTabAndUrl = (t: Tab) => {
+    setTab(t);
+    setSearchInput("");
+    setAppliedQuery("");
+    navigate({ to: "/assets", search: { tab: t }, replace: true });
+  };
 
-  const stats = [
-    { l: "收藏资料", v: state.favorites.length, k: "fav" as Tab },
-    { l: "学习笔记", v: state.notes.length, k: "note" as Tab },
+  const handleSearch = () => {
+    setAppliedQuery(searchInput.trim());
+  };
+
+  const wrongCount = state.wrong.length || PERSONAL_OVERVIEW.wrongToReview;
+  const lastPractice = PRACTICE_RECORDS[0];
+  const activeQuiz =
+    QUIZ_SETS.find((q) => q.status === "进行中") ?? QUIZ_SETS.find((q) => q.status === "未开始");
+  const latestNote = state.notes[state.notes.length - 1];
+  const latestFavoriteDoc = state.favorites
+    .map((id) => DOCS.find((d) => d.id === id))
+    .filter(Boolean)[0];
+
+  const overviewStats = [
+    {
+      key: "fav" as const,
+      label: "收藏资料",
+      value: state.favorites.length,
+      hint: "规程与案例",
+      detail: latestFavoriteDoc ? `最近：${latestFavoriteDoc.title.slice(0, 14)}…` : "暂无收藏",
+      icon: <Star className="h-[18px] w-[18px]" />,
+    },
+    {
+      key: "note" as const,
+      label: "学习笔记",
+      value: state.notes.length,
+      hint: "学习过程记录",
+      detail: latestNote ? `最近：${latestNote.title}` : "暂无笔记",
+      icon: <NotebookPen className="h-[18px] w-[18px]" />,
+    },
+    {
+      key: "quizsets" as const,
+      label: "智能题单",
+      value: QUIZ_SETS.length,
+      hint: `${QUIZ_SETS.filter((q) => q.status !== "已完成").length} 份未完成`,
+      detail: activeQuiz ? `进行中：${activeQuiz.title.slice(0, 14)}…` : "全部已完成",
+      icon: <Sparkles className="h-[18px] w-[18px]" />,
+    },
+    {
+      key: "wrong" as const,
+      label: "错题待复习",
+      value: wrongCount,
+      hint: "待巩固题目",
+      detail: GROWTH_REMINDER.weakPoints[0]
+        ? `薄弱：${GROWTH_REMINDER.weakPoints[0]}`
+        : "暂无薄弱点",
+      icon: <BookMarked className="h-[18px] w-[18px]" />,
+      emphasis: wrongCount > 0 ? ("remind" as const) : ("default" as const),
+    },
+    {
+      key: "records" as const,
+      label: "练习记录",
+      value: PRACTICE_RECORDS.length,
+      hint: "近期训练回看",
+      detail: lastPractice
+        ? `最近：${lastPractice.title.slice(0, 12)}… · ${lastPractice.accuracy}%`
+        : "暂无记录",
+      icon: <ListChecks className="h-[18px] w-[18px]" />,
+    },
   ];
 
-  const noteCountForFolder = (id: string) =>
-    state.notes.filter((n) => n.collectionIds?.includes(id)).length;
-  const uncategorizedCount = state.notes.filter(
-    (n) => !n.collectionIds || n.collectionIds.length === 0,
-  ).length;
+  const filteredFavorites = useMemo(() => {
+    return FAVORITE_META.filter((f) => state.favorites.includes(f.docId))
+      .map((meta) => {
+        const doc = DOCS.find((d) => d.id === meta.docId);
+        return doc ? { doc, meta } : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x)
+      .filter(({ doc, meta }) => {
+        if (appliedQuery && !doc.title.includes(appliedQuery) && !meta.topicTitle.includes(appliedQuery)) {
+          return false;
+        }
+        if (activeFilter === "all") return true;
+        if (activeFilter === "规程") {
+          return doc.docType.includes("规程") || meta.source === "智能问答依据";
+        }
+        if (activeFilter === "SOP") {
+          return doc.docType === "典型操作" || doc.docType === "厂家SOP";
+        }
+        if (activeFilter === "案例") return doc.docType === "历史案例";
+        if (activeFilter === "问答") return meta.source.includes("问答");
+        if (activeFilter === "题单") return meta.source.includes("题单");
+        return true;
+      });
+  }, [state.favorites, appliedQuery, activeFilter]);
+
+  const filteredNotes = useMemo(() => {
+    return NOTE_META.filter((n) => {
+      const exists = state.notes.some((sn) => sn.id === n.id) || true;
+      if (!exists) return false;
+      if (appliedQuery && !n.title.includes(appliedQuery) && !n.summary.includes(appliedQuery)) return false;
+      if (activeFilter !== "all" && !n.tags.some((t) => t.includes(activeFilter))) return false;
+      return true;
+    });
+  }, [state.notes, appliedQuery, activeFilter]);
+
+  const filteredQuizSets = useMemo(() => {
+    return QUIZ_SETS.filter((q) => {
+      if (appliedQuery && !q.title.includes(appliedQuery)) return false;
+      if (activeFilter !== "all" && q.status !== activeFilter) return false;
+      return true;
+    });
+  }, [appliedQuery, activeFilter]);
+
+  const filteredWrong = useMemo(() => {
+    return WRONG_QUESTION_DETAILS.filter((w) => {
+      if (appliedQuery && !w.stem.includes(appliedQuery) && !w.knowledge.includes(appliedQuery)) return false;
+      if (activeFilter !== "all" && w.knowledge !== activeFilter) return false;
+      return state.wrong.some((sw) => sw.qid === w.qid) || true;
+    });
+  }, [appliedQuery, activeFilter, state.wrong]);
+
+  const filteredRecords = useMemo(() => {
+    return PRACTICE_RECORDS.filter((r) => {
+      if (appliedQuery && !r.title.includes(appliedQuery)) return false;
+      if (activeFilter !== "all" && r.source !== activeFilter) return false;
+      return true;
+    });
+  }, [appliedQuery, activeFilter]);
 
   const handleSaveNote = (n: Parameters<typeof addNote>[0]) => {
     if (editor.note) {
       const prevIds = editor.note.collectionIds ?? [];
       updateNote(editor.note.id, n);
-      // sync collection.noteIds for newly added folders
       (n.collectionIds ?? []).forEach((cid) => {
         if (!prevIds.includes(cid)) addToCollection(cid, { noteId: editor.note!.id });
       });
@@ -107,184 +303,181 @@ function AssetsPage() {
 
   return (
     <PageShell>
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[24px] font-semibold tracking-tight">个人沉淀</h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            收藏、笔记、错题本、今日复习与成长成就一站式管理
-          </p>
-        </div>
-        <button
-          onClick={() => {
-            if (confirm("将重置所有本地沉淀数据(收藏 / 笔记 / 错题 / 复习状态),确认?")) {
-              resetAll();
-              toast.success("已重置本地数据");
-            }
-          }}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-[12px] text-muted-foreground hover:bg-muted"
-        >
-          重置示例数据
-        </button>
-      </div>
+      <PageHeader
+        title="个人沉淀"
+        subtitle="收藏、笔记、题单、错题与练习记录，集中管理你的学习成果"
+      />
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-2">
-        {stats.map((s) => {
-          const Icon = s.k === "fav" ? Star : NotebookPen;
-          return (
-            <button
-              key={s.l}
-              onClick={() => setTab(s.k)}
-              className={`group relative overflow-hidden rounded-lg border p-4 text-left transition-all hover:-translate-y-0.5 ${
-                tab === s.k
-                  ? "border-primary bg-gradient-to-br from-primary-soft/50 to-transparent"
-                  : "border-border bg-card"
-              }`}
-            >
-              <svg
-                className="absolute inset-0 h-full w-full opacity-[0.12]"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden
-              >
-                <defs>
-                  <pattern
-                    id={`grid-stat-${s.k}`}
-                    width="20"
-                    height="20"
-                    patternUnits="userSpaceOnUse"
-                  >
-                    <path
-                      d="M 20 0 L 0 0 0 20"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="0.5"
-                    />
-                  </pattern>
-                </defs>
-                <rect width="100%" height="100%" fill={`url(#grid-stat-${s.k})`} />
-              </svg>
-              <div className="relative flex items-center justify-between">
-                <div>
-                  <div className="text-[11px] text-muted-foreground">{s.l}</div>
-                  <div className="mt-1 text-[22px] font-semibold tabular-nums">{s.v}</div>
-                </div>
-                <div
-                  className={`grid h-10 w-10 place-items-center rounded-lg transition-colors ${
-                    tab === s.k
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-primary-soft text-accent-foreground group-hover:bg-primary group-hover:text-primary-foreground"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {/* 概览 */}
+      <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {overviewStats.map((s, i) => (
+          <OverviewStatCard
+            key={s.key}
+            label={s.label}
+            value={s.value}
+            hint={s.hint}
+            detail={s.detail}
+            icon={s.icon}
+            tint={i}
+            emphasis={"emphasis" in s ? s.emphasis : i === 0 ? "primary" : "default"}
+            active={tab === s.key}
+            onClick={() => setTabAndUrl(s.key)}
+          />
+        ))}
+      </section>
 
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <div className="flex flex-1 items-center gap-1 rounded-lg border border-border bg-card p-1 min-w-[280px]">
-          {(
-            [
-              { k: "fav", l: "我的收藏", icon: Star },
-              { k: "note", l: "我的笔记", icon: NotebookPen },
-            ] as { k: Tab; l: string; icon: typeof Star }[]
-          ).map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.k;
-            return (
-              <button
-                key={t.k}
-                onClick={() => setTab(t.k)}
-                className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-medium transition-colors ${
-                  active ? "bg-primary text-primary-foreground" : "text-foreground/70 hover:bg-muted"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" /> {t.l}
-              </button>
-            );
-          })}
-        </div>
-        {(tab === "fav" || tab === "note") && (
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索…"
-              className="w-56 rounded-lg border border-border bg-card pl-8 pr-3 py-2 text-[12.5px] outline-none focus:border-primary"
-            />
+      {/* 学习跟进 */}
+      <section className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="text-[14px] font-semibold text-foreground">学习跟进</div>
+            <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
+              建议今日复习{" "}
+              <span className="font-medium text-foreground">{GROWTH_REMINDER.wrongToday} 题</span>
+              错题
+              <span className="mx-2 text-border">·</span>
+              薄弱点{" "}
+              <span className="text-foreground">{GROWTH_REMINDER.weakPoints.join("、")}</span>
+              {lastPractice && (
+                <>
+                  <span className="mx-2 text-border">·</span>
+                  上次练习正确率{" "}
+                  <span className="font-medium text-foreground">{lastPractice.accuracy}%</span>
+                </>
+              )}
+            </p>
           </div>
-        )}
-        {tab === "note" && (
-          <button
-            onClick={() => setEditor({ open: true })}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="h-3.5 w-3.5" /> 新建笔记
-          </button>
-        )}
-      </div>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Link
+              to="/training/session/$id"
+              params={{ id: "今日回看" }}
+              search={{
+                mode: "review",
+                filter: "",
+                count: GROWTH_REMINDER.wrongToday,
+                limit: 0,
+              }}
+            >
+              <ActionButton>
+                <RotateCcw className="h-3.5 w-3.5" />
+                复习错题
+              </ActionButton>
+            </Link>
+            {/* {activeQuiz && (
+              <ActionButton variant="outline" onClick={() => setTabAndUrl("quizsets")}>
+                继续题单
+                <ChevronRight className="h-3.5 w-3.5" />
+              </ActionButton>
+            )} */}
+            <Link to="/training/growth">
+              <LinkButton variant="outline">
+                <TrendingUp className="h-3.5 w-3.5" />
+                能力成长
+              </LinkButton>
+            </Link>
+          </div>
+        </div>
+      </section>
 
+      {/* Tab 面板 */}
+      <section className="mb-5">
+        <ModulePanel>
+          <ModuleTabs
+            tabs={ASSET_TABS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              desc: t.desc,
+              icon: <t.icon className="h-4 w-4" />,
+            }))}
+            value={tab}
+            onChange={setTabAndUrl}
+          />
+
+          <div className="flex flex-col gap-3 border-b border-divider px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+              <SearchBar
+                value={searchInput}
+                onChange={setSearchInput}
+                onSearch={handleSearch}
+                placeholder={SEARCH_PLACEHOLDERS[tab]}
+              />
+              <PillSelect
+                options={TAB_FILTER_OPTIONS[tab]}
+                value={activeFilter}
+                onChange={setActiveFilter}
+              />
+            </div>
+            {tab === "note" && (
+              <ActionButton onClick={() => setEditor({ open: true })}>
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                新建笔记
+              </ActionButton>
+            )}
+          </div>
+
+          <div className="p-4">
+      {/* 收藏 */}
       {tab === "fav" && (
         <div className="space-y-3">
           {filteredFavorites.length === 0 ? (
-            <Empty text="还没有收藏内容,可在资料检索或学习页面点击「收藏」。" />
+            <EmptyState description="还没有收藏内容，可在资料检索或学习页面点击「收藏」。" />
           ) : (
-            filteredFavorites.map((d) => (
-              <div
-                key={d.id}
-                className="group flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40"
-              >
-                <div className="grid h-10 w-10 place-items-center rounded-lg bg-warning-soft text-warning-foreground">
-                  <Star className="h-4 w-4 fill-current" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] font-medium">{d.title}</div>
-                  <div className="mt-1 flex flex-wrap gap-x-2 text-[11.5px] text-muted-foreground">
-                    <span>{d.docType}</span>
+            filteredFavorites.map(({ doc, meta }) => (
+              <PersonalAssetCard
+                key={doc.id}
+                icon={<Star className="h-5 w-5 fill-current" />}
+                title={doc.title}
+                tags={<Tag variant="outline">{meta.source.includes("规程") ? "规程" : doc.docType === "典型操作" ? "SOP" : "规程"}</Tag>}
+                meta={
+                  <>
+                    {/* <span>所属专题：{meta.topicTitle}</span>
+                    <span>·</span> */}
+                    <span>来源：{meta.source}</span>
                     <span>·</span>
-                    <span>{d.plant}</span>
-                    <span>·</span>
-                    <span>更新 {d.updatedAt}</span>
-                  </div>
-                </div>
-                <Link
-                  to="/learn/doc/$id"
-                  params={{ id: d.id }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-[12px] hover:bg-muted"
-                >
-                  <BookOpen className="h-3 w-3" /> 阅读
-                </Link>
-                <Link
-                  to="/chat"
-                  search={{ prefill: `请基于资料《${d.title}》总结要点` }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-[12px] hover:bg-muted"
-                >
-                  <ExternalLink className="h-3 w-3" /> 提问
-                </Link>
-                <button
-                  onClick={() => {
-                    removeFavorite(d.id);
-                    toast.success("已取消收藏");
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[12px] text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
+                    <span>更新：{doc.updatedAt}</span>
+                  </>
+                }
+                actions={
+                  <>
+                    <Link to="/learn/doc/$id" params={{ id: doc.id }} className={listActionClass("text")}>
+                      <BookOpen className="h-3.5 w-3.5" />
+                      阅读
+                    </Link>
+                    <Link
+                      to="/chat"
+                      search={{ prefill: `请基于资料《${doc.title}》总结要点` }}
+                      className={listActionClass("text")}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      提问
+                    </Link>
+                    <button
+                      type="button"
+                      className={listActionClass("text")}
+                      onClick={() => {
+                        removeFavorite(doc.id);
+                        toast.success("已取消收藏");
+                      }}
+                    >
+                      <Star className="h-3.5 w-3.5" />
+                      取消收藏
+                    </button>
+                  </>
+                }
+              />
             ))
           )}
         </div>
       )}
 
+      {/* 笔记 */}
       {tab === "note" && (
         <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-          {/* Folder sidebar */}
-          <aside className="rounded-lg border border-border bg-card p-3">
+          <aside className="rounded-2xl border border-border bg-card p-3">
             <div className="mb-2 flex items-center justify-between px-1">
               <span className="text-[11.5px] font-medium text-muted-foreground">笔记目录</span>
               <button
+                type="button"
                 onClick={() => {
                   const name = prompt("新目录名称");
                   if (!name?.trim()) return;
@@ -304,287 +497,310 @@ function AssetsPage() {
               </button>
             </div>
             <ul className="space-y-0.5">
-              <FolderRow
-                label="全部笔记"
-                count={state.notes.length}
-                active={activeFolder === "all"}
-                onClick={() => setActiveFolder("all")}
-              />
-              <FolderRow
-                label="未分类"
-                count={uncategorizedCount}
-                active={activeFolder === "none"}
-                onClick={() => setActiveFolder("none")}
-              />
-              {state.collections.length > 0 && (
-                <li className="px-2 pb-1 pt-2 text-[10.5px] uppercase tracking-wider text-muted-foreground/70">
-                  目录
-                </li>
-              )}
+              <FolderRow label="全部笔记" count={state.notes.length} active={activeFolder === "all"} onClick={() => setActiveFolder("all")} />
               {state.collections.map((c) => (
                 <FolderRow
                   key={c.id}
                   label={c.name}
-                  count={noteCountForFolder(c.id)}
+                  count={state.notes.filter((n) => n.collectionIds?.includes(c.id)).length}
                   active={activeFolder === c.id}
                   onClick={() => setActiveFolder(c.id)}
                 />
               ))}
             </ul>
           </aside>
-
-          {/* Notes list */}
           <div className="space-y-3">
             {filteredNotes.length === 0 ? (
-              <Empty text="此目录下还没有笔记,点击右上「新建笔记」开始记录。" />
+              <EmptyState description="此目录下还没有笔记，点击「新建笔记」开始记录。" />
             ) : (
-              filteredNotes.map((n) => {
-                const linkedDoc = n.docId ? DOCS.find((d) => d.id === n.docId) : null;
-                const noteFolders = (n.collectionIds ?? [])
-                  .map((cid) => state.collections.find((c) => c.id === cid))
-                  .filter((c): c is NonNullable<typeof c> => !!c);
-                return (
-                  <div
-                    key={n.id}
-                    className="rounded-lg border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {n.tag && (
-                            <span className="rounded-md bg-primary-soft px-2 py-0.5 text-[10.5px] text-accent-foreground">
-                              {n.tag}
-                            </span>
-                          )}
-                          <span className="text-[13.5px] font-semibold">{n.title}</span>
-                          {noteFolders.map((c) => (
-                            <span
-                              key={c.id}
-                              className="inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/40 px-1.5 py-0.5 text-[10.5px] text-muted-foreground"
-                            >
-                              <FolderOpen className="h-2.5 w-2.5" /> {c.name}
-                            </span>
-                          ))}
-                        </div>
-                        <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground/80">
-                          {n.body || <span className="italic text-muted-foreground">(空)</span>}
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-2 text-[10.5px] text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>创建 {n.createdAt}</span>
-                          {n.updatedAt && <span>· 更新 {n.updatedAt}</span>}
-                          {linkedDoc && (
-                            <>
-                              <span>·</span>
-                              <Link
-                                to="/learn/doc/$id"
-                                params={{ id: linkedDoc.id }}
-                                className="text-primary hover:underline"
-                              >
-                                来源:{linkedDoc.title}
-                              </Link>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <button
-                          onClick={() => setEditor({ open: true, note: n })}
-                          className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            removeNote(n.id);
-                            toast.success("笔记已删除");
-                          }}
-                          className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+              filteredNotes.map((n) => (
+                <PersonalAssetCard
+                  key={n.id}
+                  icon={<NotebookPen className="h-5 w-5" />}
+                  title={n.title}
+                  tags={n.tags.map((t) => (
+                    <Tag key={t}>{t}</Tag>
+                  ))}
+                  meta={
+                    <>
+                      <span className="line-clamp-2 text-[13px] text-foreground/80">{n.summary}</span>
+                      {n.relatedDocTitle && (
+                        <>
+                          <span className="mt-1 block w-full">关联资料：{n.relatedDocTitle}</span>
+                        </>
+                      )}
+                      <span className="mt-1 inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        创建 {n.createdAt}
+                      </span>
+                    </>
+                  }
+                  actions={
+                    <>
+                      <button
+                        type="button"
+                        className={listActionClass("text")}
+                        onClick={() => {
+                          const note = state.notes.find((sn) => sn.id === n.id);
+                          if (note) setEditor({ open: true, note });
+                        }}
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        查看
+                      </button>
+                      <button
+                        type="button"
+                        className={listActionClass("text")}
+                        onClick={() => {
+                          const note = state.notes.find((sn) => sn.id === n.id);
+                          if (note) setEditor({ open: true, note });
+                        }}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        编辑
+                      </button>
+                      <Link
+                        to="/training/session/$id"
+                        params={{ id: `笔记生成-${n.id}` }}
+                        search={{ mode: "practice", filter: n.tags[0] ?? "", count: 5, limit: 0 }}
+                        className={listActionClass("text")}
+                      >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        生成训练题
+                      </Link>
+                      <button
+                        type="button"
+                        className={listActionClass("text")}
+                        onClick={() => {
+                          removeNote(n.id);
+                          toast.success("笔记已删除");
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        删除
+                      </button>
+                    </>
+                  }
+                />
+              ))
             )}
           </div>
         </div>
       )}
 
-
-      {tab === "wrong" && (
+      {/* 题单 */}
+      {tab === "quizsets" && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-gradient-to-r from-warning-soft/40 to-transparent p-4">
-            <div>
-              <div className="text-[13px] font-medium">错题速览</div>
-              <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                显示最近 5 题待巩固,完整列表请进入错题本
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Link
-                to="/training/session/$id"
-                params={{ id: "错题集中复习" }}
-                search={{ mode: "review", filter: "", count: state.wrong.length || 5, limit: 0 }}
-                className="rounded-lg border border-border bg-background px-3 py-1.5 text-[12px] hover:bg-muted"
-              >
-                集中复习
-              </Link>
-              <Link
-                to="/training/wrong"
-                className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                进入错题本 <ChevronRight className="h-3 w-3" />
-              </Link>
-            </div>
-          </div>
-          {wrongInline.length === 0 ? (
-            <Empty text="暂无错题,继续保持!" />
+          {filteredQuizSets.length === 0 ? (
+            <EmptyState description="暂无智能生成题单，可在智能问答或知识学习中生成。" />
           ) : (
-            wrongInline.map((w) => {
-              const q = QUESTIONS.find((x) => x.id === w.qid);
-              if (!q) return null;
-              return (
-                <div
-                  key={w.qid}
-                  className="flex items-start gap-3 rounded-lg border border-border bg-card p-4"
-                >
-                  <span className="mt-0.5 rounded-md bg-destructive/10 px-2 py-0.5 text-[10.5px] font-medium text-destructive">
-                    {w.mastery}
-                  </span>
-                  <div className="min-w-0 flex-1 text-[13px]">{q.stem}</div>
-                  <Link
-                    to="/training/session/$id"
-                    params={{ id: `复习-${w.qid}` }}
-                    search={{ mode: "review", filter: "", count: 1, limit: 0 }}
-                    className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
-                  >
-                    复习
-                  </Link>
-                  <button
-                    onClick={() => {
-                      removeWrong(w.qid);
-                      toast.success("已从错题本移除");
-                    }}
-                    className="grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {tab === "review" && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg border border-border bg-gradient-to-r from-primary-soft/60 to-transparent p-4">
-            <div>
-              <div className="text-[13px] font-medium">今日复习计划</div>
-              <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                基于艾宾浩斯曲线,共 {TODAY_REVIEW.length} 项 · 已完成{" "}
-                {TODAY_REVIEW.length - todayList.length} 项
-              </p>
-            </div>
-            <Link
-              to="/training/session/$id"
-              params={{ id: "今日复习" }}
-              search={{ mode: "review", filter: "", count: 5, limit: 0 }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <RotateCcw className="h-3.5 w-3.5" /> 一键开始
-            </Link>
-          </div>
-
-          {todayList.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-success/30 bg-success-soft/30 p-10 text-center">
-              <CalendarCheck className="mx-auto h-8 w-8 text-success" />
-              <div className="mt-2 text-[13.5px] font-medium text-success">今日复习全部完成 🎉</div>
-              <p className="mt-1 text-[11.5px] text-muted-foreground">
-                可以继续做专项练习,或休息一下吧。
-              </p>
-            </div>
-          ) : (
-            todayList.map((r) => (
-              <div
-                key={r.id}
-                className="flex items-center gap-4 rounded-lg border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40"
-              >
-                <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary-soft text-primary">
-                  {r.kind === "错题" ? <BookMarked className="h-4 w-4" /> : <BookOpen className="h-4 w-4" />}
-                </div>
-                <div className="flex-1">
-                  <div className="text-[13.5px] font-medium">{r.title}</div>
-                  <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    类型:{r.kind} · 下次复习 {r.nextAt}
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setReview(r.id, { deferTo: "明天" });
-                    toast.message("已延后至明天");
-                  }}
-                  className="rounded-lg border border-border bg-background px-3 py-1.5 text-[12px] hover:bg-muted"
-                >
-                  延后
-                </button>
-                <button
-                  onClick={() => {
-                    setReview(r.id, { done: true });
-                    toast.success("已标记完成");
-                  }}
-                  className="rounded-lg border border-success/30 bg-success-soft/50 px-3 py-1.5 text-[12px] text-success hover:bg-success-soft"
-                >
-                  标记完成
-                </button>
-                <button
-                  onClick={() =>
-                    navigate({
-                      to: "/training/session/$id",
-                      params: { id: `复习-${r.id}` },
-                      search: { mode: "review", filter: "", count: 3, limit: 0 },
-                    })
-                  }
-                  className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  立即复习
-                </button>
-              </div>
+            filteredQuizSets.map((q) => (
+              <PersonalAssetCard
+                key={q.id}
+                icon={<Sparkles className="h-5 w-5" />}
+                title={q.title}
+                tags={
+                  <>
+                    <Tag variant={q.status === "进行中" ? "primary" : "outline"}>
+                      {q.status}
+                    </Tag>
+                    <Tag>{q.source}</Tag>
+                  </>
+                }
+                meta={
+                  <>
+                    <span>题目：{q.questionCount} 题</span>
+                    <span>·</span>
+                    <span>正确率：{q.accuracy != null ? `${q.accuracy}%` : "--"}</span>
+                    {q.relatedChat && (
+                      <>
+                        <span>·</span>
+                        <span>关联对话：{q.relatedChat}</span>
+                      </>
+                    )}
+                    <span>·</span>
+                    <span>生成时间：{q.createdAt}</span>
+                  </>
+                }
+                actions={
+                  <>
+                    <Link to="/assets" search={{ tab: "quizsets" }} className={listActionClass("text")}>
+                      <FileSearch className="h-3.5 w-3.5" />
+                      查看题单
+                    </Link>
+                    {q.status === "未开始" || q.status === "进行中" ? (
+                      <Link
+                        to="/training/session/$id"
+                        params={{ id: q.id }}
+                        search={{ mode: "practice", filter: q.filter, count: q.questionCount, limit: 0 }}
+                        className={listActionClass("textPrimary")}
+                      >
+                        <BookOpen className="h-3.5 w-3.5" />
+                        {q.status === "未开始" ? "开始练习" : "继续练习"}
+                      </Link>
+                    ) : (
+                      <>
+                        <Link
+                          to="/training/result/$id"
+                          params={{ id: q.id }}
+                          className={listActionClass("text")}
+                        >
+                          <FileSearch className="h-3.5 w-3.5" />
+                          查看结果
+                        </Link>
+                        <Link
+                          to="/training/session/$id"
+                          params={{ id: `再练-${q.id}` }}
+                          search={{ mode: "practice", filter: q.filter, count: q.questionCount, limit: 0 }}
+                          className={listActionClass("textPrimary")}
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" />
+                          再练一次
+                        </Link>
+                      </>
+                    )}
+                  </>
+                }
+              />
             ))
           )}
         </div>
       )}
 
-      {tab === "badge" && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {ACHIEVEMENTS.map((a) => (
-            <div
-              key={a.id}
-              className={`group rounded-lg border p-5 transition-all hover:-translate-y-0.5 ${
-                a.earned
-                  ? "border-primary/40 bg-gradient-to-br from-primary-soft/60 to-transparent"
-                  : "border-dashed border-border bg-muted/30 opacity-70"
-              }`}
-            >
-              <div className="text-[28px]">{a.icon}</div>
-              <div className="mt-2 text-[14px] font-semibold">{a.name}</div>
-              <p className="mt-1 text-[12px] text-muted-foreground">{a.desc}</p>
-              <div
-                className={`mt-3 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-                  a.earned
-                    ? "bg-success-soft text-success"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {a.earned ? "已获得" : "未达成"}
-              </div>
-            </div>
-          ))}
+      {/* 错题本 */}
+      {tab === "wrong" && (
+        <div className="space-y-3">
+          {filteredWrong.length === 0 ? (
+            <EmptyState description="暂无错题，继续保持！" />
+          ) : (
+            filteredWrong.map((w) => (
+              <PersonalAssetCard
+                key={w.qid}
+                icon={<BookMarked className="h-5 w-5" />}
+                title={w.stem}
+                tags={
+                  <>
+                    <Tag>{w.typeLabel}</Tag>
+                    {/* <Tag variant="outline">{w.errorReason}</Tag> */}
+                    <Tag variant="outline">{w.knowledge}</Tag>
+                  </>
+                }
+                meta={
+                  <>
+                    <span>来源：{w.sourceQuiz}</span>
+                    <span>·</span>
+                    <span>最近错误：{w.lastWrongAt}</span>
+                    <span>·</span>
+                    <span>复习 {w.reviewCount} 次</span>
+                  </>
+                }
+                actions={
+                  <>
+                    <Link
+                      to="/training/session/$id"
+                      params={{ id: `解析-${w.qid}` }}
+                      search={{ mode: "review", filter: "", count: 1, limit: 0 }}
+                      className={listActionClass("text")}
+                    >
+                      <FileSearch className="h-3.5 w-3.5" />
+                      查看解析
+                    </Link>
+                    <Link
+                      to="/training/session/$id"
+                      params={{ id: `复习-${w.qid}` }}
+                      search={{ mode: "review", filter: "", count: 1, limit: 0 }}
+                      className={listActionClass("textPrimary")}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      再练一次
+                    </Link>
+                    <button
+                      type="button"
+                      className={listActionClass("text")}
+                      onClick={() => toast.success("已加入今日复习")}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      加入今日复习
+                    </button>
+                    <button
+                      type="button"
+                      className={listActionClass("text")}
+                      onClick={() => {
+                        removeWrong(w.qid);
+                        toast.success("已从错题本移除");
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      移除
+                    </button>
+                  </>
+                }
+              />
+            ))
+          )}
         </div>
       )}
+
+      {/* 练习记录 */}
+      {tab === "records" && (
+        <ListCard className="rounded-md shadow-none">
+          <div
+            className={cn(
+              "hidden border-b border-divider px-5 py-3 text-[11.5px] font-medium text-muted-foreground lg:grid lg:items-center lg:gap-4",
+              RECORDS_TABLE_GRID,
+            )}
+          >
+            <span>练习名称</span>
+            <span>来源</span>
+            <span>完成时间</span>
+            <span>题数</span>
+            <span>正确率</span>
+            <span>错题</span>
+            <span>用时</span>
+            <span className="text-right">操作</span>
+          </div>
+          {filteredRecords.length === 0 ? (
+            <div className="p-8">
+              <EmptyState description="暂无练习记录" />
+            </div>
+          ) : (
+            filteredRecords.map((r) => (
+              <RecordRow
+                key={r.id}
+                cells={[
+                  r.title,
+                  r.source,
+                  r.completedAt,
+                  `${r.questionCount} 题`,
+                  `${r.accuracy}%`,
+                  `错题 ${r.wrongCount}`,
+                  r.duration,
+                ]}
+                actions={
+                  <>
+                    <Link to="/training/result/$id" params={{ id: r.id }} className={listActionClass("text")}>
+                      <FileSearch className="h-3.5 w-3.5" />
+                      查看结果
+                    </Link>
+                    <Link
+                      to="/training/session/$id"
+                      params={{ id: `再练-${r.id}` }}
+                      search={{ mode: "practice", filter: r.filter, count: r.questionCount, limit: 0 }}
+                      className={listActionClass("textPrimary")}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      再练一次
+                    </Link>
+                  </>
+                }
+              />
+            ))
+          )}
+        </ListCard>
+      )}
+          </div>
+        </ModulePanel>
+      </section>
 
       <NoteEditor
         open={editor.open}
@@ -630,34 +846,20 @@ function FolderRow({
   return (
     <li>
       <button
+        type="button"
         onClick={onClick}
         className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-[12.5px] transition-colors ${
-          active
-            ? "bg-primary text-primary-foreground"
-            : "text-foreground/80 hover:bg-muted"
+          active ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-muted"
         }`}
       >
         <span className="inline-flex items-center gap-1.5 truncate">
           <FolderOpen className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate">{label}</span>
         </span>
-        <span
-          className={`tabular-nums text-[10.5px] ${
-            active ? "text-primary-foreground/80" : "text-muted-foreground"
-          }`}
-        >
+        <span className={`tabular-nums text-[10.5px] ${active ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
           {count}
         </span>
       </button>
     </li>
   );
 }
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-border bg-card/50 p-10 text-center text-[12.5px] text-muted-foreground">
-      {text}
-    </div>
-  );
-}
-

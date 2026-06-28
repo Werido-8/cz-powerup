@@ -87,7 +87,7 @@ const TASKS: {
   },
   {
     id: "2",
-    title: "知识卡片复习：继电保护动作逻辑",
+    title: "专题复习：继电保护动作逻辑",
     meta: "艾宾浩斯 · 第 4 天复习节点",
     tag: "记忆",
     tagTone: "memory",
@@ -111,7 +111,7 @@ const ENTRIES: { icon: typeof BookOpen; title: string; desc: string; tag: string
   {
     icon: BookOpen,
     title: "知识学习",
-    desc: "结构化课程与知识卡片，按岗位能力递进",
+    desc: "结构化课程与专题资料，按岗位能力递进",
     tag: "今日 3 节",
     to: "/learn",
   },
