@@ -1108,20 +1108,20 @@ export function RecommendedItem({
   return (
     <div className="flex flex-col gap-3 border-t border-divider px-5 py-4 transition-colors first:border-t-0 hover:bg-primary-soft/10 lg:flex-row lg:items-center lg:gap-5">
       <div className="flex min-w-0 flex-1 items-start gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-primary/15 bg-primary-soft text-[12px] font-bold tabular-nums text-primary">
+        {/* <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-primary/15 bg-primary-soft text-[12px] font-bold tabular-nums text-primary">
           {String(index).padStart(2, "0")}
-        </div>
+        </div> */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <div className="text-[15px] font-semibold leading-snug text-foreground">{title}</div>
-            <span
+            {/* <span
               className={cn(
                 "text-[12px] font-medium tabular-nums",
                 mastery < 40 ? "text-warning-foreground" : "text-primary",
               )}
             >
               掌握度 {mastery}%
-            </span>
+            </span> */}
           </div>
           <p className="mt-1 line-clamp-1 text-[12.5px] text-muted-foreground">{reason}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-[12px] text-muted-foreground">
@@ -1134,13 +1134,13 @@ export function RecommendedItem({
               </Tag>
             ))}
           </div>
-          <div className="mt-2.5 flex max-w-xs items-center gap-2.5">
+          {/* <div className="mt-2.5 flex max-w-xs items-center gap-2.5">
             <ProgressBar
               value={progress}
               className="flex-1"
               barClassName={mastery < 40 ? "bg-warning" : undefined}
             />
-          </div>
+          </div> */}
         </div>
       </div>
       <div className="shrink-0 lg:w-[108px] lg:text-right">{action}</div>

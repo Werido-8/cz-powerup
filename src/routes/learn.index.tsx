@@ -188,7 +188,6 @@ function LearnPage() {
     <PageShell>
       <PageHeader
         title="知识学习"
-        subtitle="专题学习 + 资料浏览 + 学习状态 + 训练 / 问答 / 沉淀联动"
       />
 
       {/* 学习状态区：左栏继续学习 + 今日复习，右栏三张小卡 */}
