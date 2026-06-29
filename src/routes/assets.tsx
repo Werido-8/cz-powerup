@@ -71,7 +71,7 @@ const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
   fav: [
     { value: "all", label: "全部" },
     { value: "规程", label: "规程" },
-    { value: "SOP", label: "SOP" },
+    // { value: "SOP", label: "SOP" },
     { value: "案例", label: "案例" },
     { value: "问答", label: "问答" },
     { value: "题单", label: "题单" },

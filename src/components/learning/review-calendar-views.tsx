@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { BookMarked, BookOpen, ChevronLeft, ChevronRight, Eye, List, RotateCcw } from "lucide-react";
+import { BookMarked, BookOpen, Brain, CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo } from "react";
 import {
   buildReviewTimeline,
@@ -19,7 +19,7 @@ import {
   type ReviewTimelineEntry,
 } from "@/lib/mock/spaced-review";
 import { cn } from "@/lib/utils";
-import { learningBtnRadius, listActionClass } from "./ui";
+import { learningBtnRadius, PillSelect, SearchBar } from "./ui";
 
 export type ReviewViewMode = "list" | "month" | "week" | "day";
 
@@ -63,10 +63,10 @@ export function ReviewPhaseTag({ phase }: { phase: ReviewEntryPhase }) {
   return (
     <span
       className={cn(
-        "rounded-md px-2 py-0.5 text-[10.5px] font-medium",
-        phase === "overdue" && "bg-destructive/15 text-destructive",
-        phase === "due" && "bg-warning/15 text-warning-foreground",
-        phase === "upcoming" && "bg-muted text-muted-foreground",
+        "rounded-sm px-1.5 py-px text-[10.5px] font-medium",
+        phase === "overdue" && "bg-destructive/8 text-destructive",
+        phase === "due" && "bg-warning-soft/50 text-warning-foreground",
+        phase === "upcoming" && "bg-muted/60 text-muted-foreground",
       )}
     >
       {ENTRY_PHASE_LABEL[phase]}
@@ -74,63 +74,59 @@ export function ReviewPhaseTag({ phase }: { phase: ReviewEntryPhase }) {
   );
 }
 
-export function ReviewEntryActions({ row, phase }: { row: ReviewPlanRow; phase: ReviewEntryPhase }) {
+function reviewActionTarget(row: ReviewPlanRow) {
   if (row.kind === "doc") {
-    if (phase === "upcoming") {
-      return (
-        <>
-          <Link to="/learn/doc/$id" params={{ id: row.sourceId }} className={listActionClass()}>
-            <Eye className="h-3.5 w-3.5" />
-            查看资料
-          </Link>
-          <Link to="/learn/doc/$id" params={{ id: row.sourceId }} className={listActionClass("soft")}>
-            <BookOpen className="h-3.5 w-3.5" />
-            提前阅读
-          </Link>
-        </>
-      );
-    }
+    return {
+      to: "/learn/doc/$id" as const,
+      params: { id: row.sourceId },
+      search: undefined as undefined,
+    };
+  }
+  return {
+    to: "/training/session/$id" as const,
+    params: { id: `复习-${row.sourceId}` },
+    search: { mode: "review" as const, filter: "", count: 1, limit: 0 },
+  };
+}
+
+const reviewBtnBase =
+  "inline-flex shrink-0 items-center gap-1.5 rounded-sm px-3 py-1 text-[12px] font-medium transition-colors";
+
+export function ReviewEntryActions({ row, phase }: { row: ReviewPlanRow; phase: ReviewEntryPhase }) {
+  const isEarly = phase === "upcoming";
+  const target = reviewActionTarget(row);
+
+  if (isEarly) {
     return (
       <Link
-        to="/learn/doc/$id"
-        params={{ id: row.sourceId }}
-        className={listActionClass(phase === "overdue" ? "primary" : "outline")}
+        to={target.to}
+        params={target.params}
+        search={target.search}
+        className={cn(
+          reviewBtnBase,
+          "border border-border text-muted-foreground hover:border-primary/30 hover:text-primary",
+        )}
       >
-        <BookOpen className="h-3.5 w-3.5" />
-        {phase === "overdue" ? "立即阅读" : "阅读"}
+        <CalendarClock className="h-3.5 w-3.5" />
+        提前复习
       </Link>
-    );
-  }
-
-  if (phase === "upcoming") {
-    return (
-      <>
-        <Link to="/training/wrong" className={listActionClass()}>
-          <Eye className="h-3.5 w-3.5" />
-          查看错题
-        </Link>
-        <Link
-          to="/training/session/$id"
-          params={{ id: `复习-${row.sourceId}` }}
-          search={{ mode: "review", filter: "", count: 1, limit: 0 }}
-          className={listActionClass("soft")}
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          提前复习
-        </Link>
-      </>
     );
   }
 
   return (
     <Link
-      to="/training/session/$id"
-      params={{ id: `复习-${row.sourceId}` }}
-      search={{ mode: "review", filter: "", count: 1, limit: 0 }}
-      className={listActionClass(phase === "overdue" ? "primary" : "outline")}
+      to={target.to}
+      params={target.params}
+      search={target.search}
+      className={cn(
+        reviewBtnBase,
+        phase === "overdue"
+          ? "border border-destructive/30 text-destructive hover:bg-destructive/[0.04]"
+          : "border border-primary/35 bg-primary text-primary-foreground hover:bg-primary/90",
+      )}
     >
-      <RotateCcw className="h-3.5 w-3.5" />
-      {phase === "overdue" ? "立即复习" : "复习"}
+      <Brain className="h-3.5 w-3.5" />
+      立即复习
     </Link>
   );
 }
@@ -141,12 +137,24 @@ export function ReviewViewToolbar({
   cursorDate,
   onCursorChange,
   onToday,
+  searchInput,
+  onSearchInputChange,
+  onSearch,
+  docCount,
+  wrongCount,
+  dueCount,
 }: {
   mode: ReviewViewMode;
   onModeChange: (m: ReviewViewMode) => void;
   cursorDate: Date;
   onCursorChange: (d: Date) => void;
   onToday: () => void;
+  searchInput: string;
+  onSearchInputChange: (v: string) => void;
+  onSearch: () => void;
+  docCount: number;
+  wrongCount: number;
+  dueCount: number;
 }) {
   const title =
     mode === "month"
@@ -158,72 +166,73 @@ export function ReviewViewToolbar({
           : "今日待复习";
 
   return (
-    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-0.5 rounded-lg border border-border bg-muted/30 p-0.5">
-          {VIEW_OPTIONS.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => onModeChange(opt.key)}
-              className={cn(
-                "px-2.5 py-1 text-[12px] font-medium transition-colors",
-                learningBtnRadius,
-                mode === opt.key
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {opt.key === "list" ? (
-                <span className="inline-flex items-center gap-1">
-                  <List className="h-3.5 w-3.5" />
-                  {opt.label}
-                </span>
-              ) : (
-                opt.label
-              )}
-            </button>
-          ))}
+    <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+        <SearchBar
+          value={searchInput}
+          onChange={onSearchInputChange}
+          onSearch={onSearch}
+          placeholder="搜索复习项标题"
+          className="sm:max-w-md"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <PillSelect
+            options={VIEW_OPTIONS.map((opt) => ({ value: opt.key, label: opt.label }))}
+            value={mode}
+            onChange={(v) => onModeChange(v as ReviewViewMode)}
+          />
+          {mode !== "list" && (
+            <span className="text-[14px] font-semibold text-foreground">{title}</span>
+          )}
         </div>
-        {mode !== "list" && (
-          <span className="text-[14px] font-semibold text-foreground">{title}</span>
-        )}
       </div>
 
-      {mode !== "list" && (
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onToday}
-            className={cn(
-              "border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-foreground hover:bg-muted/40",
-              learningBtnRadius,
-            )}
-          >
-            今天
-          </button>
-          <button
-            type="button"
-            onClick={() => onCursorChange(shiftCursor(mode, cursorDate, -1))}
-            className={cn(
-              "grid h-8 w-8 place-items-center border border-border bg-card text-muted-foreground hover:bg-muted/40",
-              learningBtnRadius,
-            )}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onCursorChange(shiftCursor(mode, cursorDate, 1))}
-            className={cn(
-              "grid h-8 w-8 place-items-center border border-border bg-card text-muted-foreground hover:bg-muted/40",
-              learningBtnRadius,
-            )}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      <div className="flex shrink-0 flex-wrap items-center gap-3">
+        <p className="text-[12.5px] text-muted-foreground">
+          资料 {docCount} 项 · 错题 {wrongCount} 题
+          {dueCount > 0 && (
+            <>
+              <span className="mx-1.5 text-border">·</span>
+              <span className="font-medium text-warning-foreground">{dueCount} 项待复习</span>
+            </>
+          )}
+        </p>
+
+        {mode !== "list" && (
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onToday}
+              className={cn(
+                "border border-border bg-card px-2.5 py-1 text-[12px] font-medium text-foreground hover:bg-muted/40",
+                learningBtnRadius,
+              )}
+            >
+              今天
+            </button>
+            <button
+              type="button"
+              onClick={() => onCursorChange(shiftCursor(mode, cursorDate, -1))}
+              className={cn(
+                "grid h-8 w-8 place-items-center border border-border bg-card text-muted-foreground hover:bg-muted/40",
+                learningBtnRadius,
+              )}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onCursorChange(shiftCursor(mode, cursorDate, 1))}
+              className={cn(
+                "grid h-8 w-8 place-items-center border border-border bg-card text-muted-foreground hover:bg-muted/40",
+                learningBtnRadius,
+              )}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -240,7 +249,7 @@ function CalendarEntryChip({
   const time = extractTime(entry.at);
   const phase = getEntryPhase(entry);
   const label = compact
-    ? `${phase === "upcoming" ? "预期 " : ""}第${entry.round}轮 · ${entry.row.title.slice(0, 10)}${entry.row.title.length > 10 ? "…" : ""}`
+    ? `${phase === "upcoming" ? "未开始 " : ""}第${entry.round}轮 · ${entry.row.title.slice(0, 10)}${entry.row.title.length > 10 ? "…" : ""}`
     : `第 ${entry.round} 次 · ${entry.row.title}`;
 
   const inner = (
@@ -275,9 +284,9 @@ function DayEntryDetail({ entry }: { entry: ReviewTimelineEntry }) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 border-t border-divider px-4 py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5",
-        phase === "due" && "bg-warning-soft/15",
-        phase === "overdue" && "bg-destructive/5",
+        "flex flex-col gap-2 border-t border-divider px-4 py-2.5 first:border-t-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-4",
+        phase === "due" && "bg-warning-soft/[0.06]",
+        phase === "overdue" && "bg-destructive/[0.03]",
       )}
     >
       <div className="min-w-0 flex-1">
@@ -370,7 +379,7 @@ export function ReviewMonthView({
                 </span>
               </div>
               <div className="space-y-0.5">
-                {entries.slice(0, 3).map((e) => (
+                {entries.slice(0, 3).map((e: ReviewTimelineEntry) => (
                   <CalendarEntryChip key={e.id} entry={e} compact />
                 ))}
                 {entries.length > 3 && (
@@ -447,7 +456,7 @@ export function ReviewWeekView({
               {entries.length === 0 ? (
                 <span className="px-1 py-4 text-center text-[10px] text-muted-foreground/60">—</span>
               ) : (
-                entries.map((e) => (
+                entries.map((e: ReviewTimelineEntry) => (
                   <CalendarEntryChip
                     key={e.id}
                     entry={e}
@@ -474,7 +483,7 @@ export function ReviewDayView({
   const key = toDateKey(cursorDate);
   const entries = entriesForDate(timeline, key);
   const day = timeline.find((d) => d.dateKey === key);
-  const dueCount = entries.filter((e) => getEntryPhase(e) === "due" || getEntryPhase(e) === "overdue").length;
+  const dueCount = entries.filter((e: ReviewTimelineEntry) => getEntryPhase(e) === "due" || getEntryPhase(e) === "overdue").length;
   const upcomingCount = entries.length - dueCount;
 
   if (!day || entries.length === 0) {
@@ -493,10 +502,10 @@ export function ReviewDayView({
         <div className="mt-0.5 text-[12px] text-muted-foreground">
           {formatWeekday(key)} · {entries.length} 项复习
           {dueCount > 0 && <span className="text-warning-foreground"> · {dueCount} 项待复习</span>}
-          {upcomingCount > 0 && <span> · {upcomingCount} 项预期</span>}
+          {upcomingCount > 0 && <span> · {upcomingCount} 项未开始</span>}
         </div>
       </div>
-      {entries.map((entry) => (
+      {entries.map((entry: ReviewTimelineEntry) => (
         <DayEntryDetail key={entry.id} entry={entry} />
       ))}
     </div>

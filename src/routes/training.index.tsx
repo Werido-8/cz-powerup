@@ -80,17 +80,6 @@ function TrainingHome() {
     <PageShell>
       <PageHeader
         title="题库训练"
-        action={
-          <Link
-            to="/training/session/$id"
-            params={{ id: "今日复习" }}
-            search={{ mode: "review", filter: "", count: 5, limit: 0 }}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
-          >
-            <Flame className="h-4 w-4" />
-            今日建议复习 5 题
-          </Link>
-        }
       />
 
       {/* 训练概览 */}

@@ -1,14 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   GraduationCap,
   Layers,
+  ChevronLeft,
   ChevronRight,
   LayoutGrid,
   List,
   FileText,
-  Building2,
   Calendar,
   Tag,
   Wrench,
@@ -48,9 +48,15 @@ import {
   HeroOverviewCard,
   HeroOverviewBody,
   HeroActionRail,
+  TableListPager,
+  TABLE_PAGE_SIZE_DEFAULT,
 } from "@/components/learning/ui";
 import { getTopicHeaderTheme } from "@/components/learning/topic-art";
-import { TodayActivityCard, SpacedReviewPanel, TodayReviewHeroCard } from "@/components/learning/spaced-review";
+import {
+  TodayActivityCard,
+  SpacedReviewPanel,
+  TodayReviewHeroCard,
+} from "@/components/learning/spaced-review";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/learn/")({
@@ -83,7 +89,7 @@ type TabKey = "topic" | "all" | "mine" | "review" | "recent";
 
 const LEARN_TABS: { key: TabKey; label: string; desc: string; icon: typeof Layers }[] = [
   { key: "topic", label: "专题学习", desc: "按专题浏览资料与练习", icon: Layers },
-  { key: "all", label: "全部资料", desc: "规程、案例与 SOP 全库", icon: BookOpen },
+  { key: "all", label: "全部资料", desc: "规程、案例全库", icon: BookOpen },
   { key: "mine", label: "我的学习", desc: "进行中与需复习资料", icon: GraduationCap },
   { key: "review", label: "复习计划", desc: "艾宾浩斯间隔复习与待办", icon: Brain },
   { key: "recent", label: "最近更新", desc: "最新入库与学习动态", icon: Clock },
@@ -97,7 +103,7 @@ const LEARN_TAB_FILTERS: Record<TabKey, { value: string; label: string }[]> = {
   recent: [
     { value: "all", label: "全部" },
     { value: "规程", label: "规程" },
-    { value: "SOP", label: "SOP" },
+    // { value: "SOP", label: "SOP" },
     { value: "案例", label: "案例" },
     { value: "通知", label: "通知" },
   ],
@@ -111,8 +117,10 @@ const SEARCH_PLACEHOLDERS: Record<TabKey, string> = {
   recent: "搜索最近更新资料",
 };
 
-const RECENT_LIST_GRID =
-  "md:grid md:grid-cols-[minmax(0,2.2fr)_0.55fr_minmax(0,1.1fr)_0.8fr_0.7fr_minmax(128px,1fr)] md:items-center md:gap-3";
+const LEARN_TABLE_CARD_CLASS = "overflow-hidden rounded-md";
+const LEARN_TABLE_HEAD_CLASS =
+  "sticky top-0 z-10 bg-muted/95 text-[11.5px] text-muted-foreground backdrop-blur-sm";
+const LEARN_TABLE_TH_CLASS = "px-5 py-3 text-left font-medium";
 
 function LearnPage() {
   const [tab, setTab] = useState<TabKey>("topic");
@@ -147,7 +155,9 @@ function LearnPage() {
       DOCS.filter(
         (d) =>
           (activeFilter === "all" || d.docType === activeFilter) &&
-          (!appliedQuery || d.title.includes(appliedQuery) || d.highlight.some((h) => h.includes(appliedQuery))),
+          (!appliedQuery ||
+            d.title.includes(appliedQuery) ||
+            d.highlight.some((h) => h.includes(appliedQuery))),
       ),
     [activeFilter, appliedQuery],
   );
@@ -162,7 +172,9 @@ function LearnPage() {
       myDocs.filter(
         (d) =>
           (activeFilter === "all" || d.docType === activeFilter) &&
-          (!appliedQuery || d.title.includes(appliedQuery) || d.highlight.some((h) => h.includes(appliedQuery))),
+          (!appliedQuery ||
+            d.title.includes(appliedQuery) ||
+            d.highlight.some((h) => h.includes(appliedQuery))),
       ),
     [myDocs, activeFilter, appliedQuery],
   );
@@ -170,7 +182,10 @@ function LearnPage() {
   const filteredTopics = useMemo(() => {
     if (!appliedQuery) return ENRICHED_TOPICS;
     return ENRICHED_TOPICS.filter(
-      (t) => t.title.includes(appliedQuery) || t.desc.includes(appliedQuery) || t.roleTags.some((r) => r.includes(appliedQuery)),
+      (t) =>
+        t.title.includes(appliedQuery) ||
+        t.desc.includes(appliedQuery) ||
+        t.roleTags.some((r) => r.includes(appliedQuery)),
     );
   }, [appliedQuery]);
 
@@ -178,7 +193,8 @@ function LearnPage() {
     return RECENT_MATERIALS.filter((m) => {
       const doc = DOCS.find((d) => d.id === m.docId);
       if (!doc) return false;
-      if (appliedQuery && !doc.title.includes(appliedQuery) && !m.topicTitle.includes(appliedQuery)) return false;
+      if (appliedQuery && !doc.title.includes(appliedQuery) && !m.topicTitle.includes(appliedQuery))
+        return false;
       if (activeFilter !== "all" && m.typeLabel !== activeFilter) return false;
       return true;
     });
@@ -186,9 +202,7 @@ function LearnPage() {
 
   return (
     <PageShell>
-      <PageHeader
-        title="知识学习"
-      />
+      <PageHeader title="知识学习" />
 
       {/* 学习状态区：左栏继续学习 + 今日复习，右栏三张小卡 */}
       <section className="mb-6 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
@@ -288,63 +302,74 @@ function LearnPage() {
           )}
 
           <div className="p-4">
-      {tab === "topic" && (
-        <section>
-          <SectionHeader title="专题学习" subtitle="每个专题包含资料、题目与场景练习，可一键进入学习或生成训练题" />
-          {filteredTopics.length === 0 ? (
-            <EmptyState description="暂无匹配的专题" />
-          ) : (
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {filteredTopics.map((t) => {
-                const Icon = TOPIC_ICONS[t.id] ?? BookOpen;
-                return (
-                  <Link key={t.id} to="/learn/topic/$id" params={{ id: t.id }} className="block">
-                    <TopicCard
-                      title={t.title}
-                      desc={t.desc}
-                      roleTags={t.roleTags}
-                      docCount={t.docCount}
-                      questionCount={t.questionCount}
-                      scenarioCount={t.scenarioCount}
-                      scenarioLabel={t.scenarioLabel}
-                      progress={t.progress}
-                      updatedAt={t.updatedAt}
-                      icon={<Icon className="h-5 w-5" />}
-                      headerTheme={getTopicHeaderTheme(t.id)}
-                      action={
-                        <span className={cn("inline-flex w-full items-center justify-center gap-1 border border-primary/20 bg-primary-soft/50 px-3 py-2 text-[12.5px] font-medium text-accent-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground", learningBtnRadius)}>
-                          进入学习 <ChevronRight className="h-3.5 w-3.5" />
-                        </span>
-                      }
-                    />
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      )}
+            {tab === "topic" && (
+              <section>
+                <SectionHeader
+                  title=""
+                  subtitle="每个专题包含资料、题目与场景练习，可一键进入学习或生成训练题"
+                />
+                {filteredTopics.length === 0 ? (
+                  <EmptyState description="暂无匹配的专题" />
+                ) : (
+                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                    {filteredTopics.map((t) => {
+                      const Icon = TOPIC_ICONS[t.id] ?? BookOpen;
+                      return (
+                        <Link
+                          key={t.id}
+                          to="/learn/topic/$id"
+                          params={{ id: t.id }}
+                          className="block"
+                        >
+                          <TopicCard
+                            title={t.title}
+                            desc={t.desc}
+                            roleTags={t.roleTags}
+                            docCount={t.docCount}
+                            questionCount={t.questionCount}
+                            scenarioCount={t.scenarioCount}
+                            scenarioLabel={t.scenarioLabel}
+                            progress={t.progress}
+                            updatedAt={t.updatedAt}
+                            icon={<Icon className="h-5 w-5" />}
+                            headerTheme={getTopicHeaderTheme(t.id)}
+                            action={
+                              <span
+                                className={cn(
+                                  "inline-flex w-full items-center justify-center gap-1 border border-primary/20 bg-primary-soft/50 px-3 py-2 text-[12.5px] font-medium text-accent-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground",
+                                  learningBtnRadius,
+                                )}
+                              >
+                                进入学习 <ChevronRight className="h-3.5 w-3.5" />
+                              </span>
+                            }
+                          />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
 
-      {tab === "all" && (
-        <AllDocsPanel docs={filteredDocs} view={view} />
-      )}
+            {tab === "all" && <AllDocsPanel docs={filteredDocs} view={view} />}
 
-      {tab === "mine" && (
-        <AllDocsPanel docs={filteredMyDocs} view={view} actionLabel="继续学习" />
-      )}
+            {tab === "mine" && (
+              <AllDocsPanel docs={filteredMyDocs} view={view} actionLabel="继续学习" />
+            )}
 
-      {tab === "review" && <SpacedReviewPanel embedded />}
+            {tab === "review" && <SpacedReviewPanel embedded />}
 
-      {tab === "recent" && (
-        <section>
-          <SectionHeader title="最近更新" subtitle="按更新时间排序的资料列表" />
-          {filteredRecentMaterials.length === 0 ? (
-            <EmptyState description="暂无符合条件的资料" />
-          ) : (
-            <RecentMaterialsList materials={filteredRecentMaterials} />
-          )}
-        </section>
-      )}
+            {tab === "recent" && (
+              <section>
+                <SectionHeader title="最近更新" subtitle="按更新时间排序的资料列表" />
+                {filteredRecentMaterials.length === 0 ? (
+                  <EmptyState description="暂无符合条件的资料" />
+                ) : (
+                  <RecentMaterialsList materials={filteredRecentMaterials} />
+                )}
+              </section>
+            )}
           </div>
         </ModulePanel>
       </section>
@@ -354,57 +379,73 @@ function LearnPage() {
 
 function RecentMaterialsList({ materials }: { materials: typeof RECENT_MATERIALS }) {
   return (
-    <ListCard>
-      <div
-        className={`hidden border-b border-divider px-5 py-3 text-[11.5px] font-medium text-muted-foreground ${RECENT_LIST_GRID}`}
-      >
-        <span>资料标题</span>
-        <span>类型</span>
-        <span>关联专题</span>
-        <span>更新时间</span>
-        <span>学习状态</span>
-        <span className="text-right">操作</span>
+    <ListCard className={LEARN_TABLE_CARD_CLASS}>
+      <div className="max-h-[min(32rem,60vh)] overflow-y-auto">
+        <table className="w-full text-[13px]">
+          <thead className={LEARN_TABLE_HEAD_CLASS}>
+            <tr>
+              <th className={LEARN_TABLE_TH_CLASS}>标题</th>
+              <th className={LEARN_TABLE_TH_CLASS}>文件类型</th>
+              <th className={LEARN_TABLE_TH_CLASS}>文件性质</th>
+              <th className={LEARN_TABLE_TH_CLASS}>关联专题</th>
+              <th className={LEARN_TABLE_TH_CLASS}>更新时间</th>
+              <th className={LEARN_TABLE_TH_CLASS}>学习状态</th>
+              <th className={cn(LEARN_TABLE_TH_CLASS, "text-right")}>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {materials.map((m) => {
+              const doc = DOCS.find((d) => d.id === m.docId);
+              if (!doc) return null;
+              return (
+                <tr
+                  key={m.docId}
+                  className="border-t border-divider transition-colors hover:bg-muted/30"
+                >
+                  <td className="px-5 py-3">
+                    <Link
+                      to="/learn/doc/$id"
+                      params={{ id: doc.id }}
+                      className="font-medium hover:text-primary"
+                    >
+                      {doc.title}
+                    </Link>
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">{m.typeLabel}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{doc.source}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{m.topicTitle}</td>
+                  <td className="px-5 py-3 tabular-nums text-muted-foreground">{m.updatedAt}</td>
+                  <td className="px-5 py-3">
+                    <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[m.status]}`}>
+                      {STATUS_LABEL[m.status]}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      <Link to="/learn/doc/$id" params={{ id: doc.id }} className={listActionClass("text")}>
+                        <BookOpen className="h-3.5 w-3.5" />
+                        阅读
+                      </Link>
+                      <Link
+                        to="/chat"
+                        search={{ prefill: `请基于资料《${doc.title}》总结要点` }}
+                        className={listActionClass("text")}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" />
+                        提问
+                      </Link>
+                      <Link to="/assets" search={{ tab: "fav" }} className={listActionClass("text")}>
+                        <Star className="h-3.5 w-3.5" />
+                        收藏
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
-      {materials.map((m) => {
-        const doc = DOCS.find((d) => d.id === m.docId);
-        if (!doc) return null;
-        return (
-          <div
-            key={m.docId}
-            className={`border-t border-divider px-5 py-4 transition-colors first:border-t-0 hover:bg-muted/20 ${RECENT_LIST_GRID}`}
-          >
-            <div className="min-w-0 text-[14px] font-medium leading-snug text-foreground">{doc.title}</div>
-            <UiTag variant="outline" className="w-fit">
-              {m.typeLabel}
-            </UiTag>
-            <span className="truncate text-[12.5px] text-muted-foreground">{m.topicTitle}</span>
-            <span className="text-[12.5px] tabular-nums text-muted-foreground">{m.updatedAt}</span>
-            <span
-              className={`inline-flex w-fit rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[m.status]}`}
-            >
-              {STATUS_LABEL[m.status]}
-            </span>
-            <div className="flex flex-wrap justify-start gap-1.5 md:justify-end">
-              <Link to="/learn/doc/$id" params={{ id: doc.id }} className={listActionClass("text")}>
-                <BookOpen className="h-3.5 w-3.5" />
-                阅读
-              </Link>
-              <Link
-                to="/chat"
-                search={{ prefill: `请基于资料《${doc.title}》总结要点` }}
-                className={listActionClass("text")}
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-                提问
-              </Link>
-              <Link to="/assets" search={{ tab: "fav" }} className={listActionClass("text")}>
-                <Star className="h-3.5 w-3.5" />
-                收藏
-              </Link>
-            </div>
-          </div>
-        );
-      })}
     </ListCard>
   );
 }
@@ -438,14 +479,21 @@ function ViewToggle({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-1 rounded-md border border-border bg-card p-1", className)}>
+    <div
+      className={cn(
+        "flex items-center gap-1 rounded-md border border-border bg-card p-1",
+        className,
+      )}
+    >
       <button
         type="button"
         onClick={() => setView("card")}
         className={cn(
           "inline-flex items-center gap-1 px-2 py-1 text-[11.5px] transition-colors",
           learningBtnRadius,
-          view === "card" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+          view === "card"
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-muted",
         )}
       >
         <LayoutGrid className="h-3.5 w-3.5" /> 卡片
@@ -456,7 +504,9 @@ function ViewToggle({
         className={cn(
           "inline-flex items-center gap-1 px-2 py-1 text-[11.5px] transition-colors",
           learningBtnRadius,
-          view === "table" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+          view === "table"
+            ? "bg-primary text-primary-foreground"
+            : "text-muted-foreground hover:bg-muted",
         )}
       >
         <List className="h-3.5 w-3.5" /> 表格
@@ -465,95 +515,270 @@ function ViewToggle({
   );
 }
 
+const TYPE_ACCENT = "bg-primary-soft/50 text-primary";
+const CARD_PAGE_SIZE = 6;
+
 function DocList({ docs, actionLabel = "开始学习" }: { docs: typeof DOCS; actionLabel?: string }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const totalPages = Math.max(1, Math.ceil(docs.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const pageDocs = docs.slice(startIndex, startIndex + pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [docs]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   return (
-    <ListCard>
-      <table className="w-full text-[13px]">
-        <thead className="bg-muted/40 text-[11.5px] text-muted-foreground">
-          <tr>
-            <th className="px-5 py-3 text-left font-medium">标题</th>
-            <th className="px-5 py-3 text-left font-medium">类型</th>
-            <th className="px-5 py-3 text-left font-medium">厂站</th>
-            <th className="px-5 py-3 text-left font-medium">学习状态</th>
-            <th className="px-5 py-3 text-right font-medium">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {docs.map((d) => (
-            <tr key={d.id} className="border-t border-divider transition-colors hover:bg-muted/30">
-              <td className="px-5 py-3">
-                <Link to="/learn/doc/$id" params={{ id: d.id }} className="font-medium hover:text-primary">
-                  {d.title}
-                </Link>
-              </td>
-              <td className="px-5 py-3 text-muted-foreground">{d.docType}</td>
-              <td className="px-5 py-3 text-muted-foreground">{d.plant}</td>
-              <td className="px-5 py-3">
-                <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[d.status]}`}>
-                  {d.status}
-                </span>
-              </td>
-              <td className="px-5 py-3 text-right">
-                <Link to="/learn/doc/$id" params={{ id: d.id }} className={listActionClass("text")}>
-                  <BookOpen className="h-3.5 w-3.5" />
-                  {actionLabel}
-                </Link>
-              </td>
+    <ListCard className={LEARN_TABLE_CARD_CLASS}>
+      <div className="max-h-[min(32rem,60vh)] overflow-y-auto">
+        <table className="w-full text-[13px]">
+          <thead className={LEARN_TABLE_HEAD_CLASS}>
+            <tr>
+              <th className={LEARN_TABLE_TH_CLASS}>标题</th>
+              <th className={LEARN_TABLE_TH_CLASS}>文件类型</th>
+              <th className={LEARN_TABLE_TH_CLASS}>文件性质</th>
+              <th className={LEARN_TABLE_TH_CLASS}>学习状态</th>
+              <th className={cn(LEARN_TABLE_TH_CLASS, "text-right")}>操作</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pageDocs.map((d) => (
+              <tr key={d.id} className="border-t border-divider transition-colors hover:bg-muted/30">
+                <td className="px-5 py-3">
+                  <Link
+                    to="/learn/doc/$id"
+                    params={{ id: d.id }}
+                    className="font-medium hover:text-primary"
+                  >
+                    {d.title}
+                  </Link>
+                </td>
+                <td className="px-5 py-3 text-muted-foreground">{d.docType}</td>
+                <td className="px-5 py-3 text-muted-foreground">{d.source}</td>
+                <td className="px-5 py-3">
+                  <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[d.status]}`}>
+                    {d.status}
+                  </span>
+                </td>
+                <td className="px-5 py-3 text-right">
+                  <Link to="/learn/doc/$id" params={{ id: d.id }} className={listActionClass("text")}>
+                    <BookOpen className="h-3.5 w-3.5" />
+                    {actionLabel}
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <TableListPager
+        page={safePage}
+        totalPages={totalPages}
+        totalItems={docs.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </ListCard>
   );
 }
 
-const TYPE_ACCENT = "bg-primary-soft/50 text-primary";
+function DocCardPager({
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+}) {
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
 
-function DocCardGrid({ docs, actionLabel = "开始学习" }: { docs: typeof DOCS; actionLabel?: string }) {
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-      {docs.map((d) => {
-        return (
-          <Link
-            key={d.id}
-            to="/learn/doc/$id"
-            params={{ id: d.id }}
-            className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] transition-colors hover:border-primary/30"
+    <div className="relative mt-2 pt-6" style={{ paddingTop: "5px" }}>
+      <div
+        className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent"
+        aria-hidden
+      />
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
+          第 <span className="font-medium text-foreground">{start}–{end}</span> 份，共{" "}
+          <span className="font-medium text-foreground">{totalItems}</span> 份
+        </p>
+
+        <div className="flex items-center justify-center gap-2 sm:justify-end">
+          <button
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 1}
+            aria-label="上一批"
+            className={cn(
+              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors",
+              "hover:border-primary/30 hover:bg-muted hover:text-foreground",
+              "disabled:pointer-events-none disabled:opacity-35",
+            )}
           >
-            <div className={`relative flex h-16 items-center justify-between px-4 ${TYPE_ACCENT}`}>
-              <div className="inline-flex items-center gap-1.5 rounded-md bg-card/90 px-2 py-0.5 text-[10.5px] font-medium text-foreground">
-                <Tag className="h-3 w-3 text-primary" /> {d.docType}
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+
+          <div
+            className="flex items-center gap-1.5 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1.5"
+            role="tablist"
+            aria-label="快速跳转批次"
+          >
+            {Array.from({ length: totalPages }).map((_, index) => {
+              const pageNumber = index + 1;
+              const active = pageNumber === page;
+              return (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={`第 ${pageNumber} 批`}
+                  title={`第 ${pageNumber} 批`}
+                  onClick={() => onPageChange(pageNumber)}
+                  className={cn(
+                    "rounded-full transition-all duration-200",
+                    active
+                      ? "h-2 w-6 bg-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.15)]"
+                      : "h-2 w-2 bg-muted-foreground/25 hover:scale-125 hover:bg-primary/45",
+                  )}
+                />
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page === totalPages}
+            aria-label="下一批"
+            className={cn(
+              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors",
+              "hover:border-primary/30 hover:bg-muted hover:text-foreground",
+              "disabled:pointer-events-none disabled:opacity-35",
+            )}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocCardGrid({
+  docs,
+  actionLabel = "开始学习",
+}: {
+  docs: typeof DOCS;
+  actionLabel?: string;
+}) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(docs.length / CARD_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * CARD_PAGE_SIZE;
+  const pageDocs = docs.slice(startIndex, startIndex + CARD_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [docs]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  const goToPage = (nextPage: number) => {
+    setPage(nextPage);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div
+        key={safePage}
+        className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 animate-in fade-in duration-300"
+      >
+        {pageDocs.map((d) => {
+          return (
+            <Link
+              key={d.id}
+              to="/learn/doc/$id"
+              params={{ id: d.id }}
+              className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] transition-colors hover:border-primary/30"
+            >
+              <div
+                className={`relative flex h-16 items-center justify-between px-4 ${TYPE_ACCENT}`}
+              >
+                <div className="inline-flex items-center gap-1.5 rounded-md bg-card/90 px-2 py-0.5 text-[10.5px] font-medium text-foreground">
+                  <Tag className="h-3 w-3 text-primary" /> {d.docType}
+                </div>
+                <FileText className="h-7 w-7 text-primary/60" />
               </div>
-              <FileText className="h-7 w-7 text-primary/60" />
-            </div>
-            <div className="flex flex-1 flex-col p-5">
-              <h3 className="line-clamp-2 min-h-[40px] text-[15px] font-semibold leading-snug group-hover:text-primary">
-                {d.title}
-              </h3>
-              <p className="mt-2 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">{d.snippet}</p>
-              <div className="mt-3 flex flex-wrap gap-1">
-                {d.highlight.slice(0, 3).map((h) => (
-                  <UiTag key={h}>{h}</UiTag>
-                ))}
+              <div className="flex flex-1 flex-col p-5">
+                <h3 className="line-clamp-2 min-h-[40px] text-[15px] font-semibold leading-snug group-hover:text-primary">
+                  {d.title}
+                </h3>
+                <p className="mt-2 line-clamp-2 text-[12.5px] leading-relaxed text-muted-foreground">
+                  {d.snippet}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {d.highlight.slice(0, 3).map((h) => (
+                    <UiTag key={h}>{h}</UiTag>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-3 text-[11.5px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <Layers className="h-3 w-3" /> {d.source}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="h-3 w-3" /> {d.updatedAt}
+                  </span>
+                </div>
+                <div className="mt-4 flex items-center justify-between border-t border-divider pt-3">
+                  <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[d.status]}`}>
+                    {d.status}
+                  </span>
+                  <span className="inline-flex items-center text-[12.5px] font-medium text-primary">
+                    {actionLabel} <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+                  </span>
+                </div>
               </div>
-              <div className="mt-3 flex items-center gap-3 text-[11.5px] text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <Building2 className="h-3 w-3" /> {d.plant}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="h-3 w-3" /> {d.updatedAt}
-                </span>
-              </div>
-              <div className="mt-4 flex items-center justify-between border-t border-divider pt-3">
-                <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[d.status]}`}>{d.status}</span>
-                <span className="inline-flex items-center text-[12.5px] font-medium text-primary">
-                  {actionLabel} <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
-                </span>
-              </div>
-            </div>
-          </Link>
-        );
-      })}
+            </Link>
+          );
+        })}
+      </div>
+
+      {totalPages > 1 && (
+        <DocCardPager
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={docs.length}
+          pageSize={CARD_PAGE_SIZE}
+          onPageChange={goToPage}
+        />
+      )}
     </div>
   );
 }

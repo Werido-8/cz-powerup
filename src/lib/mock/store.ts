@@ -3,7 +3,10 @@ import { useEffect, useState, useCallback } from "react";
 import { DEFAULT_COLLECTIONS, type Collection } from "./scenario";
 import { QUIZ_SETS, type QuizSet } from "./learning-hub";
 
-const KEY = "ai-grid-mock-store-v3";
+const KEY = "ai-grid-mock-store-v4";
+
+const DAY = 86400000;
+const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
 
 export type Mastery = "新增" | "初步掌握" | "需巩固" | "基本掌握" | "熟练" | "长期掌握";
 const MASTERY_ORDER: Mastery[] = ["新增", "初步掌握", "需巩固", "基本掌握", "熟练", "长期掌握"];
@@ -93,32 +96,88 @@ const DEFAULT: MockState = {
     { qid: "q9", wrongCount: 1, lastWrongAt: "昨天", mastery: "初步掌握" },
     { qid: "q1", wrongCount: 1, lastWrongAt: "今天", mastery: "新增" },
     { qid: "q17", wrongCount: 3, lastWrongAt: "今天", mastery: "新增" },
-    { qid: "q21", wrongCount: 1, lastWrongAt: "3 天前", mastery: "基本掌握" },
   ],
   reviews: [
+    // 资料与错题穿插，复习轮次刻意错开（round = 已完成轮数，下次为 round+1 次复习）
     {
       id: "doc-d2",
       kind: "doc",
       sourceId: "d2",
       title: "500kV 主变停役标准化操作程序 v3.2",
-      addedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
-      round: 1,
+      addedAt: daysAgo(12),
+      round: 2,
     },
     {
-      id: "doc-d10",
-      kind: "doc",
-      sourceId: "d10",
-      title: "差动保护动作复盘:核查思路与典型场景",
-      addedAt: new Date(Date.now() - 9 * 86400000).toISOString(),
+      id: "wrong-q4",
+      kind: "wrong",
+      sourceId: "q4",
+      title: "差动保护动作后,推荐的核查顺序四步法是:",
+      addedAt: daysAgo(3),
       round: 0,
     },
     {
       id: "doc-d8",
       kind: "doc",
       sourceId: "d8",
-      title: "AGC 调节异常处置要点",
-      addedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+      title: "两细则考核常见知识点汇编(2024)",
+      addedAt: daysAgo(35),
+      round: 4,
+    },
+    {
+      id: "wrong-q9",
+      kind: "wrong",
+      sourceId: "q9",
+      title: "差动保护误动可能由 TA 二次回路绝缘破损引起。",
+      addedAt: daysAgo(6),
+      round: 1,
+    },
+    {
+      id: "doc-d1",
+      kind: "doc",
+      sourceId: "d1",
+      title: "《并网发电厂辅助服务管理实施细则》AGC 考核条款解读",
+      addedAt: daysAgo(1),
       round: 0,
+    },
+    {
+      id: "doc-d10",
+      kind: "doc",
+      sourceId: "d10",
+      title: "差动保护动作复盘:核查思路与典型场景",
+      addedAt: daysAgo(18),
+      round: 3,
+    },
+    {
+      id: "wrong-q17",
+      kind: "wrong",
+      sourceId: "q17",
+      title: "下列情形属于差动保护「区外故障」表现的有(多选):",
+      addedAt: daysAgo(10),
+      round: 2,
+    },
+    {
+      id: "doc-d6",
+      kind: "doc",
+      sourceId: "d6",
+      title: "厂家 SOP:AGC 控制器死区与速率配置说明",
+      addedAt: daysAgo(5),
+      round: 1,
+    },
+    {
+      id: "doc-d13",
+      kind: "doc",
+      sourceId: "d13",
+      title: "220kV 线路停送电标准化操作要点",
+      addedAt: daysAgo(2),
+      round: 0,
+    },
+    {
+      id: "wrong-q1",
+      kind: "wrong",
+      sourceId: "q1",
+      title: "两细则中 AGC 考核的三项核心指标不包括下列哪一项?",
+      addedAt: daysAgo(28),
+      round: 4,
     },
   ],
   collections: DEFAULT_COLLECTIONS,

@@ -1,6 +1,6 @@
-import type { CSSProperties, ReactNode } from "react";
+import { type CSSProperties, type ReactNode, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
-import { Search, ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TopicHeaderIllustration, type TopicHeaderTheme } from "./topic-art";
 
@@ -222,6 +222,133 @@ export function listActionClass(variant: ListActionVariant = "outline", classNam
     isText ? "px-1 py-0.5 text-[12px]" : "px-2.5 py-1.5 text-[12px]",
     listActionVariants[variant],
     className,
+  );
+}
+
+export const TABLE_PAGE_SIZE_DEFAULT = 10;
+export const TABLE_PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
+
+function buildTablePageRange(current: number, total: number): (number | "ellipsis")[] {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, index) => index + 1);
+  }
+
+  const pages: (number | "ellipsis")[] = [];
+  const push = (value: number | "ellipsis") => {
+    if (value === "ellipsis") {
+      if (pages[pages.length - 1] !== "ellipsis") pages.push("ellipsis");
+      return;
+    }
+    if (!pages.includes(value)) pages.push(value);
+  };
+
+  push(1);
+  if (current > 3) push("ellipsis");
+
+  for (let pageNumber = Math.max(2, current - 1); pageNumber <= Math.min(total - 1, current + 1); pageNumber++) {
+    push(pageNumber);
+  }
+
+  if (current < total - 2) push("ellipsis");
+  push(total);
+  return pages;
+}
+
+/** 列表模式底部分页器（全部资料、复习计划等复用） */
+export function TableListPager({
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+}) {
+  const visiblePages = useMemo(() => buildTablePageRange(page, totalPages), [page, totalPages]);
+  const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
+
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-divider px-5 py-2.5">
+      <span className="shrink-0 text-[11.5px] tabular-nums text-muted-foreground">
+        {start}–{end} / {totalItems}
+      </span>
+
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-0.5 rounded-sm bg-muted/60 p-0.5">
+          {TABLE_PAGE_SIZE_OPTIONS.map((size) => (
+            <button
+              key={size}
+              type="button"
+              onClick={() => onPageSizeChange(size)}
+              className={cn(
+                "min-w-[28px] rounded-[3px] px-2 py-[3px] text-[11.5px] tabular-nums transition-colors",
+                size === pageSize
+                  ? "bg-card font-medium text-foreground shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1" role="navigation" aria-label="分页">
+          <button
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 1}
+            aria-label="上一页"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ChevronLeft className="h-[14px] w-[14px]" />
+          </button>
+
+          {visiblePages.map((item, index) =>
+            item === "ellipsis" ? (
+              <span
+                key={`e-${index}`}
+                className="inline-flex h-7 w-5 items-end justify-center pb-0.5 text-[11px] font-bold tracking-widest text-muted-foreground/40"
+              >
+                ···
+              </span>
+            ) : (
+              <button
+                key={item}
+                type="button"
+                onClick={() => onPageChange(item)}
+                aria-label={`第 ${item} 页`}
+                aria-current={item === page ? "page" : undefined}
+                className={cn(
+                  "inline-flex h-7 min-w-7 items-center justify-center rounded-sm px-1.5 text-[12px] tabular-nums transition-colors",
+                  item === page
+                    ? "bg-primary font-semibold text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {item}
+              </button>
+            ),
+          )}
+
+          <button
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page === totalPages}
+            aria-label="下一页"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ChevronRight className="h-[14px] w-[14px]" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

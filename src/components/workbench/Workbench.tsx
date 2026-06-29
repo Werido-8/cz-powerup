@@ -177,12 +177,12 @@ const UPDATES: { type: string; title: string; time: string; docId: string }[] = 
     time: "2 小时前",
     docId: "d4",
   },
-  {
-    type: "SOP",
-    title: "220kV 主变停送电标准化作业流程 v3.2",
-    time: "今天 09:20",
-    docId: "d2",
-  },
+  // {
+  //   type: "SOP",
+  //   title: "220kV 主变停送电标准化作业流程 v3.2",
+  //   time: "今天 09:20",
+  //   docId: "d2",
+  // },
   {
     type: "案例",
     title: "某 500kV 变电站母差保护动作分析报告",

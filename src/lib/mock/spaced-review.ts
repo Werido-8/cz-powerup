@@ -84,6 +84,11 @@ export type ReviewTimelineEntry = {
   nextDateKey: string | null;
 };
 
+export type ReviewTimelineDay = {
+  dateKey: string;
+  entries: ReviewTimelineEntry[];
+};
+
 export type ReviewEntryPhase = "overdue" | "due" | "upcoming";
 
 export function getEntryPhase(
@@ -106,7 +111,7 @@ export function getRowPhase(row: ReviewPlanRow, now = new Date()): ReviewEntryPh
 export const ENTRY_PHASE_LABEL: Record<ReviewEntryPhase, string> = {
   overdue: "已逾期",
   due: "待复习",
-  upcoming: "预期",
+  upcoming: "未开始",
 };
 
 function formatDue(date: Date, now = new Date()) {

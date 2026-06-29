@@ -1,11 +1,11 @@
-import { Link } from "@tanstack/react-router";
-import { BookMarked, BookOpen, Brain, ChevronRight, RotateCcw } from "lucide-react";
-import { useMemo, useState } from "react";
+import { BookMarked, BookOpen, Brain, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { QUESTIONS } from "@/lib/mock/data";
 import { LEARNING_ACTIVITIES } from "@/lib/mock/learning-hub";
 import { buildReviewPlan, buildSchedule, getRowPhase } from "@/lib/mock/spaced-review";
 import { useMockStore } from "@/lib/mock/store";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ReviewDayView,
   ReviewEntryActions,
@@ -16,7 +16,7 @@ import {
   useReviewTimeline,
   type ReviewViewMode,
 } from "./review-calendar-views";
-import { learningBtnRadius, HeroOverviewCard, HeroOverviewBody, HeroActionRail } from "./ui";
+import { HeroOverviewCard, HeroOverviewBody, HeroActionRail, ListCard, TableListPager, TABLE_PAGE_SIZE_DEFAULT } from "./ui";
 
 /** 学习概览右侧之「今日动态」 */
 export function TodayActivityCard({ className }: { className?: string }) {
@@ -48,21 +48,14 @@ function ReviewPlanRowItem({ row }: { row: import("@/lib/mock/spaced-review").Re
   const upcoming = row.schedule.filter((s) => s.status !== "done").slice(0, 3);
 
   return (
-    <div
-      className={cn(
-        "rounded-md border px-4 py-3 transition-colors",
-        phase === "due" && "border-warning/30 bg-warning-soft/25",
-        phase === "overdue" && "border-destructive/30 bg-destructive/5",
-        phase === "upcoming" && "border-border bg-card",
-      )}
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className="rounded-md border border-border bg-card px-3.5 py-2.5 transition-colors">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-medium",
-                row.kind === "doc" ? "bg-primary-soft text-accent-foreground" : "bg-muted text-muted-foreground",
+                "inline-flex items-center gap-1 rounded-sm px-1.5 py-px text-[10.5px] font-medium",
+                row.kind === "doc" ? "bg-primary-soft/70 text-accent-foreground" : "bg-muted/60 text-muted-foreground",
               )}
             >
               {row.kind === "doc" ? <BookOpen className="h-3 w-3" /> : <BookMarked className="h-3 w-3" />}
@@ -70,27 +63,35 @@ function ReviewPlanRowItem({ row }: { row: import("@/lib/mock/spaced-review").Re
             </span>
             <ReviewPhaseTag phase={phase} />
           </div>
-          <div className="mt-1.5 text-[13.5px] font-medium leading-snug text-foreground">{row.title}</div>
-          <div className="mt-1 text-[12px] text-muted-foreground">
-            已完成 {row.currentRound} 轮 · 下次为第 {row.nextRound} 次复习 ·{" "}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <p className="mt-1 truncate text-[13.5px] font-medium leading-snug text-foreground">
+                {row.title}
+              </p>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-sm text-[12px] leading-snug">
+              {row.title}
+            </TooltipContent>
+          </Tooltip>
+          <div className="mt-0.5 text-[12px] text-muted-foreground">
+            下次为第 {row.nextRound} 次复习 ·{" "}
             <span className="font-medium text-foreground">{row.nextAt}</span>
-            {phase === "upcoming" && <span className="text-muted-foreground"> · 可按需提前复习</span>}
           </div>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-1.5">
+        <div className="flex shrink-0 items-center">
           <ReviewEntryActions row={row} phase={phase} />
         </div>
       </div>
       {upcoming.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-divider pt-3">
+        <div className="mt-2 flex flex-wrap gap-1.5 border-t border-divider pt-2">
           {upcoming.map((s) => (
             <span
               key={s.round}
               className={cn(
-                "rounded-md border px-2 py-1 text-[10.5px]",
+                "rounded-sm border px-1.5 py-px text-[10.5px]",
                 s.status === "due"
-                  ? "border-warning/30 bg-warning-soft/40 text-warning-foreground"
-                  : "border-border bg-background text-muted-foreground",
+                  ? "border-warning/25 text-warning-foreground"
+                  : "border-border text-muted-foreground",
               )}
             >
               {s.label} · {s.at}
@@ -99,6 +100,58 @@ function ReviewPlanRowItem({ row }: { row: import("@/lib/mock/spaced-review").Re
         </div>
       )}
     </div>
+  );
+}
+
+function ReviewPlanList({ plan, query = "" }: { plan: import("@/lib/mock/spaced-review").ReviewPlanRow[]; query?: string }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const totalPages = Math.max(1, Math.ceil(plan.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const pageRows = plan.slice(startIndex, startIndex + pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [plan]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  if (plan.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted-foreground">
+        {query
+          ? "暂无匹配的复习项，请调整搜索关键词。"
+          : "暂无复习项。标记资料「已学」并纳入复习计划，或完成练习产生错题后将自动出现在此。"}
+      </div>
+    );
+  }
+
+  return (
+    <ListCard className="overflow-hidden">
+      <div className="max-h-[min(32rem,60vh)] space-y-2 overflow-y-auto p-3">
+        {pageRows.map((row) => (
+          <ReviewPlanRowItem key={row.id} row={row} />
+        ))}
+      </div>
+
+      <TableListPager
+        page={safePage}
+        totalPages={totalPages}
+        totalItems={plan.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
+    </ListCard>
   );
 }
 
@@ -166,9 +219,24 @@ export function SpacedReviewPanel({ embedded = false }: { embedded?: boolean }) 
   const [viewMode, setViewMode] = useState<ReviewViewMode>("list");
   const [cursorDate, setCursorDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const timeline = useReviewTimeline(plan);
+  const [searchInput, setSearchInput] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
 
-  const visiblePlan = embedded ? plan : plan.slice(0, 6);
+  const filteredPlan = useMemo(() => {
+    if (!appliedQuery) return plan;
+    const q = appliedQuery.toLowerCase();
+    return plan.filter(
+      (row) => row.title.toLowerCase().includes(q) || row.kindLabel.toLowerCase().includes(q),
+    );
+  }, [plan, appliedQuery]);
+
+  const timeline = useReviewTimeline(filteredPlan);
+
+  const visiblePlan = embedded ? filteredPlan : filteredPlan.slice(0, 6);
+
+  const handleSearch = () => {
+    setAppliedQuery(searchInput.trim());
+  };
 
   const handleModeChange = (mode: ReviewViewMode) => {
     setViewMode(mode);
@@ -193,41 +261,12 @@ export function SpacedReviewPanel({ embedded = false }: { embedded?: boolean }) 
   };
 
   return (
-    <section
-      className={cn(
-        embedded ? "" : "mb-6 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5",
-      )}
-    >
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-[15px] font-semibold text-foreground">复习计划</h2>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">
-            资料 {docCount} 项 · 错题 {wrongCount} 题
-            {dueCount > 0 && (
-              <>
-                <span className="mx-1.5 text-border">·</span>
-                <span className="font-medium text-warning-foreground">{dueCount} 项待复习</span>
-              </>
-            )}
-          </p>
-        </div>
-        <Link
-          to="/training/session/$id"
-          params={{ id: "今日复习" }}
-          search={{ mode: "review", filter: "", count: Math.max(1, dueCount), limit: 0 }}
-        >
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90",
-              learningBtnRadius,
-            )}
-          >
-            开始今日复习
-            <ChevronRight className="h-3.5 w-3.5" />
-          </span>
-        </Link>
-      </div>
-
+    <TooltipProvider delayDuration={200}>
+      <section
+        className={cn(
+          embedded ? "" : "mb-6 rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)] sm:p-5",
+        )}
+      >
       {embedded && (
         <>
           <ReviewViewToolbar
@@ -236,19 +275,15 @@ export function SpacedReviewPanel({ embedded = false }: { embedded?: boolean }) 
             cursorDate={cursorDate}
             onCursorChange={setCursorDate}
             onToday={handleToday}
+            searchInput={searchInput}
+            onSearchInputChange={setSearchInput}
+            onSearch={handleSearch}
+            docCount={docCount}
+            wrongCount={wrongCount}
+            dueCount={dueCount}
           />
 
-          {viewMode === "list" && (
-            <div className="space-y-2.5">
-              {plan.length === 0 ? (
-                <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted-foreground">
-                  暂无复习项。标记资料「已学」并纳入复习计划，或完成练习产生错题后将自动出现在此。
-                </div>
-              ) : (
-                plan.map((row) => <ReviewPlanRowItem key={row.id} row={row} />)
-              )}
-            </div>
-          )}
+          {viewMode === "list" && <ReviewPlanList plan={filteredPlan} query={appliedQuery} />}
 
           {viewMode === "month" && (
             <ReviewMonthView
@@ -274,20 +309,23 @@ export function SpacedReviewPanel({ embedded = false }: { embedded?: boolean }) 
       )}
 
       {!embedded && (
-        <div className="space-y-2.5">
-          {plan.length === 0 ? (
+        <div className="space-y-2">
+          {filteredPlan.length === 0 ? (
             <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted-foreground">
               暂无复习项。标记资料「已学」并纳入复习计划，或完成练习产生错题后将自动出现在此。
             </div>
           ) : (
             visiblePlan.map((row) => <ReviewPlanRowItem key={row.id} row={row} />)
           )}
-          {plan.length > 6 && (
-            <p className="text-center text-[11.5px] text-muted-foreground">还有 {plan.length - 6} 项未展示</p>
+          {filteredPlan.length > 6 && (
+            <p className="text-center text-[11.5px] text-muted-foreground">
+              还有 {filteredPlan.length - 6} 项未展示
+            </p>
           )}
         </div>
       )}
-    </section>
+      </section>
+    </TooltipProvider>
   );
 }
 
