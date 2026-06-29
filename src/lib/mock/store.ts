@@ -1,6 +1,7 @@
 // Tiny localStorage-backed mock store with React hook for cross-page sharing.
 import { useEffect, useState, useCallback } from "react";
 import { DEFAULT_COLLECTIONS, type Collection } from "./scenario";
+import { QUIZ_SETS, type QuizSet } from "./learning-hub";
 
 const KEY = "ai-grid-mock-store-v3";
 
@@ -25,7 +26,17 @@ export type NoteItem = {
   collectionIds?: string[];
 };
 
-export type ReviewState = { id: string; done?: boolean; deferTo?: string };
+export type SpacedReviewItem = {
+  id: string;
+  kind: "doc" | "wrong";
+  sourceId: string;
+  title: string;
+  addedAt: string;
+  round: number;
+};
+
+/** @deprecated 使用 SpacedReviewItem */
+export type ReviewState = SpacedReviewItem;
 
 export type ScenarioFavorite = {
   id: string; // unique
@@ -39,10 +50,11 @@ export type MockState = {
   favorites: string[]; // doc ids
   notes: NoteItem[];
   wrong: WrongItem[];
-  reviews: ReviewState[];
+  reviews: SpacedReviewItem[];
   collections: Collection[];
   scenarioFavorites: ScenarioFavorite[];
   recentScenarios: string[]; // scenarioId
+  quizSets: QuizSet[];
 };
 
 const DEFAULT: MockState = {
@@ -66,6 +78,15 @@ const DEFAULT: MockState = {
       createdAt: "2024-08-21 14:02",
       collectionIds: ["kc-main"],
     },
+    {
+      id: "n-seed-3",
+      docId: "d10",
+      title: "差动保护复盘四步法",
+      tag: "继电保护",
+      body: "TA 极性 → 二次回路 → 定值 → 一次设备状态，按序核查避免遗漏。",
+      createdAt: "2024-07-08 09:15",
+      collectionIds: [],
+    },
   ],
   wrong: [
     { qid: "q4", wrongCount: 2, lastWrongAt: "2 天前", mastery: "需巩固" },
@@ -74,10 +95,36 @@ const DEFAULT: MockState = {
     { qid: "q17", wrongCount: 3, lastWrongAt: "今天", mastery: "新增" },
     { qid: "q21", wrongCount: 1, lastWrongAt: "3 天前", mastery: "基本掌握" },
   ],
-  reviews: [],
+  reviews: [
+    {
+      id: "doc-d2",
+      kind: "doc",
+      sourceId: "d2",
+      title: "500kV 主变停役标准化操作程序 v3.2",
+      addedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+      round: 1,
+    },
+    {
+      id: "doc-d10",
+      kind: "doc",
+      sourceId: "d10",
+      title: "差动保护动作复盘:核查思路与典型场景",
+      addedAt: new Date(Date.now() - 9 * 86400000).toISOString(),
+      round: 0,
+    },
+    {
+      id: "doc-d8",
+      kind: "doc",
+      sourceId: "d8",
+      title: "AGC 调节异常处置要点",
+      addedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+      round: 0,
+    },
+  ],
   collections: DEFAULT_COLLECTIONS,
   scenarioFavorites: [],
   recentScenarios: [],
+  quizSets: QUIZ_SETS.map((q) => ({ ...q })),
 };
 
 function read(): MockState {
@@ -85,7 +132,22 @@ function read(): MockState {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return DEFAULT;
-    return { ...DEFAULT, ...JSON.parse(raw) };
+    const parsed = { ...DEFAULT, ...JSON.parse(raw) } as MockState;
+    parsed.reviews = Array.isArray(parsed.reviews)
+      ? parsed.reviews.filter((r): r is SpacedReviewItem => !!r && typeof r === "object" && "kind" in r && "sourceId" in r)
+      : DEFAULT.reviews;
+    parsed.wrong = Array.isArray(parsed.wrong) ? parsed.wrong : DEFAULT.wrong;
+    parsed.favorites = Array.isArray(parsed.favorites) ? parsed.favorites : DEFAULT.favorites;
+    parsed.notes = Array.isArray(parsed.notes) ? parsed.notes : DEFAULT.notes;
+    parsed.collections = Array.isArray(parsed.collections) ? parsed.collections : DEFAULT.collections;
+    parsed.scenarioFavorites = Array.isArray(parsed.scenarioFavorites)
+      ? parsed.scenarioFavorites
+      : DEFAULT.scenarioFavorites;
+    parsed.recentScenarios = Array.isArray(parsed.recentScenarios)
+      ? parsed.recentScenarios
+      : DEFAULT.recentScenarios;
+    parsed.quizSets = Array.isArray(parsed.quizSets) ? parsed.quizSets : DEFAULT.quizSets;
+    return parsed;
   } catch {
     return DEFAULT;
   }
@@ -181,13 +243,48 @@ export function useMockStore() {
     write(s);
   }, []);
 
-  const setReview = useCallback((id: string, patch: Partial<ReviewState>) => {
+  const setReview = useCallback((id: string, patch: Partial<SpacedReviewItem>) => {
     const s = read();
     const cur = s.reviews.find((r) => r.id === id);
     if (cur) Object.assign(cur, patch);
-    else s.reviews = [...s.reviews, { id, ...patch }];
+    else s.reviews = [...s.reviews, { id, kind: "doc", sourceId: id, title: "", addedAt: new Date().toISOString(), round: 0, ...patch }];
     write(s);
   }, []);
+
+  const addSpacedReview = useCallback(
+    (item: { kind: "doc" | "wrong"; sourceId: string; title: string }) => {
+      const s = read();
+      const id = `${item.kind}-${item.sourceId}`;
+      if (s.reviews.some((r) => r.id === id)) return id;
+      s.reviews = [
+        ...s.reviews,
+        {
+          id,
+          kind: item.kind,
+          sourceId: item.sourceId,
+          title: item.title,
+          addedAt: new Date().toISOString(),
+          round: 0,
+        },
+      ];
+      write(s);
+      return id;
+    },
+    [],
+  );
+
+  const removeSpacedReview = useCallback((id: string) => {
+    const s = read();
+    s.reviews = s.reviews.filter((r) => r.id !== id);
+    write(s);
+  }, []);
+
+  const hasSpacedReview = useCallback(
+    (kind: "doc" | "wrong", sourceId: string) => {
+      return read().reviews.some((r) => r.kind === kind && r.sourceId === sourceId);
+    },
+    [],
+  );
 
   // ---------- Collections ----------
   const createCollection = useCallback((c: Omit<Collection, "id" | "updatedAt">) => {
@@ -247,6 +344,17 @@ export function useMockStore() {
     write(DEFAULT);
   }, []);
 
+  const addQuizSet = useCallback((q: QuizSet) => {
+    const s = read();
+    s.quizSets = [q, ...s.quizSets.filter((x) => x.id !== q.id)];
+    write(s);
+    return q.id;
+  }, []);
+
+  const getQuizSetByMsgId = useCallback((msgId: string) => {
+    return read().quizSets.find((q) => q.relatedMsgId === msgId);
+  }, []);
+
   return {
     state,
     toggleFavorite,
@@ -258,10 +366,15 @@ export function useMockStore() {
     advanceMastery,
     removeWrong,
     setReview,
+    addSpacedReview,
+    removeSpacedReview,
+    hasSpacedReview,
     createCollection,
     addToCollection,
     saveScenarioFavorite,
     pushRecentScenario,
     resetAll,
+    addQuizSet,
+    getQuizSetByMsgId,
   };
 }

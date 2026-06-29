@@ -15,7 +15,6 @@ import {
   Ban,
   GitMerge,
   CheckCircle2,
-  Undo2,
   FileSearch,
   Users,
   History,
@@ -34,9 +33,17 @@ import {
   Power,
   PlusCircle,
   ListChecks,
+  Clock,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
+import {
+  PaperQuestionList,
+  PaperQuestionSummary,
+  usePaperQuestionGroups,
+} from "@/components/exam/paper-question-list";
+import { PageHeader, StatCard, ModuleTabs, ModulePanel } from "@/components/learning/ui";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -148,28 +155,30 @@ function riskClass(r: string) {
         : "bg-muted text-muted-foreground";
 }
 
-// ---------- Stat cards ----------
+const EXAM_STAT_ICONS: Record<string, React.ReactNode> = {
+  pending: <ClipboardCheck className="h-[18px] w-[18px]" />,
+  bank: <Library className="h-[18px] w-[18px]" />,
+  issued: <FileText className="h-[18px] w-[18px]" />,
+  finish: <ListChecks className="h-[18px] w-[18px]" />,
+  correct: <TrendingUp className="h-[18px] w-[18px]" />,
+  time: <Clock className="h-[18px] w-[18px]" />,
+};
+
 function StatCards() {
-  const toneMap: Record<string, string> = {
-    warning: "text-warning-foreground",
-    success: "text-success",
-    primary: "text-primary",
-  };
   return (
-    <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-      {EXAM_STATS.map((s) => (
-        <div
+    <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      {EXAM_STATS.map((s, i) => (
+        <StatCard
           key={s.key}
-          className="rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]"
-        >
-          <div className="text-[11.5px] text-muted-foreground">{s.label}</div>
-          <div className={`mt-1.5 text-[24px] font-semibold tracking-tight ${toneMap[s.tone]}`}>
-            {s.value}
-          </div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">{s.hint}</div>
-        </div>
+          label={s.label}
+          value={s.value}
+          hint={s.hint}
+          icon={EXAM_STAT_ICONS[s.key]}
+          tint={i}
+          emphasis={s.tone === "warning" ? "remind" : s.tone === "success" ? "default" : "primary"}
+        />
       ))}
-    </div>
+    </section>
   );
 }
 
@@ -186,23 +195,32 @@ function ActionBtn({
   label,
   onClick,
   tone = "default",
+  variant = "ghost",
 }: {
   icon: typeof Eye;
   label: string;
   onClick?: () => void;
   tone?: "default" | "danger" | "primary";
+  variant?: "ghost" | "text";
 }) {
   const cls =
-    tone === "danger"
-      ? "text-destructive hover:bg-destructive/10"
-      : tone === "primary"
-        ? "text-primary hover:bg-primary-soft"
-        : "text-muted-foreground hover:bg-muted hover:text-foreground";
+    variant === "text"
+      ? tone === "danger"
+        ? "text-destructive hover:text-destructive/80"
+        : tone === "primary"
+          ? "text-primary hover:text-primary/80"
+          : "text-muted-foreground hover:text-primary"
+      : tone === "danger"
+        ? "text-destructive hover:bg-destructive/10"
+        : tone === "primary"
+          ? "text-primary hover:bg-primary-soft"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground";
+  const base =
+    variant === "text"
+      ? "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-1 py-0.5 text-[12px] font-medium transition-colors"
+      : "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[12px] transition-colors";
   return (
-    <button
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] transition-colors ${cls}`}
-    >
+    <button type="button" onClick={onClick} className={`${base} ${cls}`}>
       <Icon className="h-3.5 w-3.5" />
       {label}
     </button>
@@ -233,14 +251,19 @@ function ReviewModule() {
   const [evidenceOf, setEvidenceOf] = useState<ReviewItem | null>(null);
   const [editOf, setEditOf] = useState<ReviewItem | null>(null);
   const [approveOf, setApproveOf] = useState<ReviewItem | null>(null);
-  const [returnOf, setReturnOf] = useState<ReviewItem | null>(null);
+  const [deleteOf, setDeleteOf] = useState<ReviewItem | null>(null);
   const [mergeOf, setMergeOf] = useState<ReviewItem | null>(null);
 
   const [batchApproveOpen, setBatchApproveOpen] = useState(false);
-  const [batchReturnOpen, setBatchReturnOpen] = useState(false);
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
   const updateStatus = (ids: string[], status: ReviewItem["status"]) => {
     setRows((rs) => rs.map((r) => (ids.includes(r.id) ? { ...r, status } : r)));
+    setSelected(new Set());
+  };
+
+  const removeRows = (ids: string[]) => {
+    setRows((rs) => rs.filter((r) => !ids.includes(r.id)));
     setSelected(new Set());
   };
 
@@ -283,10 +306,10 @@ function ReviewModule() {
           </button>
           <button
             disabled={selected.size === 0}
-            onClick={() => setBatchReturnOpen(true)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] disabled:opacity-40 hover:bg-muted"
+            onClick={() => setBatchDeleteOpen(true)}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-destructive disabled:opacity-40 hover:bg-destructive/10"
           >
-            <Undo2 className="h-3.5 w-3.5" /> 批量退回
+            <Trash2 className="h-3.5 w-3.5" /> 批量删除
           </button>
           <button
             disabled={selected.size === 0}
@@ -355,7 +378,7 @@ function ReviewModule() {
                       {!done && (
                         <>
                           <ActionBtn icon={CheckCircle2} label="通过入库" tone="primary" onClick={() => setApproveOf(q)} />
-                          <ActionBtn icon={Undo2} label="退回修改" onClick={() => setReturnOf(q)} />
+                          <ActionBtn icon={Trash2} label="删除" tone="danger" onClick={() => setDeleteOf(q)} />
                           <ActionBtn icon={GitMerge} label="合并相似题" onClick={() => setMergeOf(q)} />
                         </>
                       )}
@@ -386,10 +409,10 @@ function ReviewModule() {
         onConfirm={(r) => { updateStatus([r.id], "已入库"); setApproveOf(null); toast.success("已通过并入库"); }}
         onViewSimilar={(r) => { setApproveOf(null); setMergeOf(r); }}
       />
-      <ReturnDialog
-        q={returnOf}
-        onClose={() => setReturnOf(null)}
-        onConfirm={(r) => { updateStatus([r.id], "退回修改"); setReturnOf(null); toast.success("已退回修改"); }}
+      <DeleteDialog
+        q={deleteOf}
+        onClose={() => setDeleteOf(null)}
+        onConfirm={(r) => { removeRows([r.id]); setDeleteOf(null); toast.success("已删除题目"); }}
       />
       <MergeDrawer
         q={mergeOf}
@@ -429,20 +452,19 @@ function ReviewModule() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={batchReturnOpen} onOpenChange={setBatchReturnOpen}>
+      <Dialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>批量退回修改</DialogTitle>
-            <DialogDescription>共 {selectedRows.length} 道题将退回修改</DialogDescription>
+            <DialogTitle>批量删除题目</DialogTitle>
+            <DialogDescription>共 {selectedRows.length} 道题将被永久删除,此操作不可恢复。</DialogDescription>
           </DialogHeader>
-          <Textarea rows={3} placeholder="请填写统一的修改意见" className="text-[13px]" />
           <DialogFooter>
-            <button onClick={() => setBatchReturnOpen(false)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
+            <button onClick={() => setBatchDeleteOpen(false)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
             <button
-              onClick={() => { updateStatus(selectedRows.map((r) => r.id), "退回修改"); setBatchReturnOpen(false); toast.success("已批量退回"); }}
-              className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+              onClick={() => { removeRows(selectedRows.map((r) => r.id)); setBatchDeleteOpen(false); toast.success("已批量删除"); }}
+              className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90"
             >
-              确认退回
+              确认删除
             </button>
           </DialogFooter>
         </DialogContent>
@@ -756,7 +778,7 @@ function ApproveDialog({
   );
 }
 
-function ReturnDialog({
+function DeleteDialog({
   q,
   onClose,
   onConfirm,
@@ -765,41 +787,19 @@ function ReturnDialog({
   onClose: () => void;
   onConfirm: (r: ReviewItem) => void;
 }) {
-  const [reason, setReason] = useState<string>("题干表述不清");
   return (
     <Dialog open={!!q} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         {q && (
           <>
             <DialogHeader>
-              <DialogTitle>返回修改</DialogTitle>
-              <DialogDescription>请说明退回原因,题目将回到出题人处</DialogDescription>
+              <DialogTitle>删除题目</DialogTitle>
+              <DialogDescription>删除后不可恢复,请确认是否删除该待审核题目。</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <ReviewSummary q={q} />
-              <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">退回原因</div>
-                <Select value={reason} onValueChange={setReason}>
-                  <SelectTrigger className="text-[13px]"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(["题干表述不清","答案不唯一","解析不完整","依据不足","难度不匹配","与已有题目重复","其他"] as const).map((r) => (
-                      <SelectItem key={r} value={r}>{r}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">修改意见</div>
-                <Textarea
-                  rows={3}
-                  placeholder="请说明需要修改的地方,例如:题干中'响应慢'表述不够准确,建议改为'AGC 响应速率不满足考核要求'。"
-                  className="text-[13px]"
-                />
-              </div>
-            </div>
+            <ReviewSummary q={q} />
             <DialogFooter>
               <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-              <button onClick={() => onConfirm(q)} className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">确认退回</button>
+              <button onClick={() => onConfirm(q)} className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90">确认删除</button>
             </DialogFooter>
           </>
         )}
@@ -1732,28 +1732,28 @@ function PaperModule({
 }) {
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           onClick={onGenerate}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
         >
-          <Sparkles className="h-4 w-4" /> 智能组卷
+          <Sparkles className="h-3.5 w-3.5" /> 智能组卷
         </button>
         <button
           onClick={onNew}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium hover:bg-muted"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3.5 py-1.5 text-[12.5px] font-medium text-foreground hover:border-primary/25 hover:bg-muted/70"
         >
-          <Plus className="h-4 w-4" /> 新建试卷
+          <Plus className="h-3.5 w-3.5" /> 新建试卷
         </button>
         <button
           onClick={() => toast.info("批量下发已选试卷")}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-4 py-2 text-[13px] font-medium hover:bg-muted"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3.5 py-1.5 text-[12.5px] font-medium text-foreground hover:border-primary/25 hover:bg-muted/70"
         >
-          <Send className="h-4 w-4" /> 批量下发
+          <Send className="h-3.5 w-3.5" /> 批量下发
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full whitespace-nowrap text-[13px]">
           <thead className="bg-muted/40 text-[12px] text-muted-foreground">
             <tr>
@@ -1772,14 +1772,14 @@ function PaperModule({
               <Th><span title="按每人最新一次已提交记录计算">平均分</span></Th>
               <Th><span title="按每人最新一次已提交记录计算">平均用时</span></Th>
               <Th>状态</Th>
-              <Th className="text-right">操作</Th>
+              <Th className="sticky right-0 z-10 min-w-[340px] bg-muted/40 text-right">操作</Th>
             </tr>
           </thead>
           <tbody>
             {PAPERS.map((p) => {
               const finishRate = p.assigned ? Math.round((p.finished / p.assigned) * 100) : 0;
               return (
-                <tr key={p.id} className="border-t border-border">
+                <tr key={p.id} className="group border-t border-border hover:bg-primary-soft/10">
                   <Td className="font-medium">{p.name}</Td>
                   <Td><Badge variant="secondary" className="font-normal">{p.goal}</Badge></Td>
                   <Td className="text-muted-foreground">{p.category}</Td>
@@ -1799,14 +1799,14 @@ function PaperModule({
                       {p.status}
                     </span>
                   </Td>
-                  <Td>
-                    <div className="flex flex-wrap justify-end gap-0.5">
-                      <ActionBtn icon={Eye} label="试卷详情" onClick={() => onPreview(p)} />
-                      <ActionBtn icon={Pencil} label="编辑" onClick={() => onEdit(p)} />
-                      <ActionBtn icon={Wand2} label="智能优化" tone="primary" onClick={() => onOptimize(p)} />
-                      <ActionBtn icon={Send} label="下发" tone="primary" onClick={() => onAssign(p)} />
-                      <ActionBtn icon={History} label="下发记录" onClick={() => onRecords(p)} />
-                      <ActionBtn icon={Copy} label="复制" onClick={() => onCopy(p)} />
+                  <Td className="sticky right-0 z-[1] whitespace-nowrap bg-card text-right shadow-[-6px_0_10px_-8px_rgba(15,35,45,0.12)] group-hover:bg-primary-soft/10">
+                    <div className="inline-flex flex-nowrap items-center justify-end gap-2">
+                      <ActionBtn variant="text" icon={Eye} label="试卷详情" onClick={() => onPreview(p)} />
+                      <ActionBtn variant="text" icon={Pencil} label="编辑" onClick={() => onEdit(p)} />
+                      {/* <ActionBtn variant="text" icon={Wand2} label="智能优化" tone="primary" onClick={() => onOptimize(p)} /> */}
+                      <ActionBtn variant="text" icon={Send} label="下发" tone="primary" onClick={() => onAssign(p)} />
+                      <ActionBtn variant="text" icon={History} label="下发记录" onClick={() => onRecords(p)} />
+                      {/* <ActionBtn icon={Copy} label="复制" onClick={() => onCopy(p)} /> */}
                     </div>
                   </Td>
                 </tr>
@@ -1823,10 +1823,15 @@ function PaperModule({
 function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const [nl, setNl] = useState("");
   const [generated, setGenerated] = useState(false);
+  const [addType, setAddType] = useState<QuestionType | null>(null);
+  const [swapOpen, setSwapOpen] = useState(false);
+  const { groups, collapsed, toggleCollapse, move, remove, aiAppend, resetGroups, summary } =
+    usePaperQuestionGroups(EDITOR_GROUPS);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-        <SheetHeader>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <SheetHeader className="border-b border-border px-6 py-4">
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" /> 智能组卷
           </SheetTitle>
@@ -1835,7 +1840,7 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-5 space-y-5">
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
           <div>
             <label className="mb-1.5 block text-[12.5px] font-medium">自然语言组卷</label>
             <Textarea
@@ -1859,6 +1864,7 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
           <button
             onClick={() => {
+              resetGroups();
               setGenerated(true);
               toast.success("已生成试卷预览");
             }}
@@ -1868,12 +1874,12 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
           </button>
 
           {generated && (
-            <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+            <div className="space-y-4">
               <div className="rounded-lg border border-border bg-card p-3">
                 <div className="text-[13px] font-semibold">AGC / 两细则取证复习考试</div>
                 <div className="mt-1 flex flex-wrap gap-3 text-[11.5px] text-muted-foreground">
-                  <span>题量 20</span>
-                  <span>总分 100</span>
+                  <span>题量 {summary[0]?.value ?? 0}</span>
+                  <span>总分 {summary[1]?.value ?? 0}</span>
                   <span>时长 30 分</span>
                   <span>及格线 60</span>
                 </div>
@@ -1896,57 +1902,54 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
                 缺题提醒:简答题题量不足,建议补充 1 道或调整题型比例。
               </div>
 
-              <div className="space-y-2">
-                <div className="text-[12px] font-medium text-muted-foreground">题目清单</div>
-                {GEN_PREVIEW.questions.map((qq, idx) => (
-                  <div
-                    key={qq.no}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px]"
-                  >
-                    <span className="text-muted-foreground">{idx + 1}.</span>
-                    <span className="min-w-0 flex-1 truncate">{qq.stem}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{qq.type}</span>
-                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${diffClass(qq.difficulty)}`}>
-                      {qq.difficulty}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      <IconBtn icon={FileSearch} title="查看依据" onClick={() => toast.info("查看资料依据")} />
-                      <IconBtn icon={Wand2} title="AI 换题" onClick={() => toast.success("已替换此题")} />
-                      <IconBtn icon={ArrowUp} title="上移" onClick={() => toast.info("上移")} />
-                      <IconBtn icon={ArrowDown} title="下移" onClick={() => toast.info("下移")} />
-                      <IconBtn icon={Trash2} title="删除" danger onClick={() => toast.success("已删除该题")} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <PaperQuestionSummary summary={summary} />
+
+              <PaperQuestionList
+                groups={groups}
+                collapsed={collapsed}
+                onToggleCollapse={toggleCollapse}
+                onAdd={setAddType}
+                onAiAppend={aiAppend}
+                onMove={move}
+                onRemove={remove}
+                onSwap={() => setSwapOpen(true)}
+              />
 
               <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-[11.5px] text-warning-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 智能组卷用于辅助培训负责人创建考试,正式下发前需人工确认。
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setGenerated(false)}
-                  className="flex-1 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium hover:bg-muted"
-                >
-                  继续调整
-                </button>
-                <button
-                  onClick={() => {
-                    toast.success("试卷已保存为草稿");
-                    onOpenChange(false);
-                    setGenerated(false);
-                  }}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  <CheckCircle2 className="h-4 w-4" /> 保存为试卷
-                </button>
-              </div>
             </div>
           )}
         </div>
+
+        {generated && (
+          <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3.5">
+            <button
+              onClick={() => setGenerated(false)}
+              className="rounded-lg border border-border px-4 py-2 text-[13px] hover:bg-muted"
+            >
+              继续调整
+            </button>
+            <button
+              onClick={() => {
+                toast.success("试卷已保存为草稿");
+                onOpenChange(false);
+                setGenerated(false);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <CheckCircle2 className="h-4 w-4" /> 保存为试卷
+            </button>
+          </div>
+        )}
       </SheetContent>
+      <AddQuestionDialog
+        open={addType !== null}
+        onClose={() => setAddType(null)}
+        onAdd={(n) => toast.success(`已向${addType ?? "试卷"}添加 ${n} 题`)}
+      />
+      <SwapDialog open={swapOpen} onClose={() => setSwapOpen(false)} onPick={() => {}} />
     </Sheet>
   );
 }
@@ -2396,11 +2399,11 @@ function RecordsDrawer({ paper, onClose }: { paper: Paper | null; onClose: () =>
                   </div>
                 )}
 
-                {shuffled && (
+                {/* {shuffled && (
                   <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-3 py-1 text-[11.5px] font-medium text-primary">
                     <ShieldCheck className="h-3.5 w-3.5" /> 该记录为个人乱序卷面,已映射回标准卷统计。
                   </div>
-                )}
+                )} */}
 
                 {record.status === "已提交" && record.answers.length > 0 ? (
                   <AnswerList items={record.answers} />
@@ -2943,75 +2946,16 @@ function AddQuestionDialog({ open, onClose, onAdd }: { open: boolean; onClose: (
 const GOAL_OPTIONS = ["取证复习", "复证巩固", "岗位达标", "阶段测评", "日常自测"];
 
 function PaperEditor({ open, onClose, paper }: { open: boolean; onClose: () => void; paper: Paper | null }) {
-  const [groups, setGroups] = useState<EditorGroup[]>(() => structuredClone(EDITOR_GROUPS));
-  const [collapsed, setCollapsed] = useState<Set<QuestionType>>(new Set());
+  const { groups, collapsed, toggleCollapse, move, remove, aiAppend, resetGroups, summary } =
+    usePaperQuestionGroups(EDITOR_GROUPS);
   const [addType, setAddType] = useState<QuestionType | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
   const [lastPaper, setLastPaper] = useState<string | null>(null);
 
   if (open && (paper?.id ?? null) !== lastPaper) {
-    setGroups(structuredClone(EDITOR_GROUPS));
+    resetGroups();
     setLastPaper(paper?.id ?? null);
   }
-
-  const totalCount = groups.reduce((s, g) => s + g.questions.length, 0);
-  const totalScore = groups.reduce((s, g) => s + g.questions.length * g.perScore, 0);
-  const countByType = (t: QuestionType) => groups.find((g) => g.type === t)?.questions.length ?? 0;
-
-  const toggleCollapse = (t: QuestionType) =>
-    setCollapsed((prev) => {
-      const n = new Set(prev);
-      n.has(t) ? n.delete(t) : n.add(t);
-      return n;
-    });
-
-  const move = (type: QuestionType, idx: number, dir: -1 | 1) => {
-    setGroups((prev) =>
-      prev.map((g) => {
-        if (g.type !== type) return g;
-        const q = [...g.questions];
-        const j = idx + dir;
-        if (j < 0 || j >= q.length) return g;
-        [q[idx], q[j]] = [q[j], q[idx]];
-        return { ...g, questions: q };
-      }),
-    );
-  };
-
-  const remove = (type: QuestionType, id: string) => {
-    setGroups((prev) =>
-      prev.map((g) => (g.type === type ? { ...g, questions: g.questions.filter((q) => q.id !== id) } : g)),
-    );
-  };
-
-  const aiAppend = (type: QuestionType) => {
-    setGroups((prev) =>
-      prev.map((g) => {
-        if (g.type !== type) return g;
-        const base = g.questions[0];
-        const extra = Array.from({ length: 3 }).map((_, i) => ({
-          id: `ai-${type}-${Date.now()}-${i}`,
-          stem: `AI 补充的${type}:AGC/两细则中等难度题目 ${i + 1}`,
-          knowledge: base?.knowledge ?? "AGC / 两细则",
-          difficulty: "中" as Difficulty,
-          source: base?.source ?? "AGC 控制器 SOP v2024.06",
-          score: g.perScore,
-        }));
-        return { ...g, questions: [...g.questions, ...extra] };
-      }),
-    );
-    toast.success(`已为${type}补 3 道题`);
-  };
-
-  const summary: { label: string; value: string | number }[] = [
-    { label: "当前题量", value: totalCount },
-    { label: "试卷总分", value: totalScore },
-    { label: "单选题", value: countByType("单选题") },
-    { label: "多选题", value: countByType("多选题") },
-    { label: "判断题", value: countByType("判断题") },
-    { label: "填空题", value: countByType("填空题") },
-    { label: "简答题", value: countByType("简答题") },
-  ];
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -3057,62 +3001,18 @@ function PaperEditor({ open, onClose, paper }: { open: boolean; onClose: () => v
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 rounded-lg border border-border bg-muted/30 p-3 md:grid-cols-7">
-            {summary.map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-[16px] font-semibold tracking-tight text-primary">{s.value}</div>
-                <div className="mt-0.5 text-[10.5px] text-muted-foreground">{s.label}</div>
-              </div>
-            ))}
-          </div>
+          <PaperQuestionSummary summary={summary} />
 
-          {groups.map((g) => {
-            const isCol = collapsed.has(g.type);
-            const groupScore = g.questions.length * g.perScore;
-            return (
-              <div key={g.type} className="rounded-lg border border-border bg-card">
-                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-                  <button onClick={() => toggleCollapse(g.type)} className="flex items-center gap-1.5 text-[13px] font-medium">
-                    {isCol ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                    {g.type}(共 {g.questions.length} 小题,每小题 {g.perScore} 分,共 {groupScore} 分)
-                  </button>
-                  <div className="flex items-center gap-0.5">
-                    <ActionBtn icon={Plus} label="添加题目" onClick={() => setAddType(g.type)} />
-                    <ActionBtn icon={Sparkles} label="AI 补题" tone="primary" onClick={() => aiAppend(g.type)} />
-                  </div>
-                </div>
-                {!isCol && (
-                  <div className="divide-y divide-border">
-                    {g.questions.map((q, idx) => (
-                      <div key={q.id} className="flex items-center gap-3 px-4 py-2 text-[12.5px]">
-                        <span className="w-5 shrink-0 text-muted-foreground">{idx + 1}.</span>
-                        <span className="min-w-0 flex-1 truncate font-medium">{q.stem}</span>
-                        <Badge variant="secondary" className="shrink-0 font-normal">{q.knowledge}</Badge>
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${diffClass(q.difficulty)}`}>{q.difficulty}</span>
-                        <span className="hidden w-32 shrink-0 truncate text-[11px] text-muted-foreground lg:block">{q.source}</span>
-                        <span className="w-10 shrink-0 text-right text-muted-foreground">{q.score} 分</span>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          <IconBtn icon={FileSearch} title="查看依据" onClick={() => toast.info("查看资料依据")} />
-                          <IconBtn icon={Wand2} title="AI 换题" onClick={() => setSwapOpen(true)} />
-                          <IconBtn icon={ArrowUp} title="上移" onClick={() => move(g.type, idx, -1)} />
-                          <IconBtn icon={ArrowDown} title="下移" onClick={() => move(g.type, idx, 1)} />
-                          <IconBtn icon={Trash2} title="删除" danger onClick={() => remove(g.type, q.id)} />
-                        </div>
-                      </div>
-                    ))}
-                    {g.questions.length === 0 && (
-                      <div className="px-4 py-4 text-center text-[12px] text-muted-foreground">暂无题目,点击“添加题目”或“AI 补题”</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-[11.5px] text-warning-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            AI 补题和换题仅用于辅助组卷,正式保存和下发前需培训负责人确认。
-          </div>
+          <PaperQuestionList
+            groups={groups}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            onAdd={setAddType}
+            onAiAppend={aiAppend}
+            onMove={move}
+            onRemove={remove}
+            onSwap={() => setSwapOpen(true)}
+          />
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3.5">
@@ -3189,44 +3089,26 @@ function ExamAdminPage() {
 
   return (
     <PageShell>
-      <div className="mb-6 flex items-center gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-lg bg-primary-soft text-primary">
-          <ClipboardCheck className="h-5.5 w-5.5" />
-        </div>
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">考试管理</h1>
-          <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-            题目审核、题库维护、智能组卷、试卷下发与答题跟踪。
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="考试管理"
+        subtitle="题目审核、题库维护、智能组卷、试卷下发与答题跟踪。"
+        size="md"
+      />
 
       <StatCards />
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 rounded-lg border px-4 py-2.5 text-left transition-all ${
-                active
-                  ? "border-primary/40 bg-primary-soft"
-                  : "border-border bg-card hover:border-primary/30"
-              }`}
-            >
-              <Icon className={`h-4.5 w-4.5 ${active ? "text-primary" : "text-muted-foreground"}`} />
-              <div>
-                <div className={`text-[13.5px] font-medium ${active ? "text-primary" : ""}`}>{t.label}</div>
-                <div className="text-[11px] text-muted-foreground">{t.desc}</div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
+      <ModulePanel>
+        <ModuleTabs
+          tabs={TABS.map((t) => ({
+            key: t.key,
+            label: t.label,
+            desc: t.desc,
+            icon: <t.icon className="h-4 w-4" />,
+          }))}
+          value={tab}
+          onChange={setTab}
+        />
+        <div className="p-4">
       {tab === "review" && <ReviewModule />}
       {tab === "bank" && <BankModule />}
       {tab === "paper" && (
@@ -3241,6 +3123,8 @@ function ExamAdminPage() {
           onNew={() => openEditor(null)}
         />
       )}
+        </div>
+      </ModulePanel>
 
       <PaperEditor open={editorOpen} onClose={() => setEditorOpen(false)} paper={editorPaper} />
       <GenerateDrawer open={genOpen} onOpenChange={setGenOpen} />

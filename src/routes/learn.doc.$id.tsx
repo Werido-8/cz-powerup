@@ -20,6 +20,17 @@ import { DOCS, QUESTIONS, TOPICS, type Doc } from "@/lib/mock/data";
 import { useMockStore } from "@/lib/mock/store";
 import { toast } from "sonner";
 import { RichMindMap } from "@/components/learn/RichMindMap";
+import { ReviewSchedulePreview } from "@/components/learning/spaced-review";
+import { learningBtnRadius } from "@/components/learning/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/learn/doc/$id")({
   loader: ({ params }) => {
@@ -49,8 +60,11 @@ export const Route = createFileRoute("/learn/doc/$id")({
 
 function DocPage() {
   const { doc } = Route.useLoaderData() as { doc: Doc };
-  const { state, toggleFavorite, addNote, addToCollection } = useMockStore();
-  const [learned, setLearned] = useState(doc.status === "已学");
+  const { state, toggleFavorite, addNote, addToCollection, addSpacedReview, removeSpacedReview } =
+    useMockStore();
+  const inReviewPlan = state.reviews.some((r) => r.kind === "doc" && r.sourceId === doc.id);
+  const [learned, setLearned] = useState(doc.status === "已学" || inReviewPlan);
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [noteTitle, setNoteTitle] = useState(`《${doc.title}》学习笔记`);
@@ -63,8 +77,6 @@ function DocPage() {
   const prev = DOCS[idx - 1];
   const next = DOCS[idx + 1];
   const related = QUESTIONS.filter((q) => q.relatedDocId === doc.id).slice(0, 3);
-  const highlights = doc.body.filter((b) => b.highlight);
-
   const saveNote = (alsoCollection = false) => {
     if (!noteText.trim()) {
       toast.error("请填写笔记内容");
@@ -115,7 +127,7 @@ function DocPage() {
                 {doc.source}
               </span>
               <span className={`rounded-md px-2 py-0.5 text-[10.5px] ${learned ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"}`}>
-                {learned ? "已学" : doc.status}
+                {learned ? (inReviewPlan ? "已学 · 复习中" : "已学") : doc.status}
               </span>
             </div>
             <h1 className="text-[24px] font-semibold leading-tight tracking-tight">{doc.title}</h1>
@@ -133,14 +145,21 @@ function DocPage() {
               </Link>
               <button
                 onClick={() => {
-                  setLearned((s) => !s);
-                  toast.success(learned ? "已取消已学标记" : "已标记为已学");
+                  if (learned) {
+                    setLearned(false);
+                    removeSpacedReview(`doc-${doc.id}`);
+                    toast.success("已取消已学标记，并从复习计划移除");
+                    return;
+                  }
+                  setReviewDialogOpen(true);
                 }}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[12.5px] font-medium transition-colors ${
+                className={cn(
+                  "inline-flex items-center gap-1.5 border px-3 py-2 text-[12.5px] font-medium transition-colors",
+                  learningBtnRadius,
                   learned
                     ? "border-success/40 bg-success-soft text-success"
-                    : "border-border bg-background hover:border-primary/40"
-                }`}
+                    : "border-border bg-background hover:border-primary/40",
+                )}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" /> {learned ? "已学" : "标记已学"}
               </button>
@@ -396,6 +415,44 @@ function DocPage() {
           </div>
         </div>
       )}
+
+      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[16px]">纳入复习计划？</DialogTitle>
+            <DialogDescription className="text-[13px] leading-relaxed">
+              已标记《{doc.title.slice(0, 24)}
+              {doc.title.length > 24 ? "…" : ""}》为已学。是否按艾宾浩斯遗忘曲线加入复习计划？系统将在以下节点提醒您回顾。
+            </DialogDescription>
+          </DialogHeader>
+          <ReviewSchedulePreview />
+          <DialogFooter className="gap-2 sm:gap-0">
+            <button
+              type="button"
+              onClick={() => {
+                setLearned(true);
+                setReviewDialogOpen(false);
+                toast.success("已标记为已学");
+              }}
+              className={cn("border border-border bg-background px-4 py-2 text-[13px] hover:bg-muted", learningBtnRadius)}
+            >
+              仅标记已学
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLearned(true);
+                addSpacedReview({ kind: "doc", sourceId: doc.id, title: doc.title });
+                setReviewDialogOpen(false);
+                toast.success("已纳入复习计划");
+              }}
+              className={cn("bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90", learningBtnRadius)}
+            >
+              纳入复习计划
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageShell>
   );
 }

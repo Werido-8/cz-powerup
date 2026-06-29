@@ -12,6 +12,7 @@ interface MenuItem {
 const MENU: MenuItem[] = [
   { label: "首页工作台", to: "/" },
   { label: "资料检索", to: "/search" },
+  { label: "知识库", to: "/knowledge" },
   { label: "智能问答", to: "/chat" },
   {
     label: "能力提升",
@@ -121,15 +122,15 @@ export function Header() {
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-[1760px] items-center gap-8 px-8">
         <Link to="/" className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-lg bg-white ring-1 ring-border">
-            <img src={logo} alt="平台 Logo" className="h-11 w-11 object-contain" />
+          <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-white ring-1 ring-border">
+            <img src={logo} alt="平台 Logo" className="h-8 w-8 object-contain" />
           </div>
           <div className="leading-tight">
             <div className="text-[15px] font-semibold tracking-tight text-foreground">
-              涉网运行能力智能支撑平台
+              涉网运行能力智能提升平台
             </div>
             <div className="text-[11px] text-muted-foreground">
-              面向厂站人员的知识学习、题库训练与场景复盘平台
+              面向电厂人员的知识学习、场景练习与能力成长平台
             </div>
           </div>
         </Link>
@@ -140,16 +141,20 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
-          <button className="relative grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+        <div className="flex items-center gap-2.5">
+          <button className="relative grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
             <Bell className="h-[18px] w-[18px]" />
-            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-destructive" />
+            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-remind" />
           </button>
-          <div className="flex items-center gap-2.5 rounded-full border border-border bg-card py-1 pl-1 pr-3 shadow-sm">
-            <div className="grid h-7 w-7 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.5_0.13_205)] text-[12px] font-semibold text-primary-foreground">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-2">
+            <div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[12px] font-semibold text-primary-foreground">
               张
             </div>
             <span className="text-[13px] font-medium text-foreground">张工</span>
+            <button className="flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+              运行值班
+              <ChevronDown className="h-3 w-3" />
+            </button>
           </div>
         </div>
       </div>

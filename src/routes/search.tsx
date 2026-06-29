@@ -12,6 +12,7 @@ import {
   Tag as TagIcon,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
+import { PageHeader } from "@/components/learning/ui";
 import { DocDrawer } from "@/components/common/DocDrawer";
 import { SafetyBanner } from "@/components/common/SafetyBanner";
 import { DOCS, DOC_TYPES, HOT_KEYWORDS, PLANTS, type Doc } from "@/lib/mock/data";
@@ -71,12 +72,10 @@ function SearchPage() {
 
   return (
     <PageShell>
-      <div className="mb-6">
-        <h1 className="text-[24px] font-semibold tracking-tight text-foreground">资料检索</h1>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          按场景、设备、关键词查找可追溯依据,所有结果均带来源标注
-        </p>
-      </div>
+      <PageHeader
+        title="资料检索"
+        subtitle="按场景、设备、关键词查找可追溯依据,所有结果均带来源标注"
+      />
 
       <div className="rounded-lg border border-border bg-card p-5 shadow-[var(--shadow-card)]">
         <div className="flex items-center gap-3">
@@ -158,9 +157,9 @@ function SearchPage() {
         )}
       </div>
 
-      <div className="mt-4">
+      {/* <div className="mt-4">
         <SafetyBanner compact />
-      </div>
+      </div> */}
 
       <div className="mt-5 mb-3 flex items-center justify-between">
         <div className="text-[12.5px] text-muted-foreground">

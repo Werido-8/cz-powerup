@@ -1,15 +1,11 @@
-import { useState } from "react";
 import {
-  ShieldAlert,
   TrendingUp,
   Target,
   Activity,
-  AlertCircle,
   Clock,
-  CheckCircle2,
   ArrowRight,
   Wrench,
-  Siren,
+  FileSearch,
   BookOpen,
   Brain,
   MessagesSquare,
@@ -17,409 +13,522 @@ import {
   FileText,
   ChevronRight,
   Sparkles,
-  X,
   GraduationCap,
-  Zap,
-  Award,
+  BookMarked,
+  Layers,
+  Bot,
+  Info,
 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 type EntryRoute = "/learn" | "/training" | "/chat" | "/assets";
 type ScenarioRoute = "/scenario/typical" | "/scenario/fault";
+type TaskRoute = "/training/wrong" | "/learn/topic/$id" | "/training/practice";
+type DocRoute = "/learn/doc/$id";
+type TopicRoute = "/learn/topic/$id";
 
-type ReviewItem = {
+const CARD =
+  "rounded-2xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-[#fafcfd]";
+const CARD_SHADOW = "shadow-[0_1px_2px_0_rgba(52,155,172,0.04)]";
+
+const METRICS = [
+  {
+    label: "学习进度",
+    value: 85,
+    suffix: "%",
+    desc: "岗位能力路径完成度",
+    icon: TrendingUp,
+    bar: "primary" as const,
+  },
+  {
+    label: "答题正确率",
+    value: 92,
+    suffix: "%",
+    desc: "近 30 天知识掌握情况",
+    icon: Target,
+    bar: "success" as const,
+  },
+  {
+    label: "练习次数",
+    value: 24,
+    suffix: "次",
+    desc: "近 30 天场景练习记录",
+    icon: Activity,
+    bar: "primary" as const,
+    progress: 80,
+  },
+];
+
+const WEAK_POINTS = [
+  { name: "继电保护动作原理", rate: 62 },
+  { name: "变压器有载调压", rate: 68 },
+  { name: "AGC / AVC 闭环逻辑", rate: 71 },
+];
+
+const TASKS: {
   id: string;
   title: string;
   meta: string;
   tag: string;
-  done: boolean;
-};
-
-const INITIAL_REVIEW: ReviewItem[] = [
+  tagTone: "muted" | "memory" | "weak";
+  action: string;
+  to: TaskRoute;
+  params?: { id: string };
+  highlight?: boolean;
+}[] = [
   {
     id: "1",
     title: "错题巩固：220kV 变电站典型故障处置",
     meta: "昨日错题 · 3 题待复习",
     tag: "错题",
-    done: false,
+    tagTone: "muted",
+    action: "去巩固",
+    to: "/training/wrong",
   },
   {
     id: "2",
-    title: "知识卡片复习：继电保护动作逻辑",
-    meta: "艾宾浩斯 · 第 4 次复习节点",
+    title: "专题复习：继电保护动作逻辑",
+    meta: "艾宾浩斯 · 第 4 天复习节点",
     tag: "记忆",
-    done: false,
+    tagTone: "memory",
+    action: "去复习",
+    to: "/learn/topic/$id",
+    params: { id: "t-fault" },
   },
   {
     id: "3",
     title: "薄弱点强化：母线差动保护原理",
     meta: "近 7 日正确率 62%",
     tag: "薄弱",
-    done: false,
+    tagTone: "weak",
+    action: "去练习",
+    to: "/training/practice",
+    highlight: true,
   },
-];
-
-const METRICS = [
-  { label: "学习进度", value: 85, suffix: "%", icon: TrendingUp, hue: "primary" },
-  { label: "答题正确率", value: 92, suffix: "%", icon: Target, hue: "success" },
-  { label: "训练次数", value: 24, suffix: "次", icon: Activity, hue: "primary" },
-];
-
-const WEAK_POINTS = [
-  { name: "母线差动保护原理", rate: 62 },
-  { name: "变压器有载调压", rate: 68 },
-  { name: "AGC/AVC 闭环逻辑", rate: 71 },
 ];
 
 const ENTRIES: { icon: typeof BookOpen; title: string; desc: string; tag: string; to: EntryRoute }[] = [
   {
     icon: BookOpen,
     title: "知识学习",
-    desc: "结构化课程与知识卡片，按岗位推送",
+    desc: "结构化课程与专题资料，按岗位能力递进",
     tag: "今日 3 节",
     to: "/learn",
   },
   {
     icon: ClipboardList,
     title: "题库训练",
-    desc: "智能组卷 · 错题溯源 · 考点画像",
+    desc: "智能组卷、错题回顾、考点画像",
     tag: "1280 题",
     to: "/training",
   },
   {
     icon: MessagesSquare,
     title: "智能问答",
-    desc: "基于内部规程的多轮检索增强问答",
+    desc: "基于内部知识库的多轮答疑与原文引用",
     tag: "AI",
     to: "/chat",
   },
   {
     icon: Brain,
     title: "个人沉淀",
-    desc: "复盘笔记、错题本与能力雷达",
+    desc: "复盘记录、错因分析与能力成长轨迹",
     tag: "已沉淀 48",
     to: "/assets",
   },
 ];
 
-const SCENARIOS: { icon: typeof Wrench; title: string; desc: string; stats: string[]; accent: string; to: ScenarioRoute }[] = [
+const SCENARIOS: {
+  icon: typeof Wrench;
+  title: string;
+  desc: string;
+  stats: string[];
+  bg: string;
+  to: ScenarioRoute;
+}[] = [
   {
     icon: Wrench,
     title: "典型操作训练",
-    desc: "围绕设备、任务和前置条件，学习典型操作关键步骤、风险点和依据。",
-    stats: ["12 类设备", "48 个操作场景", "覆盖 220kV / 500kV"],
-    accent: "from-primary/15 to-primary/0",
+    desc: "围绕启停、任务前准备、操作步骤、关键确认点和易错环节，进行情景化练习。",
+    stats: ["12 条规程", "48 个操作场景", "覆盖 220kV / 500kV"],
+    bg: "bg-primary-soft/50",
     to: "/scenario/typical",
   },
   {
-    icon: Siren,
+    icon: FileSearch,
     title: "故障处置复盘训练",
-    desc: "围绕现象、保护动作和开关状态，训练核查思路和复盘能力。",
-    stats: ["36 个真实案例", "保护动作还原", "时间线复盘"],
-    accent: "from-[oklch(0.7_0.17_55)]/15 to-[oklch(0.7_0.17_55)]/0",
+    desc: "围绕故障现象、保护动作、处置流程和复盘依据，提升异常场景下的判断能力。",
+    stats: ["36 个典型案例", "保护动作逻辑", "时间线复盘"],
+    bg: "bg-remind-soft/80",
     to: "/scenario/fault",
   },
 ];
 
-const PATHS = [
-  { step: "01", title: "新员工入门专题", meta: "12 课时 · 4 周", progress: 35 },
-  { step: "02", title: "典型操作专项", meta: "8 课时 · 含 6 个实训", progress: 60 },
-  { step: "03", title: "考证冲刺", meta: "押题 + 模考 · 30 天", progress: 12 },
+const PATHS: { step: string; title: string; meta: string; progress: number; topicId: string; recommend?: boolean }[] = [
+  { step: "01", title: "新员工入门专题", meta: "12 课时 · 4 周", progress: 35, topicId: "t-newbie", recommend: true },
+  { step: "02", title: "典型操作专项", meta: "8 课时 · 含 6 个案例", progress: 60, topicId: "t-op" },
+  { step: "03", title: "考评冲刺", meta: "问答 · 规程 · 30 天", progress: 12, topicId: "t-agc" },
 ];
 
-const UPDATES = [
-  { type: "规程", title: "《国家电网公司变电站典型操作票》2024 修订版", time: "2 小时前" },
-  { type: "SOP", title: "220kV 主变停送电标准化作业流程 v3.2", time: "今天 09:20" },
-  { type: "案例", title: "某 500kV 变电站母差误动事故分析报告", time: "昨天" },
-  { type: "通知", title: "迎峰度夏期间运行风险提示（第 12 期）", time: "2 天前" },
+const UPDATES: { type: string; title: string; time: string; docId: string }[] = [
+  {
+    type: "规程",
+    title: "《国家电网公司变电站典型操作票》2024 修订版",
+    time: "2 小时前",
+    docId: "d4",
+  },
+  {
+    type: "SOP",
+    title: "220kV 主变停送电标准化作业流程 v3.2",
+    time: "今天 09:20",
+    docId: "d2",
+  },
+  {
+    type: "案例",
+    title: "某 500kV 变电站母差保护动作分析报告",
+    time: "昨天",
+    docId: "d3",
+  },
+  {
+    type: "通知",
+    title: "迎峰度夏期间运行风险提示（第 12 期）",
+    time: "2 天前",
+    docId: "d7",
+  },
 ];
+
+const TAG_STYLES: Record<string, string> = {
+  规程: "bg-primary-soft text-accent-foreground",
+  SOP: "bg-success-soft text-success",
+  案例: "bg-remind-soft text-remind-foreground",
+  通知: "bg-muted text-muted-foreground",
+};
+
+const TASK_TAG_STYLES: Record<string, string> = {
+  muted: "bg-muted text-muted-foreground",
+  memory: "bg-primary-soft text-accent-foreground",
+  weak: "bg-remind-soft text-remind-foreground",
+};
+
+function ProgressBar({
+  value,
+  tone = "primary",
+  className = "",
+}: {
+  value: number;
+  tone?: "primary" | "success" | "remind";
+  className?: string;
+}) {
+  const fill =
+    tone === "success" ? "bg-success" : tone === "remind" ? "bg-remind" : "bg-primary";
+  return (
+    <div className={`h-1 overflow-hidden rounded-full bg-divider ${className}`}>
+      <div className={`h-full rounded-full ${fill}`} style={{ width: `${value}%` }} />
+    </div>
+  );
+}
+
+function SectionCard({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`${CARD} ${CARD_SHADOW} p-6 ${className}`}>{children}</div>
+  );
+}
+
+function SectionHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="mb-5 flex items-start justify-between gap-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
+        {subtitle && <p className="mt-1 text-[13px] text-muted-foreground">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
 
 export function Workbench() {
-  const [reviews, setReviews] = useState(INITIAL_REVIEW);
-  const [modal, setModal] = useState<ReviewItem | null>(null);
-
-  const completeReview = (id: string) => {
-    setReviews((rs) => rs.map((r) => (r.id === id ? { ...r, done: true } : r)));
-    setModal(null);
-  };
-
   return (
-    <main className="mx-auto max-w-[1760px] px-8 py-8">
-      {/* Section A: Welcome + Safety */}
-      <section className="relative overflow-hidden rounded-lg border border-border bg-card p-8 shadow-[var(--shadow-card)]">
-        <div className="absolute right-0 top-0 h-full w-2/3 bg-gradient-to-l from-primary-soft/60 to-transparent" />
-        <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
-        <div className="relative flex flex-wrap items-end justify-between gap-6">
+    <main className="mx-auto max-w-[1760px] px-8 py-6">
+      {/* Welcome Banner */}
+      <section
+        className={`relative overflow-hidden ${CARD} border-primary/10 bg-gradient-to-r from-primary-soft/80 via-primary-soft/40 to-card px-6 py-5`}
+        style={{ minHeight: 140 }}
+      >
+        <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-primary/8 blur-2xl" />
+        <div className="pointer-events-none absolute bottom-0 right-1/3 h-24 w-24 rounded-full bg-primary/5 blur-xl" />
+        <div className="relative flex flex-wrap items-center justify-between gap-5">
           <div className="max-w-2xl">
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-medium text-accent-foreground">
-              <Sparkles className="h-3 w-3" />
-              <span>今日推荐 3 项训练</span>
+            <div className="mb-2.5 inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-white/70 px-2.5 py-1 text-[11px] font-medium text-accent-foreground">
+              <Sparkles className="h-3 w-3 text-primary" />
+              今日任务 3 项待完成
             </div>
-            <h1 className="text-[28px] font-semibold tracking-tight text-foreground">
-              下午好，张工 <span className="text-muted-foreground font-normal">·</span>{" "}
-              <span className="bg-gradient-to-r from-primary to-[oklch(0.5_0.13_205)] bg-clip-text text-transparent">
-                让我们开启今天的训练
-              </span>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              下午好，张工
+              <span className="mx-2 font-normal text-muted-foreground">｜</span>
+              <span className="text-primary">让我们开始今天的能力提升</span>
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              你已连续学习 <span className="font-medium text-foreground">7 天</span>，本周训练目标完成{" "}
+            <p className="mt-2 text-[13px] text-muted-foreground">
+              你已连续学习 <span className="font-medium text-foreground">7 天</span>，本周目标完成度{" "}
               <span className="font-medium text-foreground">68%</span>，继续保持。
             </p>
-          </div>
-          <div className="flex items-start gap-3 rounded-lg border border-warning/30 bg-warning-soft/70 px-4 py-3 text-[12.5px] text-warning-foreground">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-            <div className="max-w-md leading-relaxed">
-              <span className="font-medium">安全边界提示：</span>
-              本平台为 AI 智能训练辅助系统，不替代正式操作票、调度指令或事故定性结论。
+            <div className="mt-3 flex flex-wrap gap-2">
+              {["今日任务 3 项", "连续学习 7 天", "本周完成度 68%"].map((t) => (
+                <span
+                  key={t}
+                  className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[11px] text-muted-foreground"
+                >
+                  {t}
+                </span>
+              ))}
             </div>
+          </div>
+
+          <div className="w-full max-w-[300px] shrink-0 rounded-xl border border-remind/20 bg-remind-soft/60 p-4">
+            <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-remind-foreground">
+              <Bot className="h-3.5 w-3.5 text-remind" />
+              AI 学习助手提示
+            </div>
+            <p className="text-[12px] leading-relaxed text-remind-foreground/90">
+              本平台提供知识学习、场景练习和能力成长辅助，关键操作仍需以现场规程、票卡和岗位要求为准。
+            </p>
+            <Link
+              to="/governance"
+              className="mt-2.5 inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:text-primary/80"
+            >
+              <Info className="h-3 w-3" />
+              查看使用说明
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Section B: Growth + Review */}
-      <section className="mt-6 grid grid-cols-12 gap-6">
-        {/* Left: Capability */}
-        <div className="col-span-12 lg:col-span-7 rounded-lg border border-border bg-card p-7 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-card-hover)]">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">能力成长概览</h2>
-              <p className="mt-1 text-[12.5px] text-muted-foreground">
-                综合学习、训练与考核的近 30 天表现
-              </p>
-            </div>
-            <Link to="/training/growth" className="flex items-center gap-1 text-[12.5px] font-medium text-primary hover:text-primary/80">
-              查看能力雷达 <ChevronRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
+      {/* Growth Overview + Today's Tasks */}
+      <section className="mt-5 grid grid-cols-12 gap-5">
+        <SectionCard className="col-span-12 lg:col-span-8">
+          <SectionHeader
+            title="能力成长概览"
+            subtitle="综合学习进度、答题表现和场景练习情况生成"
+            action={
+              <Link
+                to="/training/growth"
+                className="flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-primary hover:text-primary/80"
+              >
+                查看能力雷达
+                <ChevronRight className="h-3.5 w-3.5" />
+              </Link>
+            }
+          />
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3">
             {METRICS.map((m) => {
               const Icon = m.icon;
-              const isSuccess = m.hue === "success";
               return (
                 <div
                   key={m.label}
-                  className="group relative overflow-hidden rounded-lg border border-border bg-gradient-to-br from-background to-muted/40 p-5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[var(--shadow-card)]"
+                  className="rounded-xl border border-border bg-[#fafcfd] p-4 transition-all hover:border-primary/20"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <span className="text-[12px] text-muted-foreground">{m.label}</span>
-                    <div
-                      className={`grid h-7 w-7 place-items-center rounded-lg ${
-                        isSuccess ? "bg-success-soft text-success" : "bg-primary-soft text-primary"
-                      }`}
-                    >
+                    <div className="grid h-7 w-7 place-items-center rounded-lg bg-primary-soft text-primary">
                       <Icon className="h-3.5 w-3.5" />
                     </div>
                   </div>
-                  <div className="mt-3 flex items-baseline gap-1">
-                    <span className="text-3xl font-semibold tracking-tight text-foreground">
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-[28px] font-bold leading-none tracking-tight text-foreground">
                       {m.value}
                     </span>
-                    <span className="text-sm text-muted-foreground">{m.suffix}</span>
+                    <span className="text-[13px] text-muted-foreground">{m.suffix}</span>
                   </div>
-                  {m.suffix === "%" && (
-                    <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          isSuccess ? "bg-success" : "bg-primary"
-                        }`}
-                        style={{ width: `${m.value}%` }}
-                      />
-                    </div>
-                  )}
+                  <p className="mt-1 text-[11px] text-muted-foreground">{m.desc}</p>
+                  <ProgressBar
+                    value={m.suffix === "%" ? m.value : (m.progress ?? 80)}
+                    tone={m.bar}
+                    className="mt-3"
+                  />
                 </div>
               );
             })}
           </div>
 
-          <div className="mt-6 rounded-lg border border-dashed border-border bg-muted/30 p-5">
+          <div className="mt-5 border-t border-divider pt-5">
             <div className="mb-3 flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-warning" />
-              <span className="text-[13px] font-medium">薄弱知识点</span>
-              <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10.5px] font-medium text-warning-foreground">
-                需重点关注
+              <BookMarked className="h-4 w-4 text-primary" />
+              <span className="text-[14px] font-semibold text-foreground">薄弱知识点</span>
+              <span className="rounded-full bg-remind-soft px-2 py-0.5 text-[10px] font-medium text-remind-foreground">
+                需要重点关注
               </span>
             </div>
-            <ul className="space-y-2.5">
+            <ul className="space-y-3">
               {WEAK_POINTS.map((w) => (
                 <li key={w.name} className="flex items-center gap-3">
-                  <span className="flex-1 text-[13px] text-foreground">{w.name}</span>
-                  <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-warning"
-                      style={{ width: `${w.rate}%` }}
-                    />
-                  </div>
-                  <span className="w-10 text-right text-[12px] tabular-nums text-muted-foreground">
+                  <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">{w.name}</span>
+                  <ProgressBar value={w.rate} tone="remind" className="w-28" />
+                  <span className="w-9 shrink-0 text-right text-[12px] tabular-nums text-muted-foreground">
                     {w.rate}%
                   </span>
                 </li>
               ))}
             </ul>
           </div>
-        </div>
+        </SectionCard>
 
-        {/* Right: Ebbinghaus Review */}
-        <div className="col-span-12 lg:col-span-5 rounded-lg border border-border bg-card p-7 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-card-hover)]">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">今日复习与错题巩固</h2>
-              <p className="mt-1 text-[12.5px] text-muted-foreground">
-                基于艾宾浩斯遗忘曲线智能编排
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-medium text-accent-foreground">
-              <Clock className="h-3 w-3" />
-              <span>预计 15 分钟</span>
-            </div>
-          </div>
+        <SectionCard className="col-span-12 flex flex-col lg:col-span-4">
+          <SectionHeader
+            title="今日学习与情景巩固"
+            subtitle="基于历史学习表现和近期资料更新智能推荐"
+            action={
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary-soft px-2.5 py-1 text-[11px] font-medium text-accent-foreground">
+                <Clock className="h-3 w-3" />
+                预计 15 分钟
+              </span>
+            }
+          />
 
-          <ul className="space-y-3">
-            {reviews.map((r) => (
+          <ul className="flex flex-1 flex-col gap-3">
+            {TASKS.map((t) => (
               <li
-                key={r.id}
-                className={`group flex items-center gap-4 rounded-lg border border-border bg-background p-4 transition-all ${
-                  r.done
-                    ? "opacity-60"
-                    : "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[var(--shadow-card)]"
+                key={t.id}
+                className={`flex items-center gap-3 rounded-xl border p-3.5 transition-all ${
+                  t.highlight
+                    ? "border-primary/25 bg-primary-soft/30"
+                    : "border-border bg-[#fafcfd] hover:border-primary/20"
                 }`}
               >
-                <div
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg transition-colors ${
-                    r.done
-                      ? "bg-success-soft text-success"
-                      : "bg-primary-soft text-primary group-hover:bg-primary group-hover:text-primary-foreground"
-                  }`}
-                >
-                  {r.done ? <CheckCircle2 className="h-5 w-5" /> : <Brain className="h-5 w-5" />}
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
+                  <Layers className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
+                    <span className="truncate text-[13px] font-medium text-foreground">{t.title}</span>
                     <span
-                      className={`truncate text-[13.5px] font-medium ${
-                        r.done ? "text-muted-foreground line-through" : "text-foreground"
-                      }`}
+                      className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium ${TASK_TAG_STYLES[t.tagTone]}`}
                     >
-                      {r.title}
-                    </span>
-                    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {r.tag}
+                      {t.tag}
                     </span>
                   </div>
-                  <div className="mt-0.5 text-[11.5px] text-muted-foreground">{r.meta}</div>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{t.meta}</p>
                 </div>
-                {r.done ? (
-                  <span className="text-[12px] font-medium text-success">已完成</span>
-                ) : (
-                  <button
-                    onClick={() => setModal(r)}
-                    className="flex shrink-0 items-center gap-1 rounded-lg bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[var(--shadow-glow)]"
+                {t.params ? (
+                  <Link
+                    to={t.to as TopicRoute}
+                    params={t.params}
+                    className="shrink-0 rounded-lg border border-primary/20 bg-white px-2.5 py-1.5 text-[12px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary-soft"
                   >
-                    去复习 <ArrowRight className="h-3 w-3" />
-                  </button>
+                    {t.action}
+                  </Link>
+                ) : (
+                  <Link
+                    to={t.to as "/training/wrong" | "/training/practice"}
+                    className="shrink-0 rounded-lg border border-primary/20 bg-white px-2.5 py-1.5 text-[12px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary-soft"
+                  >
+                    {t.action}
+                  </Link>
                 )}
               </li>
             ))}
           </ul>
 
-          <div className="mt-5 flex items-center justify-between rounded-lg bg-muted/50 px-4 py-3">
-            <span className="text-[12px] text-muted-foreground">
+          <div className="mt-4 flex items-center justify-between rounded-xl border border-divider bg-muted/40 px-4 py-2.5 text-[12px] text-muted-foreground">
+            <span>
               本周累计复习 <span className="font-semibold text-foreground">18</span> 项
             </span>
-            <div className="flex items-center gap-1 text-[12px] font-medium text-success">
-              <Award className="h-3.5 w-3.5" /> 记忆稳固度 86%
-            </div>
+            <span>
+              记忆路径覆盖 <span className="font-semibold text-primary">86%</span>
+            </span>
           </div>
-        </div>
+        </SectionCard>
       </section>
 
-      {/* Section C: Core entries + Scenario training */}
-      <section className="mt-6 grid grid-cols-12 gap-6">
-        <div className="col-span-12 xl:col-span-5">
-          <div className="mb-4 flex items-end justify-between">
-            <h2 className="text-lg font-semibold tracking-tight">核心能力入口</h2>
-            <span className="text-[12px] text-muted-foreground">高频使用</span>
+      {/* Core Entries + Scenario Training */}
+      <section className="mt-5 grid grid-cols-12 items-stretch gap-5">
+        <div className="col-span-12 flex flex-col xl:col-span-5">
+          <div className="mb-4 flex min-h-14 items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">核心能力入口</h2>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">知识学习、题库训练与智能问答核心入口</p>
+            </div>
+            <span className="mb-0.5 shrink-0 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
+              高频使用
+            </span>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid flex-1 grid-cols-2 grid-rows-2 gap-4">
             {ENTRIES.map((e) => {
               const Icon = e.icon;
               return (
                 <Link
                   key={e.title}
                   to={e.to}
-                  className="group flex flex-col items-start rounded-lg border border-border bg-card p-5 text-left shadow-[var(--shadow-card)] transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[var(--shadow-card-hover)]"
+                  className={`group flex h-full flex-col ${CARD} ${CARD_SHADOW} p-5`}
                 >
-                  <div className="mb-4 flex w-full items-center justify-between">
-                    <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <div className="mb-3 flex w-full items-center justify-between">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <span className="rounded-md bg-muted px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                       {e.tag}
                     </span>
                   </div>
-                  <div className="text-[14.5px] font-semibold tracking-tight text-foreground">
-                    {e.title}
-                  </div>
-                  <div className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-                    {e.desc}
-                  </div>
+                  <div className="text-[15px] font-semibold text-foreground">{e.title}</div>
+                  <p className="mt-1 flex-1 text-[12px] leading-relaxed text-muted-foreground">{e.desc}</p>
                 </Link>
               );
             })}
           </div>
         </div>
 
-        <div className="col-span-12 xl:col-span-7">
-          <div className="mb-4 flex items-end justify-between">
+        <div className="col-span-12 flex flex-col xl:col-span-7">
+          <div className="mb-4 flex min-h-14 items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">场景训练</h2>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
-                沉浸式仿真训练，连接知识与一线作业
+              <p className="mt-0.5 text-[13px] text-muted-foreground">
+                沉浸式情景练习，连接知识点与一线作业
               </p>
             </div>
-            <span className="rounded-full border border-destructive/30 bg-destructive/5 px-2 py-0.5 text-[10.5px] font-medium text-destructive">
-              P0 · 高优先级
-            </span>
+         
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2">
             {SCENARIOS.map((s) => {
               const Icon = s.icon;
               return (
                 <Link
                   key={s.title}
                   to={s.to}
-                  className="group relative block overflow-hidden rounded-lg border border-border bg-card p-6 shadow-[var(--shadow-card)] transition-all hover:-translate-y-1 hover:border-primary/40 hover:shadow-[var(--shadow-card-hover)]"
+                  className={`group relative flex h-full overflow-hidden ${CARD} ${CARD_SHADOW} p-5`}
                 >
-                  <div
-                    className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${s.accent} opacity-60`}
-                  />
-                  <div className="relative">
-                    <div className="flex items-center justify-between">
-                      <div className="grid h-11 w-11 place-items-center rounded-lg bg-card shadow-sm ring-1 ring-border">
-                        <Icon className="h-5 w-5 text-primary" />
-                      </div>
-                      <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
-                        P0
-                      </span>
+                  <div className={`absolute inset-0 ${s.bg} opacity-70`} />
+                  <div className="relative flex h-full flex-col">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl border border-border/60 bg-white text-primary">
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <h3 className="mt-4 text-[16px] font-semibold tracking-tight text-foreground">
-                      {s.title}
-                    </h3>
-                    <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
-                      {s.desc}
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <h3 className="mt-4 text-[16px] font-semibold text-foreground">{s.title}</h3>
+                    <p className="mt-1.5 flex-1 text-[12.5px] leading-relaxed text-muted-foreground">{s.desc}</p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
                       {s.stats.map((t) => (
                         <span
                           key={t}
-                          className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur"
+                          className="rounded-full border border-border/80 bg-white/80 px-2 py-0.5 text-[10.5px] text-muted-foreground"
                         >
                           {t}
                         </span>
                       ))}
                     </div>
-                    <span className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-primary transition-transform group-hover:translate-x-0.5">
-                      开始训练 <ArrowRight className="h-3.5 w-3.5" />
+                    <span className="mt-4 inline-flex items-center gap-1 text-[13px] font-medium text-primary transition-transform group-hover:translate-x-0.5">
+                      开始训练
+                      <ArrowRight className="h-3.5 w-3.5" />
                     </span>
                   </div>
                 </Link>
@@ -429,150 +538,88 @@ export function Workbench() {
         </div>
       </section>
 
-      {/* Section D: Paths + Updates */}
-      <section className="mt-6 grid grid-cols-12 gap-6">
-        <div className="col-span-12 lg:col-span-7 rounded-lg border border-border bg-card p-7 shadow-[var(--shadow-card)]">
-          <div className="mb-5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold tracking-tight">推荐学习路径</h2>
-            </div>
-            <Link to="/learn" className="text-[12px] font-medium text-primary hover:text-primary/80">
-              全部路径
-            </Link>
-          </div>
+      {/* Learning Paths + Recent Updates */}
+      <section className="mt-5 grid grid-cols-12 gap-5">
+        <SectionCard className="col-span-12 lg:col-span-8">
+          <SectionHeader
+            title="推荐学习路径"
+            subtitle="根据岗位、学习记录和薄弱点智能生成"
+            action={
+              <Link to="/learn" className="text-[12px] font-medium text-primary hover:text-primary/80">
+                全部路径
+              </Link>
+            }
+          />
           <div className="space-y-3">
-            {PATHS.map((p, i) => (
+            {PATHS.map((p) => (
               <Link
-                to="/learn"
                 key={p.step}
-                className="group flex items-center gap-5 rounded-lg border border-border bg-background p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-[var(--shadow-card)]"
+                to="/learn/topic/$id"
+                params={{ id: p.topicId }}
+                className={`group flex items-center gap-4 rounded-xl border border-border bg-[#f8fbfc] p-4 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-primary-soft/20`}
               >
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary/10 to-primary/0 text-[15px] font-semibold text-primary ring-1 ring-primary/15">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary text-[14px] font-bold text-primary-foreground">
                   {p.step}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-medium text-foreground">{p.title}</span>
-                    {i === 0 && (
-                      <span className="rounded-md bg-primary-soft px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground">
+                    <span className="text-[14px] font-semibold text-foreground">{p.title}</span>
+                    {p.recommend && (
+                      <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
                         推荐
                       </span>
                     )}
                   </div>
-                  <div className="mt-1 text-[12px] text-muted-foreground">{p.meta}</div>
+                  <p className="mt-0.5 text-[12px] text-muted-foreground">{p.meta}</p>
                   <div className="mt-2 flex items-center gap-3">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-primary to-[oklch(0.5_0.13_205)]"
-                        style={{ width: `${p.progress}%` }}
-                      />
-                    </div>
-                    <span className="w-10 text-right text-[11.5px] tabular-nums text-muted-foreground">
+                    <ProgressBar value={p.progress} className="flex-1" />
+                    <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">
                       {p.progress}%
                     </span>
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
               </Link>
             ))}
           </div>
-        </div>
+        </SectionCard>
 
-        <div className="col-span-12 lg:col-span-5 rounded-lg border border-border bg-card p-7 shadow-[var(--shadow-card)]">
-          <div className="mb-5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold tracking-tight">近期资料更新</h2>
-            </div>
-            <Link to="/learn" className="text-[12px] font-medium text-primary hover:text-primary/80">
-              全部
-            </Link>
-          </div>
-          <ul className="space-y-2">
-            {UPDATES.map((u, i) => (
-              <li key={i}>
+        <SectionCard className="col-span-12 lg:col-span-4">
+          <SectionHeader
+            title="近期资料更新"
+            subtitle="知识库资料、规程、案例和 SOP 更新动态"
+            action={
+              <Link to="/search" className="text-[12px] font-medium text-primary hover:text-primary/80">
+                全部
+              </Link>
+            }
+          />
+          <ul className="divide-y divide-divider">
+            {UPDATES.map((u) => (
+              <li key={u.docId}>
                 <Link
-                  to="/learn"
-                  className="group flex cursor-pointer items-start gap-3 rounded-lg px-3 py-3 transition-colors hover:bg-muted/60"
+                  to="/learn/doc/$id"
+                  params={{ id: u.docId }}
+                  className="group flex items-start gap-3 py-3 first:pt-0 last:pb-0"
                 >
-                <span
-                  className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${
-                    u.type === "规程"
-                      ? "bg-primary-soft text-accent-foreground"
-                      : u.type === "SOP"
-                        ? "bg-success-soft text-success"
-                        : u.type === "案例"
-                          ? "bg-warning-soft text-warning-foreground"
-                          : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {u.type}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[13px] text-foreground group-hover:text-primary">
-                    {u.title}
+                  <span
+                    className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${TAG_STYLES[u.type] ?? "bg-muted text-muted-foreground"}`}
+                  >
+                    {u.type}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="line-clamp-2 text-[13px] leading-snug text-foreground group-hover:text-primary">
+                      {u.title}
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">{u.time}</div>
                   </div>
-                  <div className="mt-0.5 text-[11.5px] text-muted-foreground">{u.time}</div>
-                </div>
-                <ChevronRight className="mt-0.5 h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                  <ChevronRight className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                 </Link>
               </li>
             ))}
           </ul>
-        </div>
+        </SectionCard>
       </section>
-
-      {/* Review Modal */}
-      {modal && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 p-4 backdrop-blur-sm animate-in fade-in"
-          onClick={() => setModal(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-lg border border-border bg-card p-7 shadow-2xl animate-in zoom-in-95"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between">
-              <div className="grid h-11 w-11 place-items-center rounded-lg bg-primary-soft text-primary">
-                <Zap className="h-5 w-5" />
-              </div>
-              <button
-                onClick={() => setModal(null)}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <h3 className="mt-4 text-[17px] font-semibold tracking-tight text-foreground">
-              开始复习
-            </h3>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{modal.title}</p>
-            <div className="mt-4 rounded-lg border border-border bg-muted/40 p-4 text-[12.5px] text-muted-foreground">
-              <div className="mb-2 flex items-center gap-1.5 text-foreground">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="font-medium">AI 编排</span>
-              </div>
-              基于你的近 7 日表现，本次复习将聚焦 <span className="text-foreground">3 个核心考点</span>
-              ，预计 5 分钟完成。
-            </div>
-            <div className="mt-5 flex items-center gap-3">
-              <button
-                onClick={() => setModal(null)}
-                className="flex-1 rounded-lg border border-border bg-background py-2.5 text-[13px] font-medium text-foreground transition-colors hover:bg-muted"
-              >
-                稍后再说
-              </button>
-              <button
-                onClick={() => completeReview(modal.id)}
-                className="flex-1 rounded-lg bg-primary py-2.5 text-[13px] font-medium text-primary-foreground transition-all hover:bg-primary/90 hover:shadow-[var(--shadow-glow)]"
-              >
-                标记已完成
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
