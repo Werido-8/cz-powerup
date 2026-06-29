@@ -4,11 +4,11 @@ import {
   Star, Pencil, RefreshCw, Download, Info, AlertTriangle, AlertOctagon,
   BookOpen, FileText, MessagesSquare, Send, ChevronLeft, ChevronRight,
   Sparkles, Bot, ArrowLeftRight, ListChecks, ShieldAlert, Activity,
-  Workflow, CheckCircle2, XCircle, History, ChevronDown, Search,
+  Workflow, CheckCircle2, XCircle, History, ChevronDown, Hexagon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
-import { ScenarioBreadcrumb, scenarioResultBlockClass } from "@/components/scenario/parts";
+import { ScenarioBreadcrumb, scenarioResultBlockClass, scenarioResultInnerBlockClass, ScenarioSectionHeader } from "@/components/scenario/parts";
 
 export const Route = createFileRoute("/scenario/sootblow/result/$id")({
   component: SootblowResult,
@@ -24,16 +24,17 @@ const TAGS = [
 ];
 const FOCUS_RISKS = ["炉膛负压", "结焦/垮灰", "火检信号", "SCR入口烟温", "炉膛压力保护"];
 
-const SCOPE_APPLY = [
-  "机组处于低负荷或深度调峰运行状态。",
-  "锅炉计划执行吹灰,或吹灰过程中需关注炉膛负压、火检、积灰结焦等参数变化。",
-  "运行人员需要学习低负荷稳燃边界、吹灰扰动影响和异常复核框架。",
-];
-const SCOPE_NOT_APPLY = [
-  "不用于直接生成现场操作票。",
-  "不用于替代值长事故处理指令。",
-  "不用于判断本厂机组最低稳燃负荷边界,须以本厂深调试验报告、运行规程为准。",
-  "不将其他电厂历史案例直接套用于本厂。",
+const SCOPE_ITEMS: { kind: "apply" | "notApply"; text: string }[] = [
+  { kind: "apply", text: "机组处于低负荷或深度调峰运行状态。" },
+  {
+    kind: "apply",
+    text: "锅炉计划执行吹灰,或吹灰过程中需关注炉膛负压、火检、积灰结焦等参数变化。",
+  },
+  { kind: "apply", text: "运行人员需要学习低负荷稳燃边界、吹灰扰动影响和异常复核框架。" },
+  {
+    kind: "notApply",
+    text: "不用于判断本厂机组最低稳燃负荷边界,须以本厂深调试验报告、运行规程为准。",
+  },
 ];
 
 const CHAIN_NODES: { text: string; tone?: "warn" | "danger" }[] = [
@@ -46,69 +47,69 @@ const CHAIN_NODES: { text: string; tone?: "warn" | "danger" }[] = [
   { text: "锅炉燃烧不稳定或保护动作风险上升", tone: "danger" },
 ];
 
-const CHAIN_TABLE = [
-  { name: "低负荷燃烧裕度下降", desc: "负荷降低使炉温、着火区温度下降,危及着火稳定性,甚至造成灭火", ref: "依据-10" },
-  { name: "低负荷抗扰能力差", desc: "深调过程中煤粉着火困难、着火点后移,燃烧稳定性下降", ref: "依据-11" },
-  { name: "积灰与吹灰扰动", desc: "低负荷烟气流速下降致水平烟道底部积灰;受热面结焦影响传热,吹灰可改善受热面状态", ref: "依据-13" },
-  { name: "炉膛负压波动加剧", desc: "低负荷工况下炉内负压波动加剧,易发生燃烧不稳定", ref: "依据-14" },
-  { name: "判定参考边界", desc: "非启停磨组或吹灰等扰动工况下,炉膛负压波动不大于 ±300Pa;火检异常判定见关键核查清单", ref: "依据-05" },
-];
-
 const CHECKLIST = [
-  { no: 1, name: "当前负荷", desc: "是否处于本厂深调试验认定的低负荷区间;是否满足本厂吹灰负荷边界", refs: ["依据-03"] },
-  { no: 2, name: "燃烧状态", desc: "火检、炉膛负压/炉膛压力、氧量、燃烧器运行是否稳定", refs: ["依据-05"] },
-  { no: 3, name: "制粉系统", desc: "磨煤机组合、一次风量/风压、煤粉细度、石子煤排放", refs: ["依据-06", "依据-11"] },
-  { no: 4, name: "吹灰条件", desc: "是否存在积灰、结焦严重区域;吹灰是否会造成明显扰动", refs: ["依据-13", "依据-17"] },
-  { no: 5, name: "风烟系统", desc: "引风机、送风机、一次风机参数及调节能力", refs: ["依据-18"] },
-  { no: 6, name: "环保参数", desc: "SCR入口烟温、NOx、氨逃逸、空预器阻力/堵塞", refs: ["依据-07", "依据-15", "依据-16"] },
-  { no: 7, name: "保护状态", desc: "MFT、炉膛压力保护、火检相关逻辑", refs: ["依据-08", "依据-09"] },
+  { no: 1, name: "当前负荷与深调吹灰边界核查", desc: "核查机组是否处于本厂深调试验认定的低负荷区间,并确认当前负荷率满足吹灰操作边界与稳燃要求", refs: ["依据-03"] },
+  { no: 2, name: "燃烧状态与炉膛参数持续监视", desc: "重点监视火检信号、炉膛负压/炉膛压力、氧量变化及燃烧器运行状态是否持续稳定", refs: ["依据-05"] },
+  { no: 3, name: "制粉系统运行方式与参数检查", desc: "检查磨煤机组合方式、一次风量/风压、煤粉细度及石子煤排放是否符合深调运行要求", refs: ["依据-06", "依据-11"] },
+  { no: 4, name: "吹灰条件与积灰结焦风险评估", desc: "评估受热面积灰与结焦严重程度,判断吹灰操作是否会造成明显燃烧扰动或负压波动", refs: ["依据-13", "依据-17"] },
+  { no: 5, name: "风烟系统调节能力与运行裕度", desc: "核查引风机、送风机、一次风机运行参数及调节裕度能否支撑低负荷吹灰扰动", refs: ["依据-18"] },
+  { no: 6, name: "环保参数与SCR入口烟温监视", desc: "关注SCR入口烟温、NOx、氨逃逸及空预器阻力/堵塞趋势是否在深调允许范围", refs: ["依据-07", "依据-15", "依据-16"] },
+  { no: 7, name: "保护逻辑投运与MFT状态确认", desc: "确认MFT、炉膛压力保护及火检相关逻辑投运正常,保护信号无异常闭锁或误动", refs: ["依据-08", "依据-09"] },
 ];
 
-const CHECK_REF = [
-  { name: "炉膛负压", desc: "非启停磨组或吹灰等扰动工况下,波动不大于 ±300Pa。", ref: "依据-05" },
-  { name: "火检", desc: "投运磨煤机无任一火检开关量为 0,或火检模拟量低于 50% 且持续超过 5s。", ref: "依据-05" },
-  { name: "深调边界参考", desc: "炉膛负压波动幅度大于 300Pa 且持续时间超过 5s,可作为最小技术出力调峰运行判定参考。", ref: "依据-09" },
-  { name: "SCR烟温", desc: "脱硝入口烟温应在保护退出温度范围内;出口 NOx 满足设计要求。", ref: "依据-07" },
-  { name: "综合判定", desc: "应从煤质、制粉系统参数、炉膛烟温、炉膛负压和火检参数综合分析。", ref: "依据-05" },
-];
-
-const RISKS = [
-  { level: "高", title: "低负荷稳燃裕度下降", desc: "负荷降低使炉温、着火区温度下降,危及着火稳定性,甚至造成灭火。", refs: ["依据-10"] },
-  { level: "高", title: "吹灰扰动叠加燃烧不稳", desc: "吹灰与排污、打焦同属干扰工况;深调过程抗干扰能力差。", refs: ["依据-01", "依据-11"] },
-  { level: "高", title: "炉膛负压/压力异常", desc: "低负荷下炉内负压波动加剧;吹灰扰动下应重点监视负压。", refs: ["依据-05", "依据-14"] },
-  { level: "中", title: "积灰结焦变化", desc: "低负荷烟气流速下降致积灰;煤质偏离时结焦严重风险上升。", refs: ["依据-13"] },
-  { level: "中", title: "SCR入口烟温偏低", desc: "低负荷下入口烟温常低于 300℃,催化剂活性及脱硝效率下降。", refs: ["依据-15", "依据-16"] },
-  { level: "中", title: "空预器堵塞/氨逃逸", desc: "低负荷下喷氨量难精确控制,氨逃逸增多,易造成空预器堵塞。", refs: ["依据-15"] },
-];
-
-const FORBIDS = [
-  { type: "严禁", desc: "未确认燃烧稳定、火检与炉膛负压正常时,盲目扩大吹灰范围或连续推进。", refs: ["依据-01", "依据-04", "依据-05"] },
-  { type: "严禁", desc: "火检持续异常、炉膛负压/压力明显波动时,仍按常规节奏继续吹灰。", refs: ["依据-05"] },
-  { type: "慎用", desc: "低负荷下大幅调整风粉配比但不跟踪火检、氧量、炉膛负压。", refs: ["依据-12"] },
-  { type: "慎用", desc: "仅凭经验判断积灰/垮灰风险,不结合本厂深调试验数据与当前趋势。", refs: ["依据-03"] },
+const RISK_FORBID_ITEMS = [
+  {
+    tag: "高风险",
+    tone: "high" as const,
+    title: "低负荷稳燃裕度下降",
+    desc: "负荷降低使炉温、着火区温度下降,危及着火稳定性,甚至造成灭火,吹灰前应重点评估稳燃裕度。",
+    refs: ["依据-10"],
+  },
+  {
+    tag: "高风险",
+    tone: "high" as const,
+    title: "吹灰扰动叠加燃烧不稳",
+    desc: "吹灰与排污、打焦同属干扰工况,深调过程抗干扰能力差,易引发火检波动与负压异常。",
+    refs: ["依据-01", "依据-11"],
+  },
+  {
+    tag: "易错点",
+    tone: "warn" as const,
+    title: "炉膛负压/火检边界判断",
+    desc: "低负荷下炉内负压波动加剧,易将短时扰动误判为可继续吹灰,应结合导则边界综合判定。",
+    refs: ["依据-05", "依据-14"],
+  },
+  {
+    tag: "禁止项",
+    tone: "forbid" as const,
+    title: "火检异常时继续推进吹灰",
+    desc: "火检持续异常、炉膛负压/压力明显波动时,严禁按常规节奏继续吹灰或扩大吹灰范围。",
+    refs: ["依据-01", "依据-05"],
+  },
+  {
+    tag: "禁止项",
+    tone: "forbid" as const,
+    title: "未核查燃烧稳定即盲目吹灰",
+    desc: "未确认燃烧稳定、火检与炉膛负压正常时,不得盲目扩大吹灰范围或连续推进吹灰操作。",
+    refs: ["依据-04", "依据-05"],
+  },
 ];
 
 const STOP_RULES = [
-  { desc: "炉膛负压/炉膛压力波动超出本厂控制要求,或接近保护动作趋势。", refs: ["依据-05", "依据-09"] },
-  { desc: "火检开关量为 0,或模拟量低于 50% 持续超过 5s。", refs: ["依据-05"] },
-  { desc: "氧量突升、主汽压异常下降等燃烧恶化征象。", refs: ["依据-12"] },
-  { desc: "吹灰过程中受热面参数、风烟系统、环保参数明显偏离深调试验边界。", refs: ["依据-07", "依据-15"] },
-  { desc: "MFT、炉膛压力保护、重要辅机保护出现异常信号。", refs: ["依据-08"] },
+  "操作时出现吹灰设备卡涩、风烟系统调节异常或炉膛参数明显波动等设备异常",
+  "监控系统报警、保护动作信号、设备异常声响或火检/氧量突变等异常征象",
+  "发现操作票错误、吹灰步骤与现场实际运行方式不符或深调边界判断存疑",
 ];
 
-const REPORT_ITEMS = [
-  { name: "当前负荷与深调状态", point: "负荷率、是否处于本厂深调区间", refs: ["依据-02"] },
-  { name: "吹灰计划与执行情况", point: "开始时间、区域、当前进度", refs: ["依据-01"] },
-  { name: "炉膛负压/压力、火检、氧量", point: "是否超出导则参考边界", refs: ["依据-05"] },
-  { name: "制粉与风烟系统", point: "磨煤机组合、一次风/引送风参数", refs: ["依据-11", "依据-18"] },
-  { name: "环保参数", point: "SCR入口烟温、NOx、氨逃逸、空预器差压", refs: ["依据-07", "依据-15"] },
-  { name: "已采取措施", point: "已暂停/调整/增投稳燃等,按本厂规程表述", refs: ["依据-12"] },
-];
-
-const TRIAL_TIPS = [
-  { desc: "深调能力评估试验期间不应进行吹灰等干扰操作。", refs: ["依据-01", "依据-04"] },
-  { desc: "深调运行应综合核查煤质、制粉系统参数、炉膛烟温、炉膛负压和火检参数。", refs: ["依据-05"] },
-  { desc: "低负荷时火检应能准确指示炉内燃烧情况,必要时通过改造优化火检可靠性。", refs: ["依据-19"] },
+const REPORT_TARGETS = [
+  {
+    title: "立即向值班调度员汇报:",
+    content: "操作名称、执行进度、异常现象、设备状态、已采取措施",
+  },
+  {
+    title: "同时向站内负责人汇报:",
+    content: "现场情况、人员状态、设备受损情况初步判断",
+  },
 ];
 
 type Evidence = {
@@ -144,14 +145,6 @@ const HISTORY_CASE: Evidence = {
   excerpt: "机组约 360MW 低负荷下进行炉膛吹灰,吹灰过程中炉膛负压大幅波动,折焰角区域吹灰时火焰电视变暗、MFT 动作。大量垮灰致炉膛上部灭火、烟气量骤减,炉膛压力低三值保护动作。",
   standardNo: "厂内事件调查报告", publishDate: "2022-10-12", pageCurrent: 5, pageTotal: 18,
 };
-
-const RAG_RESULTS = [
-  { rank: 1, doc: "DLT+2993—2025燃煤发电机组深度调峰能力评估试验导则.pdf", hit: "§6.2.7、§7.1.4.2、§7.1.4.5", score: 0.92 },
-  { rank: 2, doc: "DL_T+2497—2022+燃煤机组锅炉深度调峰能力评估试验导则.pdf", hit: "§4.2.3、§4.2.6、§5.3.7", score: 0.89 },
-  { rank: 3, doc: "T+JSREA+05—2023+火电机组深度调峰运行管理规范.pdf", hit: "§4.2、§5.1", score: 0.86 },
-  { rank: 4, doc: "火电厂燃煤锅炉低负荷稳燃技术分析.docx", hit: "§110", score: 0.84 },
-  { rank: 5, doc: "630 MW机组W型锅炉深度调峰过程燃烧恶化分析及稳燃措施.docx", hit: "§14、§34", score: 0.82 },
-];
 
 // ============= 小组件 =============
 function RefChip({ id, onPick }: { id: string; onPick: (id: string) => void }) {
@@ -199,100 +192,66 @@ function SafetyBar() {
 function ScopeCard() {
   return (
     <section className={`${scenarioResultBlockClass} p-5`}>
-      <header className="mb-3 flex items-center gap-2">
-        <Info className="h-4 w-4 text-primary" />
-        <h3 className="text-[15px] font-semibold tracking-tight">适用场景说明</h3>
-      </header>
-      <p className="mb-3 text-[12.5px] text-muted-foreground">本次识别的场景为:深度调峰低负荷运行下的锅炉吹灰风险分析。</p>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-primary/20 bg-primary-soft/30 p-3.5">
-          <div className="mb-2 text-[12.5px] font-semibold text-primary">适用场景</div>
-          <ul className="space-y-1.5 text-[12.5px] leading-6 text-foreground/85">
-            {SCOPE_APPLY.map((t, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                <span>{t}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="rounded-lg border border-warning/30 bg-warning-soft/40 p-3.5">
-          <div className="mb-2 text-[12.5px] font-semibold text-warning-foreground">不适用范围</div>
-          <ul className="space-y-1.5 text-[12.5px] leading-6 text-foreground/85">
-            {SCOPE_NOT_APPLY.map((t, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" />
-                <span>{t}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+      <ScenarioSectionHeader
+        icon={<Info className="h-4 w-4 text-primary" />}
+        iconWrapClassName="bg-primary/10"
+        title="适用场景说明"
+      />
+      <p className="mb-3 pl-[calc(1.75rem+0.625rem)] text-[12.5px] text-muted-foreground">
+        本次识别的场景为:深度调峰低负荷运行下的锅炉吹灰风险分析。
+      </p>
+      <ul className="space-y-2.5 pl-[calc(1.75rem+0.625rem)]">
+        {SCOPE_ITEMS.map((item, i) => (
+          <li
+            key={i}
+            className={`flex gap-2.5 text-[13px] leading-6 ${
+              item.kind === "apply" ? "text-foreground/90" : "text-[#C47A00]"
+            }`}
+          >
+            <span className="flex h-6 w-4 shrink-0 items-center justify-center">
+              {item.kind === "apply" ? (
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+              ) : (
+                <AlertTriangle className="h-4 w-4 text-[#F5A623]" />
+              )}
+            </span>
+            <span className="min-w-0 flex-1">{item.text}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
 
-function ChainCard({ onPick }: { onPick: (id: string) => void }) {
+function ChainCard() {
   return (
     <section className={`${scenarioResultBlockClass} p-5`}>
-      <header className="mb-3 flex items-center gap-2">
-        <Workflow className="h-4 w-4 text-primary" />
-        <h3 className="text-[15px] font-semibold tracking-tight">风险链路识别</h3>
-      </header>
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        {/* 链路 */}
-        <div className="rounded-lg border border-border bg-muted/30 p-4">
-          <ol className="space-y-1.5">
-            {CHAIN_NODES.map((n, i) => (
-              <li key={i} className="flex flex-col items-center">
-                <div
-                  className={`w-full rounded-md border px-3 py-2 text-center text-[12.5px] leading-5 ${
-                    n.tone === "danger"
-                      ? "border-destructive/30 bg-destructive/[0.06] text-foreground"
-                      : n.tone === "warn"
+      <ScenarioSectionHeader
+        icon={<Workflow className="h-4 w-4 text-primary" />}
+        iconWrapClassName="bg-primary/10"
+        title="风险链路识别"
+      />
+      <div className="overflow-x-auto rounded-[14px] border border-[#EEEFF2] bg-muted/30 p-4">
+        <ol className="flex min-w-max items-center gap-1">
+          {CHAIN_NODES.map((n, i) => (
+            <li key={i} className="flex items-center">
+              <div
+                className={`w-[132px] shrink-0 rounded-lg border px-2.5 py-2 text-center text-[11.5px] leading-5 ${
+                  n.tone === "danger"
+                    ? "border-destructive/30 bg-destructive/[0.06] text-foreground"
+                    : n.tone === "warn"
                       ? "border-warning/30 bg-warning-soft/40 text-foreground"
-                      : "border-border bg-card text-foreground"
-                  }`}
-                >
-                  {n.text}
-                </div>
-                {i < CHAIN_NODES.length - 1 && (
-                  <div className="my-0.5 h-4 w-px border-l border-dashed border-muted-foreground/40" />
-                )}
-              </li>
-            ))}
-          </ol>
-        </div>
-        {/* 风险摘要 */}
-        <div className="flex flex-col gap-3 rounded-lg border border-destructive/25 bg-destructive/[0.04] p-4">
-          <div>
-            <div className="text-[12px] text-muted-foreground">综合风险</div>
-            <div className="mt-1 inline-flex items-center rounded-md bg-destructive/15 px-2.5 py-0.5 text-[13px] font-semibold text-destructive">高</div>
-          </div>
-          <div>
-            <div className="text-[12px] text-muted-foreground">主要触发因素</div>
-            <div className="mt-1 text-[12.5px] leading-5 text-foreground/90">
-              低负荷稳燃裕度不足 + 吹灰扰动 + 积灰结焦 + 负压/火检异常
-            </div>
-          </div>
-          <div className="rounded-md bg-card/60 p-2.5 text-[11.5px] leading-5 text-muted-foreground">
-            风险等级需结合本厂深调试验边界、当前煤质与设备状态综合判断,本卡片为学习预判,不作实时定级。
-          </div>
-        </div>
-      </div>
-
-      {/* 链路节点支撑 */}
-      <div className="mt-4 rounded-lg border border-border bg-background">
-        <div className="border-b border-border px-4 py-2 text-[12.5px] font-semibold">链路节点与原文支撑</div>
-        <ul className="divide-y divide-border">
-          {CHAIN_TABLE.map((r, i) => (
-            <li key={i} className="grid grid-cols-[160px_1fr_auto] items-start gap-4 px-4 py-2.5 text-[12.5px]">
-              <span className="font-medium text-foreground">{r.name}</span>
-              <span className="text-muted-foreground leading-5">{r.desc}</span>
-              <RefChip id={r.ref} onPick={onPick} />
+                      : "border-[#EEEFF2] bg-card text-foreground"
+                }`}
+              >
+                {n.text}
+              </div>
+              {i < CHAIN_NODES.length - 1 && (
+                <ChevronRight className="mx-0.5 h-4 w-4 shrink-0 text-muted-foreground/45" />
+              )}
             </li>
           ))}
-        </ul>
+        </ol>
       </div>
     </section>
   );
@@ -301,158 +260,158 @@ function ChainCard({ onPick }: { onPick: (id: string) => void }) {
 function ChecklistCard({ onPick }: { onPick: (id: string) => void }) {
   return (
     <section className={`${scenarioResultBlockClass} p-5`}>
-      <header className="mb-3 flex items-center gap-2">
-        <ListChecks className="h-4 w-4 text-primary" />
-        <h3 className="text-[15px] font-semibold tracking-tight">关键核查清单</h3>
-      </header>
+      <ScenarioSectionHeader
+        icon={<ListChecks className="h-4 w-4 text-primary" />}
+        iconWrapClassName="bg-primary/10"
+        title="关键核查清单"
+      />
       <ol className="space-y-2">
         {CHECKLIST.map((c) => (
-          <li key={c.no} className="flex items-start gap-3 rounded-lg border border-border bg-background p-3">
-            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[12.5px] font-semibold text-primary-foreground">{c.no}</span>
+          <li key={c.no} className={`${scenarioResultInnerBlockClass} flex items-center gap-3 p-3`}>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[12.5px] font-semibold text-primary-foreground">
+              {c.no}
+            </span>
             <div className="min-w-0 flex-1">
               <div className="text-[13px] font-semibold">{c.name}</div>
-              <p className="mt-0.5 text-[12px] leading-5 text-muted-foreground">{c.desc}</p>
+              <p className="mt-0.5 truncate text-[12px] text-muted-foreground" title={c.desc}>
+                {c.desc}
+              </p>
             </div>
-            <div className="flex shrink-0 flex-wrap items-start gap-1">
-              {c.refs.map((r) => <RefChip key={r} id={r} onPick={onPick} />)}
+            <div className="flex shrink-0 flex-wrap items-center gap-1">
+              {c.refs.map((r) => (
+                <RefChip key={r} id={r} onPick={onPick} />
+              ))}
             </div>
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
 
-      <div className="mt-4 rounded-lg border border-[#2F80ED]/25 bg-[#2F80ED]/[0.05] p-4">
-        <div className="mb-2 flex items-center gap-2 text-[12.5px] font-semibold text-[#2F80ED]">
-          <Info className="h-3.5 w-3.5" /> 核查判定参考(学习口径)
-        </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          {CHECK_REF.map((r, i) => (
-            <div key={i} className="rounded-md border border-border bg-card p-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[12.5px] font-medium">{r.name}</span>
-                <RefChip id={r.ref} onPick={onPick} />
+function RiskForbidCard({ onPick }: { onPick: (id: string) => void }) {
+  const toneClass = {
+    high: "border-destructive/25 bg-[#FFF5F5]",
+    warn: "border-warning/30 bg-[#FFFBF0]",
+    forbid: "border-[#DDE3EA] bg-[#F7F8FA]",
+  };
+  const tagClass = {
+    high: "border-destructive/40 bg-destructive/10 text-destructive",
+    warn: "border-warning/50 bg-warning-soft text-warning-foreground",
+    forbid: "border-[#B0BEC5] bg-[#ECEFF1] text-[#546E7A]",
+  };
+
+  return (
+    <section className={`${scenarioResultBlockClass} flex h-full min-h-[360px] flex-col p-5`}>
+      <ScenarioSectionHeader
+        icon={<AlertOctagon className="h-4 w-4 text-[#E53935]" />}
+        iconWrapClassName="bg-[#FEECEC]"
+        title="风险点与禁止项"
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <ul className="space-y-2">
+          {RISK_FORBID_ITEMS.map((item, i) => (
+            <li key={i} className={`rounded-[14px] border p-3 ${toneClass[item.tone]}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-2">
+                  <span className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${tagClass[item.tone]}`}>
+                    {item.tag}
+                  </span>
+                  <div className="min-w-0 text-[13px] font-semibold text-foreground">{item.title}</div>
+                </div>
+                <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                  {item.refs.map((id) => (
+                    <RefChip key={id} id={id} onPick={onPick} />
+                  ))}
+                </div>
               </div>
-              <p className="mt-1 text-[11.5px] leading-5 text-muted-foreground">{r.desc}</p>
-            </div>
+              <p className="mt-2 text-[12px] leading-5 text-muted-foreground">{item.desc}</p>
+            </li>
           ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function StopAndReportCard() {
+  return (
+    <section className={`${scenarioResultBlockClass} flex h-full min-h-[360px] flex-col p-5`}>
+      <ScenarioSectionHeader
+        icon={<Hexagon className="h-4 w-4 text-foreground" />}
+        iconWrapClassName="bg-muted"
+        title="异常停止与汇报提示"
+      />
+      <div className="space-y-4">
+        <div>
+          <div className="mb-2.5 flex items-center gap-2 text-[13px] font-semibold text-foreground">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            遇以下情况应立即停止操作
+          </div>
+          <ul className="space-y-2">
+            {STOP_RULES.map((rule, i) => (
+              <li key={i} className="flex items-start gap-2 text-[12.5px] leading-6 text-foreground/90">
+                <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <span>{rule}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-[14px] border border-[#EEEFF2] bg-[#F7F8FA] p-4">
+          <div className="mb-3 text-[13px] font-semibold text-foreground">汇报对象与要点</div>
+          <div className="space-y-3">
+            {REPORT_TARGETS.map((item) => (
+              <div key={item.title}>
+                <div className="text-[12.5px] font-semibold text-foreground">{item.title}</div>
+                <p className="mt-1 text-[12.5px] leading-6 text-muted-foreground">{item.content}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function RiskAndForbidCard({ onPick }: { onPick: (id: string) => void }) {
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {/* 风险点 */}
-      <section className={`${scenarioResultBlockClass} p-5`}>
-        <header className="mb-3 flex items-center gap-2">
-          <AlertOctagon className="h-4 w-4 text-destructive" />
-          <h3 className="text-[15px] font-semibold tracking-tight">风险点</h3>
-        </header>
-        <ul className="space-y-2">
-          {RISKS.map((r, i) => {
-            const high = r.level === "高";
-            return (
-              <li key={i} className={`rounded-lg border p-3 ${high ? "border-destructive/25 bg-destructive/[0.05]" : "border-warning/30 bg-warning-soft/35"}`}>
-                <div className="flex items-start gap-2">
-                  <span className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${high ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-warning/50 bg-warning-soft text-warning-foreground"}`}>
-                    {r.level}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-semibold">{r.title}</div>
-                    <p className="mt-1 text-[12px] leading-5 text-muted-foreground">{r.desc}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {r.refs.map((id) => <RefChip key={id} id={id} onPick={onPick} />)}
-                    </div>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
-      {/* 慎用 / 禁止项 */}
-      <section className={`${scenarioResultBlockClass} p-5`}>
-        <header className="mb-3 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-warning-foreground" />
-          <h3 className="text-[15px] font-semibold tracking-tight">慎用 / 禁止项</h3>
-        </header>
-        <ul className="space-y-2">
-          {FORBIDS.map((f, i) => {
-            const strict = f.type === "严禁";
-            return (
-              <li key={i} className={`rounded-lg border p-3 ${strict ? "border-destructive/30 bg-destructive/[0.05]" : "border-warning/30 bg-warning-soft/40"}`}>
-                <div className="flex items-start gap-2">
-                  <span className={`inline-flex shrink-0 items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${strict ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-warning/50 bg-warning-soft text-warning-foreground"}`}>
-                    {f.type}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] leading-5 text-foreground/90">{f.desc}</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {f.refs.map((id) => <RefChip key={id} id={id} onPick={onPick} />)}
-                    </div>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-        <p className="mt-3 rounded-md bg-muted/50 px-3 py-2 text-[11.5px] leading-5 text-muted-foreground">
-          措辞原则:出现上述信号时,应核查、应汇报、应按本厂规程和值长指令处理;本卡片不下"必须停吹灰"类硬性命令。
-        </p>
-      </section>
-    </div>
-  );
-}
-
-function StopAndReportCard({ onPick }: { onPick: (id: string) => void }) {
+function HistoryCard({ onPick }: { onPick: (id: string) => void }) {
   return (
     <section className={`${scenarioResultBlockClass} p-5`}>
-      <header className="mb-3 flex items-center gap-2">
-        <AlertTriangle className="h-4 w-4 text-warning" />
-        <h3 className="text-[15px] font-semibold tracking-tight">异常停止与汇报提示</h3>
-      </header>
-
-      <div className="space-y-4">
-        <div className="rounded-lg border border-destructive/25 bg-destructive/[0.04] p-4">
-          <div className="mb-2 text-[12.5px] font-semibold text-destructive">遇以下情况应停止当前分析辅助并立即上报</div>
-          <ol className="space-y-1.5 text-[12.5px] leading-5">
-            {STOP_RULES.map((s, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-destructive" />
-                <span className="flex-1 text-foreground/90">{s.desc}</span>
-                <span className="flex shrink-0 gap-1">{s.refs.map((r) => <RefChip key={r} id={r} onPick={onPick} />)}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-
-        <div className="rounded-lg border border-border bg-background">
-          <div className="border-b border-border px-4 py-2 text-[12.5px] font-semibold">立即向值长汇报</div>
-          <ul className="divide-y divide-border">
-            {REPORT_ITEMS.map((r, i) => (
-              <li key={i} className="grid grid-cols-[200px_1fr_auto] items-start gap-4 px-4 py-2 text-[12.5px]">
-                <span className="font-medium">{r.name}</span>
-                <span className="text-muted-foreground leading-5">{r.point}</span>
-                <span className="flex flex-wrap gap-1">{r.refs.map((id) => <RefChip key={id} id={id} onPick={onPick} />)}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="rounded-lg border border-[#2F80ED]/25 bg-[#2F80ED]/[0.05] p-4">
-          <div className="mb-2 flex items-center gap-2 text-[12.5px] font-semibold text-[#2F80ED]">
-            <Info className="h-3.5 w-3.5" /> 深调试验管理提示(学习口径,非现场命令)
+      <ScenarioSectionHeader
+        icon={<History className="h-4 w-4 text-[#2F80ED]" />}
+        iconWrapClassName="bg-[#E8F1FD]"
+        title="历史案例参考"
+      />
+      <p className="mb-3 pl-[calc(1.75rem+0.625rem)] text-[11.5px] leading-5 text-muted-foreground">
+        以下为知识库中的他厂历史事件,用于培训复盘与风险联想,不构成对本厂的负荷边界、吹灰方案或处置指令。
+      </p>
+      <div className={`${scenarioResultInnerBlockClass} p-4`}>
+        <div className="text-[13.5px] font-semibold text-foreground">{HISTORY_CASE.title}</div>
+        <div className="mt-0.5 text-[11.5px] text-muted-foreground">来源:{HISTORY_CASE.doc}</div>
+        <dl className="mt-3 space-y-2 text-[12.5px] leading-6 text-foreground/85">
+          <div className="flex gap-2">
+            <dt className="w-20 shrink-0 font-medium">事件背景</dt>
+            <dd>机组约 360MW 低负荷下进行炉膛吹灰。</dd>
           </div>
-          <ol className="space-y-1.5 text-[12.5px] leading-5">
-            {TRIAL_TIPS.map((t, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#2F80ED]/15 text-[10px] font-semibold text-[#2F80ED]">{i + 1}</span>
-                <span className="flex-1 text-foreground/90">{t.desc}</span>
-                <span className="flex shrink-0 gap-1">{t.refs.map((id) => <RefChip key={id} id={id} onPick={onPick} />)}</span>
-              </li>
-            ))}
-          </ol>
+          <div className="flex gap-2">
+            <dt className="w-20 shrink-0 font-medium">典型过程</dt>
+            <dd>吹灰中炉膛负压大幅波动;折焰角区域吹灰时火焰电视变暗、MFT 动作。</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-20 shrink-0 font-medium">直接原因</dt>
+            <dd>大量垮灰致炉膛上部灭火、烟气量骤减,炉膛压力低三值保护动作。</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="w-20 shrink-0 font-medium">管理教训</dt>
+            <dd>吹灰负荷边界管理不足、异常后未充分评估仍继续吹灰、经验主义。</dd>
+          </div>
+        </dl>
+        <div className="mt-3 flex justify-end">
+          <button
+            onClick={() => onPick(HISTORY_CASE.id)}
+            className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+          >
+            查看案例原文 <ChevronRight className="h-3 w-3" />
+          </button>
         </div>
       </div>
     </section>
@@ -460,103 +419,59 @@ function StopAndReportCard({ onPick }: { onPick: (id: string) => void }) {
 }
 
 function EvidenceCard({ activeId, onPick }: { activeId?: string; onPick: (id: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? EVIDENCES : EVIDENCES.slice(0, 4);
+
   return (
     <section className={`${scenarioResultBlockClass} p-5`}>
-      <header className="mb-1 flex items-center gap-2">
-        <BookOpen className="h-4 w-4 text-primary" />
-        <h3 className="text-[15px] font-semibold tracking-tight">原文依据</h3>
-      </header>
-      <p className="mb-4 text-[12px] text-muted-foreground">点击正文中的依据标签可定位到对应条目,并在右侧查看原文引用。</p>
+      <ScenarioSectionHeader
+        icon={<BookOpen className="h-4 w-4 text-primary" />}
+        iconWrapClassName="bg-primary/10"
+        title="原文依据"
+        className="mb-1"
+      />
+      <p className="mb-4 pl-[calc(1.75rem+0.625rem)] text-[12px] text-muted-foreground">
+        点击正文中的依据标签可定位到对应条目,并在右侧查看原文引用。
+      </p>
       <div className="grid gap-3 md:grid-cols-2">
-        {EVIDENCES.map((e) => {
+        {visible.map((e) => {
           const active = e.id === activeId;
           return (
-            <div key={e.id} id={`ev-${e.id}`} className={`rounded-lg border p-3.5 transition-colors ${active ? "border-primary bg-primary-soft/40" : "border-border bg-background hover:border-primary/40"}`}>
+            <div
+              key={e.id}
+              id={`ev-${e.id}`}
+              className={`rounded-[14px] border p-3.5 transition-colors ${
+                active ? "border-primary bg-primary-soft/40" : "border-[#EEEFF2] bg-background hover:border-primary/40"
+              }`}
+            >
               <div className="mb-1.5 flex items-center gap-2">
                 <span className="rounded bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary">{e.id}</span>
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{e.type}</span>
                 <FileText className="ml-auto h-3.5 w-3.5 text-muted-foreground" />
               </div>
               <div className="text-[12.5px] font-semibold">{e.title}</div>
-              <p className="mt-1 line-clamp-2 text-[11.5px] leading-5 text-muted-foreground">{e.doc} · {e.section}</p>
-              <button onClick={() => onPick(e.id)} className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline">
+              <p className="mt-1 line-clamp-2 text-[11.5px] leading-5 text-muted-foreground">
+                {e.doc} · {e.section}
+              </p>
+              <button
+                onClick={() => onPick(e.id)}
+                className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
+              >
                 查看依据 <ChevronRight className="h-3 w-3" />
               </button>
             </div>
           );
         })}
       </div>
-
-      {/* 历史案例 */}
-      <div className="mt-5 rounded-lg border border-[#2F80ED]/25 bg-[#2F80ED]/[0.04] p-4">
-        <div className="mb-2 flex items-center gap-2">
-          <History className="h-4 w-4 text-[#2F80ED]" />
-          <h4 className="text-[13.5px] font-semibold">历史案例参考</h4>
-        </div>
-        <p className="mb-3 text-[11.5px] leading-5 text-muted-foreground">
-          以下为知识库中的他厂历史事件,用于培训复盘与风险联想,不构成对本厂的负荷边界、吹灰方案或处置指令。本厂应以本站运行规程、深调试验报告和值长指令为准。
-        </p>
-        <div className="rounded-md border border-border bg-card p-3.5">
-          <div className="text-[13px] font-semibold">{HISTORY_CASE.title}</div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">来源:{HISTORY_CASE.doc}</div>
-          <dl className="mt-2 space-y-1 text-[12px] leading-5 text-foreground/85">
-            <div className="flex gap-2"><dt className="w-20 shrink-0 font-medium">事件背景</dt><dd>机组约 360MW 低负荷下进行炉膛吹灰。</dd></div>
-            <div className="flex gap-2"><dt className="w-20 shrink-0 font-medium">典型过程</dt><dd>吹灰中炉膛负压大幅波动;折焰角区域吹灰时火焰电视变暗、MFT 动作。</dd></div>
-            <div className="flex gap-2"><dt className="w-20 shrink-0 font-medium">直接原因</dt><dd>大量垮灰致炉膛上部灭火、烟气量骤减,炉膛压力低三值保护动作。</dd></div>
-            <div className="flex gap-2"><dt className="w-20 shrink-0 font-medium">机理补充</dt><dd>MFT 因垮灰致炉膛负压低,非燃烧器区域着火不良;上部垮灰对火检影响小。</dd></div>
-            <div className="flex gap-2"><dt className="w-20 shrink-0 font-medium">管理教训</dt><dd>吹灰负荷边界管理不足、异常后未充分评估仍继续吹灰、经验主义。</dd></div>
-            <div className="flex gap-2"><dt className="w-20 shrink-0 font-medium">改进方向</dt><dd>修订吹灰方案、强化异常汇报、低负荷吹灰前稳燃准备。</dd></div>
-          </dl>
-          <div className="mt-2 flex justify-end">
-            <button onClick={() => onPick(HISTORY_CASE.id)} className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline">
-              查看案例原文 <ChevronRight className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function RagCard() {
-  const [open, setOpen] = useState(false);
-  return (
-    <section className={`${scenarioResultBlockClass}`}>
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between px-5 py-3 text-left">
-        <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-primary" />
-          <h3 className="text-[14px] font-semibold tracking-tight">知识检索记录</h3>
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">RAG · {RAG_RESULTS.length} 条主命中</span>
-        </div>
-        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div className="space-y-4 border-t border-border px-5 py-4">
-          <div>
-            <div className="mb-2 text-[12px] text-muted-foreground">
-              检索 Query:<span className="ml-1 text-foreground">深度调峰 低负荷 吹灰 积灰 结焦 炉膛负压 火检 SCR烟温 稳燃 MFT</span>
-            </div>
-            <div className="rounded-md border border-border">
-              <div className="grid grid-cols-[40px_1fr_220px_60px] gap-3 border-b border-border bg-muted/40 px-3 py-1.5 text-[11.5px] font-medium text-muted-foreground">
-                <span>排名</span><span>文档</span><span>命中片段</span><span className="text-right">相关度</span>
-              </div>
-              {RAG_RESULTS.map((r) => (
-                <div key={r.rank} className="grid grid-cols-[40px_1fr_220px_60px] gap-3 border-b border-border px-3 py-2 text-[12px] last:border-b-0">
-                  <span className="text-muted-foreground">#{r.rank}</span>
-                  <span className="truncate" title={r.doc}>{r.doc}</span>
-                  <span className="text-muted-foreground">{r.hit}</span>
-                  <span className="text-right font-medium text-primary">{r.score.toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div className="mb-2 text-[12px] text-muted-foreground">历史案例检索</div>
-            <div className="rounded-md border border-[#2F80ED]/25 bg-[#2F80ED]/[0.05] px-3 py-2 text-[12px]">
-              <div className="font-medium">{HISTORY_CASE.doc}</div>
-              <div className="mt-0.5 text-muted-foreground">用途:培训复盘 · 风险联想 · 相关度 <span className="text-primary">0.95</span></div>
-            </div>
-          </div>
+      {EVIDENCES.length > 4 && (
+        <div className="mt-4 flex justify-center">
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="inline-flex items-center gap-1 rounded-lg border border-[#EEEFF2] bg-background px-4 py-2 text-[12.5px] text-foreground/85 hover:bg-muted"
+          >
+            {expanded ? "收起依据" : `展开全部 ${EVIDENCES.length} 条依据`}
+            <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
+          </button>
         </div>
       )}
     </section>
@@ -780,12 +695,14 @@ function SootblowResult() {
       <div className="mt-4 flex gap-4">
         <div className="min-w-0 flex-1 space-y-4">
           <ScopeCard />
-          <ChainCard onPick={pickEvidence} />
+          <ChainCard />
           <ChecklistCard onPick={pickEvidence} />
-          <RiskAndForbidCard onPick={pickEvidence} />
-          <StopAndReportCard onPick={pickEvidence} />
+          <div className="grid items-stretch gap-4 lg:grid-cols-2">
+            <RiskForbidCard onPick={pickEvidence} />
+            <StopAndReportCard />
+          </div>
+          <HistoryCard onPick={pickEvidence} />
           <EvidenceCard activeId={evId} onPick={pickEvidence} />
-          <RagCard />
         </div>
         <RightSidebar mode={mode} setMode={setMode} evidence={activeEvidence} />
       </div>
