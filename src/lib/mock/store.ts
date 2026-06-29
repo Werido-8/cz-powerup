@@ -1,6 +1,7 @@
 // Tiny localStorage-backed mock store with React hook for cross-page sharing.
 import { useEffect, useState, useCallback } from "react";
 import { DEFAULT_COLLECTIONS, type Collection } from "./scenario";
+import { QUIZ_SETS, type QuizSet } from "./learning-hub";
 
 const KEY = "ai-grid-mock-store-v3";
 
@@ -53,6 +54,7 @@ export type MockState = {
   collections: Collection[];
   scenarioFavorites: ScenarioFavorite[];
   recentScenarios: string[]; // scenarioId
+  quizSets: QuizSet[];
 };
 
 const DEFAULT: MockState = {
@@ -122,6 +124,7 @@ const DEFAULT: MockState = {
   collections: DEFAULT_COLLECTIONS,
   scenarioFavorites: [],
   recentScenarios: [],
+  quizSets: QUIZ_SETS.map((q) => ({ ...q })),
 };
 
 function read(): MockState {
@@ -143,6 +146,7 @@ function read(): MockState {
     parsed.recentScenarios = Array.isArray(parsed.recentScenarios)
       ? parsed.recentScenarios
       : DEFAULT.recentScenarios;
+    parsed.quizSets = Array.isArray(parsed.quizSets) ? parsed.quizSets : DEFAULT.quizSets;
     return parsed;
   } catch {
     return DEFAULT;
@@ -340,6 +344,17 @@ export function useMockStore() {
     write(DEFAULT);
   }, []);
 
+  const addQuizSet = useCallback((q: QuizSet) => {
+    const s = read();
+    s.quizSets = [q, ...s.quizSets.filter((x) => x.id !== q.id)];
+    write(s);
+    return q.id;
+  }, []);
+
+  const getQuizSetByMsgId = useCallback((msgId: string) => {
+    return read().quizSets.find((q) => q.relatedMsgId === msgId);
+  }, []);
+
   return {
     state,
     toggleFavorite,
@@ -359,5 +374,7 @@ export function useMockStore() {
     saveScenarioFavorite,
     pushRecentScenario,
     resetAll,
+    addQuizSet,
+    getQuizSetByMsgId,
   };
 }

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Send,
@@ -52,6 +52,13 @@ import {
 import { useMockStore } from "@/lib/mock/store";
 import { toast } from "sonner";
 import { z } from "zod";
+import {
+  QuizSetDialog,
+  buildQuizSetTitle,
+  inferQuizFilter,
+  pickQuestionsForAnswer,
+} from "@/components/chat/quiz-set-dialog";
+import type { QuizSet } from "@/lib/mock/learning-hub";
 
 const searchSchema = z.object({ prefill: z.string().optional() });
 
@@ -1161,7 +1168,9 @@ function AnswerBubble({
   onFollowUp,
   onAddNote,
   onFavorite,
-  onGenerateQuiz,
+  onQuizAction,
+  quizGenerating,
+  quizReady,
 }: {
   card: AnswerCard;
   msgId: string;
@@ -1171,7 +1180,9 @@ function AnswerBubble({
   onFollowUp: (text: string) => void;
   onAddNote: () => void;
   onFavorite: () => void;
-  onGenerateQuiz: () => void;
+  onQuizAction: () => void;
+  quizGenerating?: boolean;
+  quizReady?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showAllCites, setShowAllCites] = useState(false);
@@ -1328,11 +1339,12 @@ function AnswerBubble({
             </button>
             <button
               type="button"
-              onClick={onGenerateQuiz}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11.5px] hover:border-primary/30 hover:bg-primary-soft/40"
+              onClick={onQuizAction}
+              disabled={quizGenerating}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-[11.5px] hover:border-primary/30 hover:bg-primary-soft/40 disabled:opacity-60"
             >
               <MessagesSquare className="h-3 w-3" />
-              生成训练题
+              {quizGenerating ? "生成中…" : quizReady ? "查看题单" : "生成题单"}
             </button>
             {/* <button
               type="button"
@@ -1556,8 +1568,7 @@ function ChatComposer({
 
 function ChatPage() {
   const { prefill } = Route.useSearch();
-  const navigate = useNavigate();
-  const { state, addNote, toggleFavorite, removeFavorite } = useMockStore();
+  const { state, addNote, toggleFavorite, removeFavorite, addQuizSet, getQuizSetByMsgId } = useMockStore();
 
   const [conversations, setConversations] = useState<Conversation[]>(CONVERSATIONS);
   const [activeId, setActiveId] = useState(CONVERSATIONS[0].id);
@@ -1574,6 +1585,12 @@ function ChatPage() {
   const [citationCollapsed, setCitationCollapsed] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [hasNewReply, setHasNewReply] = useState(false);
+  const [quizDialog, setQuizDialog] = useState<{ open: boolean; msgId: string | null }>({
+    open: false,
+    msgId: null,
+  });
+  const [generatingMsgIds, setGeneratingMsgIds] = useState<Set<string>>(() => new Set());
+  const genTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -1744,10 +1761,79 @@ function ChatPage() {
     } else toast.message("本条回答暂无可收藏资料");
   };
 
-  const handleGenerateQuiz = (card: AnswerCard) => {
-    sessionStorage.setItem("practice-prefill", card.summary.slice(0, 80));
-    navigate({ to: "/training/practice" });
-    toast.success("已跳转专项练习");
+  const activeQuizSet = quizDialog.msgId
+    ? state.quizSets.find((q) => q.relatedMsgId === quizDialog.msgId) ?? null
+    : null;
+  const quizDialogLoading = !!quizDialog.msgId && generatingMsgIds.has(quizDialog.msgId);
+
+  const startQuizGeneration = useCallback(
+    (msgId: string, card: AnswerCard, userQuestion: string) => {
+      if (getQuizSetByMsgId(msgId)) {
+        setQuizDialog({ open: true, msgId });
+        return;
+      }
+      if (generatingMsgIds.has(msgId) || genTimersRef.current.has(msgId)) {
+        setQuizDialog({ open: true, msgId });
+        return;
+      }
+
+      setQuizDialog({ open: true, msgId });
+      setGeneratingMsgIds((prev) => new Set(prev).add(msgId));
+      toast.message("已开始生成题单，完成后将同步至个人沉淀");
+
+      const timer = setTimeout(() => {
+        genTimersRef.current.delete(msgId);
+        const docIds = card.citations.map((c) => c.docId);
+        const questionIds = pickQuestionsForAnswer(docIds, card.summary, 5);
+        const quiz: QuizSet = {
+          id: `qs-${Date.now()}`,
+          title: buildQuizSetTitle(userQuestion, card.summary),
+          source: "智能问答生成",
+          questionCount: questionIds.length,
+          status: "未开始",
+          relatedChat: userQuestion || card.summary.slice(0, 40),
+          relatedMsgId: msgId,
+          relatedConvId: activeId,
+          createdAt: new Date().toLocaleString("zh-CN", { hour12: false }),
+          filter: inferQuizFilter(questionIds),
+          questionIds,
+        };
+        addQuizSet(quiz);
+        setGeneratingMsgIds((prev) => {
+          const next = new Set(prev);
+          next.delete(msgId);
+          return next;
+        });
+        toast.success("题单已生成，可在个人沉淀查看");
+      }, 2500);
+
+      genTimersRef.current.set(msgId, timer);
+    },
+    [activeId, addQuizSet, generatingMsgIds, getQuizSetByMsgId],
+  );
+
+  useEffect(() => {
+    return () => {
+      genTimersRef.current.forEach((t) => clearTimeout(t));
+      genTimersRef.current.clear();
+    };
+  }, []);
+
+  const handleQuizAction = (msgId: string, card: AnswerCard, userQuestion: string) => {
+    const existing = getQuizSetByMsgId(msgId);
+    if (existing) {
+      setQuizDialog({ open: true, msgId });
+      return;
+    }
+    startQuizGeneration(msgId, card, userQuestion);
+  };
+
+  const findUserQuestionForMsg = (msgIndex: number) => {
+    for (let i = msgIndex - 1; i >= 0; i -= 1) {
+      const m = conv.messages[i];
+      if (m.role === "user") return m.text;
+    }
+    return conv.title;
   };
 
   return (
@@ -1809,13 +1895,16 @@ function ChatPage() {
                 </div>
               )}
 
-              {conv.messages.map((m, i) =>
-                m.role === "user" ? (
-                  <UserBubble key={i} text={m.text} time={m.time} />
-                ) : (
+              {conv.messages.map((m, i) => {
+                if (m.role === "user") {
+                  return <UserBubble key={i} text={m.text} time={m.time} />;
+                }
+                const msgId = `msg-${activeId}-${i}`;
+                const quizSet = state.quizSets.find((q) => q.relatedMsgId === msgId);
+                return (
                   <AnswerBubble
                     key={i}
-                    msgId={`msg-${activeId}-${i}`}
+                    msgId={msgId}
                     card={m.card}
                     time={m.time}
                     showCiteTrace={chatSettings.citeTrace}
@@ -1823,10 +1912,12 @@ function ChatPage() {
                     onFollowUp={setInput}
                     onAddNote={() => handleAddNote(m.card)}
                     onFavorite={() => handleFavorite(m.card)}
-                    onGenerateQuiz={() => handleGenerateQuiz(m.card)}
+                    quizReady={!!quizSet}
+                    quizGenerating={generatingMsgIds.has(msgId)}
+                    onQuizAction={() => handleQuizAction(msgId, m.card, findUserQuestionForMsg(i))}
                   />
-                ),
-              )}
+                );
+              })}
 
               {loading && (
                 <div className="flex items-center gap-3">
@@ -1889,6 +1980,13 @@ function ChatPage() {
           </div>
         </div>
       </div>
+
+      <QuizSetDialog
+        open={quizDialog.open}
+        onOpenChange={(open) => setQuizDialog((prev) => ({ ...prev, open }))}
+        loading={quizDialogLoading}
+        quizSet={activeQuizSet}
+      />
     </PageShell>
   );
 }

@@ -27,7 +27,6 @@ import { DOCS } from "@/lib/mock/data";
 import { useMockStore, type NoteItem } from "@/lib/mock/store";
 import { NoteEditor } from "@/components/common/NoteEditor";
 import {
-  QUIZ_SETS,
   PRACTICE_RECORDS,
   WRONG_QUESTION_DETAILS,
   FAVORITE_META,
@@ -172,7 +171,8 @@ function AssetsPage() {
   const wrongCount = state.wrong.length || PERSONAL_OVERVIEW.wrongToReview;
   const lastPractice = PRACTICE_RECORDS[0];
   const activeQuiz =
-    QUIZ_SETS.find((q) => q.status === "进行中") ?? QUIZ_SETS.find((q) => q.status === "未开始");
+    state.quizSets.find((q) => q.status === "进行中") ??
+    state.quizSets.find((q) => q.status === "未开始");
   const latestNote = state.notes[state.notes.length - 1];
   const latestFavoriteDoc = state.favorites
     .map((id) => DOCS.find((d) => d.id === id))
@@ -198,8 +198,8 @@ function AssetsPage() {
     {
       key: "quizsets" as const,
       label: "智能题单",
-      value: QUIZ_SETS.length,
-      hint: `${QUIZ_SETS.filter((q) => q.status !== "已完成").length} 份未完成`,
+      value: state.quizSets.length,
+      hint: `${state.quizSets.filter((q) => q.status !== "已完成").length} 份未完成`,
       detail: activeQuiz ? `进行中：${activeQuiz.title.slice(0, 14)}…` : "全部已完成",
       icon: <Sparkles className="h-[18px] w-[18px]" />,
     },
@@ -262,12 +262,12 @@ function AssetsPage() {
   }, [state.notes, appliedQuery, activeFilter]);
 
   const filteredQuizSets = useMemo(() => {
-    return QUIZ_SETS.filter((q) => {
+    return state.quizSets.filter((q) => {
       if (appliedQuery && !q.title.includes(appliedQuery)) return false;
       if (activeFilter !== "all" && q.status !== activeFilter) return false;
       return true;
     });
-  }, [appliedQuery, activeFilter]);
+  }, [state.quizSets, appliedQuery, activeFilter]);
 
   const filteredWrong = useMemo(() => {
     return WRONG_QUESTION_DETAILS.filter((w) => {

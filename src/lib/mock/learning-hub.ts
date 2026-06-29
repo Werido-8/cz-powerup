@@ -28,8 +28,11 @@ export type QuizSet = {
   status: "未开始" | "进行中" | "已完成";
   accuracy?: number;
   relatedChat?: string;
+  relatedMsgId?: string;
+  relatedConvId?: string;
   createdAt: string;
   filter: string;
+  questionIds?: string[];
 };
 
 export type PracticeRecord = {
@@ -289,8 +292,11 @@ export const QUIZ_SETS: QuizSet[] = [
     status: "已完成",
     accuracy: 80,
     relatedChat: "AGC 考核主要依据哪些文件？",
+    relatedMsgId: "msg-c-agc-1",
+    relatedConvId: "c-agc",
     createdAt: "今天 14:18",
     filter: "AGC",
+    questionIds: ["q1", "q3", "q4", "q8", "q12"],
   },
   // {
   //   id: "qs2",
@@ -319,6 +325,7 @@ export const QUIZ_SETS: QuizSet[] = [
     relatedChat: "两细则考核常见扣分点有哪些？",
     createdAt: "3 天前",
     filter: "AGC",
+    questionIds: ["q1", "q2", "q5", "q6", "q7", "q8", "q9", "q10", "q11", "q12"],
   },
 ];
 
