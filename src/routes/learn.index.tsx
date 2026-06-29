@@ -385,19 +385,19 @@ function RecentMaterialsList({ materials }: { materials: typeof RECENT_MATERIALS
               {STATUS_LABEL[m.status]}
             </span>
             <div className="flex flex-wrap justify-start gap-1.5 md:justify-end">
-              <Link to="/learn/doc/$id" params={{ id: doc.id }} className={listActionClass()}>
+              <Link to="/learn/doc/$id" params={{ id: doc.id }} className={listActionClass("text")}>
                 <BookOpen className="h-3.5 w-3.5" />
                 阅读
               </Link>
               <Link
                 to="/chat"
                 search={{ prefill: `请基于资料《${doc.title}》总结要点` }}
-                className={listActionClass()}
+                className={listActionClass("text")}
               >
                 <MessageSquare className="h-3.5 w-3.5" />
                 提问
               </Link>
-              <Link to="/assets" search={{ tab: "fav" }} className={listActionClass("soft")}>
+              <Link to="/assets" search={{ tab: "fav" }} className={listActionClass("text")}>
                 <Star className="h-3.5 w-3.5" />
                 收藏
               </Link>
@@ -494,7 +494,7 @@ function DocList({ docs, actionLabel = "开始学习" }: { docs: typeof DOCS; ac
                 </span>
               </td>
               <td className="px-5 py-3 text-right">
-                <Link to="/learn/doc/$id" params={{ id: d.id }} className={listActionClass()}>
+                <Link to="/learn/doc/$id" params={{ id: d.id }} className={listActionClass("text")}>
                   <BookOpen className="h-3.5 w-3.5" />
                   {actionLabel}
                 </Link>

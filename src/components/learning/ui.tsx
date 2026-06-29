@@ -1201,9 +1201,9 @@ export function TopicCard({
         <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
           <span>资料 {docCount}</span>
           <span>题目 {questionCount}</span>
-          <span>
+          {/* <span>
             {scenarioLabel} {scenarioCount}
-          </span>
+          </span> */}
         </div>
         <div className="mt-3">
           <div className="mb-1.5 flex justify-between text-[12px]">
