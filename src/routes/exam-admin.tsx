@@ -38,6 +38,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
+import {
+  PaperQuestionList,
+  PaperQuestionSummary,
+  usePaperQuestionGroups,
+} from "@/components/exam/paper-question-list";
 import { PageHeader, StatCard, ModuleTabs, ModulePanel } from "@/components/learning/ui";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -1818,10 +1823,15 @@ function PaperModule({
 function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const [nl, setNl] = useState("");
   const [generated, setGenerated] = useState(false);
+  const [addType, setAddType] = useState<QuestionType | null>(null);
+  const [swapOpen, setSwapOpen] = useState(false);
+  const { groups, collapsed, toggleCollapse, move, remove, aiAppend, resetGroups, summary } =
+    usePaperQuestionGroups(EDITOR_GROUPS);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
-        <SheetHeader>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <SheetHeader className="border-b border-border px-6 py-4">
           <SheetTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" /> 智能组卷
           </SheetTitle>
@@ -1830,7 +1840,7 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-5 space-y-5">
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
           <div>
             <label className="mb-1.5 block text-[12.5px] font-medium">自然语言组卷</label>
             <Textarea
@@ -1854,6 +1864,7 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
 
           <button
             onClick={() => {
+              resetGroups();
               setGenerated(true);
               toast.success("已生成试卷预览");
             }}
@@ -1863,12 +1874,12 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
           </button>
 
           {generated && (
-            <div className="space-y-4 rounded-lg border border-border bg-muted/30 p-4">
+            <div className="space-y-4">
               <div className="rounded-lg border border-border bg-card p-3">
                 <div className="text-[13px] font-semibold">AGC / 两细则取证复习考试</div>
                 <div className="mt-1 flex flex-wrap gap-3 text-[11.5px] text-muted-foreground">
-                  <span>题量 20</span>
-                  <span>总分 100</span>
+                  <span>题量 {summary[0]?.value ?? 0}</span>
+                  <span>总分 {summary[1]?.value ?? 0}</span>
                   <span>时长 30 分</span>
                   <span>及格线 60</span>
                 </div>
@@ -1891,57 +1902,54 @@ function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (
                 缺题提醒:简答题题量不足,建议补充 1 道或调整题型比例。
               </div>
 
-              <div className="space-y-2">
-                <div className="text-[12px] font-medium text-muted-foreground">题目清单</div>
-                {GEN_PREVIEW.questions.map((qq, idx) => (
-                  <div
-                    key={qq.no}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px]"
-                  >
-                    <span className="text-muted-foreground">{idx + 1}.</span>
-                    <span className="min-w-0 flex-1 truncate">{qq.stem}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{qq.type}</span>
-                    <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] ${diffClass(qq.difficulty)}`}>
-                      {qq.difficulty}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-0.5">
-                      <IconBtn icon={FileSearch} title="查看依据" onClick={() => toast.info("查看资料依据")} />
-                      <IconBtn icon={Wand2} title="AI 换题" onClick={() => toast.success("已替换此题")} />
-                      <IconBtn icon={ArrowUp} title="上移" onClick={() => toast.info("上移")} />
-                      <IconBtn icon={ArrowDown} title="下移" onClick={() => toast.info("下移")} />
-                      <IconBtn icon={Trash2} title="删除" danger onClick={() => toast.success("已删除该题")} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <PaperQuestionSummary summary={summary} />
+
+              <PaperQuestionList
+                groups={groups}
+                collapsed={collapsed}
+                onToggleCollapse={toggleCollapse}
+                onAdd={setAddType}
+                onAiAppend={aiAppend}
+                onMove={move}
+                onRemove={remove}
+                onSwap={() => setSwapOpen(true)}
+              />
 
               <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-[11.5px] text-warning-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 智能组卷用于辅助培训负责人创建考试,正式下发前需人工确认。
               </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setGenerated(false)}
-                  className="flex-1 rounded-lg border border-border px-4 py-2.5 text-[13px] font-medium hover:bg-muted"
-                >
-                  继续调整
-                </button>
-                <button
-                  onClick={() => {
-                    toast.success("试卷已保存为草稿");
-                    onOpenChange(false);
-                    setGenerated(false);
-                  }}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  <CheckCircle2 className="h-4 w-4" /> 保存为试卷
-                </button>
-              </div>
             </div>
           )}
         </div>
+
+        {generated && (
+          <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3.5">
+            <button
+              onClick={() => setGenerated(false)}
+              className="rounded-lg border border-border px-4 py-2 text-[13px] hover:bg-muted"
+            >
+              继续调整
+            </button>
+            <button
+              onClick={() => {
+                toast.success("试卷已保存为草稿");
+                onOpenChange(false);
+                setGenerated(false);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <CheckCircle2 className="h-4 w-4" /> 保存为试卷
+            </button>
+          </div>
+        )}
       </SheetContent>
+      <AddQuestionDialog
+        open={addType !== null}
+        onClose={() => setAddType(null)}
+        onAdd={(n) => toast.success(`已向${addType ?? "试卷"}添加 ${n} 题`)}
+      />
+      <SwapDialog open={swapOpen} onClose={() => setSwapOpen(false)} onPick={() => {}} />
     </Sheet>
   );
 }
@@ -2938,75 +2946,16 @@ function AddQuestionDialog({ open, onClose, onAdd }: { open: boolean; onClose: (
 const GOAL_OPTIONS = ["取证复习", "复证巩固", "岗位达标", "阶段测评", "日常自测"];
 
 function PaperEditor({ open, onClose, paper }: { open: boolean; onClose: () => void; paper: Paper | null }) {
-  const [groups, setGroups] = useState<EditorGroup[]>(() => structuredClone(EDITOR_GROUPS));
-  const [collapsed, setCollapsed] = useState<Set<QuestionType>>(new Set());
+  const { groups, collapsed, toggleCollapse, move, remove, aiAppend, resetGroups, summary } =
+    usePaperQuestionGroups(EDITOR_GROUPS);
   const [addType, setAddType] = useState<QuestionType | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
   const [lastPaper, setLastPaper] = useState<string | null>(null);
 
   if (open && (paper?.id ?? null) !== lastPaper) {
-    setGroups(structuredClone(EDITOR_GROUPS));
+    resetGroups();
     setLastPaper(paper?.id ?? null);
   }
-
-  const totalCount = groups.reduce((s, g) => s + g.questions.length, 0);
-  const totalScore = groups.reduce((s, g) => s + g.questions.length * g.perScore, 0);
-  const countByType = (t: QuestionType) => groups.find((g) => g.type === t)?.questions.length ?? 0;
-
-  const toggleCollapse = (t: QuestionType) =>
-    setCollapsed((prev) => {
-      const n = new Set(prev);
-      n.has(t) ? n.delete(t) : n.add(t);
-      return n;
-    });
-
-  const move = (type: QuestionType, idx: number, dir: -1 | 1) => {
-    setGroups((prev) =>
-      prev.map((g) => {
-        if (g.type !== type) return g;
-        const q = [...g.questions];
-        const j = idx + dir;
-        if (j < 0 || j >= q.length) return g;
-        [q[idx], q[j]] = [q[j], q[idx]];
-        return { ...g, questions: q };
-      }),
-    );
-  };
-
-  const remove = (type: QuestionType, id: string) => {
-    setGroups((prev) =>
-      prev.map((g) => (g.type === type ? { ...g, questions: g.questions.filter((q) => q.id !== id) } : g)),
-    );
-  };
-
-  const aiAppend = (type: QuestionType) => {
-    setGroups((prev) =>
-      prev.map((g) => {
-        if (g.type !== type) return g;
-        const base = g.questions[0];
-        const extra = Array.from({ length: 3 }).map((_, i) => ({
-          id: `ai-${type}-${Date.now()}-${i}`,
-          stem: `AI 补充的${type}:AGC/两细则中等难度题目 ${i + 1}`,
-          knowledge: base?.knowledge ?? "AGC / 两细则",
-          difficulty: "中" as Difficulty,
-          source: base?.source ?? "AGC 控制器 SOP v2024.06",
-          score: g.perScore,
-        }));
-        return { ...g, questions: [...g.questions, ...extra] };
-      }),
-    );
-    toast.success(`已为${type}补 3 道题`);
-  };
-
-  const summary: { label: string; value: string | number }[] = [
-    { label: "当前题量", value: totalCount },
-    { label: "试卷总分", value: totalScore },
-    { label: "单选题", value: countByType("单选题") },
-    { label: "多选题", value: countByType("多选题") },
-    { label: "判断题", value: countByType("判断题") },
-    { label: "填空题", value: countByType("填空题") },
-    { label: "简答题", value: countByType("简答题") },
-  ];
 
   return (
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
@@ -3052,62 +3001,18 @@ function PaperEditor({ open, onClose, paper }: { open: boolean; onClose: () => v
             </div>
           </div>
 
-          <div className="grid grid-cols-4 gap-2 rounded-lg border border-border bg-muted/30 p-3 md:grid-cols-7">
-            {summary.map((s) => (
-              <div key={s.label} className="text-center">
-                <div className="text-[16px] font-semibold tracking-tight text-primary">{s.value}</div>
-                <div className="mt-0.5 text-[10.5px] text-muted-foreground">{s.label}</div>
-              </div>
-            ))}
-          </div>
+          <PaperQuestionSummary summary={summary} />
 
-          {groups.map((g) => {
-            const isCol = collapsed.has(g.type);
-            const groupScore = g.questions.length * g.perScore;
-            return (
-              <div key={g.type} className="rounded-lg border border-border bg-card">
-                <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2.5">
-                  <button onClick={() => toggleCollapse(g.type)} className="flex items-center gap-1.5 text-[13px] font-medium">
-                    {isCol ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-                    {g.type}(共 {g.questions.length} 小题,每小题 {g.perScore} 分,共 {groupScore} 分)
-                  </button>
-                  <div className="flex items-center gap-0.5">
-                    <ActionBtn icon={Plus} label="添加题目" onClick={() => setAddType(g.type)} />
-                    <ActionBtn icon={Sparkles} label="AI 补题" tone="primary" onClick={() => aiAppend(g.type)} />
-                  </div>
-                </div>
-                {!isCol && (
-                  <div className="divide-y divide-border">
-                    {g.questions.map((q, idx) => (
-                      <div key={q.id} className="flex items-center gap-3 px-4 py-2 text-[12.5px]">
-                        <span className="w-5 shrink-0 text-muted-foreground">{idx + 1}.</span>
-                        <span className="min-w-0 flex-1 truncate font-medium">{q.stem}</span>
-                        <Badge variant="secondary" className="shrink-0 font-normal">{q.knowledge}</Badge>
-                        <span className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${diffClass(q.difficulty)}`}>{q.difficulty}</span>
-                        <span className="hidden w-32 shrink-0 truncate text-[11px] text-muted-foreground lg:block">{q.source}</span>
-                        <span className="w-10 shrink-0 text-right text-muted-foreground">{q.score} 分</span>
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          <IconBtn icon={FileSearch} title="查看依据" onClick={() => toast.info("查看资料依据")} />
-                          <IconBtn icon={Wand2} title="AI 换题" onClick={() => setSwapOpen(true)} />
-                          <IconBtn icon={ArrowUp} title="上移" onClick={() => move(g.type, idx, -1)} />
-                          <IconBtn icon={ArrowDown} title="下移" onClick={() => move(g.type, idx, 1)} />
-                          <IconBtn icon={Trash2} title="删除" danger onClick={() => remove(g.type, q.id)} />
-                        </div>
-                      </div>
-                    ))}
-                    {g.questions.length === 0 && (
-                      <div className="px-4 py-4 text-center text-[12px] text-muted-foreground">暂无题目,点击“添加题目”或“AI 补题”</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-[11.5px] text-warning-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            AI 补题和换题仅用于辅助组卷,正式保存和下发前需培训负责人确认。
-          </div>
+          <PaperQuestionList
+            groups={groups}
+            collapsed={collapsed}
+            onToggleCollapse={toggleCollapse}
+            onAdd={setAddType}
+            onAiAppend={aiAppend}
+            onMove={move}
+            onRemove={remove}
+            onSwap={() => setSwapOpen(true)}
+          />
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3.5">

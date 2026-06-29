@@ -1,16 +1,22 @@
 import { Link } from "@tanstack/react-router";
 import { BookMarked, BookOpen, Brain, ChevronRight, RotateCcw } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { QUESTIONS } from "@/lib/mock/data";
 import { LEARNING_ACTIVITIES } from "@/lib/mock/learning-hub";
-import {
-  buildReviewPlan,
-  buildSchedule,
-  type ReviewPlanRow,
-} from "@/lib/mock/spaced-review";
+import { buildReviewPlan, buildSchedule, getRowPhase } from "@/lib/mock/spaced-review";
 import { useMockStore } from "@/lib/mock/store";
 import { cn } from "@/lib/utils";
-import { learningBtnRadius, listActionClass, HeroOverviewCard, HeroOverviewBody, HeroActionRail } from "./ui";
+import {
+  ReviewDayView,
+  ReviewEntryActions,
+  ReviewMonthView,
+  ReviewPhaseTag,
+  ReviewViewToolbar,
+  ReviewWeekView,
+  useReviewTimeline,
+  type ReviewViewMode,
+} from "./review-calendar-views";
+import { learningBtnRadius, HeroOverviewCard, HeroOverviewBody, HeroActionRail } from "./ui";
 
 /** 学习概览右侧之「今日动态」 */
 export function TodayActivityCard({ className }: { className?: string }) {
@@ -37,14 +43,17 @@ export function TodayActivityCard({ className }: { className?: string }) {
   );
 }
 
-function ReviewPlanRowItem({ row }: { row: ReviewPlanRow }) {
+function ReviewPlanRowItem({ row }: { row: import("@/lib/mock/spaced-review").ReviewPlanRow }) {
+  const phase = getRowPhase(row);
   const upcoming = row.schedule.filter((s) => s.status !== "done").slice(0, 3);
 
   return (
     <div
       className={cn(
         "rounded-md border px-4 py-3 transition-colors",
-        row.due ? "border-warning/30 bg-warning-soft/25" : "border-border bg-card",
+        phase === "due" && "border-warning/30 bg-warning-soft/25",
+        phase === "overdue" && "border-destructive/30 bg-destructive/5",
+        phase === "upcoming" && "border-border bg-card",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -59,35 +68,17 @@ function ReviewPlanRowItem({ row }: { row: ReviewPlanRow }) {
               {row.kind === "doc" ? <BookOpen className="h-3 w-3" /> : <BookMarked className="h-3 w-3" />}
               {row.kindLabel}
             </span>
-            {row.due && (
-              <span className="rounded-md bg-warning/15 px-2 py-0.5 text-[10.5px] font-medium text-warning-foreground">
-                待复习
-              </span>
-            )}
+            <ReviewPhaseTag phase={phase} />
           </div>
           <div className="mt-1.5 text-[13.5px] font-medium leading-snug text-foreground">{row.title}</div>
           <div className="mt-1 text-[12px] text-muted-foreground">
             已完成 {row.currentRound} 轮 · 下次为第 {row.nextRound} 次复习 ·{" "}
             <span className="font-medium text-foreground">{row.nextAt}</span>
+            {phase === "upcoming" && <span className="text-muted-foreground"> · 可按需提前复习</span>}
           </div>
         </div>
-        <div className="flex shrink-0 gap-1.5">
-          {row.kind === "doc" ? (
-            <Link to="/learn/doc/$id" params={{ id: row.sourceId }} className={listActionClass()}>
-              <BookOpen className="h-3.5 w-3.5" />
-              阅读
-            </Link>
-          ) : (
-            <Link
-              to="/training/session/$id"
-              params={{ id: `复习-${row.sourceId}` }}
-              search={{ mode: "review", filter: "", count: 1, limit: 0 }}
-              className={listActionClass()}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              复习
-            </Link>
-          )}
+        <div className="flex shrink-0 flex-wrap gap-1.5">
+          <ReviewEntryActions row={row} phase={phase} />
         </div>
       </div>
       {upcoming.length > 0 && (
@@ -172,7 +163,34 @@ export function useSpacedReviewSummary() {
 /** 艾宾浩斯复习计划面板（独立 Tab 内展示完整清单） */
 export function SpacedReviewPanel({ embedded = false }: { embedded?: boolean }) {
   const { plan, dueCount, docCount, wrongCount } = useSpacedReviewSummary();
+  const [viewMode, setViewMode] = useState<ReviewViewMode>("list");
+  const [cursorDate, setCursorDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const timeline = useReviewTimeline(plan);
+
   const visiblePlan = embedded ? plan : plan.slice(0, 6);
+
+  const handleModeChange = (mode: ReviewViewMode) => {
+    setViewMode(mode);
+    if (mode === "day") setCursorDate(selectedDate);
+  };
+
+  const handleToday = () => {
+    const today = new Date();
+    setCursorDate(today);
+    setSelectedDate(today);
+  };
+
+  const handleSelectDate = (date: Date) => {
+    setSelectedDate(date);
+    setCursorDate(date);
+  };
+
+  const handleOpenDay = (date: Date) => {
+    setSelectedDate(date);
+    setCursorDate(date);
+    setViewMode("day");
+  };
 
   return (
     <section
@@ -210,7 +228,53 @@ export function SpacedReviewPanel({ embedded = false }: { embedded?: boolean }) 
         </Link>
       </div>
 
-      <div className="space-y-2.5">
+      {embedded && (
+        <>
+          <ReviewViewToolbar
+            mode={viewMode}
+            onModeChange={handleModeChange}
+            cursorDate={cursorDate}
+            onCursorChange={setCursorDate}
+            onToday={handleToday}
+          />
+
+          {viewMode === "list" && (
+            <div className="space-y-2.5">
+              {plan.length === 0 ? (
+                <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted-foreground">
+                  暂无复习项。标记资料「已学」并纳入复习计划，或完成练习产生错题后将自动出现在此。
+                </div>
+              ) : (
+                plan.map((row) => <ReviewPlanRowItem key={row.id} row={row} />)
+              )}
+            </div>
+          )}
+
+          {viewMode === "month" && (
+            <ReviewMonthView
+              timeline={timeline}
+              cursorDate={cursorDate}
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+            />
+          )}
+
+          {viewMode === "week" && (
+            <ReviewWeekView
+              timeline={timeline}
+              cursorDate={cursorDate}
+              selectedDate={selectedDate}
+              onSelectDate={handleSelectDate}
+              onOpenDay={handleOpenDay}
+            />
+          )}
+
+          {viewMode === "day" && <ReviewDayView timeline={timeline} cursorDate={cursorDate} />}
+        </>
+      )}
+
+      {!embedded && (
+        <div className="space-y-2.5">
           {plan.length === 0 ? (
             <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted-foreground">
               暂无复习项。标记资料「已学」并纳入复习计划，或完成练习产生错题后将自动出现在此。
@@ -218,10 +282,11 @@ export function SpacedReviewPanel({ embedded = false }: { embedded?: boolean }) 
           ) : (
             visiblePlan.map((row) => <ReviewPlanRowItem key={row.id} row={row} />)
           )}
-          {!embedded && plan.length > 6 && (
+          {plan.length > 6 && (
             <p className="text-center text-[11.5px] text-muted-foreground">还有 {plan.length - 6} 项未展示</p>
           )}
         </div>
+      )}
     </section>
   );
 }
