@@ -28,6 +28,7 @@ import {
   Save,
   Layers,
   ShieldCheck,
+  XCircle,
   RefreshCw,
   MoreHorizontal,
   Power,
@@ -257,11 +258,11 @@ function ReviewModule() {
 
   const [evidenceOf, setEvidenceOf] = useState<ReviewItem | null>(null);
   const [editOf, setEditOf] = useState<ReviewItem | null>(null);
-  const [approveOf, setApproveOf] = useState<ReviewItem | null>(null);
   const [deleteOf, setDeleteOf] = useState<ReviewItem | null>(null);
   const [mergeOf, setMergeOf] = useState<ReviewItem | null>(null);
 
   const [batchApproveOpen, setBatchApproveOpen] = useState(false);
+  const [batchRejectOpen, setBatchRejectOpen] = useState(false);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
 
   const updateStatus = (ids: string[], status: ReviewItem["status"]) => {
@@ -310,6 +311,13 @@ function ReviewModule() {
             className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] disabled:opacity-40 hover:bg-muted"
           >
             <CheckCircle2 className="h-3.5 w-3.5" /> 批量通过
+          </button>
+          <button
+            disabled={selected.size === 0}
+            onClick={() => setBatchRejectOpen(true)}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-destructive disabled:opacity-40 hover:bg-destructive/10"
+          >
+            <XCircle className="h-3.5 w-3.5" /> 批量驳回
           </button>
           <button
             disabled={selected.size === 0}
@@ -381,10 +389,9 @@ function ReviewModule() {
                   <Td>
                     <div className="flex flex-wrap justify-end gap-0.5">
                       <ActionBtn icon={FileSearch} label="查看依据" onClick={() => setEvidenceOf(q)} />
-                      <ActionBtn icon={Pencil} label="编辑" onClick={() => setEditOf(q)} />
                       {!done && (
                         <>
-                          <ActionBtn icon={CheckCircle2} label="通过入库" tone="primary" onClick={() => setApproveOf(q)} />
+                          <ActionBtn icon={ClipboardCheck} label="审核" tone="primary" onClick={() => setEditOf(q)} />
                           <ActionBtn icon={Trash2} label="删除" tone="danger" onClick={() => setDeleteOf(q)} />
                           {/* <ActionBtn icon={GitMerge} label="合并相似题" onClick={() => setMergeOf(q)} /> */}
                         </>
@@ -401,20 +408,14 @@ function ReviewModule() {
       <EvidenceDrawer
         q={evidenceOf}
         onClose={() => setEvidenceOf(null)}
-        onEdit={(r) => { setEvidenceOf(null); setEditOf(r); }}
-        onApprove={(r) => { setEvidenceOf(null); setApproveOf(r); }}
+        onReview={(r) => { setEvidenceOf(null); setEditOf(r); }}
       />
       <ReviewEditDrawer
         q={editOf}
         onClose={() => setEditOf(null)}
         onSave={() => { setEditOf(null); toast.success("已保存,状态保持待审核"); }}
-        onSaveAndApprove={(r) => { updateStatus([r.id], "已入库"); setEditOf(null); toast.success("已保存并入库"); }}
-      />
-      <ApproveDialog
-        q={approveOf}
-        onClose={() => setApproveOf(null)}
-        onConfirm={(r) => { updateStatus([r.id], "已入库"); setApproveOf(null); toast.success("已通过并入库"); }}
-        onViewSimilar={(r) => { setApproveOf(null); setMergeOf(r); }}
+        onSaveAndApprove={(r) => { updateStatus([r.id], "已入库"); setEditOf(null); toast.success("已保存并通过入库"); }}
+        onReject={(r, _comment) => { updateStatus([r.id], "已退回"); setEditOf(null); toast.success("已驳回题目"); }}
       />
       <DeleteDialog
         q={deleteOf}
@@ -459,6 +460,18 @@ function ReviewModule() {
         </DialogContent>
       </Dialog>
 
+      <RejectDialog
+        open={batchRejectOpen}
+        onClose={() => setBatchRejectOpen(false)}
+        title="批量驳回题目"
+        description={`共 ${selectedRows.length} 道题将被驳回,请填写驳回意见`}
+        onConfirm={() => {
+          updateStatus(selectedRows.map((r) => r.id), "已退回");
+          setBatchRejectOpen(false);
+          toast.success(`已批量驳回 ${selectedRows.length} 道题`);
+        }}
+      />
+
       <Dialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -499,13 +512,11 @@ function ReviewSummary({ q }: { q: ReviewItem }) {
 function EvidenceDrawer({
   q,
   onClose,
-  onEdit,
-  onApprove,
+  onReview,
 }: {
   q: ReviewItem | null;
   onClose: () => void;
-  onEdit: (r: ReviewItem) => void;
-  onApprove: (r: ReviewItem) => void;
+  onReview: (r: ReviewItem) => void;
 }) {
   const d = q ? REVIEW_DETAILS[q.id] : undefined;
   const [openKinds, setOpenKinds] = useState<Set<string>>(new Set(["主依据0"]));
@@ -575,12 +586,9 @@ function EvidenceDrawer({
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3">
               <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">关闭</button>
-              <button onClick={() => onEdit(q)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">
-                <Pencil className="h-3.5 w-3.5" /> 编辑题目
-              </button>
-              {(q.status === "待审核" ) && (
-                <button onClick={() => onApprove(q)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> 通过入库
+              {(q.status === "待审核") && (
+                <button onClick={() => onReview(q)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">
+                  <ClipboardCheck className="h-3.5 w-3.5" /> 审核题目
                 </button>
               )}
             </div>
@@ -847,11 +855,13 @@ function ReviewEditDrawer({
   onClose,
   onSave,
   onSaveAndApprove,
+  onReject,
 }: {
   q: ReviewItem | null;
   onClose: () => void;
   onSave: (r: ReviewItem) => void;
   onSaveAndApprove: (r: ReviewItem) => void;
+  onReject: (r: ReviewItem, comment: string) => void;
 }) {
   const [type, setType] = useState<QuestionType>(q?.type ?? "单选题");
   const [stem, setStem] = useState(q?.stem ?? "");
@@ -859,6 +869,7 @@ function ReviewEditDrawer({
   const [options, setOptions] = useState<{ key: string; text: string }[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [textAnswer, setTextAnswer] = useState("");
+  const [rejectOpen, setRejectOpen] = useState(false);
 
   if (q && q.id !== opened) {
     setOpened(q.id);
@@ -918,8 +929,8 @@ function ReviewEditDrawer({
         {q && (
           <>
             <SheetHeader className="border-b border-border px-6 py-4">
-              <SheetTitle>编辑题目</SheetTitle>
-              <SheetDescription>保存后状态保持待审核,需再次确认通过入库</SheetDescription>
+              <SheetTitle>题目审核</SheetTitle>
+              <SheetDescription>编辑题目内容,可保存、通过入库或驳回</SheetDescription>
             </SheetHeader>
             <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
               <BankField label="题干">
@@ -993,13 +1004,27 @@ function ReviewEditDrawer({
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3">
               <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-              <button onClick={() => onSave(q)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">
-                <Save className="h-3.5 w-3.5" /> 保存修改
+              <button onClick={() => setRejectOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3.5 py-2 text-[12.5px] text-destructive hover:bg-destructive/10">
+                <XCircle className="h-3.5 w-3.5" /> 驳回
               </button>
+              {/* <button onClick={() => onSave(q)} className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">
+                <Save className="h-3.5 w-3.5" /> 保存
+              </button> */}
               <button onClick={() => onSaveAndApprove(q)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">
-                <CheckCircle2 className="h-3.5 w-3.5" /> 保存并通过入库
+                <CheckCircle2 className="h-3.5 w-3.5" /> 保存并通过
               </button>
             </div>
+            <RejectDialog
+              open={rejectOpen}
+              onClose={() => setRejectOpen(false)}
+              title="驳回题目"
+              description="请填写驳回意见,提交后题目状态将变为已退回"
+              summary={q}
+              onConfirm={(comment) => {
+                onReject(q, comment);
+                setRejectOpen(false);
+              }}
+            />
           </>
         )}
       </SheetContent>
@@ -1007,54 +1032,61 @@ function ReviewEditDrawer({
   );
 }
 
-function ApproveDialog({
-  q,
+function RejectDialog({
+  open,
   onClose,
+  title,
+  description,
+  summary,
   onConfirm,
-  onViewSimilar,
 }: {
-  q: ReviewItem | null;
+  open: boolean;
   onClose: () => void;
-  onConfirm: (r: ReviewItem) => void;
-  onViewSimilar: (r: ReviewItem) => void;
+  title: string;
+  description?: string;
+  summary?: ReviewItem | null;
+  onConfirm: (comment: string) => void;
 }) {
+  const [comment, setComment] = useState("");
+
+  useEffect(() => {
+    if (!open) setComment("");
+  }, [open]);
+
+  const canSubmit = comment.trim().length > 0;
+
   return (
-    <Dialog open={!!q} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg">
-        {q && (
-          <>
-            <DialogHeader>
-              <DialogTitle>确认通过入库</DialogTitle>
-              <DialogDescription>通过后该题进入正式题库,可用于组卷</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <ReviewSummary q={q} />
-              {/* <div className="flex items-center gap-2 text-[12.5px]">
-                <span className="text-muted-foreground">相似题风险:</span>
-                <span className={`rounded-md px-2 py-0.5 text-[11px] ${riskClass(q.similarRisk)}`}>{q.similarRisk}</span>
-              </div>
-              {q.similarRisk === "高" && (
-                <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 px-3 py-2 text-[12.5px] text-destructive">
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  该题存在高相似题风险,建议先查看或合并相似题后再入库。
-                </div>
-              )} */}
-              <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">审核备注</div>
-                <Textarea
-                  rows={3}
-                  placeholder="可填写入库说明,例如:依据准确,答案唯一,适合 AGC/两细则取证复习。"
-                  className="text-[13px]"
-                />
-              </div>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          {description && <DialogDescription>{description}</DialogDescription>}
+        </DialogHeader>
+        <div className="space-y-3">
+          {summary && <ReviewSummary q={summary} />}
+          <div>
+            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              驳回意见 <span className="text-destructive">*</span>
             </div>
-            <DialogFooter>
-              <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-              <button onClick={() => onViewSimilar(q)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">查看相似题</button>
-              <button onClick={() => onConfirm(q)} className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">仍然入库</button>
-            </DialogFooter>
-          </>
-        )}
+            <Textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={4}
+              placeholder="请说明驳回原因,例如:题干表述不清、答案与依据不符、选项存在歧义等"
+              className="text-[13px]"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
+          <button
+            disabled={!canSubmit}
+            onClick={() => onConfirm(comment.trim())}
+            className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40"
+          >
+            确认驳回
+          </button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
