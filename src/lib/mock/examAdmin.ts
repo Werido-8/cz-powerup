@@ -126,7 +126,7 @@ export const REVIEW_QUESTIONS: ReviewQuestion[] = [
     source: "安控装置运行规程 v2023.09",
     similarRisk: "无",
     origin: "AI 生成",
-    status: "退回修改",
+    status: "待审核",
   },
   {
     id: "rq5",
@@ -988,7 +988,7 @@ export const REWRITE_DIAGS: RewriteDiag[] = [
   { name: "答案唯一性", level: "通过", note: "正确答案唯一,无歧义。" },
   { name: "解析完整度", level: "建议优化", note: "当前解析未说明依据来源,建议补充资料章节。" },
   { name: "知识点匹配", level: "通过", note: "题目与所属知识点匹配良好。" },
-  { name: "相似题风险", level: "建议优化", note: "题库中存在 1 道相似度 86% 的题目,建议差异化处理。" },
+  // { name: "相似题风险", level: "建议优化", note: "题库中存在 1 道相似度 86% 的题目,建议差异化处理。" },
   { name: "历史正确率", level: "风险较高", note: "正确率 49%,可能题目偏难或表述不清,建议核对。" },
 ];
 
@@ -999,7 +999,7 @@ export interface RewriteCandidate {
   options?: BankOption[];
   answer: string;
   analysis: string;
-  diffChange: string;
+  // diffChange: string;
   reason: string;
   source: string;
 }
@@ -1007,7 +1007,7 @@ export interface RewriteCandidate {
 export const REWRITE_CANDIDATES: RewriteCandidate[] = [
   {
     id: "rw-a",
-    title: "版本 A:清晰化题干",
+    title: "版本 A",
     stem: "AGC 控制方式下,机组 AGC 响应速率不满足两细则考核要求时,将被如何考核?",
     options: [
       { key: "A", text: "不纳入考核,仅作记录" },
@@ -1018,13 +1018,13 @@ export const REWRITE_CANDIDATES: RewriteCandidate[] = [
     answer: "B",
     analysis:
       "两细则对 AGC 调节速率设有量化考核指标,响应速率不达标会按规则扣减调频补偿费用。依据见 AGC 控制器 SOP 第 4.2 节。",
-    diffChange: "难度不变(中)",
+    // diffChange: "难度不变(中)",
     reason: "明确口语化表述,增强选项区分度,补充解析依据来源。",
     source: "AGC 控制器 SOP v2024.06 · 第 4.2 节",
   },
   {
     id: "rw-b",
-    title: "版本 B:取证考试风格",
+    title: "版本 B",
     stem: "依据两细则,机组 AGC 调节速率连续不达标时,对其调频补偿的影响是?",
     options: [
       { key: "A", text: "补偿费用不受影响" },
@@ -1034,26 +1034,26 @@ export const REWRITE_CANDIDATES: RewriteCandidate[] = [
     ],
     answer: "B",
     analysis: "取证考试侧重规则理解,本题强调考核与补偿的对应关系,依据两细则考核计分规则。",
-    diffChange: "难度略升(中→中偏难)",
+    // diffChange: "难度略升(中→中偏难)",
     reason: "贴近取证考试出题风格,聚焦规则要点。",
     source: "两细则考核知识点汇编 v2024.05 · 第 3.4 节",
   },
-  {
-    id: "rw-c",
-    title: "版本 C:降低难度",
-    stem: "AGC 响应速率不满足要求,会对机组的两细则考核产生什么影响?",
-    options: [
-      { key: "A", text: "无影响" },
-      { key: "B", text: "会被扣减调频补偿" },
-      { key: "C", text: "增加补偿" },
-      { key: "D", text: "立即停机" },
-    ],
-    answer: "B",
-    analysis: "响应速率不达标会被扣减调频补偿,这是两细则考核的基本要求。",
-    diffChange: "难度下降(中→易)",
-    reason: "简化题干与选项,适合基础巩固。",
-    source: "AGC 控制器 SOP v2024.06 · 第 4.2 节",
-  },
+  // {
+  //   id: "rw-c",
+  //   title: "版本 C",
+  //   stem: "AGC 响应速率不满足要求,会对机组的两细则考核产生什么影响?",
+  //   options: [
+  //     { key: "A", text: "无影响" },
+  //     { key: "B", text: "会被扣减调频补偿" },
+  //     { key: "C", text: "增加补偿" },
+  //     { key: "D", text: "立即停机" },
+  //   ],
+  //   answer: "B",
+  //   analysis: "响应速率不达标会被扣减调频补偿,这是两细则考核的基本要求。",
+  //   // diffChange: "难度下降(中→易)",
+  //   reason: "简化题干与选项,适合基础巩固。",
+  //   source: "AGC 控制器 SOP v2024.06 · 第 4.2 节",
+  // },
 ];
 
 export interface SimilarBankQuestion {

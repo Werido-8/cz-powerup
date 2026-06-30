@@ -56,9 +56,6 @@ export function formatShortDate(dateKey: string, now = new Date()) {
     (date.setHours(0, 0, 0, 0) - now.setHours(0, 0, 0, 0)) / dayMs,
   );
   const text = `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
-  if (diff === 0) return `${text}（今天）`;
-  if (diff === 1) return `${text}（明天）`;
-  if (diff === -1) return `${text}（昨天）`;
   return text;
 }
 
@@ -157,6 +154,8 @@ const WRONG_ADDED_DAYS: Record<string, number> = {
   q9: 5,
   q1: 2,
   q17: 0,
+  q2: 14,
+  q13: 20,
   q21: 16,
 };
 
@@ -209,6 +208,13 @@ function rowFromItem(
     schedule,
     due: next?.status === "due" || next?.at.startsWith("今天") || next?.at.startsWith("已逾期"),
   };
+}
+
+export function getWrongNextReviewLabel(w: WrongItem, now = new Date()): string {
+  const row = rowFromWrong(w, "", now);
+  const next = row.schedule[row.currentRound] ?? row.schedule.find((s) => s.status !== "done");
+  if (!next) return formatShortDate(toDateKey(now), now);
+  return formatShortDate(next.dateKey, now);
 }
 
 function rowFromWrong(w: WrongItem, title: string, now = new Date()): ReviewPlanRow {

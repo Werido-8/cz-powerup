@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { DEFAULT_COLLECTIONS, type Collection } from "./scenario";
 import { QUIZ_SETS, type QuizSet } from "./learning-hub";
 
-const KEY = "ai-grid-mock-store-v4";
+const KEY = "ai-grid-mock-store-v5";
 
 const DAY = 86400000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
@@ -51,6 +51,7 @@ export type ScenarioFavorite = {
 
 export type MockState = {
   favorites: string[]; // doc ids
+  favoriteQuestions: string[]; // question ids
   notes: NoteItem[];
   wrong: WrongItem[];
   reviews: SpacedReviewItem[];
@@ -62,6 +63,7 @@ export type MockState = {
 
 const DEFAULT: MockState = {
   favorites: ["d1", "d2", "d8"],
+  favoriteQuestions: [],
   notes: [
     {
       id: "n-seed-1",
@@ -96,6 +98,8 @@ const DEFAULT: MockState = {
     { qid: "q9", wrongCount: 1, lastWrongAt: "昨天", mastery: "初步掌握" },
     { qid: "q1", wrongCount: 1, lastWrongAt: "今天", mastery: "新增" },
     { qid: "q17", wrongCount: 3, lastWrongAt: "今天", mastery: "新增" },
+    { qid: "q2", wrongCount: 2, lastWrongAt: "3 天前", mastery: "基本掌握" },
+    { qid: "q13", wrongCount: 1, lastWrongAt: "5 天前", mastery: "熟练" },
   ],
   reviews: [
     // 资料与错题穿插，复习轮次刻意错开（round = 已完成轮数，下次为 round+1 次复习）
@@ -179,6 +183,22 @@ const DEFAULT: MockState = {
       addedAt: daysAgo(28),
       round: 4,
     },
+    {
+      id: "wrong-q2",
+      kind: "wrong",
+      sourceId: "q2",
+      title: "500kV 主变停役前应核对的项目包括(多选):",
+      addedAt: daysAgo(14),
+      round: 3,
+    },
+    {
+      id: "wrong-q13",
+      kind: "wrong",
+      sourceId: "q13",
+      title: "AVC 主要调节对象是:",
+      addedAt: daysAgo(20),
+      round: 4,
+    },
   ],
   collections: DEFAULT_COLLECTIONS,
   scenarioFavorites: [],
@@ -197,6 +217,9 @@ function read(): MockState {
       : DEFAULT.reviews;
     parsed.wrong = Array.isArray(parsed.wrong) ? parsed.wrong : DEFAULT.wrong;
     parsed.favorites = Array.isArray(parsed.favorites) ? parsed.favorites : DEFAULT.favorites;
+    parsed.favoriteQuestions = Array.isArray(parsed.favoriteQuestions)
+      ? parsed.favoriteQuestions
+      : DEFAULT.favoriteQuestions;
     parsed.notes = Array.isArray(parsed.notes) ? parsed.notes : DEFAULT.notes;
     parsed.collections = Array.isArray(parsed.collections) ? parsed.collections : DEFAULT.collections;
     parsed.scenarioFavorites = Array.isArray(parsed.scenarioFavorites)
@@ -243,6 +266,20 @@ export function useMockStore() {
   const removeFavorite = useCallback((docId: string) => {
     const s = read();
     s.favorites = s.favorites.filter((x) => x !== docId);
+    write(s);
+  }, []);
+
+  const toggleFavoriteQuestion = useCallback((qid: string) => {
+    const s = read();
+    s.favoriteQuestions = s.favoriteQuestions.includes(qid)
+      ? s.favoriteQuestions.filter((x) => x !== qid)
+      : [...s.favoriteQuestions, qid];
+    write(s);
+  }, []);
+
+  const removeFavoriteQuestion = useCallback((qid: string) => {
+    const s = read();
+    s.favoriteQuestions = s.favoriteQuestions.filter((x) => x !== qid);
     write(s);
   }, []);
 
@@ -293,6 +330,13 @@ export function useMockStore() {
       const i = MASTERY_ORDER.indexOf(w.mastery);
       w.mastery = MASTERY_ORDER[Math.min(i + 1, MASTERY_ORDER.length - 1)];
     }
+    write(s);
+  }, []);
+
+  const setMastery = useCallback((qid: string, mastery: Mastery) => {
+    const s = read();
+    const w = s.wrong.find((w) => w.qid === qid);
+    if (w) w.mastery = mastery;
     write(s);
   }, []);
 
@@ -418,11 +462,14 @@ export function useMockStore() {
     state,
     toggleFavorite,
     removeFavorite,
+    toggleFavoriteQuestion,
+    removeFavoriteQuestion,
     addNote,
     updateNote,
     removeNote,
     addWrong,
     advanceMastery,
+    setMastery,
     removeWrong,
     setReview,
     addSpacedReview,

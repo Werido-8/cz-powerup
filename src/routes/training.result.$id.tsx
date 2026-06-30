@@ -18,6 +18,32 @@ type Saved = {
   mode: "practice" | "exam" | "review";
 };
 
+/** 智能考试历史作答的演示数据（无 session 时回退） */
+const EXAM_RESULT_MOCKS: Record<string, { score: number; count: number; elapsed: number }> = {
+  "exam-复证巩固-20260601": { score: 80, count: 18, elapsed: 1420 },
+  "exam-复证巩固-20260510": { score: 70, count: 18, elapsed: 1680 },
+  "exam-AGC-20260605": { score: 72, count: 20, elapsed: 1560 },
+  "exam-AGC-20260528": { score: 65, count: 20, elapsed: 1740 },
+  "exam-PSS-20260608": { score: 85, count: 16, elapsed: 1320 },
+  "exam-黑启动-20260606": { score: 78, count: 18, elapsed: 1580 },
+  "exam-黑启动-20260520": { score: 68, count: 18, elapsed: 1720 },
+  "exam-厂用电-20260603": { score: 92, count: 15, elapsed: 980 },
+};
+
+function buildExamResultMock(meta: { score: number; count: number; elapsed: number }): Saved {
+  const qids = QUESTIONS.slice(0, meta.count).map((q) => q.id);
+  const wrongCount = Math.max(0, Math.round(meta.count * (1 - meta.score / 100)));
+  const wrongIds = qids.slice(0, wrongCount);
+  return {
+    wrongIds,
+    total: meta.count,
+    answers: {},
+    qids,
+    elapsed: meta.elapsed,
+    mode: "exam",
+  };
+}
+
 function ResultPage() {
   const { id } = Route.useParams();
   const [data, setData] = useState<Saved>({
@@ -31,7 +57,12 @@ function ResultPage() {
 
   useEffect(() => {
     const raw = sessionStorage.getItem(`result-${id}`);
-    if (raw) setData(JSON.parse(raw));
+    if (raw) {
+      setData(JSON.parse(raw));
+      return;
+    }
+    const mock = EXAM_RESULT_MOCKS[id];
+    if (mock) setData(buildExamResultMock(mock));
   }, [id]);
 
   const correct = data.total - data.wrongIds.length;

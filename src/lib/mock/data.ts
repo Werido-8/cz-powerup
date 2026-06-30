@@ -1009,19 +1009,19 @@ export const QUESTIONS: Question[] = [
 
 // ---------- Knowledge categories (for 专项练习 selector) ----------
 export const KNOWLEDGE_CATEGORIES = [
-  { key: "电力系统基础知识", label: "电力系统基础知识", desc: "电力系统基本理论、一次设备基础、电网结构、运行方式、潮流与稳定等基础内容" },
-  { key: "规程规定和制度", label: "规程规定和制度", desc: "安全规程、运行规程、调度规程、操作票制度、反事故措施及公司管理制度" },
-  { key: "电网调度运行操作", label: "电网调度运行操作", desc: "调控运行、倒闸操作、运行方式调整、许可汇报、异常信号处置等内容" },
-  { key: "电网运行危险点与反事故演习", label: "电网运行危险点与反事故演习", desc: "国家法规、行业规程、公司制度、本市调控规程、变电运行规程、配网运维规程、标准化作业要求" },
-  { key: "其他专业知识", label: "其他专业知识", desc: "继电保护、安全自动装置、通信自动化、配电网运行、发电厂及电气设备等扩展专业内容" },
-  { key: "AGC", label: "AGC / 两细则", desc: "AGC 三项指标、调频、考核计算" },
-  { key: "主变停役", label: "典型操作", desc: "主变停送电、母线倒闸、操作票" },
-  { key: "差动保护", label: "继电保护与故障复盘", desc: "差动、距离、零序复盘四步法" },
-  { key: "AVC", label: "AVC / 无功电压", desc: "AVC 自动控制、电压越限处置" },
-  { key: "迎峰度夏", label: "季节性运行", desc: "迎峰度夏、冷却系统、温升监测" },
-  { key: "异常处置", label: "异常处置原则", desc: "先汇报后处置、无把握不操作" },
-  { key: "厂站规程", label: "厂站资料 / 新员工", desc: "值班、交接、规程优先适用" },
-  { key: "一次调频", label: "一次调频 / 惯量响应", desc: "死区、调差率、贡献电量" },
+  { key: "电力系统基础知识", label: "电力系统基础知识", desc: "电力系统基本理论、一次设备基础、电网结构、运行方式、潮流与稳定等基础内容", questionCount: 892 },
+  { key: "规程规定和制度", label: "规程规定和制度", desc: "安全规程、运行规程、调度规程、操作票制度、反事故措施及公司管理制度", questionCount: 756 },
+  { key: "电网调度运行操作", label: "电网调度运行操作", desc: "调控运行、倒闸操作、运行方式调整、许可汇报、异常信号处置等内容", questionCount: 634 },
+  { key: "电网运行危险点与反事故演习", label: "电网运行危险点与反事故演习", desc: "国家法规、行业规程、公司制度、本市调控规程、变电运行规程、配网运维规程、标准化作业要求", questionCount: 521 },
+  { key: "其他专业知识", label: "其他专业知识", desc: "继电保护、安全自动装置、通信自动化、配电网运行、发电厂及电气设备等扩展专业内容", questionCount: 487 },
+  { key: "AGC", label: "AGC / 两细则", desc: "AGC 三项指标、调频、考核计算", questionCount: 648 },
+  { key: "主变停役", label: "典型操作", desc: "主变停送电、母线倒闸、操作票", questionCount: 412 },
+  { key: "差动保护", label: "继电保护与故障复盘", desc: "差动、距离、零序复盘四步法", questionCount: 538 },
+  { key: "AVC", label: "AVC / 无功电压", desc: "AVC 自动控制、电压越限处置", questionCount: 356 },
+  { key: "迎峰度夏", label: "季节性运行", desc: "迎峰度夏、冷却系统、温升监测", questionCount: 289 },
+  { key: "异常处置", label: "异常处置原则", desc: "先汇报后处置、无把握不操作", questionCount: 445 },
+  { key: "厂站规程", label: "厂站资料 / 新员工", desc: "值班、交接、规程优先适用", questionCount: 367 },
+  { key: "一次调频", label: "一次调频 / 惯量响应", desc: "死区、调差率、贡献电量", questionCount: 423 },
 ] as const;
 
 // ---------- Conversations (mock chat) ----------

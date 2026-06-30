@@ -1,8 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Target, ChevronRight, BookOpen, Sparkles } from "lucide-react";
+import { useState } from "react";
+import {
+  Target,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
+  Circle,
+  Clock,
+  Layers,
+  BookOpenCheck,
+} from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
-import { KNOWLEDGE_CATEGORIES, QUESTIONS } from "@/lib/mock/data";
+import { KNOWLEDGE_CATEGORIES } from "@/lib/mock/data";
+import { PageHeader, listActionClass } from "@/components/learning/ui";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/practice")({
   component: PracticePage,
@@ -15,12 +26,13 @@ function PracticePage() {
   const [count, setCount] = useState<number>(10);
   const [diff, setDiff] = useState<"all" | "easy" | "hard">("all");
 
-  const matched = useMemo(
-    () => QUESTIONS.filter((q) => q.knowledgePoints.some((k) => k.includes(cat))),
-    [cat],
-  );
+  const selectedCategory = KNOWLEDGE_CATEGORIES.find((x) => x.key === cat);
+  const bankCount = selectedCategory?.questionCount ?? 0;
+  const canStart = bankCount > 0;
+  const actualCount = Math.min(count, bankCount);
 
   const start = () => {
+    if (!canStart) return;
     navigate({
       to: "/training/session/$id",
       params: { id: `专项练习-${cat}` },
@@ -30,83 +42,79 @@ function PracticePage() {
 
   return (
     <PageShell>
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <div className="text-[12px] text-muted-foreground">题库训练 / 专项练习</div>
-          <h1 className="mt-1 text-[24px] font-semibold tracking-tight">专项练习</h1>
-          <p className="mt-1 text-[12.5px] text-muted-foreground">
-            按知识点 / 场景定向训练,练后即可加入错题本并复习
-          </p>
-        </div>
+      <nav aria-label="页面导航" className="mb-2 flex items-center gap-1 text-[12px]">
         <Link
           to="/training"
-          className="rounded-lg border border-border bg-background px-3 py-2 text-[12.5px] hover:bg-muted"
+          className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-primary"
         >
-          返回训练首页
+          <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
+          题库训练
         </Link>
-      </div>
+        <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
+        <span className="text-foreground/70">专项练习</span>
+      </nav>
 
-      <div className="grid gap-5 lg:grid-cols-3">
+      <PageHeader
+        title="专项练习"
+        subtitle="按知识点 / 场景定向训练，练后即可加入错题本并复习"
+        size="md"
+      />
+
+      <div className="grid gap-5 lg:grid-cols-3 lg:items-stretch">
         <section className="rounded-lg border border-border bg-card p-5 lg:col-span-2">
           <div className="mb-3 text-[13px] font-semibold">1 · 选择知识点</div>
-          <div className="grid gap-2.5 sm:grid-cols-2">
+          <div className="grid max-h-[min(28rem,55vh)] gap-2.5 overflow-y-auto pr-1 sm:grid-cols-2">
             {KNOWLEDGE_CATEGORIES.map((c) => {
               const active = cat === c.key;
-              const n = Math.floor(Math.random() * 500) + 500;
+              const n = c.questionCount;
               return (
                 <button
                   key={c.key}
+                  type="button"
                   onClick={() => setCat(c.key)}
-                  className={`group rounded-lg border p-3 text-left transition-all ${
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-all",
                     active
                       ? "border-primary bg-primary-soft shadow-[var(--shadow-card)]"
-                      : "border-border bg-background hover:-translate-y-0.5 hover:border-primary/40"
-                  }`}
+                      : "border-border bg-background hover:-translate-y-0.5 hover:border-primary/40",
+                  )}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="text-[13.5px] font-medium">{c.label}</div>
-                    <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10.5px] text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[13.5px] font-medium leading-snug">{c.label}</div>
+                    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10.5px] tabular-nums text-muted-foreground">
                       {n} 题
                     </span>
                   </div>
-                  <div className="mt-1 text-[11.5px] text-muted-foreground">{c.desc}</div>
+                  <div className="mt-1 line-clamp-2 text-[11.5px] text-muted-foreground">{c.desc}</div>
                 </button>
               );
             })}
           </div>
 
           <div className="mt-6 mb-3 text-[13px] font-semibold">2 · 难度</div>
-          <div className="inline-flex rounded-lg border border-border bg-background p-1 text-[12.5px]">
-            {(
-              [
-                { k: "all", l: "全部" },
-                { k: "easy", l: "基础" },
-                { k: "hard", l: "进阶" },
-              ] as const
-            ).map((d) => (
-              <button
-                key={d.k}
-                onClick={() => setDiff(d.k)}
-                className={`rounded-lg px-3 py-1.5 ${
-                  diff === d.k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {d.l}
-              </button>
-            ))}
-          </div>
+          <ToggleGroup
+            value={diff}
+            onChange={setDiff}
+            options={[
+              { k: "all", l: "全部" },
+              { k: "easy", l: "基础" },
+              { k: "hard", l: "进阶" },
+            ]}
+          />
 
           <div className="mt-6 mb-3 text-[13px] font-semibold">3 · 题量</div>
           <div className="flex flex-wrap items-center gap-2">
             {[5, 10, 15, 20].map((n) => (
               <button
                 key={n}
+                type="button"
                 onClick={() => setCount(n)}
-                className={`rounded-lg border px-4 py-2 text-[12.5px] transition-colors ${
+                className={cn(
+                  "rounded-lg border px-4 py-2 text-[12.5px] transition-colors",
                   count === n
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary/40"
-                }`}
+                    : "border-border bg-background hover:border-primary/40",
+                )}
               >
                 {n} 题
               </button>
@@ -114,67 +122,160 @@ function PracticePage() {
           </div>
         </section>
 
-        <aside className="rounded-lg border border-border bg-gradient-to-br from-primary-soft/60 to-transparent p-5">
-          <div className="inline-flex items-center gap-1.5 text-[12px] font-medium text-primary">
-            <Sparkles className="h-3.5 w-3.5" /> 本次练习概览
-          </div>
-          <div className="mt-3 space-y-3 rounded-lg bg-card p-4">
-            <Row k="知识点" v={KNOWLEDGE_CATEGORIES.find((x) => x.key === cat)?.label ?? cat} />
-            <Row k="题量" v={`${count} 题`} />
-            <Row k="难度" v={{ all: "全部", easy: "基础", hard: "进阶" }[diff]} />
-            <Row k="题库匹配" v={`${matched.length} 题可用`} />
-            <Row k="模式" v="无限时 · 含解析" />
-          </div>
-          <button
-            onClick={start}
-            className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Target className="h-3.5 w-3.5" /> 开始专项练习
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
-          <div className="mt-3 text-[11px] text-muted-foreground">
-            · 练习结果不计入考核,可随时退出
-          </div>
-        </aside>
-      </div>
-
-      <h2 className="mt-8 mb-3 text-[15px] font-semibold">该知识点典型题</h2>
-      <div className="space-y-2">
-        {matched.slice(0, 4).map((q) => (
-          <div
-            key={q.id}
-            className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40"
-          >
-            <span className="mt-0.5 rounded-md bg-primary-soft px-2 py-0.5 text-[10.5px] text-accent-foreground">
-              {{ single: "单选", multiple: "多选", judge: "判断", text: "简答" }[q.type]}
-            </span>
-            <div className="flex-1 text-[13px]">{q.stem}</div>
-            {q.relatedDocId && (
-              <Link
-                to="/learn/doc/$id"
-                params={{ id: q.relatedDocId }}
-                className="inline-flex items-center gap-1 text-[11.5px] text-primary hover:underline"
-              >
-                <BookOpen className="h-3 w-3" /> 查依据
-              </Link>
-            )}
-          </div>
-        ))}
-        {matched.length === 0 && (
-          <div className="rounded-lg border border-dashed border-border bg-card/50 p-8 text-center text-[12.5px] text-muted-foreground">
-            该知识点暂无题目
-          </div>
+        {selectedCategory && (
+          <PracticeLaunchPanel
+            category={selectedCategory}
+            count={count}
+            actualCount={actualCount}
+            diff={diff}
+            matchedCount={bankCount}
+            canStart={canStart}
+            onStart={start}
+          />
         )}
       </div>
     </PageShell>
   );
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+function PracticeLaunchPanel({
+  category,
+  count,
+  actualCount,
+  diff,
+  matchedCount,
+  canStart,
+  onStart,
+}: {
+  category: (typeof KNOWLEDGE_CATEGORIES)[number];
+  count: number;
+  actualCount: number;
+  diff: "all" | "easy" | "hard";
+  matchedCount: number;
+  canStart: boolean;
+  onStart: () => void;
+}) {
+  const diffLabel = { all: "全部", easy: "基础", hard: "进阶" }[diff];
+
   return (
-    <div className="flex items-center justify-between text-[12.5px]">
-      <span className="text-muted-foreground">{k}</span>
-      <span className="font-medium">{v}</span>
+    <aside className="flex flex-col overflow-hidden rounded-lg border border-border bg-card lg:min-h-full">
+      <div className="border-b border-primary/10 bg-gradient-to-br from-primary-soft/70 via-primary-soft/30 to-transparent px-5 py-5">
+        <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-background/70 px-2.5 py-0.5 text-[10.5px] font-medium text-primary">
+          <Target className="h-3 w-3" />
+          练习预览
+        </div>
+        <h3 className="mt-3 text-[17px] font-semibold leading-snug tracking-tight text-foreground">
+          {category.label}
+        </h3>
+        <p className="mt-2 line-clamp-3 text-[12px] leading-relaxed text-muted-foreground">{category.desc}</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 p-4">
+        <MetricTile icon={Layers} label="本次题量" value={canStart ? `${actualCount} 题` : `${count} 题`} />
+        <MetricTile icon={Target} label="难度" value={diffLabel} />
+        <MetricTile icon={Clock} label="时限" value="不限时" />
+        <MetricTile icon={BookOpenCheck} label="解析" value="提交可见" />
+      </div>
+
+      <div className="flex-1 px-4 pb-2">
+        <div
+          className={cn(
+            "rounded-lg border px-3.5 py-3 text-center",
+            canStart ? "border-success/25 bg-success-soft/35" : "border-destructive/25 bg-destructive/5",
+          )}
+        >
+          <div className={cn("text-[22px] font-semibold tabular-nums leading-none", canStart ? "text-success" : "text-destructive")}>
+            {matchedCount}
+          </div>
+          <div className="mt-1 text-[11.5px] text-muted-foreground">题库匹配可用</div>
+          {canStart && actualCount < count && (
+            <div className="mt-1.5 text-[11px] text-muted-foreground">已选 {count} 题，实际抽取 {actualCount} 题</div>
+          )}
+        </div>
+
+        <ul className="mt-4 space-y-2.5">
+          <ReadyItem ok={canStart} label={canStart ? "配置已完成，可以开始" : "当前知识点暂无可用题目"} />
+          <ReadyItem ok label="练习结果不计入考核" />
+          <ReadyItem ok label="支持随时退出，错题自动收录" />
+        </ul>
+      </div>
+
+      <div className="mt-auto border-t border-border bg-muted/10 p-4">
+        <button
+          type="button"
+          onClick={onStart}
+          disabled={!canStart}
+          className={listActionClass(
+            "primary",
+            "w-full justify-center py-3 text-[13.5px] shadow-sm disabled:opacity-50",
+          )}
+        >
+          <Target className="h-4 w-4" />
+          开始专项练习
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function MetricTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Target;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/80 bg-muted/15 px-3 py-2.5">
+      <div className="flex items-center gap-1 text-[10.5px] text-muted-foreground">
+        <Icon className="h-3 w-3 shrink-0 opacity-70" />
+        {label}
+      </div>
+      <div className="mt-1 text-[13px] font-semibold text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function ReadyItem({ ok, label }: { ok: boolean; label: string }) {
+  return (
+    <li className="flex items-start gap-2 text-[12px] leading-snug text-muted-foreground">
+      {ok ? (
+        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
+      ) : (
+        <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive/70" />
+      )}
+      {label}
+    </li>
+  );
+}
+
+function ToggleGroup<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { k: T; l: string }[];
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-border bg-background p-1 text-[12.5px]">
+      {options.map((d) => (
+        <button
+          key={d.k}
+          type="button"
+          onClick={() => onChange(d.k)}
+          className={cn(
+            "rounded-lg px-3 py-1.5 transition-colors",
+            value === d.k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+          )}
+        >
+          {d.l}
+        </button>
+      ))}
     </div>
   );
 }

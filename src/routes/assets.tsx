@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/workbench/PageShell";
-import { DOCS } from "@/lib/mock/data";
+import { DOCS, QUESTIONS } from "@/lib/mock/data";
 import { useMockStore, type NoteItem } from "@/lib/mock/store";
 import { NoteEditor } from "@/components/common/NoteEditor";
 import {
@@ -75,6 +75,7 @@ const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
     { value: "案例", label: "案例" },
     { value: "问答", label: "问答" },
     { value: "题单", label: "题单" },
+    { value: "题目", label: "题目" },
   ],
   note: [
     { value: "all", label: "全部" },
@@ -126,6 +127,7 @@ function AssetsPage() {
   const {
     state,
     removeFavorite,
+    removeFavoriteQuestion,
     addNote,
     updateNote,
     removeNote,
@@ -250,6 +252,26 @@ function AssetsPage() {
         return true;
       });
   }, [state.favorites, appliedQuery, activeFilter]);
+
+  const filteredFavoriteQuestions = useMemo(() => {
+    const typeLabel: Record<string, string> = {
+      single: "单选",
+      multiple: "多选",
+      judge: "判断",
+      text: "简答",
+    };
+    return state.favoriteQuestions
+      .map((qid) => QUESTIONS.find((q) => q.id === qid))
+      .filter((q): q is NonNullable<typeof q> => !!q)
+      .filter((q) => {
+        if (appliedQuery && !q.stem.includes(appliedQuery) && !q.knowledgePoints.join("").includes(appliedQuery)) {
+          return false;
+        }
+        if (activeFilter === "all" || activeFilter === "题目") return true;
+        return false;
+      })
+      .map((q) => ({ q, typeLabel: typeLabel[q.type] ?? q.type }));
+  }, [state.favoriteQuestions, appliedQuery, activeFilter]);
 
   const filteredNotes = useMemo(() => {
     return NOTE_META.filter((n) => {
@@ -419,10 +441,11 @@ function AssetsPage() {
       {/* 收藏 */}
       {tab === "fav" && (
         <div className="space-y-3">
-          {filteredFavorites.length === 0 ? (
-            <EmptyState description="还没有收藏内容，可在资料检索或学习页面点击「收藏」。" />
+          {filteredFavorites.length === 0 && filteredFavoriteQuestions.length === 0 ? (
+            <EmptyState description="还没有收藏内容，可在资料检索、学习页面或错题本点击「收藏」。" />
           ) : (
-            filteredFavorites.map(({ doc, meta }) => (
+            <>
+            {filteredFavorites.map(({ doc, meta }) => (
               <PersonalAssetCard
                 key={doc.id}
                 icon={<Star className="h-5 w-5 fill-current" />}
@@ -465,7 +488,61 @@ function AssetsPage() {
                   </>
                 }
               />
-            ))
+            ))}
+            {filteredFavoriteQuestions.map(({ q, typeLabel }) => (
+              <PersonalAssetCard
+                key={q.id}
+                icon={<ListChecks className="h-5 w-5" />}
+                title={q.stem}
+                tags={
+                  <>
+                    <Tag variant="primary">题目</Tag>
+                    <Tag variant="outline">{typeLabel}</Tag>
+                    {q.knowledgePoints.slice(0, 2).map((k) => (
+                      <Tag key={k} variant="outline">
+                        {k}
+                      </Tag>
+                    ))}
+                  </>
+                }
+                meta={
+                  <>
+                    <span>来源：错题本收藏</span>
+                    <span>·</span>
+                    <span>{q.knowledgePoints[0] ?? "综合"}</span>
+                  </>
+                }
+                actions={
+                  <>
+                    <Link
+                      to="/training/session/$id"
+                      params={{ id: `复习-${q.id}` }}
+                      search={{ mode: "review", filter: "", count: 1, limit: 0 }}
+                      className={listActionClass("textPrimary")}
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      复习
+                    </Link>
+                    <Link to="/assets" search={{ tab: "wrong" }} className={listActionClass("text")}>
+                      <BookMarked className="h-3.5 w-3.5" />
+                      错题本
+                    </Link>
+                    <button
+                      type="button"
+                      className={listActionClass("text")}
+                      onClick={() => {
+                        removeFavoriteQuestion(q.id);
+                        toast.success("已取消收藏");
+                      }}
+                    >
+                      <Star className="h-3.5 w-3.5 fill-current" />
+                      取消收藏
+                    </button>
+                  </>
+                }
+              />
+            ))}
+            </>
           )}
         </div>
       )}
