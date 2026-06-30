@@ -20,6 +20,7 @@ import {
   Brain,
   MessageSquare,
   Star,
+  Flame,
   type LucideIcon,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
@@ -29,6 +30,7 @@ import {
   LEARNING_STATS,
   ENRICHED_TOPICS,
   RECENT_MATERIALS,
+  DOC_READ_INSIGHTS_BY_ID,
 } from "@/lib/mock/learning-hub";
 import {
   PageHeader,
@@ -57,6 +59,10 @@ import {
   SpacedReviewPanel,
   TodayReviewHeroCard,
 } from "@/components/learning/spaced-review";
+import {
+  DocCardReadMeta,
+  DocReadingHeatDashboard,
+} from "@/components/learning/doc-reading-insights";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/learn/")({
@@ -86,6 +92,7 @@ const TOPIC_ICONS: Record<string, LucideIcon> = {
 };
 
 type TabKey = "topic" | "all" | "mine" | "review" | "recent";
+type AllDocsSubView = "list" | "heat";
 
 const LEARN_TABS: { key: TabKey; label: string; desc: string; icon: typeof Layers }[] = [
   { key: "topic", label: "专题学习", desc: "按专题浏览资料与练习", icon: Layers },
@@ -134,6 +141,7 @@ function LearnPage() {
     recent: "all",
   });
   const [view, setView] = useState<"card" | "table">("card");
+  const [allSubView, setAllSubView] = useState<AllDocsSubView>("list");
 
   const activeFilter = tabFilters[tab];
   const setActiveFilter = (value: string) => {
@@ -144,6 +152,7 @@ function LearnPage() {
     setTab(t);
     setSearchInput("");
     setAppliedQuery("");
+    setAllSubView("list");
   };
 
   const handleSearch = () => {
@@ -270,6 +279,7 @@ function LearnPage() {
       <section className="mb-6">
         <ModulePanel>
           <ModuleTabs
+            compact
             tabs={LEARN_TABS.map((t) => ({
               key: t.key,
               label: t.label,
@@ -280,7 +290,7 @@ function LearnPage() {
             onChange={setTabAndReset}
           />
 
-          {tab !== "review" && tab !== "topic" && (
+          {tab !== "review" && tab !== "topic" && !(tab === "all" && allSubView === "heat") && (
             <div className="flex flex-col gap-3 border-b border-divider px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
                 <SearchBar
@@ -297,11 +307,28 @@ function LearnPage() {
                   />
                 )}
               </div>
-              {(tab === "all" || tab === "mine") && <ViewToggle view={view} setView={setView} />}
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {tab === "all" && allSubView === "list" && (
+                  <button
+                    type="button"
+                    onClick={() => setAllSubView("heat")}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                      learningBtnRadius,
+                    )}
+                  >
+                    <Flame className="h-3.5 w-3.5" />
+                    阅读热度
+                  </button>
+                )}
+                {(tab === "all" || tab === "mine") && allSubView === "list" && (
+                  <ViewToggle view={view} setView={setView} />
+                )}
+              </div>
             </div>
           )}
 
-          <div className="p-4">
+          <div className={cn(tab === "all" && allSubView === "heat" ? "p-0" : "p-4")}>
             {tab === "topic" && (
               <section>
                 <SectionHeader
@@ -352,7 +379,13 @@ function LearnPage() {
               </section>
             )}
 
-            {tab === "all" && <AllDocsPanel docs={filteredDocs} view={view} />}
+            {tab === "all" && allSubView === "heat" && (
+              <DocReadingHeatDashboard onBack={() => setAllSubView("list")} />
+            )}
+
+            {tab === "all" && allSubView === "list" && (
+              <AllDocsPanel docs={filteredDocs} view={view} showReadMeta />
+            )}
 
             {tab === "mine" && (
               <AllDocsPanel docs={filteredMyDocs} view={view} actionLabel="继续学习" />
@@ -454,18 +487,20 @@ function AllDocsPanel({
   docs,
   view,
   actionLabel = "开始学习",
+  showReadMeta = false,
 }: {
   docs: typeof DOCS;
   view: "card" | "table";
   actionLabel?: string;
+  showReadMeta?: boolean;
 }) {
   if (docs.length === 0) {
     return <EmptyState description="暂无符合条件的资料" />;
   }
   return view === "card" ? (
-    <DocCardGrid docs={docs} actionLabel={actionLabel} />
+    <DocCardGrid docs={docs} actionLabel={actionLabel} showReadMeta={showReadMeta} />
   ) : (
-    <DocList docs={docs} actionLabel={actionLabel} />
+    <DocList docs={docs} actionLabel={actionLabel} showReadMeta={showReadMeta} />
   );
 }
 
@@ -518,7 +553,15 @@ function ViewToggle({
 const TYPE_ACCENT = "bg-primary-soft/50 text-primary";
 const CARD_PAGE_SIZE = 6;
 
-function DocList({ docs, actionLabel = "开始学习" }: { docs: typeof DOCS; actionLabel?: string }) {
+function DocList({
+  docs,
+  actionLabel = "开始学习",
+  showReadMeta = false,
+}: {
+  docs: typeof DOCS;
+  actionLabel?: string;
+  showReadMeta?: boolean;
+}) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
   const totalPages = Math.max(1, Math.ceil(docs.length / pageSize));
@@ -549,6 +592,7 @@ function DocList({ docs, actionLabel = "开始学习" }: { docs: typeof DOCS; ac
               <th className={LEARN_TABLE_TH_CLASS}>标题</th>
               <th className={LEARN_TABLE_TH_CLASS}>文件类型</th>
               <th className={LEARN_TABLE_TH_CLASS}>文件性质</th>
+              {showReadMeta && <th className={LEARN_TABLE_TH_CLASS}>近7日阅读</th>}
               <th className={LEARN_TABLE_TH_CLASS}>学习状态</th>
               <th className={cn(LEARN_TABLE_TH_CLASS, "text-right")}>操作</th>
             </tr>
@@ -567,6 +611,18 @@ function DocList({ docs, actionLabel = "开始学习" }: { docs: typeof DOCS; ac
                 </td>
                 <td className="px-5 py-3 text-muted-foreground">{d.docType}</td>
                 <td className="px-5 py-3 text-muted-foreground">{d.source}</td>
+                {showReadMeta && (
+                  <td className="px-5 py-3 tabular-nums text-muted-foreground">
+                    {DOC_READ_INSIGHTS_BY_ID[d.id] ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {DOC_READ_INSIGHTS_BY_ID[d.id].readers7d} 人
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                )}
                 <td className="px-5 py-3">
                   <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[d.status]}`}>
                     {d.status}
@@ -690,9 +746,11 @@ function DocCardPager({
 function DocCardGrid({
   docs,
   actionLabel = "开始学习",
+  showReadMeta = false,
 }: {
   docs: typeof DOCS;
   actionLabel?: string;
+  showReadMeta?: boolean;
 }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(docs.length / CARD_PAGE_SIZE));
@@ -748,9 +806,13 @@ function DocCardGrid({
                     <UiTag key={h}>{h}</UiTag>
                   ))}
                 </div>
-                <div className="mt-3 flex items-center gap-3 text-[11.5px] text-muted-foreground">
+                {showReadMeta && <DocCardReadMeta docId={d.id} relatedCount={d.related?.length} />}
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
                   <span className="inline-flex items-center gap-1">
                     <Layers className="h-3 w-3" /> {d.source}
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <Wrench className="h-3 w-3" /> {d.equipment}
                   </span>
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="h-3 w-3" /> {d.updatedAt}

@@ -909,14 +909,22 @@ export function ModuleTabs<T extends string>({
   value,
   onChange,
   className,
+  compact,
 }: {
   tabs: ModuleTabItem<T>[];
   value: T;
   onChange: (v: T) => void;
   className?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={cn("flex flex-wrap gap-1 border-b border-divider bg-primary-soft/25 px-2 pt-2 pb-0", className)}>
+    <div
+      className={cn(
+        "flex flex-wrap gap-1 border-b border-divider bg-primary-soft/25 px-2 pb-0",
+        compact ? "pt-1.5" : "pt-2",
+        className,
+      )}
+    >
       {tabs.map((t) => {
         const active = value === t.key;
         return (
@@ -925,7 +933,8 @@ export function ModuleTabs<T extends string>({
             type="button"
             onClick={() => onChange(t.key)}
             className={cn(
-              "relative flex items-center gap-2 rounded-t-lg px-3.5 py-2.5 text-left transition-all",
+              "relative flex items-center gap-2 rounded-t-lg text-left transition-all",
+              compact ? "px-3 py-2" : "px-3.5 py-2.5",
               active
                 ? "z-[1] -mb-px border border-divider border-b-card bg-card text-primary shadow-sm ring-1 ring-primary/15"
                 : "border border-transparent text-foreground/70 hover:bg-card/55 hover:text-foreground",
@@ -950,7 +959,12 @@ export function ModuleTabs<T extends string>({
                 {t.label}
               </div>
               {t.desc && (
-                <div className={cn("text-[10.5px]", active ? "text-primary/65" : "text-muted-foreground")}>
+                <div
+                  className={cn(
+                    compact ? "text-[10px] text-muted-foreground/65" : "text-[10.5px]",
+                    active && !compact ? "text-primary/65" : !compact ? "text-muted-foreground" : "",
+                  )}
+                >
                   {t.desc}
                 </div>
               )}

@@ -550,3 +550,90 @@ export const PERSONAL_OVERVIEW = {
   wrongToReview: 6,
   recentPractice: 8,
 };
+
+/** 单篇资料近 7 日阅读洞察（用于全部资料热度面板与卡片） */
+export type DocReadInsight = {
+  docId: string;
+  readers7d: number;
+  reads7d: number;
+  /** 较上周阅读人次变化百分比 */
+  trendDelta: number;
+  /** 近 7 日每日阅读人次（从 6 天前到今天） */
+  dailyReads: [number, number, number, number, number, number, number];
+  rank: number;
+};
+
+/** 平台级阅读热力：近 14 天每日总阅读人次 */
+export type PlatformReadHeatmapDay = {
+  label: string;
+  reads: number;
+};
+
+/** 近 7 天 × 4 时段阅读强度（0–4），时段：晨 6–12 / 午 12–18 / 晚 18–22 / 夜 22–6 */
+export type PlatformReadHeatmap = {
+  days: PlatformReadHeatmapDay[];
+  timeSlots: readonly ["晨", "午", "晚", "夜"];
+  hourlyGrid: number[][];
+};
+
+export const PLATFORM_READ_HEATMAP: PlatformReadHeatmap = {
+  days: [
+    { label: "6/17", reads: 42 },
+    { label: "6/18", reads: 58 },
+    { label: "6/19", reads: 51 },
+    { label: "6/20", reads: 73 },
+    { label: "6/21", reads: 68 },
+    { label: "6/22", reads: 45 },
+    { label: "6/23", reads: 62 },
+    { label: "6/24", reads: 88 },
+    { label: "6/25", reads: 95 },
+    { label: "6/26", reads: 79 },
+    { label: "6/27", reads: 54 },
+    { label: "6/28", reads: 71 },
+    { label: "6/29", reads: 103 },
+    { label: "6/30", reads: 86 },
+  ],
+  timeSlots: ["晨", "午", "晚", "夜"],
+  hourlyGrid: [
+    [2, 3, 2, 1],
+    [3, 4, 3, 2],
+    [2, 3, 4, 2],
+    [3, 4, 3, 1],
+    [4, 3, 2, 2],
+    [2, 2, 3, 3],
+    [3, 4, 4, 2],
+  ],
+};
+
+export const DOC_READ_INSIGHTS: DocReadInsight[] = [
+  { docId: "d1", readers7d: 48, reads7d: 132, trendDelta: 18, dailyReads: [12, 18, 22, 15, 28, 25, 32], rank: 1 },
+  { docId: "d2", readers7d: 41, reads7d: 98, trendDelta: 12, dailyReads: [10, 14, 16, 12, 18, 15, 22], rank: 2 },
+  { docId: "d6", readers7d: 36, reads7d: 87, trendDelta: 24, dailyReads: [8, 10, 14, 11, 16, 13, 20], rank: 3 },
+  { docId: "d5", readers7d: 29, reads7d: 71, trendDelta: -5, dailyReads: [12, 11, 9, 10, 8, 11, 10], rank: 4 },
+  { docId: "d10", readers7d: 27, reads7d: 64, trendDelta: 8, dailyReads: [7, 9, 8, 10, 9, 11, 12], rank: 5 },
+  { docId: "d3", readers7d: 22, reads7d: 55, trendDelta: 3, dailyReads: [6, 8, 7, 9, 8, 7, 10], rank: 6 },
+  { docId: "d4", readers7d: 19, reads7d: 48, trendDelta: -2, dailyReads: [7, 6, 8, 7, 6, 7, 7], rank: 7 },
+  { docId: "d7", readers7d: 18, reads7d: 42, trendDelta: 6, dailyReads: [5, 6, 7, 5, 6, 7, 6], rank: 8 },
+  { docId: "d8", readers7d: 16, reads7d: 38, trendDelta: 0, dailyReads: [5, 5, 6, 5, 5, 6, 6], rank: 9 },
+  { docId: "d9", readers7d: 15, reads7d: 35, trendDelta: -8, dailyReads: [6, 5, 4, 5, 5, 5, 5], rank: 10 },
+  { docId: "d11", readers7d: 14, reads7d: 32, trendDelta: 4, dailyReads: [4, 5, 4, 5, 4, 5, 5], rank: 11 },
+  { docId: "d12", readers7d: 13, reads7d: 30, trendDelta: 2, dailyReads: [4, 4, 5, 4, 4, 4, 5], rank: 12 },
+  { docId: "d13", readers7d: 12, reads7d: 28, trendDelta: -3, dailyReads: [5, 4, 3, 4, 4, 4, 4], rank: 13 },
+  { docId: "d14", readers7d: 11, reads7d: 26, trendDelta: 1, dailyReads: [3, 4, 4, 3, 4, 4, 4], rank: 14 },
+  { docId: "d15", readers7d: 10, reads7d: 24, trendDelta: 5, dailyReads: [3, 3, 4, 3, 3, 4, 4], rank: 15 },
+  { docId: "d16", readers7d: 9, reads7d: 22, trendDelta: -1, dailyReads: [3, 3, 3, 3, 3, 3, 3], rank: 16 },
+  { docId: "d17", readers7d: 8, reads7d: 19, trendDelta: 0, dailyReads: [2, 3, 3, 2, 3, 3, 3], rank: 17 },
+  { docId: "d18", readers7d: 7, reads7d: 16, trendDelta: -4, dailyReads: [3, 2, 2, 3, 2, 2, 2], rank: 18 },
+  { docId: "d19", readers7d: 6, reads7d: 14, trendDelta: 2, dailyReads: [2, 2, 2, 2, 2, 2, 2], rank: 19 },
+  { docId: "d20", readers7d: 5, reads7d: 12, trendDelta: -6, dailyReads: [2, 2, 1, 2, 1, 2, 2], rank: 20 },
+  { docId: "d21", readers7d: 4, reads7d: 10, trendDelta: 0, dailyReads: [1, 2, 1, 2, 1, 1, 2], rank: 21 },
+  { docId: "d22", readers7d: 3, reads7d: 8, trendDelta: 1, dailyReads: [1, 1, 1, 1, 1, 1, 1], rank: 22 },
+  { docId: "d23", readers7d: 2, reads7d: 6, trendDelta: -2, dailyReads: [1, 1, 0, 1, 1, 1, 1], rank: 23 },
+  { docId: "d24", readers7d: 1, reads7d: 3, trendDelta: 0, dailyReads: [0, 1, 0, 1, 0, 0, 1], rank: 24 },
+];
+
+export const DOC_READ_INSIGHTS_BY_ID: Record<string, DocReadInsight> = Object.fromEntries(
+  DOC_READ_INSIGHTS.map((item) => [item.docId, item]),
+);
+
+export const TOP_READING_DOCS = DOC_READ_INSIGHTS.slice(0, 5);

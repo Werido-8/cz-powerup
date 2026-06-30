@@ -22,6 +22,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   ArrowUp,
   ArrowDown,
   Trash2,
@@ -40,6 +42,7 @@ import {
   Zap,
   SlidersHorizontal,
   RotateCcw,
+  HelpCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
@@ -50,7 +53,7 @@ import {
 } from "@/components/exam/paper-question-list";
 import { PageHeader, StatCard, ModuleTabs, ModulePanel, TableListPager, TABLE_PAGE_SIZE_DEFAULT, PillSelect } from "@/components/learning/ui";
 import { StemCell } from "@/components/common/ellipsis-tooltip";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -114,6 +117,7 @@ import {
   aggregateStats,
   type Difficulty,
   type Paper,
+  type ExamGoal,
   type QuestionType,
   type EditorGroup,
   type AssignRecord,
@@ -196,6 +200,32 @@ function Th({ children, className = "" }: { children: React.ReactNode; className
 }
 function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+}
+
+function ThWithTip({
+  label,
+  tip,
+  className = "",
+}: {
+  label: string;
+  tip: string;
+  className?: string;
+}) {
+  return (
+    <Th className={className}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex cursor-help items-center gap-1">
+            {label}
+            <HelpCircle className="h-3 w-3 shrink-0 opacity-45" />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[260px] text-left font-normal leading-relaxed">
+          {tip}
+        </TooltipContent>
+      </Tooltip>
+    </Th>
+  );
 }
 
 function ActionBtn({
@@ -2470,7 +2500,6 @@ function UsageDialog({ q, onClose }: { q: BankQuestion | null; onClose: () => vo
                 <Th className="min-w-[200px]">试卷名称</Th>
                 <Th>使用时间</Th>
                 <Th>下发人数</Th>
-                <Th>平均正确率</Th>
                 <Th>最近使用</Th>
               </tr>
             </thead>
@@ -2547,6 +2576,27 @@ function AddToPaperDialog({ q, onClose }: { q: BankQuestion | null; onClose: () 
 
 
 // ---------- Paper module ----------
+/** 试卷已下发（非草稿且有人收到） */
+function paperIsIssued(p: Paper): boolean {
+  return p.status !== "草稿" && p.assigned > 0;
+}
+
+/** 已有提交答卷，可展示正确率 / 平均分 / 平均用时 */
+function paperHasSubmittedAnswers(p: Paper): boolean {
+  return paperIsIssued(p) && p.finished > 0;
+}
+
+function paperFinishRate(p: Paper): number | null {
+  if (!paperIsIssued(p)) return null;
+  return Math.round((p.finished / p.assigned) * 100);
+}
+
+function rateTone(rate: number): string {
+  if (rate >= 80) return "font-semibold text-success";
+  if (rate >= 60) return "font-medium text-amber-700 dark:text-amber-500";
+  return "font-medium text-destructive/85";
+}
+
 function statusBadge(s: Paper["status"]) {
   return s === "已下发"
     ? "bg-primary-soft text-primary"
@@ -2574,88 +2624,316 @@ function PaperModule({
   onEdit: (p: Paper) => void;
   onNew: () => void;
 }) {
+  const [draftKeyword, setDraftKeyword] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [draftGoal, setDraftGoal] = useState<ExamGoal | "all">("all");
+  const [goal, setGoal] = useState<ExamGoal | "all">("all");
+  const [draftStatus, setDraftStatus] = useState<Paper["status"] | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<Paper["status"] | "all">("all");
+  const [draftCategory, setDraftCategory] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const GOAL_OPTIONS: (ExamGoal | "all")[] = ["all", "取证复习", "复证巩固", "岗位达标", "阶段测评", "日常自测"];
+  const STATUS_OPTIONS: (Paper["status"] | "all")[] = ["all", "草稿", "已下发", "已结束"];
+  const CATEGORY_OPTIONS = useMemo(
+    () => ["all", ...Array.from(new Set(PAPERS.map((p) => p.category))).sort()],
+    [],
+  );
+  const paperMetricCol = "w-[60px] max-w-[60px] px-2 py-2.5 text-center";
+
+  const filtered = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    return PAPERS.filter((p) => {
+      if (goal !== "all" && p.goal !== goal) return false;
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+      if (!kw) return true;
+      return [p.name, p.category, p.goal, p.source, p.status].some((f) => f.toLowerCase().includes(kw));
+    });
+  }, [keyword, goal, statusFilter, categoryFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const pageRows = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePage, pageSize]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [keyword, goal, statusFilter, categoryFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const toggle = (id: string) => {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
+  const pageAllChecked = pageRows.length > 0 && pageRows.every((p) => selected.has(p.id));
+  const togglePageAll = () => {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (pageAllChecked) pageRows.forEach((p) => n.delete(p.id));
+      else pageRows.forEach((p) => n.add(p.id));
+      return n;
+    });
+  };
+
+  const selectedRows = PAPERS.filter((p) => selected.has(p.id));
+
+  const handleQuery = () => {
+    setKeyword(draftKeyword);
+    setGoal(draftGoal);
+    setStatusFilter(draftStatus);
+    setCategoryFilter(draftCategory);
+  };
+
+  const handleReset = () => {
+    setDraftKeyword("");
+    setDraftGoal("all");
+    setDraftStatus("all");
+    setDraftCategory("all");
+    setKeyword("");
+    setGoal("all");
+    setStatusFilter("all");
+    setCategoryFilter("all");
+  };
+
+  const handleBatchAssign = () => {
+    if (selectedRows.length === 0) return;
+    toast.success(`已选择 ${selectedRows.length} 份试卷，请在下发弹窗中确认对象`);
+    onAssign(selectedRows[0]);
+  };
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <button
-          onClick={onGenerate}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Sparkles className="h-3.5 w-3.5" /> 智能组卷
-        </button>
-        <button
-          onClick={onNew}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3.5 py-1.5 text-[12.5px] font-medium text-foreground hover:border-primary/25 hover:bg-muted/70"
-        >
-          <Plus className="h-3.5 w-3.5" /> 新建试卷
-        </button>
-        <button
-          onClick={() => toast.info("批量下发已选试卷")}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3.5 py-1.5 text-[12.5px] font-medium text-foreground hover:border-primary/25 hover:bg-muted/70"
-        >
-          <Send className="h-3.5 w-3.5" /> 批量下发
-        </button>
+      <div className="mb-2 rounded-lg border border-border bg-card px-3 py-2 shadow-[var(--shadow-card)]">
+        <div className="flex min-w-0 items-center gap-2 overflow-x-auto">
+          <BankFilterField label="试卷名称">
+            <Input
+              value={draftKeyword}
+              onChange={(e) => setDraftKeyword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleQuery()}
+              placeholder="搜索试卷名称"
+              className="h-8 w-[160px] rounded-sm text-[12px]"
+            />
+          </BankFilterField>
+          <BankFilterField label="考试目标">
+            <Select value={draftGoal} onValueChange={(v) => setDraftGoal(v as ExamGoal | "all")}>
+              <SelectTrigger className="h-8 w-[112px] rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {GOAL_OPTIONS.map((g) => (
+                  <SelectItem key={g} value={g} className="text-[12px]">{g === "all" ? "全部" : g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </BankFilterField>
+          <BankFilterField label="状态">
+            <Select value={draftStatus} onValueChange={(v) => setDraftStatus(v as Paper["status"] | "all")}>
+              <SelectTrigger className="h-8 w-[96px] rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s} className="text-[12px]">{s === "all" ? "全部" : s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </BankFilterField>
+          <BankFilterField label="分类">
+            <Select value={draftCategory} onValueChange={setDraftCategory}>
+              <SelectTrigger className="h-8 w-[112px] rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CATEGORY_OPTIONS.map((c) => (
+                  <SelectItem key={c} value={c} className="text-[12px]">{c === "all" ? "全部" : c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </BankFilterField>
+          <div className="ml-auto flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleQuery}
+              className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Search className="h-3.5 w-3.5" /> 查询
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-[12px] text-muted-foreground hover:bg-muted"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> 重置
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="overflow-hidden rounded-md border border-border">
-        <table className="w-full text-[13px]">
-          <thead className="bg-muted/40 text-[12px] text-muted-foreground">
-            <tr>
-              <Th>试卷名称</Th>
-              <Th>考试目标</Th>
-              <Th>分类</Th>
-              <Th>题量</Th>
-              <Th>时长</Th>
-              <Th>创建时间</Th>
-              <Th>来源</Th>
-              <Th><span title="去重后的人员数量">下发人数</span></Th>
-              <Th><span title="该试卷累计下发记录数">下发次数</span></Th>
-              <Th><span title="按每人最新一次记录统计已完成人数">完成人数</span></Th>
-              <Th><span title="按每人最新一次下发记录计算">完成率</span></Th>
-              <Th><span title="按每人最新一次已提交记录计算">平均正确率</span></Th>
-              <Th><span title="按每人最新一次已提交记录计算">平均分</span></Th>
-              <Th><span title="按每人最新一次已提交记录计算">平均用时</span></Th>
-              <Th>状态</Th>
-              <Th className="text-right">操作</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {PAPERS.map((p) => {
-              const finishRate = p.assigned ? Math.round((p.finished / p.assigned) * 100) : 0;
-              return (
-                <tr key={p.id} className="border-t border-border hover:bg-primary-soft/10">
-                  <Td className="max-w-[180px] font-medium">{p.name}</Td>
-                  <Td><Badge variant="secondary" className="font-normal">{p.goal}</Badge></Td>
-                  <Td className="text-muted-foreground">{p.category}</Td>
-                  <Td className="text-muted-foreground">{p.questionCount}</Td>
-                  <Td className="text-muted-foreground">{p.duration} 分</Td>
-                  <Td className="text-[12px] text-muted-foreground">{p.createdAt}</Td>
-                  <Td className="max-w-[100px] text-[12px] text-muted-foreground">{p.source}</Td>
-                  <Td className="text-muted-foreground">{p.assigned || "—"}</Td>
-                  <Td className="text-muted-foreground">{p.assignTimes || "—"}</Td>
-                  <Td className="text-muted-foreground">{p.assigned ? p.finished : "—"}</Td>
-                  <Td>{p.assigned ? `${finishRate}%` : "—"}</Td>
-                  <Td>{p.assigned ? `${p.avgCorrect}%` : "—"}</Td>
-                  <Td>{p.assigned ? p.avgScore : "—"}</Td>
-                  <Td className="text-muted-foreground">{p.assigned ? `${p.avgDuration} 分` : "—"}</Td>
-                  <Td>
-                    <span className={`rounded-md px-2 py-0.5 text-[11px] ${statusBadge(p.status)}`}>
-                      {p.status}
-                    </span>
-                  </Td>
-                  <Td className="text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-1.5">
-                      <ActionBtn variant="text" icon={Eye} label="试卷详情" onClick={() => onPreview(p)} />
-                      <ActionBtn variant="text" icon={Pencil} label="编辑" onClick={() => onEdit(p)} />
-                      <ActionBtn variant="text" icon={Send} label="下发" tone="primary" onClick={() => onAssign(p)} />
-                      <ActionBtn variant="text" icon={History} label="下发记录" onClick={() => onRecords(p)} />
-                    </div>
-                  </Td>
+      <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onGenerate}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> 智能组卷
+          </button>
+          <button
+            type="button"
+            onClick={onNew}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-[12.5px] font-medium text-foreground hover:border-primary/25 hover:bg-muted/70"
+          >
+            <Plus className="h-3.5 w-3.5" /> 新建试卷
+          </button>
+        </div>
+        <div className="flex flex-nowrap items-center gap-2">
+          <span className="whitespace-nowrap text-[12px] text-muted-foreground">
+            已选 <span className="font-semibold text-foreground">{selected.size}</span> 项
+          </span>
+          <button
+            type="button"
+            disabled={selected.size === 0}
+            onClick={handleBatchAssign}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] disabled:opacity-40 hover:bg-muted"
+          >
+            <Send className="h-3.5 w-3.5" /> 批量下发
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full whitespace-nowrap text-[13px]">
+            <thead className="bg-muted/40 text-[12px] text-muted-foreground">
+              <tr>
+                <Th className="w-10 px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={pageAllChecked}
+                    onChange={togglePageAll}
+                    className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                  />
+                </Th>
+                <Th className="min-w-[240px] px-3 py-2.5">试卷名称</Th>
+                <Th className="px-3 py-2.5">考试目标</Th>
+                <Th className="px-3 py-2.5">分类</Th>
+                <Th className="px-3 py-2.5">题量</Th>
+                <Th className="px-3 py-2.5">时长</Th>
+                <Th className={paperMetricCol}><span title="去重后的人员数量">下发人数</span></Th>
+                <Th className={paperMetricCol}><span title="该试卷累计下发记录数">下发次数</span></Th>
+                <Th className={paperMetricCol}><span title="按每人最新一次记录统计已完成人数">完成人数</span></Th>
+                <Th className="px-3 py-2.5"><span title="按每人最新一次下发记录计算">完成率</span></Th>
+                <ThWithTip
+                  className="px-3 py-2.5"
+                  label="正确率"
+                  tip="按每位答题人最新一次答卷统计：答对题数 / 总题数。"
+                />
+                <ThWithTip
+                  className="px-3 py-2.5"
+                  label="平均用时"
+                  tip="按每位答题人最新一次已提交答卷的实际用时取平均值。"
+                />
+                <ThWithTip
+                  className={paperMetricCol}
+                  label="平均分"
+                  tip="按每位答题人最新一次答卷的实际得分计算平均值。"
+                />
+                <Th className="px-3 py-2.5">状态</Th>
+                <Th className="px-3 py-2.5">创建时间</Th>
+                <Th className="min-w-[280px] px-3 py-2.5 text-right">操作</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageRows.length === 0 ? (
+                <tr>
+                  <td colSpan={16} className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+                    当前筛选条件下暂无试卷
+                  </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              ) : (
+                pageRows.map((p) => {
+                  const hasAnswers = paperHasSubmittedAnswers(p);
+                  const finishRate = paperFinishRate(p);
+                  return (
+                    <tr key={p.id} className="border-t border-border hover:bg-primary-soft/10">
+                      <Td className="px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(p.id)}
+                          onChange={() => toggle(p.id)}
+                          className="h-3.5 w-3.5 cursor-pointer accent-primary"
+                        />
+                      </Td>
+                      <StemCell text={p.name} maxWidthClass="max-w-[260px] min-w-[240px]" className="text-[13px]" />
+                      <Td className="px-3 py-2.5"><Badge variant="secondary" className="font-normal">{p.goal}</Badge></Td>
+                      <Td className="px-3 py-2.5 text-muted-foreground">{p.category}</Td>
+                      <Td className="px-3 py-2.5 text-muted-foreground">{p.questionCount}</Td>
+                      <Td className="px-3 py-2.5 text-muted-foreground">{p.duration} 分钟</Td>
+                      <Td className={`${paperMetricCol} text-muted-foreground`}>{paperIsIssued(p) ? p.assigned : "—"}</Td>
+                      <Td className={`${paperMetricCol} text-muted-foreground`}>{paperIsIssued(p) ? p.assignTimes : "—"}</Td>
+                      <Td className={`${paperMetricCol} text-muted-foreground`}>{paperIsIssued(p) ? p.finished : "—"}</Td>
+                      <Td className="px-3 py-2.5">
+                        {finishRate !== null ? (
+                          <span className={rateTone(finishRate)}>{finishRate}%</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </Td>
+                      <Td className="px-3 py-2.5">
+                        {hasAnswers ? (
+                          <span className={rateTone(p.avgCorrect)}>{p.avgCorrect}%</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </Td>
+                      <Td className="px-3 py-2.5 text-muted-foreground">
+                        {hasAnswers ? `${p.avgDuration} 分钟` : "—"}
+                      </Td>
+                      <Td className={`${paperMetricCol} text-[13px] text-muted-foreground`}>
+                        {hasAnswers ? p.avgScore : "—"}
+                      </Td>
+                      <Td className="px-3 py-2.5">
+                        <span className={`rounded-md px-2 py-0.5 text-[11px] ${statusBadge(p.status)}`}>
+                          {p.status}
+                        </span>
+                      </Td>
+                      <Td className="px-3 py-2.5 text-[12px] text-muted-foreground">{p.createdAt}</Td>
+                      <Td className="px-3 py-2.5 text-right">
+                        <div className="flex flex-nowrap items-center justify-end gap-1.5">
+                          <ActionBtn variant="text" icon={Eye} label="试卷详情" onClick={() => onPreview(p)} />
+                          <ActionBtn variant="text" icon={Pencil} label="编辑" onClick={() => onEdit(p)} />
+                          <ActionBtn variant="text" icon={Send} label="下发" tone="primary" onClick={() => onAssign(p)} />
+                          <ActionBtn variant="text" icon={History} label="下发记录" onClick={() => onRecords(p)} />
+                        </div>
+                      </Td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <TableListPager
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
     </div>
   );
@@ -2927,40 +3205,7 @@ function AssignDialog({
           )}
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/30 p-3.5">
-          <div className="mb-2 flex items-center gap-1.5 text-[12.5px] font-medium">
-            <ShieldCheck className="h-4 w-4 text-primary" /> 下发设置 · 防作弊乱序
-          </div>
-          <div className="divide-y divide-border">
-            <ShuffleRow
-              label="题目乱序"
-              desc="仅在同一题型内打乱题目顺序,不跨题型混排。"
-              checked={shuffleQ}
-              onChange={setShuffleQ}
-            />
-            <ShuffleRow
-              label="选项乱序"
-              desc="仅对单选题、多选题的选项打乱,系统自动同步正确答案;判断/填空/简答不参与。"
-              checked={shuffleOpt}
-              onChange={setShuffleOpt}
-            />
-            <ShuffleRow
-              label="每人生成独立卷面"
-              desc="为每位被下发人员生成不同的题目与选项顺序,题目集合保持一致以保证公平。"
-              checked={perUser}
-              onChange={setPerUser}
-            />
-          </div>
-          <div className="mt-2.5 flex items-start gap-1.5 rounded-lg bg-card px-3 py-2 text-[11.5px] text-muted-foreground">
-            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-            乱序仅改变卷面展示顺序,不改变题目集合、分值和统计口径。答题详情仍可映射回原始标准卷,便于阅卷和复盘。
-          </div>
-        </div>
-
-        <div className="rounded-lg bg-primary-soft px-3.5 py-2.5 text-[12.5px] text-primary">
-          已选择 {selected.size} 人,题目乱序{shuffleQ ? "已开启" : "已关闭"},选项乱序
-          {shuffleOpt ? "已开启" : "已关闭"},每人独立卷面{perUser ? "已开启" : "已关闭"}。
-        </div>
+      
 
         <div className="flex items-center justify-between">
           <span className="text-[12.5px] text-muted-foreground">已选 {selected.size} 人</span>
@@ -2989,38 +3234,58 @@ function AssignDialog({
 // ---------- Reusable answer list ----------
 function AnswerList({ items }: { items: typeof ANSWER_DETAIL }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {items.map((a) => (
-        <div key={a.no} className="rounded-lg border border-border bg-card p-4">
-          <div className="flex items-start gap-2">
-            <span className="text-[12px] text-muted-foreground">{a.no}.</span>
+        <div
+          key={a.no}
+          className={cn(
+            "rounded-[14px] border bg-white p-4",
+            a.isCorrect ? "border-emerald-100" : "border-red-100"
+          )}
+        >
+          <div className="flex items-start gap-2.5">
+            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#F7FBFC] text-[10.5px] font-medium text-muted-foreground ring-1 ring-[#E8F3F5]">
+              {a.no}
+            </span>
             <div className="flex-1">
-              <div className="text-[13px] font-medium leading-relaxed">{a.stem}</div>
-              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span>{a.type}</span>
+              <div className="text-[13px] font-medium leading-relaxed text-foreground">{a.stem}</div>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="rounded-md border border-[#E8F3F5] bg-[#F7FBFC] px-2 py-0.5 text-[11px] text-muted-foreground">
+                  {a.type}
+                </span>
                 {a.isCorrect ? (
-                  <span className="inline-flex items-center gap-0.5 text-success"><CheckCircle2 className="h-3 w-3" />答对</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                    <CheckCircle2 className="h-3 w-3" /> 答对
+                  </span>
                 ) : (
-                  <span className="inline-flex items-center gap-0.5 text-destructive"><X className="h-3 w-3" />答错</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-500">
+                    <X className="h-3 w-3" /> 答错
+                  </span>
                 )}
               </div>
             </div>
           </div>
-          <div className="mt-3 space-y-1.5 text-[12.5px]">
-            <div><span className="text-muted-foreground">用户答案:</span>{" "}
-              <span className={a.isCorrect ? "text-success" : "text-destructive"}>{a.userAnswer}</span>
+          <div className="mt-3 space-y-2 text-[12.5px]">
+            <div className="flex items-baseline gap-2">
+              <span className="shrink-0 text-muted-foreground">用户答案：</span>
+              <span className={cn("font-medium", a.isCorrect ? "text-emerald-600" : "text-red-500")}>{a.userAnswer}</span>
             </div>
-            <div><span className="text-muted-foreground">正确答案:</span> <span className="text-success">{a.correctAnswer}</span></div>
-            <div className="rounded-lg bg-muted/50 px-3 py-2 text-muted-foreground">
-              <span className="font-medium text-foreground">解析:</span> {a.analysis}
+            <div className="flex items-baseline gap-2">
+              <span className="shrink-0 text-muted-foreground">正确答案：</span>
+              <span className="font-medium text-emerald-600">{a.correctAnswer}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11.5px] text-primary">
-              <FileSearch className="h-3.5 w-3.5" /> 资料依据:{a.evidence}
+            <div className="rounded-[10px] bg-[#F7FBFC] px-4 py-3 text-[12px]">
+              <span className="font-medium text-foreground">解析：</span>
+              <span className="text-muted-foreground">{a.analysis}</span>
+            </div>
+            <div className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-primary transition-opacity hover:opacity-70">
+              <FileSearch className="h-3.5 w-3.5 shrink-0" />
+              <span>资料依据：{a.evidence}</span>
             </div>
             {a.wrongTags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {a.wrongTags.map((t) => (
-                  <span key={t} className="rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] text-destructive">
+                  <span key={t} className="rounded-full border border-red-100 bg-red-50 px-2.5 py-0.5 text-[11px] text-red-500">
                     {t}
                   </span>
                 ))}
@@ -3041,6 +3306,22 @@ function statusPill(s: RecordStatus | AssignRecord["status"]) {
       : s === "已过期"
         ? "bg-destructive/10 text-destructive"
         : "bg-muted text-muted-foreground";
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const cls =
+    status === "已提交"
+      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+      : status === "进行中"
+      ? "bg-amber-50 text-amber-600 border-amber-100"
+      : status === "已过期"
+      ? "bg-red-50 text-red-400 border-red-100"
+      : "bg-gray-100 text-gray-400 border-gray-200";
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] font-medium", cls)}>
+      {status}
+    </span>
+  );
 }
 
 // ---------- Records drawer (left people list + right detail + history) ----------
@@ -3069,12 +3350,18 @@ function RecordsDrawer({ paper, onClose }: { paper: Paper | null; onClose: () =>
   }, [kw, team, status, history]);
 
   const totals = aggregateStats(PERSON_AGGREGATES);
+
+  // Current index in filtered list for navigation
+  const activeIndex = people.findIndex((p) => p.id === activeId);
+  const effectiveIndex = activeIndex >= 0 ? activeIndex : 0;
+
   const active = PERSON_AGGREGATES.find((p) => p.id === activeId) ?? people[0] ?? PERSON_AGGREGATES[0];
   const record: PersonExamRecord | undefined = active
     ? active.records.find((r) => r.id === viewRecordId) ?? active.records[0]
     : undefined;
   const isLatest = record && active && record.id === active.records[0].id;
-  const shuffled = record ? record.rule !== "标准卷" : false;
+  // 卷面乱序 / 独立卷面功能暂时隐藏
+  // const shuffled = record ? record.rule !== "标准卷" : false;
 
   const selectPerson = (id: string) => {
     setActiveId(id);
@@ -3082,93 +3369,182 @@ function RecordsDrawer({ paper, onClose }: { paper: Paper | null; onClose: () =>
     setShowHistory(false);
   };
 
+  const goPrev = () => {
+    if (effectiveIndex > 0) selectPerson(people[effectiveIndex - 1].id);
+  };
+  const goNext = () => {
+    if (effectiveIndex < people.length - 1) selectPerson(people[effectiveIndex + 1].id);
+  };
+
   return (
     <Sheet open={!!paper} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
-        <SheetHeader className="border-b border-border px-6 py-4">
-          <SheetTitle className="flex items-center gap-2">
+      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl" style={{ background: "#F7FBFC" }}>
+        {/* ── 顶部标题区 ── */}
+        <SheetHeader className="border-b border-[#D8EAEF] bg-white px-6 py-4">
+          <SheetTitle className="flex items-center gap-2 text-[15px] font-semibold">
             <History className="h-5 w-5 text-primary" /> 下发记录
           </SheetTitle>
-          <SheetDescription>
+          <SheetDescription className="text-[12.5px] text-muted-foreground">
             {paper?.name} · 下发 {totals.peopleCount} 人 · 累计下发 {totals.totalTimes} 次
           </SheetDescription>
         </SheetHeader>
 
-        {/* filters */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 px-6 py-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
+        {/* ── 筛选工具栏 ── */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-[#D8EAEF] bg-white px-6" style={{ minHeight: 64 }}>
+          <label className="relative flex h-9 w-52 items-center rounded-[10px] border border-[#D8EAEF] bg-[#F7FBFC] transition-colors hover:border-primary/40 focus-within:border-primary/60">
+            <Search className="pointer-events-none ml-3 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
               value={kw}
               onChange={(e) => setKw(e.target.value)}
               placeholder="搜索员工姓名"
-              className="h-8 w-40 pl-8 text-[12.5px]"
+              className="h-full flex-1 bg-transparent pl-2 pr-3 text-[12.5px] outline-none placeholder:text-muted-foreground"
             />
-          </div>
-          <FilterSelect value={team} onChange={setTeam} options={TEAM_OPTIONS} />
-          <FilterSelect value={status} onChange={setStatus} options={RECORD_STATUS_OPTIONS} />
-          <FilterSelect value={history} onChange={setHistory} options={[...HISTORY_OPTIONS]} prefix="历史:" />
+          </label>
+          <FilterSelect value={status} onChange={setStatus} options={RECORD_STATUS_OPTIONS} width={120} />
+          <FilterSelect value={team} onChange={setTeam} options={TEAM_OPTIONS} width={130} />
+          <FilterSelect value={history} onChange={setHistory} options={[...HISTORY_OPTIONS]} prefix="历史: " width={148} />
         </div>
 
         <div className="flex min-h-0 flex-1">
-          <aside className="w-64 shrink-0 overflow-y-auto border-r border-border bg-muted/20">
-            {people.length === 0 && (
-              <div className="px-4 py-8 text-center text-[12px] text-muted-foreground">无匹配人员</div>
-            )}
-            {people.map((p) => {
-              const on = p.id === active?.id;
-              const latest = p.records[0];
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => selectPerson(p.id)}
-                  className={`flex w-full flex-col gap-1 border-b border-border px-4 py-3 text-left transition-colors ${
-                    on ? "bg-primary-soft" : "hover:bg-muted"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[13px] font-medium ${on ? "text-primary" : ""}`}>{p.user}</span>
-                    <span className={`rounded-md px-1.5 py-0.5 text-[10.5px] ${statusPill(latest.status)}`}>
-                      {latest.status}
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">{p.team} · {p.position}</div>
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                    <span>{latest.score != null ? `${latest.score} 分` : "—"}</span>
-                    <span>{latest.correctRate != null ? `正确率 ${latest.correctRate}%` : ""}</span>
-                  </div>
-                  <div className="text-[10.5px] text-muted-foreground">
-                    {latest.submittedAt ?? `下发 ${latest.assignedAt}`}
-                  </div>
-                  <div className="mt-0.5 flex flex-wrap gap-1">
-                    {p.records.length > 1 && (
-                      <span className="inline-flex items-center rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                        历史 {p.records.length} 次
-                      </span>
-                    )}
-                    <span className="inline-flex items-center rounded bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                      {latest.rule}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+          {/* ── 左侧员工列表 ── */}
+          <aside className="flex w-64 shrink-0 flex-col border-r border-[#D8EAEF]" style={{ background: "#F7FBFC" }}>
+            {/* 员工列表可滚动区域 */}
+            <div
+              className="min-h-0 flex-1 overflow-y-auto"
+              style={{ scrollbarWidth: "thin", scrollbarColor: "#D8EAEF transparent" }}
+            >
+              {people.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 px-4 py-12 text-center">
+                  <Users className="h-8 w-8 text-muted-foreground/30" />
+                  <div className="text-[12.5px] text-muted-foreground">暂无匹配员工</div>
+                  <div className="text-[11.5px] text-muted-foreground/60">请调整筛选条件</div>
+                </div>
+              ) : (
+                people.map((p) => {
+                  const on = p.id === active?.id;
+                  const latest = p.records[0];
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => selectPerson(p.id)}
+                      className={cn(
+                        "relative flex w-full cursor-pointer flex-col gap-1 border-b border-[#E8F3F5] px-4 pb-3 pt-3.5 text-left transition-colors",
+                        on ? "bg-[#EAF8FA]" : "bg-white hover:bg-[#F2FAFB]"
+                      )}
+                    >
+                      {/* 选中态左侧竖线 */}
+                      {on && (
+                        <span className="absolute inset-y-0 left-0 w-[3px] rounded-r-full bg-primary" />
+                      )}
+                      {/* 第一行：姓名 | 历史次数 + 状态 */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={cn(
+                          "text-[13px] font-medium",
+                          on ? "font-semibold text-primary" : "text-foreground"
+                        )}>{p.user}</span>
+                        <div className="flex items-center gap-1.5">
+                          {p.records.length > 1 && (
+                            <span className="inline-flex items-center rounded-full border border-primary/15 bg-primary/[0.07] px-1.5 py-0.5 text-[10px] font-medium text-primary/75">
+                              历史 {p.records.length} 次
+                            </span>
+                          )}
+                          <StatusBadge status={latest.status} />
+                        </div>
+                      </div>
+                      {/* 第二行：班组·岗位 */}
+                      <div className="text-[11px] text-muted-foreground">{p.team} · {p.position}</div>
+                      {/* 第三行：分数·正确率 */}
+                      <div className="flex items-center gap-2 text-[11.5px]">
+                        {latest.score != null ? (
+                          <span className="font-medium text-foreground">{latest.score} 分</span>
+                        ) : null}
+                        {latest.correctRate != null ? (
+                          <span className="text-muted-foreground">正确率 {latest.correctRate}%</span>
+                        ) : null}
+                        {latest.score == null && latest.correctRate == null && (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </div>
+                      {/* 第四行：时间 */}
+                      <div className="text-[10.5px] text-muted-foreground">
+                        {latest.submittedAt ? `提交 ${latest.submittedAt}` : `下发 ${latest.assignedAt}`}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* ── 底部上一位/下一位切换 ── */}
+            <div className="flex h-12 shrink-0 items-center justify-between border-t border-[#D8EAEF] bg-white px-3">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={goPrev}
+                      disabled={effectiveIndex <= 0 || people.length === 0}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg border text-[12px] transition-colors",
+                        effectiveIndex <= 0 || people.length === 0
+                          ? "cursor-not-allowed border-[#E8F3F5] bg-[#F7FBFC] text-muted-foreground/30"
+                          : "border-[#D8EAEF] bg-white text-muted-foreground hover:border-primary/30 hover:bg-[#EAF8FA] hover:text-primary"
+                      )}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>上一位</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <span className="select-none text-[12px] tabular-nums text-muted-foreground">
+                {people.length === 0 ? "0 / 0" : `${effectiveIndex + 1} / ${people.length}`}
+              </span>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={goNext}
+                      disabled={effectiveIndex >= people.length - 1 || people.length === 0}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg border text-[12px] transition-colors",
+                        effectiveIndex >= people.length - 1 || people.length === 0
+                          ? "cursor-not-allowed border-[#E8F3F5] bg-[#F7FBFC] text-muted-foreground/30"
+                          : "border-[#D8EAEF] bg-white text-muted-foreground hover:border-primary/30 hover:bg-[#EAF8FA] hover:text-primary"
+                      )}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top"><p>下一位</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </aside>
 
+          {/* ── 右侧答题详情 ── */}
           <div className="min-w-0 flex-1 overflow-y-auto px-6 py-5">
-            {active && record && (
+            {people.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <Users className="h-12 w-12 text-muted-foreground/20" />
+                <div className="text-[13px] text-muted-foreground">筛选后暂无匹配员工</div>
+                <div className="text-[12px] text-muted-foreground/60">请调整筛选条件后重试</div>
+              </div>
+            ) : active && record ? (
               <>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="text-[14px] font-semibold">{active.user}</span>
+                {/* 员工信息头部 */}
+                <div className="mb-4 flex flex-wrap items-center gap-2 rounded-[14px] border border-[#D8EAEF] bg-white px-4 py-3">
+                  <span className="text-[14px] font-semibold text-foreground">{active.user}</span>
                   <span className="text-[12px] text-muted-foreground">{active.team} · {active.position}</span>
-                  <span className={`rounded-md px-2 py-0.5 text-[11px] ${statusPill(record.status)}`}>{record.status}</span>
-                  <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                    {isLatest ? "当前查看:最新一次" : `当前查看:${record.reason}`}
+                  <StatusBadge status={record.status} />
+                  <span className="rounded-full bg-[#EAF8FA] px-2.5 py-0.5 text-[11px] text-primary/70">
+                    {isLatest ? "当前查看：最新一次" : `当前查看：${record.reason}`}
                   </span>
                   {active.records.length > 1 && (
                     <button
                       onClick={() => setShowHistory((v) => !v)}
-                      className="ml-auto inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1 text-[11.5px] hover:bg-muted"
+                      className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#D8EAEF] bg-[#F7FBFC] px-3 py-1.5 text-[11.5px] text-foreground transition-colors hover:border-primary/30 hover:bg-[#EAF8FA] hover:text-primary"
                     >
                       <History className="h-3.5 w-3.5" /> 查看历史作答
                       {showHistory ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
@@ -3176,58 +3552,67 @@ function RecordsDrawer({ paper, onClose }: { paper: Paper | null; onClose: () =>
                   )}
                 </div>
 
-                <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                {/* 统计卡片 */}
+                <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
-                    { l: "分数", v: record.score != null ? record.score : "—" },
-                    { l: "正确率", v: record.correctRate != null ? `${record.correctRate}%` : "—" },
-                    { l: "用时", v: record.duration != null ? `${record.duration} 分` : "—" },
-                    { l: "提交时间", v: record.submittedAt ?? "—" },
-                    { l: "卷面规则", v: record.rule },
+                    { l: "分数", v: record.score != null ? String(record.score) : "—", unit: record.score != null ? "分" : "" },
+                    { l: "正确率", v: record.correctRate != null ? `${record.correctRate}%` : "—", unit: "" },
+                    { l: "用时", v: record.duration != null ? String(record.duration) : "—", unit: record.duration != null ? "分钟" : "" },
+                    { l: "提交时间", v: record.submittedAt ?? "—", unit: "" },
+                    // 卷面规则（乱序 / 独立卷面）暂时隐藏
+                    // { l: "卷面规则", v: record.rule, unit: "" },
                   ].map((s) => (
-                    <div key={s.l} className="rounded-lg border border-border bg-card px-3 py-2">
+                    <div key={s.l} className="flex flex-col justify-center rounded-[12px] border border-[#D8EAEF] bg-white px-4 py-3" style={{ minHeight: 68 }}>
                       <div className="text-[10.5px] text-muted-foreground">{s.l}</div>
-                      <div className="mt-0.5 text-[12.5px] font-medium">{s.v}</div>
+                      <div className="mt-1 text-[15px] font-bold leading-tight text-foreground">
+                        {s.v}
+                        {s.unit && <span className="ml-0.5 text-[11px] font-normal text-muted-foreground">{s.unit}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                {/* history list (secondary expand) */}
+                {/* 历史作答展开区 */}
                 {showHistory && (
-                  <div className="mb-4 overflow-hidden rounded-lg border border-border">
-                    <div className="bg-muted/40 px-3 py-2 text-[12px] font-medium">
+                  <div className="mb-4 overflow-hidden rounded-[14px] border border-[#D8EAEF] bg-white">
+                    <div className="border-b border-[#E8F3F5] bg-[#F7FBFC] px-4 py-2.5 text-[12px] font-medium text-foreground">
                       历史作答记录 · 共 {active.records.length} 次
                     </div>
                     <table className="w-full text-[12px]">
-                      <thead className="bg-muted/20 text-[11px] text-muted-foreground">
+                      <thead className="bg-[#F7FBFC] text-[11px] text-muted-foreground">
                         <tr>
-                          <th className="px-3 py-1.5 text-left font-normal">下发时间</th>
-                          <th className="px-3 py-1.5 text-left font-normal">提交时间</th>
-                          <th className="px-3 py-1.5 text-left font-normal">状态</th>
-                          <th className="px-3 py-1.5 text-left font-normal">分数</th>
-                          <th className="px-3 py-1.5 text-left font-normal">正确率</th>
-                          <th className="px-3 py-1.5 text-left font-normal">用时</th>
-                          <th className="px-3 py-1.5 text-left font-normal">卷面规则</th>
-                          <th className="px-3 py-1.5 text-right font-normal">操作</th>
+                          <th className="px-4 py-2 text-left font-normal">下发时间</th>
+                          <th className="px-4 py-2 text-left font-normal">提交时间</th>
+                          <th className="px-4 py-2 text-left font-normal">状态</th>
+                          <th className="px-4 py-2 text-left font-normal">分数</th>
+                          <th className="px-4 py-2 text-left font-normal">正确率</th>
+                          <th className="px-4 py-2 text-left font-normal">用时</th>
+                          {/* 卷面规则（乱序 / 独立卷面）暂时隐藏
+                          <th className="px-4 py-2 text-left font-normal">卷面规则</th>
+                          */}
+                          <th className="px-4 py-2 text-right font-normal">操作</th>
                         </tr>
                       </thead>
                       <tbody>
                         {active.records.map((r) => {
                           const on = r.id === record.id;
                           return (
-                            <tr key={r.id} className={`border-t border-border ${on ? "bg-primary-soft/60" : ""}`}>
-                              <td className="px-3 py-1.5">{r.assignedAt}</td>
-                              <td className="px-3 py-1.5">{r.submittedAt ?? "—"}</td>
-                              <td className="px-3 py-1.5">
-                                <span className={`rounded px-1.5 py-0.5 text-[10.5px] ${statusPill(r.status)}`}>{r.status}</span>
+                            <tr key={r.id} className={cn("border-t border-[#E8F3F5] transition-colors", on ? "bg-[#EAF8FA]" : "hover:bg-[#F7FBFC]")}>
+                              <td className="px-4 py-2">{r.assignedAt}</td>
+                              <td className="px-4 py-2">{r.submittedAt ?? "—"}</td>
+                              <td className="px-4 py-2">
+                                <StatusBadge status={r.status} />
                               </td>
-                              <td className="px-3 py-1.5">{r.score ?? "—"}</td>
-                              <td className="px-3 py-1.5">{r.correctRate != null ? `${r.correctRate}%` : "—"}</td>
-                              <td className="px-3 py-1.5">{r.duration != null ? `${r.duration} 分` : "—"}</td>
-                              <td className="px-3 py-1.5 text-muted-foreground">{r.rule}</td>
-                              <td className="px-3 py-1.5 text-right">
+                              <td className="px-4 py-2">{r.score ?? "—"}</td>
+                              <td className="px-4 py-2">{r.correctRate != null ? `${r.correctRate}%` : "—"}</td>
+                              <td className="px-4 py-2">{r.duration != null ? `${r.duration} 分` : "—"}</td>
+                              {/* 卷面规则（乱序 / 独立卷面）暂时隐藏
+                              <td className="px-4 py-2 text-muted-foreground">{r.rule}</td>
+                              */}
+                              <td className="px-4 py-2 text-right">
                                 <button
                                   onClick={() => setViewRecordId(r.id)}
-                                  className="rounded border border-border px-2 py-0.5 text-[11px] hover:bg-muted disabled:opacity-50"
+                                  className="rounded-lg border border-[#D8EAEF] px-2.5 py-1 text-[11px] transition-colors hover:bg-[#EAF8FA] hover:text-primary disabled:opacity-40"
                                   disabled={on}
                                 >
                                   查看本次答题
@@ -3250,12 +3635,12 @@ function RecordsDrawer({ paper, onClose }: { paper: Paper | null; onClose: () =>
                 {record.status === "已提交" && record.answers.length > 0 ? (
                   <AnswerList items={record.answers} />
                 ) : (
-                  <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-[12.5px] text-muted-foreground">
-                    该记录{record.status},暂无答题详情。
+                  <div className="rounded-[14px] border border-dashed border-[#D8EAEF] px-4 py-10 text-center text-[12.5px] text-muted-foreground">
+                    该记录{record.status}，暂无答题详情。
                   </div>
                 )}
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </SheetContent>
@@ -3268,24 +3653,30 @@ function FilterSelect({
   onChange,
   options,
   prefix = "",
+  width = 130,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: string[];
   prefix?: string;
+  width?: number;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-8 rounded-md border border-border bg-card px-2 text-[12.5px] outline-none focus:border-primary/50"
-    >
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {prefix}{o}
-        </option>
-      ))}
-    </select>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger
+        className="h-9 rounded-[10px] border-[#D8EAEF] bg-[#F7FBFC] text-[12.5px] hover:border-primary/40 focus:border-primary/60 focus:ring-0"
+        style={{ width }}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o} value={o} className="text-[12.5px]">
+            {prefix}{o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
