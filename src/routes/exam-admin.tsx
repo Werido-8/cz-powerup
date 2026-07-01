@@ -46,11 +46,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
-import {
-  PaperQuestionList,
-  PaperQuestionSummary,
-  usePaperQuestionGroups,
-} from "@/components/exam/paper-question-list";
+import { ExamPaperEditor, type ExamPaperEditorMode } from "@/components/exam/exam-paper-editor";
 import { PageHeader, StatCard, ModuleTabs, ModulePanel, TableListPager, TABLE_PAGE_SIZE_DEFAULT, PillSelect } from "@/components/learning/ui";
 import { StemCell } from "@/components/common/ellipsis-tooltip";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -93,10 +89,8 @@ import {
   BANK_QUESTIONS,
   PAPERS,
   ANSWER_DETAIL,
-  GEN_PREVIEW,
   PERSONNEL,
   BANK_CATEGORIES,
-  EDITOR_GROUPS,
   SWAP_CANDIDATES,
   PAPER_PREVIEW,
   OPTIMIZE,
@@ -119,7 +113,6 @@ import {
   type Paper,
   type ExamGoal,
   type QuestionType,
-  type EditorGroup,
   type AssignRecord,
   type PersonAggregate,
   type PersonExamRecord,
@@ -2939,170 +2932,6 @@ function PaperModule({
   );
 }
 
-// ---------- Generate drawer ----------
-function GenerateDrawer({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
-  const [nl, setNl] = useState("");
-  const [generated, setGenerated] = useState(false);
-  const [addType, setAddType] = useState<QuestionType | null>(null);
-  const [swapOpen, setSwapOpen] = useState(false);
-  const { groups, collapsed, toggleCollapse, move, remove, aiAppend, resetGroups, summary } =
-    usePaperQuestionGroups(EDITOR_GROUPS);
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <SheetHeader className="border-b border-border px-6 py-4">
-          <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" /> 智能组卷
-          </SheetTitle>
-          <SheetDescription>
-            描述考试需求,AI 辅助生成结构化试卷,正式下发前需人工确认。
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          <div>
-            <label className="mb-1.5 block text-[12.5px] font-medium">自然语言组卷</label>
-            <Textarea
-              value={nl}
-              onChange={(e) => setNl(e.target.value)}
-              placeholder="生成一套 AGC/两细则取证复习考试,20 题,中等难度,30 分钟"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="考试目标" placeholder="取证复习" />
-            <Field label="知识点" placeholder="AGC / 一次调频" />
-            <Field label="题型" placeholder="单选 / 多选 / 判断" />
-            <Field label="难度" placeholder="中等" />
-            <Field label="题量" placeholder="20" />
-            <Field label="时长(分钟)" placeholder="30" />
-            <Field label="及格线(分)" placeholder="60" />
-            <Field label="适用岗位" placeholder="值班员 / 值班长" />
-          </div>
-
-          <button
-            onClick={() => {
-              resetGroups();
-              setGenerated(true);
-              toast.success("已生成试卷预览");
-            }}
-            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <Sparkles className="h-4 w-4" /> 生成预览
-          </button>
-
-          {generated && (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-border bg-card p-3">
-                <div className="text-[13px] font-semibold">AGC / 两细则取证复习考试</div>
-                <div className="mt-1 flex flex-wrap gap-3 text-[11.5px] text-muted-foreground">
-                  <span>题量 {summary[0]?.value ?? 0}</span>
-                  <span>总分 {summary[1]?.value ?? 0}</span>
-                  <span>时长 30 分</span>
-                  <span>及格线 60</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <DistBlock title="知识点覆盖" items={GEN_PREVIEW.knowledgeCoverage} />
-                <DistBlock title="题型比例" items={GEN_PREVIEW.typeRatio} />
-                <DistBlock title="难度分布" items={GEN_PREVIEW.difficulty} />
-                <div>
-                  <div className="mb-1.5 text-[12px] font-medium text-muted-foreground">重复题风险</div>
-                  <span className={`rounded-md px-2 py-0.5 text-[12px] ${riskClass(GEN_PREVIEW.dupRisk)}`}>
-                    {GEN_PREVIEW.dupRisk}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2 rounded-lg bg-primary-soft px-3 py-2 text-[11.5px] text-primary">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                缺题提醒:简答题题量不足,建议补充 1 道或调整题型比例。
-              </div>
-
-              <PaperQuestionSummary summary={summary} />
-
-              <PaperQuestionList
-                groups={groups}
-                collapsed={collapsed}
-                onToggleCollapse={toggleCollapse}
-                onAdd={setAddType}
-                onAiAppend={aiAppend}
-                onMove={move}
-                onRemove={remove}
-                onSwap={() => setSwapOpen(true)}
-              />
-
-              <div className="flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-[11.5px] text-warning-foreground">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                智能组卷用于辅助培训负责人创建考试,正式下发前需人工确认。
-              </div>
-            </div>
-          )}
-        </div>
-
-        {generated && (
-          <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3.5">
-            <button
-              onClick={() => setGenerated(false)}
-              className="rounded-lg border border-border px-4 py-2 text-[13px] hover:bg-muted"
-            >
-              继续调整
-            </button>
-            <button
-              onClick={() => {
-                toast.success("试卷已保存为草稿");
-                onOpenChange(false);
-                setGenerated(false);
-              }}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <CheckCircle2 className="h-4 w-4" /> 保存为试卷
-            </button>
-          </div>
-        )}
-      </SheetContent>
-      <AddQuestionDialog
-        open={addType !== null}
-        onClose={() => setAddType(null)}
-        onAdd={(n) => toast.success(`已向${addType ?? "试卷"}添加 ${n} 题`)}
-      />
-      <SwapDialog open={swapOpen} onClose={() => setSwapOpen(false)} onPick={() => {}} />
-    </Sheet>
-  );
-}
-
-function Field({ label, placeholder }: { label: string; placeholder: string }) {
-  return (
-    <div>
-      <label className="mb-1 block text-[12px] font-medium text-muted-foreground">{label}</label>
-      <Input placeholder={placeholder} className="h-9 text-[13px]" />
-    </div>
-  );
-}
-
-function DistBlock({ title, items }: { title: string; items: { name: string; count: number }[] }) {
-  const total = items.reduce((s, i) => s + i.count, 0) || 1;
-  return (
-    <div>
-      <div className="mb-1.5 text-[12px] font-medium text-muted-foreground">{title}</div>
-      <div className="space-y-1.5">
-        {items.map((i) => (
-          <div key={i.name} className="flex items-center gap-2 text-[11.5px]">
-            <span className="w-20 shrink-0 truncate">{i.name}</span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${(i.count / total) * 100}%` }} />
-            </div>
-            <span className="w-5 shrink-0 text-right text-muted-foreground">{i.count}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ---------- Shuffle row ----------
 function ShuffleRow({
   label,
@@ -4175,105 +4004,6 @@ function AddQuestionDialog({ open, onClose, onAdd }: { open: boolean; onClose: (
   );
 }
 
-// ---------- Paper editor ----------
-const GOAL_OPTIONS = ["取证复习", "复证巩固", "岗位达标", "阶段测评", "日常自测"];
-
-function PaperEditor({ open, onClose, paper }: { open: boolean; onClose: () => void; paper: Paper | null }) {
-  const { groups, collapsed, toggleCollapse, move, remove, aiAppend, resetGroups, summary } =
-    usePaperQuestionGroups(EDITOR_GROUPS);
-  const [addType, setAddType] = useState<QuestionType | null>(null);
-  const [swapOpen, setSwapOpen] = useState(false);
-  const [lastPaper, setLastPaper] = useState<string | null>(null);
-
-  if (open && (paper?.id ?? null) !== lastPaper) {
-    resetGroups();
-    setLastPaper(paper?.id ?? null);
-  }
-
-  return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <SheetHeader className="border-b border-border px-6 py-4">
-          <SheetTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" /> 试卷编辑器
-          </SheetTitle>
-          <SheetDescription>{paper ? `编辑:${paper.name}` : "新建试卷"}</SheetDescription>
-        </SheetHeader>
-
-        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <FieldLabel>试卷名称</FieldLabel>
-              <Input defaultValue={paper?.name} placeholder="如:AGC / 两细则取证复习考试" className="h-9 text-[13px]" />
-            </div>
-            <div>
-              <FieldLabel>考试目标</FieldLabel>
-              <select defaultValue={paper?.goal} className="h-9 w-full rounded-md border border-input bg-background px-2 text-[13px]">
-                {GOAL_OPTIONS.map((g) => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div>
-              <FieldLabel>试卷分类</FieldLabel>
-              <Input defaultValue={paper?.category} placeholder="如:调频调压" className="h-9 text-[13px]" />
-            </div>
-            <div>
-              <FieldLabel>适用岗位</FieldLabel>
-              <Input placeholder="如:值班员 / 值班长" className="h-9 text-[13px]" />
-            </div>
-            <div>
-              <FieldLabel>考试时长(分钟)</FieldLabel>
-              <Input defaultValue={paper?.duration} placeholder="30" className="h-9 text-[13px]" />
-            </div>
-            <div>
-              <FieldLabel>及格线(分)</FieldLabel>
-              <Input placeholder="60" className="h-9 text-[13px]" />
-            </div>
-            <div>
-              <FieldLabel>备注</FieldLabel>
-              <Input placeholder="选填" className="h-9 text-[13px]" />
-            </div>
-          </div>
-
-          <PaperQuestionSummary summary={summary} />
-
-          <PaperQuestionList
-            groups={groups}
-            collapsed={collapsed}
-            onToggleCollapse={toggleCollapse}
-            onAdd={setAddType}
-            onAiAppend={aiAppend}
-            onMove={move}
-            onRemove={remove}
-            onSwap={() => setSwapOpen(true)}
-          />
-        </div>
-
-        <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3.5">
-          <button onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-[13px] hover:bg-muted">取消</button>
-          <button
-            onClick={() => { toast.success("已保存为草稿"); onClose(); }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-[13px] font-medium hover:bg-muted"
-          >
-            <Save className="h-4 w-4" /> 保存草稿
-          </button>
-          <button
-            onClick={() => { toast.success("试卷已保存"); onClose(); }}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <CheckCircle2 className="h-4 w-4" /> 保存试卷
-          </button>
-        </div>
-      </SheetContent>
-      <AddQuestionDialog
-        open={addType !== null}
-        onClose={() => setAddType(null)}
-        onAdd={(n) => toast.success(`已向${addType ?? "试卷"}添加 ${n} 题`)}
-      />
-      <SwapDialog open={swapOpen} onClose={() => setSwapOpen(false)} onPick={() => {}} />
-    </Sheet>
-  );
-}
-
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="mb-1 block text-[12px] font-medium text-muted-foreground">{children}</label>;
 }
@@ -4305,7 +4035,6 @@ function IconBtn({
 // ---------- Page ----------
 function ExamAdminPage() {
   const [tab, setTab] = useState<TabKey>("paper");
-  const [genOpen, setGenOpen] = useState(false);
   const [assignPaper, setAssignPaper] = useState<Paper | null>(null);
   const [recordsPaper, setRecordsPaper] = useState<Paper | null>(null);
   const [previewPaper, setPreviewPaper] = useState<Paper | null>(null);
@@ -4313,10 +4042,13 @@ function ExamAdminPage() {
   const [copyPaper, setCopyPaper] = useState<Paper | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorPaper, setEditorPaper] = useState<Paper | null>(null);
+  const [editorMode, setEditorMode] = useState<ExamPaperEditorMode>("manual");
+  const [editorAddType, setEditorAddType] = useState<QuestionType | null>(null);
   const [swapOpen, setSwapOpen] = useState(false);
 
-  const openEditor = (p: Paper | null) => {
+  const openEditor = (p: Paper | null, mode: ExamPaperEditorMode = "manual") => {
     setEditorPaper(p);
+    setEditorMode(mode);
     setEditorOpen(true);
   };
 
@@ -4347,21 +4079,32 @@ function ExamAdminPage() {
       {tab === "bank" && <BankModule />}
       {tab === "paper" && (
         <PaperModule
-          onGenerate={() => setGenOpen(true)}
+          onGenerate={() => openEditor(null, "ai")}
           onAssign={setAssignPaper}
           onRecords={setRecordsPaper}
           onPreview={setPreviewPaper}
           onOptimize={setOptimizePaper}
           onCopy={setCopyPaper}
-          onEdit={openEditor}
-          onNew={() => openEditor(null)}
+          onEdit={(p) => openEditor(p, "manual")}
+          onNew={() => openEditor(null, "manual")}
         />
       )}
         </div>
       </ModulePanel>
 
-      <PaperEditor open={editorOpen} onClose={() => setEditorOpen(false)} paper={editorPaper} />
-      <GenerateDrawer open={genOpen} onOpenChange={setGenOpen} />
+      <ExamPaperEditor
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+        paper={editorPaper}
+        mode={editorMode}
+        onAddQuestion={setEditorAddType}
+        onSwapQuestion={() => setSwapOpen(true)}
+      />
+      <AddQuestionDialog
+        open={editorAddType !== null}
+        onClose={() => setEditorAddType(null)}
+        onAdd={(n) => toast.success(`已向${editorAddType ?? "试卷"}添加 ${n} 题`)}
+      />
       <AssignDialog paper={assignPaper} onClose={() => setAssignPaper(null)} />
       <RecordsDrawer paper={recordsPaper} onClose={() => setRecordsPaper(null)} />
       <PaperPreviewDrawer paper={previewPaper} onClose={() => setPreviewPaper(null)} />

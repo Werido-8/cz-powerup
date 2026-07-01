@@ -493,6 +493,8 @@ export const PAPERS: Paper[] = [
   },
 ];
 
+export const PAPER_CATEGORIES = Array.from(new Set(PAPERS.map((p) => p.category))).sort();
+
 export const ASSIGN_RECORDS: AssignRecord[] = [
   { id: "a1", user: "李工", team: "运行一班", position: "值班员", status: "已提交", score: 88, correctRate: 88, duration: 24, submittedAt: "2026-06-12 10:24", rule: "每人独立卷面" },
   { id: "a2", user: "王工", team: "运行一班", position: "值班长", status: "已提交", score: 76, correctRate: 76, duration: 28, submittedAt: "2026-06-12 11:02", rule: "每人独立卷面" },
@@ -604,6 +606,14 @@ export interface EditorGroup {
   perScore: number;
   questions: EditorQuestion[];
 }
+
+export const EMPTY_EDITOR_GROUPS: EditorGroup[] = [
+  { type: "单选题", perScore: 2, questions: [] },
+  { type: "多选题", perScore: 3, questions: [] },
+  { type: "判断题", perScore: 1, questions: [] },
+  { type: "填空题", perScore: 2, questions: [] },
+  { type: "简答题", perScore: 5, questions: [] },
+];
 
 export const EDITOR_GROUPS: EditorGroup[] = [
   {

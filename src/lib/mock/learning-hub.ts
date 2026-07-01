@@ -434,7 +434,6 @@ export const RECENT_MATERIALS: RecentMaterial[] = [
 export const LEARNING_ACTIVITIES: LearningActivity[] = [
   { id: "la1", text: "今天阅读 2 份资料" },
   { id: "la2", text: "完成 5 道题" },
-  { id: "la3", text: "收藏 1 条依据" },
   { id: "la4", text: "生成 1 份智能题单" },
   { id: "la5", text: "AGC 专题进度提升 8%" },
 ];
