@@ -79,22 +79,23 @@ const TASKS: {
   {
     id: "1",
     title: "错题巩固：220kV 变电站典型故障处置",
-    meta: "昨日错题 · 3 题待复习",
+    meta: "昨日错题 · 3 题待巩固",
     tag: "错题",
     tagTone: "muted",
     action: "去巩固",
     to: "/training/wrong",
   },
-  {
-    id: "2",
-    title: "专题复习：继电保护动作逻辑",
-    meta: "艾宾浩斯 · 第 4 天复习节点",
-    tag: "记忆",
-    tagTone: "memory",
-    action: "去复习",
-    to: "/learn/topic/$id",
-    params: { id: "t-fault" },
-  },
+  // 本期暂不开放：艾宾浩斯复习
+  // {
+  //   id: "2",
+  //   title: "专题复习：继电保护动作逻辑",
+  //   meta: "艾宾浩斯 · 第 4 天复习节点",
+  //   tag: "记忆",
+  //   tagTone: "memory",
+  //   action: "去复习",
+  //   to: "/learn/topic/$id",
+  //   params: { id: "t-fault" },
+  // },
   {
     id: "3",
     title: "薄弱点强化：母线差动保护原理",
@@ -122,13 +123,14 @@ const ENTRIES: { icon: typeof BookOpen; title: string; desc: string; tag: string
     tag: "1280 题",
     to: "/training",
   },
-  {
-    icon: MessagesSquare,
-    title: "智能问答",
-    desc: "基于内部知识库的多轮答疑与原文引用",
-    tag: "AI",
-    to: "/chat",
-  },
+  // 本期暂不开放：智能问答
+  // {
+  //   icon: MessagesSquare,
+  //   title: "智能问答",
+  //   desc: "基于内部知识库的多轮答疑与原文引用",
+  //   tag: "AI",
+  //   to: "/chat",
+  // },
   {
     icon: Brain,
     title: "个人沉淀",
@@ -322,15 +324,6 @@ export function Workbench() {
           <SectionHeader
             title="能力成长概览"
             subtitle="综合学习进度、答题表现和场景练习情况生成"
-            action={
-              <Link
-                to="/training/growth"
-                className="flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-primary hover:text-primary/80"
-              >
-                查看能力雷达
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            }
           />
 
           <div className="grid grid-cols-3 gap-3">
@@ -442,6 +435,7 @@ export function Workbench() {
             ))}
           </ul>
 
+          {/* 本期暂不开放：复习统计
           <div className="mt-4 flex items-center justify-between rounded-xl border border-divider bg-muted/40 px-4 py-2.5 text-[12px] text-muted-foreground">
             <span>
               本周累计复习 <span className="font-semibold text-foreground">18</span> 项
@@ -450,6 +444,7 @@ export function Workbench() {
               记忆路径覆盖 <span className="font-semibold text-primary">86%</span>
             </span>
           </div>
+          */}
         </SectionCard>
       </section>
 
@@ -459,7 +454,7 @@ export function Workbench() {
           <div className="mb-4 flex min-h-14 items-end justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">核心能力入口</h2>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">知识学习、题库训练与智能问答核心入口</p>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">知识学习与题库训练核心入口</p>
             </div>
             <span className="mb-0.5 shrink-0 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-accent-foreground">
               高频使用

@@ -133,6 +133,7 @@ export function DocDrawer({
           >
             <Star className={`h-3.5 w-3.5 ${fav ? "fill-current" : ""}`} /> {fav ? "已收藏" : "收藏"}
           </button>
+          {/* 本期暂不开放：智能问答
           <Link
             to="/chat"
             search={{ prefill: `针对《${doc.title}》提问` }}
@@ -141,6 +142,7 @@ export function DocDrawer({
           >
             <MessagesSquare className="h-3.5 w-3.5" /> 针对此文提问
           </Link>
+          */}
           <div className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground">
             <FileText className="h-3 w-3" /> 培训用
           </div>

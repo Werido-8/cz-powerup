@@ -3,14 +3,21 @@ import { useEffect, useMemo, useState } from "react";
 import { Clock, ChevronLeft, ChevronRight, AlertTriangle, X } from "lucide-react";
 import { z } from "zod";
 import { PageShell } from "@/components/workbench/PageShell";
-import { QUESTIONS, type Question } from "@/lib/mock/data";
+import { QUESTIONS, type Question, type QuestionType } from "@/lib/mock/data";
+import { getQuestionIdsForDoc } from "@/lib/mock/learning-progress";
+import { filterPracticeQuestions, type PracticeDifficulty } from "@/lib/mock/practice-filter";
 import { useMockStore } from "@/lib/mock/store";
 
 const searchSchema = z.object({
   mode: z.enum(["practice", "exam", "review"]).default("practice"),
   filter: z.string().default(""),
+  filters: z.string().default(""),
+  types: z.string().default(""),
+  diff: z.enum(["all", "easy", "hard"]).default("all"),
   count: z.coerce.number().default(10),
   limit: z.coerce.number().default(0),
+  docId: z.string().optional(),
+  topicId: z.string().optional(),
 });
 
 export const Route = createFileRoute("/training/session/$id")({
@@ -21,16 +28,41 @@ export const Route = createFileRoute("/training/session/$id")({
 
 function SessionPage() {
   const { id } = Route.useParams();
-  const { mode, filter, count, limit } = Route.useSearch() as z.infer<typeof searchSchema>;
+  const { mode, filter, filters, types, diff, count, limit, docId } = Route.useSearch() as z.infer<
+    typeof searchSchema
+  >;
   const navigate = useNavigate();
-  const { addWrong } = useMockStore();
+  const { addWrong, recordDocAnswers } = useMockStore();
 
   const questions: Question[] = useMemo(() => {
-    let pool = QUESTIONS;
-    if (filter) pool = pool.filter((q) => q.knowledgePoints.some((k) => k.includes(filter)));
+    if (docId) {
+      const ids = getQuestionIdsForDoc(docId);
+      const docQs = ids.map((id) => QUESTIONS.find((q) => q.id === id)).filter(Boolean) as Question[];
+      return docQs.length > 0 ? docQs : QUESTIONS.slice(0, 3);
+    }
+    const categoryKeys = filters
+      ? filters.split(",").filter(Boolean)
+      : filter
+        ? [filter]
+        : [];
+    const typeList = types
+      ? (types.split(",").filter(Boolean) as QuestionType[])
+      : ([] as QuestionType[]);
+
+    let pool =
+      categoryKeys.length > 0 || typeList.length > 0 || diff !== "all"
+        ? filterPracticeQuestions({
+            categoryKeys,
+            types: typeList.length > 0 ? typeList : (["single", "multiple", "judge", "text"] as QuestionType[]),
+            diff: diff as PracticeDifficulty,
+          })
+        : filter
+          ? QUESTIONS.filter((q) => q.knowledgePoints.some((k) => k.includes(filter)))
+          : QUESTIONS;
+
     if (pool.length === 0) pool = QUESTIONS;
     return pool.slice(0, Math.max(1, count));
-  }, [filter, count]);
+  }, [filter, filters, types, diff, count, docId]);
 
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -73,7 +105,10 @@ function SessionPage() {
         mode,
       }),
     );
-    navigate({ to: "/training/result/$id", params: { id } });
+    if (docId && mode === "practice") {
+      recordDocAnswers(docId, questions.map((qq) => qq.id));
+    }
+    navigate({ to: "/training/result/$id", params: { id }, search: docId ? { docId } : undefined });
   };
 
   // Auto-submit when time up (exam mode)
@@ -107,7 +142,7 @@ function SessionPage() {
                   : "bg-primary-soft text-accent-foreground"
             }`}
           >
-            {({ practice: "专项练习", exam: "模拟考试", review: "复习" } as const)[mode]}
+            {({ practice: "专项练习", exam: "我的考试", review: "复习" } as const)[mode]}
           </span>
           <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
             {idx + 1} / {questions.length}

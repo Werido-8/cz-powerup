@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Send,
@@ -60,7 +60,11 @@ import {
 } from "@/components/chat/quiz-set-dialog";
 import type { QuizSet } from "@/lib/mock/learning-hub";
 
-const searchSchema = z.object({ prefill: z.string().optional() });
+const searchSchema = z.object({
+  prefill: z.string().optional(),
+  libId: z.string().optional(),
+  fileId: z.string().optional(),
+});
 
 export const Route = createFileRoute("/chat")({
   validateSearch: searchSchema,
@@ -1567,6 +1571,25 @@ function ChatComposer({
 // ─── Page ────────────────────────────────────────────────
 
 function ChatPage() {
+  return (
+    <PageShell>
+      <div className="mx-auto max-w-lg rounded-xl border border-border bg-card p-10 text-center shadow-[var(--shadow-card)]">
+        <h1 className="text-[18px] font-semibold text-foreground">智能问答</h1>
+        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+          本期暂未开放。后续将支持基于知识库的多轮答疑与原文引用。
+        </p>
+        <Link
+          to="/learn"
+          className="mt-6 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          前往知识学习
+        </Link>
+      </div>
+    </PageShell>
+  );
+}
+
+function _ChatPageLegacyDisabled() {
   const { prefill } = Route.useSearch();
   const { state, addNote, toggleFavorite, removeFavorite, addQuizSet, getQuizSetByMsgId } = useMockStore();
 

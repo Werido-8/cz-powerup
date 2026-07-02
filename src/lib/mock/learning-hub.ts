@@ -152,15 +152,15 @@ export const FEATURE_CARDS = [
   },
   {
     id: "exam",
-    title: "模拟考试",
-    desc: "限时答题，贴近考评场景。",
+    title: "我的考试",
+    desc: "培训负责人下发的正式试卷，限时答题。",
     to: "/training/exam" as const,
     stats: [
       { label: "已完成", value: "3 次" },
       { label: "最近得分", value: "82 分" },
-      { label: "推荐试卷", value: "运行基础模拟卷" },
+      { label: "推荐试卷", value: "运行基础卷" },
     ],
-    action: "开始模拟",
+    action: "进入考试",
   },
   {
     id: "wrong",
@@ -174,19 +174,20 @@ export const FEATURE_CARDS = [
     ],
     action: "查看错题",
   },
-  {
-    id: "quizsets",
-    title: "智能生成题单",
-    desc: "由智能问答、知识学习和场景练习生成的专项题单。",
-    to: "/assets" as const,
-    search: { tab: "quizsets" },
-    stats: [
-      { label: "已生成", value: "4 份" },
-      { label: "未完成", value: "2 份" },
-      { label: "最近生成", value: "AGC 考核依据专项" },
-    ],
-    action: "查看题单",
-  },
+  // 本期暂不开放：智能生成题单
+  // {
+  //   id: "quizsets",
+  //   title: "智能生成题单",
+  //   desc: "由智能问答、知识学习和场景练习生成的专项题单。",
+  //   to: "/assets" as const,
+  //   search: { tab: "quizsets" },
+  //   stats: [
+  //     { label: "已生成", value: "4 份" },
+  //     { label: "未完成", value: "2 份" },
+  //     { label: "最近生成", value: "AGC 考核依据专项" },
+  //   ],
+  //   action: "查看题单",
+  // },
 ];
 
 export const RECOMMENDED_PRACTICES: RecommendedPractice[] = [

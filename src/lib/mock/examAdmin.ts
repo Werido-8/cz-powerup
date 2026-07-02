@@ -74,6 +74,7 @@ export interface AnswerDetailItem {
   analysis: string;
   evidence: string;
   wrongTags: string[];
+  options?: { key: string; text: string }[];
 }
 
 export const EXAM_STATS = [
@@ -84,6 +85,87 @@ export const EXAM_STATS = [
   { key: "correct", label: "平均正确率", value: "76%", hint: "全部试卷", tone: "success" as const },
   { key: "time", label: "平均用时", value: "26 分", hint: "单卷均值", tone: "primary" as const },
 ];
+
+/** 题库管理页专用概览（题库资产维护视角，不含考试结果类指标） */
+export const BANK_OVERVIEW_STATS: ExamStatItem[] = [
+  { key: "pending", label: "待审核题目", value: "23", hint: "AI 生成 17 · 人工 6", tone: "warning" },
+  { key: "bank", label: "题库总量", value: "1,842", hint: "本月新增 86", tone: "primary" },
+  { key: "active", label: "启用题目", value: "1,568", hint: "禁用 274", tone: "primary" },
+  { key: "optimize", label: "待优化题目", value: "36", hint: "低正确率 21 · 长期未用 15", tone: "warning" },
+];
+
+export type ExamStatItem = {
+  key: string;
+  label: string;
+  value: string;
+  hint: string;
+  tone: "warning" | "primary" | "success";
+};
+
+/** 考试管理页专用概览（不含题库审核类指标） */
+export function buildExamAdminStats(papers: Paper[]): ExamStatItem[] {
+  const draftCount = papers.filter((p) => p.status === "草稿").length;
+  const issuedCount = papers.filter((p) => p.status === "已下发").length;
+  const endedCount = papers.filter((p) => p.status === "已结束").length;
+  const totalAssigned = papers.reduce((s, p) => s + p.assigned, 0);
+  const totalFinished = papers.reduce((s, p) => s + p.finished, 0);
+  const finishRate = totalAssigned > 0 ? Math.round((totalFinished / totalAssigned) * 100) : 0;
+
+  const withMetrics = papers.filter((p) => p.assigned > 0 && p.avgCorrect > 0);
+  const avgCorrect =
+    withMetrics.length > 0
+      ? Math.round(withMetrics.reduce((s, p) => s + p.avgCorrect, 0) / withMetrics.length)
+      : 0;
+  const avgDuration =
+    withMetrics.length > 0
+      ? Math.round(withMetrics.reduce((s, p) => s + p.avgDuration, 0) / withMetrics.length)
+      : 0;
+
+  return [
+    {
+      key: "papers",
+      label: "试卷总数",
+      value: String(papers.length),
+      hint: `草稿 ${draftCount} · 已结束 ${endedCount}`,
+      tone: "primary",
+    },
+    {
+      key: "issued",
+      label: "已下发试卷",
+      value: String(issuedCount),
+      hint: `进行中 ${issuedCount}`,
+      tone: "primary",
+    },
+    {
+      key: "assigned",
+      label: "累计参考人次",
+      value: totalAssigned.toLocaleString("zh-CN"),
+      hint: `已完成 ${totalFinished.toLocaleString("zh-CN")} 人次`,
+      tone: "primary",
+    },
+    {
+      key: "finish",
+      label: "答题完成率",
+      value: `${finishRate}%`,
+      hint: "全部已下发",
+      tone: "success",
+    },
+    {
+      key: "correct",
+      label: "平均正确率",
+      value: `${avgCorrect}%`,
+      hint: "全部试卷",
+      tone: "success",
+    },
+    {
+      key: "time",
+      label: "平均用时",
+      value: `${avgDuration} 分`,
+      hint: "单卷均值",
+      tone: "primary",
+    },
+  ];
+}
 
 export const REVIEW_QUESTIONS: ReviewQuestion[] = [
   {
@@ -493,6 +575,8 @@ export const PAPERS: Paper[] = [
   },
 ];
 
+export const EXAM_ADMIN_STATS = buildExamAdminStats(PAPERS);
+
 export const PAPER_CATEGORIES = Array.from(new Set(PAPERS.map((p) => p.category))).sort();
 
 export const ASSIGN_RECORDS: AssignRecord[] = [
@@ -538,6 +622,38 @@ export const ANSWER_DETAIL: AnswerDetailItem[] = [
     wrongTags: ["主变停役", "安全措施"],
   },
 ];
+
+/** 从答卷项解析用户/正确答案的选项 key 集合 */
+export function parseAnswerKeys(answer: string, type: QuestionType): Set<string> {
+  if (!answer || answer === "未作答") return new Set();
+  if (type === "多选题") {
+    return new Set(
+      answer
+        .toUpperCase()
+        .replace(/[^A-Z]/g, "")
+        .split("")
+        .filter(Boolean),
+    );
+  }
+  if (type === "判断题") {
+    if (/^T|正确/.test(answer)) return new Set(["T"]);
+    if (/^F|错误/.test(answer)) return new Set(["F"]);
+  }
+  const m = answer.trim().match(/^([A-Z])/i);
+  return m ? new Set([m[1].toUpperCase()]) : new Set();
+}
+
+/** 获取答卷题目的选项列表（优先 item.options，其次 PAPER_PREVIEW） */
+export function getAnswerQuestionOptions(
+  item: AnswerDetailItem,
+): { key: string; text: string }[] | undefined {
+  if (item.options?.length) return item.options;
+  for (const section of PAPER_PREVIEW) {
+    const q = section.questions.find((q) => q.no === item.no);
+    if (q?.options?.length) return q.options;
+  }
+  return undefined;
+}
 
 export const GEN_PREVIEW = {
   knowledgeCoverage: [
@@ -599,6 +715,54 @@ export interface EditorQuestion {
   difficulty: Difficulty;
   source: string;
   score: number;
+  options?: { key: string; text: string }[];
+  answer?: string;
+  blankCount?: number;
+  /** 由 AI 组卷生成的题目标记，用于在编辑器中展示"AI 生成"标签 */
+  isAIGenerated?: true;
+}
+
+export const PAPER_QUESTION_TYPES: QuestionType[] = [
+  "单选题",
+  "多选题",
+  "判断题",
+  "填空题",
+  "简答题",
+];
+
+export const TYPE_PER_SCORE: Record<QuestionType, number> = {
+  单选题: 2,
+  多选题: 3,
+  判断题: 1,
+  填空题: 2,
+  简答题: 5,
+  案例分析题: 8,
+};
+
+export function defaultOptionsForType(type: QuestionType): { key: string; text: string }[] | undefined {
+  if (type === "判断题") {
+    return [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ];
+  }
+  return undefined;
+}
+
+export function editorQuestionFromBank(bank: BankQuestion, score: number): EditorQuestion {
+  const detail = BANK_DETAILS[bank.id];
+  const options = detail?.options ?? defaultOptionsForType(bank.type);
+  return {
+    id: bank.id,
+    stem: bank.stem,
+    knowledge: bank.knowledge,
+    difficulty: bank.difficulty,
+    source: bank.source,
+    score,
+    options,
+    answer: detail?.answer,
+    blankCount: bank.type === "填空题" ? Math.max(1, options?.length ?? 1) : undefined,
+  };
 }
 
 export interface EditorGroup {
@@ -620,9 +784,9 @@ export const EDITOR_GROUPS: EditorGroup[] = [
     type: "单选题",
     perScore: 2,
     questions: [
-      { id: "e1", stem: "AGC 投入后机组出力与调度指令偏差持续超 ±3% 应优先采取?", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", score: 2 },
-      { id: "e2", stem: "一次调频的负荷响应应在频率越限后多少秒内开始?", knowledge: "一次调频", difficulty: "中", source: "两细则考核知识点汇编 v2024.05", score: 2 },
-      { id: "e3", stem: "AGC 控制方式下机组响应速率不满足要求的考核方式?", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", score: 2 },
+      { id: "e1", stem: "AGC 投入后机组出力与调度指令偏差持续超 ±3% 应优先采取?", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", score: 2, options: [{ key: "A", text: "检查 AGC 通道" }, { key: "B", text: "调整死区" }, { key: "C", text: "汇报调度" }, { key: "D", text: "切至手动" }], answer: "A" },
+      { id: "e2", stem: "一次调频的负荷响应应在频率越限后多少秒内开始?", knowledge: "一次调频", difficulty: "中", source: "两细则考核知识点汇编 v2024.05", score: 2, options: [{ key: "A", text: "5 秒" }, { key: "B", text: "15 秒" }, { key: "C", text: "30 秒" }, { key: "D", text: "60 秒" }], answer: "B" },
+      { id: "e3", stem: "AGC 控制方式下机组响应速率不满足要求的考核方式?", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", score: 2, options: [{ key: "A", text: "按 K 值法" }, { key: "B", text: "按固定分" }, { key: "C", text: "不考核" }, { key: "D", text: "按容量比" }], answer: "A" },
     ],
   },
   {
@@ -637,8 +801,8 @@ export const EDITOR_GROUPS: EditorGroup[] = [
     type: "判断题",
     perScore: 1,
     questions: [
-      { id: "e6", stem: "一次调频死区设置过大会导致机组在小扰动下不动作。", knowledge: "一次调频", difficulty: "易", source: "两细则考核知识点汇编 v2024.05", score: 1 },
-      { id: "e7", stem: "差动保护属于主保护,具备绝对选择性。", knowledge: "差动保护", difficulty: "易", source: "差动保护误动复盘案例库 v2023.11", score: 1 },
+      { id: "e6", stem: "一次调频死区设置过大会导致机组在小扰动下不动作。", knowledge: "一次调频", difficulty: "易", source: "两细则考核知识点汇编 v2024.05", score: 1, options: [{ key: "T", text: "正确" }, { key: "F", text: "错误" }], answer: "T" },
+      { id: "e7", stem: "差动保护属于主保护,具备绝对选择性。", knowledge: "差动保护", difficulty: "易", source: "差动保护误动复盘案例库 v2023.11", score: 1, options: [{ key: "T", text: "正确" }, { key: "F", text: "错误" }], answer: "F" },
     ],
   },
   {
@@ -1106,6 +1270,77 @@ export function aggregateStats(people: PersonAggregate[]) {
   const latest = people.map((p) => p.records[0]);
   const finished = latest.filter((r) => r.status === "已提交").length;
   return { peopleCount, totalTimes, finished };
+}
+
+/** 各试卷关联的答题人员（mock） */
+export const PAPER_AGGREGATE_IDS: Record<string, string[]> = {
+  p1: ["u1", "u2", "u3", "u4", "u5"],
+  p2: ["u4", "u5"],
+  p4: ["u1", "u2", "u5"],
+  p5: ["u3", "u4", "u5"],
+  p7: ["u1", "u2", "u3"],
+  p8: ["u4", "u5"],
+  p9: ["u1", "u3"],
+  p10: ["u2", "u4"],
+  p11: ["u5"],
+  p12: ["u1", "u2", "u3", "u4"],
+  p13: ["u5"],
+  p14: ["u1", "u2"],
+  p15: ["u1", "u2"],
+  p16: ["u3", "u4", "u5"],
+};
+
+export function getAggregatesForPaper(paperId: string): PersonAggregate[] {
+  const ids = PAPER_AGGREGATE_IDS[paperId];
+  if (!ids) return [];
+  return PERSON_AGGREGATES.filter((a) => ids.includes(a.id));
+}
+
+export const PAPER_QUESTION_GROUPS: Record<string, EditorGroup[]> = {
+  p1: EDITOR_GROUPS,
+  p2: EDITOR_GROUPS,
+  p4: EDITOR_GROUPS,
+  p5: EDITOR_GROUPS,
+};
+
+export function getPaperQuestionGroups(paperId: string): EditorGroup[] {
+  const stored = PAPER_QUESTION_GROUPS[paperId];
+  if (stored) return structuredClone(stored);
+  return structuredClone(EDITOR_GROUPS);
+}
+
+export const PAPER_DRAFT_KEY = "exam-paper-draft-v1";
+
+/** 供 AI 组卷预览题挂载学员可见选项 */
+export function syntheticPreviewQuestion(
+  stem: string,
+  type: QuestionType,
+  difficulty: Difficulty,
+  id: string,
+  score: number,
+): EditorQuestion {
+  const template = Object.values(BANK_DETAILS).find((d) => d.options?.length)?.options;
+  const options =
+    type === "判断题"
+      ? defaultOptionsForType("判断题")
+      : type === "单选题" || type === "多选题"
+        ? template ?? [
+            { key: "A", text: "选项 A" },
+            { key: "B", text: "选项 B" },
+            { key: "C", text: "选项 C" },
+            { key: "D", text: "选项 D" },
+          ]
+        : undefined;
+  return {
+    id,
+    stem,
+    knowledge: "AGC / 两细则",
+    difficulty,
+    source: "AI 组卷",
+    score,
+    options,
+    blankCount: type === "填空题" ? 1 : undefined,
+  };
 }
 
 // ---------- Bank question rich details (for 查看详情 / 编辑) ----------

@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/exam")({
   component: ExamPage,
-  head: () => ({ meta: [{ title: "模拟考试 · 题库训练" }] }),
+  head: () => ({ meta: [{ title: "我的考试 · 题库训练" }] }),
 });
 
 type ExamGoal = "取证复习" | "复证巩固" | "岗位达标" | "阶段测评" | "日常自测";
@@ -426,7 +426,7 @@ function ExamPage() {
   const start = () => {
     navigate({
       to: "/training/session/$id",
-      params: { id: `模拟考试-${paper.id}` },
+      params: { id: `我的考试-${paper.id}` },
       search: { mode: "exam", filter: "", count: paper.count, limit: paper.limit },
     });
   };
@@ -444,10 +444,10 @@ function ExamPage() {
           题库训练
         </Link>
         <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
-        <span className="text-foreground/70">智能考试</span>
+        <span className="text-foreground/70">我的考试</span>
       </nav>
       <PageHeader
-        title="智能考试"
+        title="我的考试"
         subtitle="培训负责人下发的考试，默认展示待完成与最新下发。"
         size="md"
       />

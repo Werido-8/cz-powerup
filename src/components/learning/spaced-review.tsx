@@ -136,22 +136,24 @@ function ReviewPlanList({ plan, query = "" }: { plan: import("@/lib/mock/spaced-
   }
 
   return (
-    <ListCard className="overflow-hidden">
-      <div className="max-h-[min(32rem,60vh)] space-y-2 overflow-y-auto p-3">
-        {pageRows.map((row) => (
-          <ReviewPlanRowItem key={row.id} row={row} />
-        ))}
-      </div>
+    <TooltipProvider delayDuration={200}>
+      <ListCard className="overflow-hidden">
+        <div className="max-h-[min(32rem,60vh)] space-y-2 overflow-y-auto p-3">
+          {pageRows.map((row) => (
+            <ReviewPlanRowItem key={row.id} row={row} />
+          ))}
+        </div>
 
-      <TableListPager
-        page={safePage}
-        totalPages={totalPages}
-        totalItems={plan.length}
-        pageSize={pageSize}
-        onPageChange={setPage}
-        onPageSizeChange={setPageSize}
-      />
-    </ListCard>
+        <TableListPager
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={plan.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      </ListCard>
+    </TooltipProvider>
   );
 }
 
@@ -201,16 +203,30 @@ export function useSpacedReviewSummary() {
   );
 
   const plan = useMemo(
-    () => buildReviewPlan(state.reviews, state.wrong, questionTitles),
-    [state.reviews, state.wrong, questionTitles],
+    () => buildReviewPlan(state.reviews, [], questionTitles),
+    [state.reviews, questionTitles],
   );
 
   return {
     plan,
     dueCount: plan.filter((p) => p.due).length,
     docCount: plan.filter((p) => p.kind === "doc").length,
-    wrongCount: plan.filter((p) => p.kind === "wrong").length,
+    wrongCount: 0,
   };
+}
+
+/** 我的学习资料 Tab 内：仅展示文档级复习提醒（不含错题） */
+export function DocReviewSimpleList() {
+  const { plan } = useSpacedReviewSummary();
+  const docPlan = useMemo(() => plan.filter((p) => p.kind === "doc"), [plan]);
+  return (
+    <div className="space-y-3">
+      <p className="text-[12.5px] text-muted-foreground">
+        已纳入复习计划的资料（文档级简单提醒，不含错题复习）
+      </p>
+      <ReviewPlanList plan={docPlan} />
+    </div>
+  );
 }
 
 /** 艾宾浩斯复习计划面板（独立 Tab 内展示完整清单） */

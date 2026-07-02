@@ -1,25 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import {
   ClipboardList,
   Target,
   BookMarked,
-  Sparkles,
-  Flame,
-  ChevronRight,
-  Calendar,
-  TrendingUp,
   ListChecks,
+  TrendingUp,
   FileSearch,
   RotateCcw,
   History,
+  Calendar,
+  ChevronRight,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
 import { useMockStore } from "@/lib/mock/store";
 import {
   TRAINING_OVERVIEW,
   FEATURE_CARDS,
-  RECOMMENDED_PRACTICES,
   PRACTICE_RECORDS,
 } from "@/lib/mock/learning-hub";
 import {
@@ -28,14 +24,11 @@ import {
   StatPanel,
   FeatureCard,
   TodayPlanCard,
-  ModuleTabs,
   ModulePanel,
   ListCard,
-  RecommendedItem,
   RecordRow,
   TRAINING_RECORDS_GRID,
   listActionClass,
-  LinkButton,
   learningBtnRadius,
 } from "@/components/learning/ui";
 import { getFeatureHeaderTheme } from "@/components/learning/topic-art";
@@ -50,25 +43,17 @@ const FEATURE_ICONS = {
   practice: Target,
   exam: ClipboardList,
   wrong: BookMarked,
-  quizsets: Sparkles,
+  // quizsets: Sparkles,
 };
 
 const FEATURE_TAGS: Record<string, string[]> = {
   practice: ["定向强化"],
   exam: ["限时测评"],
   wrong: ["错因分析"],
-  quizsets: ["AI 生成"],
+  // quizsets: ["AI 生成"],
 };
 
-type PracticeTabKey = "recommended" | "records";
-
-const PRACTICE_TABS: { key: PracticeTabKey; label: string; desc: string; icon: typeof Target }[] = [
-  { key: "recommended", label: "推荐练习", desc: "根据薄弱知识点与错题智能推荐", icon: Target },
-  { key: "records", label: "最近练习记录", desc: "练习结果联动错题本与个人沉淀", icon: History },
-];
-
 function TrainingHome() {
-  const [practiceTab, setPracticeTab] = useState<PracticeTabKey>("recommended");
   const { state } = useMockStore();
   const wrongCount = state.wrong.length || TRAINING_OVERVIEW.wrongToReview;
   const overview = {
@@ -115,13 +100,14 @@ function TrainingHome() {
                   window.location.href = "/training/wrong";
                 },
               },
-              {
-                key: "quizsets",
-                label: "智能生成题单",
-                value: overview.quizSetCount,
-                hint: "AI 与场景生成",
-                icon: <Sparkles />,
-              },
+              // 本期暂不开放：智能生成题单
+              // {
+              //   key: "quizsets",
+              //   label: "智能生成题单",
+              //   value: overview.quizSetCount,
+              //   hint: "AI 与场景生成",
+              //   icon: <Sparkles />,
+              // },
               {
                 key: "streak",
                 label: "连续练习",
@@ -157,9 +143,9 @@ function TrainingHome() {
 
       {/* 训练入口 — 对齐专题学习 TopicCard 风格 */}
       <section className="mb-6">
-        <SectionHeader title="训练入口" subtitle="专项、模拟、错题与智能题单，覆盖完整练习闭环" />
-        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          {FEATURE_CARDS.map((card) => {
+        <SectionHeader title="训练入口" subtitle="专项练习、模拟考试与错题巩固" />
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          {FEATURE_CARDS.filter((card) => card.id !== "quizsets").map((card) => {
             const Icon = FEATURE_ICONS[card.id as keyof typeof FEATURE_ICONS];
             const stats =
               card.id === "wrong"
@@ -172,7 +158,6 @@ function TrainingHome() {
               <Link
                 key={card.id}
                 to={card.to}
-                search={"search" in card ? card.search : undefined}
                 className="block"
               >
                 <FeatureCard
@@ -194,96 +179,57 @@ function TrainingHome() {
         </div>
       </section>
 
-      {/* 推荐练习 / 最近练习记录 */}
+      {/* 最近练习记录 */}
       <section>
+        <SectionHeader
+          title="最近练习记录"
+          subtitle="练习结果联动错题本与个人沉淀"
+        />
         <ModulePanel>
-          <ModuleTabs
-            tabs={PRACTICE_TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              desc: t.desc,
-              icon: <t.icon className="h-4 w-4" />,
-            }))}
-            value={practiceTab}
-            onChange={setPracticeTab}
-          />
-
           <div className="p-4">
-            {practiceTab === "recommended" && (
-              <ListCard>
-                {RECOMMENDED_PRACTICES.map((r, i) => (
-                  <RecommendedItem
-                    key={r.id}
-                    index={i + 1}
-                    title={r.title}
-                    reason={r.reason}
-                    count={r.count}
-                    mastery={r.mastery}
-                    tags={r.tags}
-                    source={r.source}
-                    progress={r.progress}
-                    action={
+            <ListCard>
+              <div
+                className={cn(
+                  "hidden border-b border-divider px-5 py-3 text-[11.5px] font-medium text-muted-foreground lg:grid lg:items-center lg:gap-4",
+                  TRAINING_RECORDS_GRID,
+                )}
+              >
+                <span>练习名称</span>
+                <span>来源</span>
+                <span>完成时间</span>
+                <span>正确率</span>
+                <span>错题数</span>
+                <span className="text-right">操作</span>
+              </div>
+              {PRACTICE_RECORDS.filter((r) => r.source !== "智能问答生成").map((r) => (
+                <RecordRow
+                  key={r.id}
+                  cells={[r.title, r.source, r.completedAt, `${r.accuracy}%`, `错题 ${r.wrongCount}`]}
+                  actions={
+                    <>
+                      <Link to="/training/result/$id" params={{ id: r.id }} className={listActionClass()}>
+                        <FileSearch className="h-3.5 w-3.5" />
+                        查看结果
+                      </Link>
                       <Link
                         to="/training/session/$id"
-                        params={{ id: `推荐-${r.id}` }}
-                        search={{ mode: "practice", filter: r.filter, count: r.count, limit: 0 }}
+                        params={{ id: `再练-${r.id}` }}
+                        search={{
+                          mode: "practice",
+                          filter: r.filter,
+                          count: r.questionCount,
+                          limit: 0,
+                        }}
+                        className={listActionClass("primary")}
                       >
-                        <LinkButton>
-                          <Target className="h-3.5 w-3.5" />
-                          开始练习
-                        </LinkButton>
+                        <RotateCcw className="h-3.5 w-3.5" />
+                        再练一次
                       </Link>
-                    }
-                  />
-                ))}
-              </ListCard>
-            )}
-
-            {practiceTab === "records" && (
-              <ListCard>
-                <div
-                  className={cn(
-                    "hidden border-b border-divider px-5 py-3 text-[11.5px] font-medium text-muted-foreground lg:grid lg:items-center lg:gap-4",
-                    TRAINING_RECORDS_GRID,
-                  )}
-                >
-                  <span>练习名称</span>
-                  <span>来源</span>
-                  <span>完成时间</span>
-                  <span>正确率</span>
-                  <span>错题数</span>
-                  <span className="text-right">操作</span>
-                </div>
-                {PRACTICE_RECORDS.map((r) => (
-                  <RecordRow
-                    key={r.id}
-                    cells={[r.title, r.source, r.completedAt, `${r.accuracy}%`, `错题 ${r.wrongCount}`]}
-                    actions={
-                      <>
-                        <Link to="/training/result/$id" params={{ id: r.id }} className={listActionClass()}>
-                          <FileSearch className="h-3.5 w-3.5" />
-                          查看结果
-                        </Link>
-                        <Link
-                          to="/training/session/$id"
-                          params={{ id: `再练-${r.id}` }}
-                          search={{
-                            mode: "practice",
-                            filter: r.filter,
-                            count: r.questionCount,
-                            limit: 0,
-                          }}
-                          className={listActionClass("primary")}
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          再练一次
-                        </Link>
-                      </>
-                    }
-                  />
-                ))}
-              </ListCard>
-            )}
+                    </>
+                  }
+                />
+              ))}
+            </ListCard>
           </div>
         </ModulePanel>
       </section>

@@ -13,15 +13,17 @@ const MENU: MenuItem[] = [
   { label: "首页工作台", to: "/" },
   { label: "资料检索", to: "/search" },
   { label: "知识库", to: "/knowledge" },
-  { label: "智能问答", to: "/chat" },
+  // 本期暂不开放：智能问答
+  // { label: "智能问答", to: "/chat" },
   {
     label: "能力提升",
     to: "/learn",
     children: [
       { label: "知识学习", to: "/learn" },
       { label: "题库训练", to: "/training" },
-      { label: "考试管理", to: "/exam-admin" },
       { label: "个人沉淀", to: "/assets" },
+      { label: "题库管理", to: "/question-bank" },
+      { label: "考试管理", to: "/exam-admin" },
     ],
   },
   { label: "场景训练", to: "/scenario" },

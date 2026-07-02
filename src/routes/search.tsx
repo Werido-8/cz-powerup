@@ -171,11 +171,7 @@ function SearchPage() {
         <div className="grid place-items-center rounded-lg border border-dashed border-border bg-card/50 p-16 text-center">
           <div className="text-[14px] font-medium">未找到匹配资料</div>
           <p className="mt-1 text-[12.5px] text-muted-foreground">
-            可尝试放宽筛选,或前往{" "}
-            <Link to="/chat" className="text-primary underline">
-              智能问答
-            </Link>{" "}
-            提问
+            可尝试放宽筛选，或调整关键词后重新检索
           </p>
         </div>
       ) : (
@@ -241,6 +237,7 @@ function SearchPage() {
                     <Star className={`h-3 w-3 ${fav ? "fill-current" : ""}`} />
                     {fav ? "已收藏" : "收藏"}
                   </button>
+                  {/* 本期暂不开放：智能问答
                   <Link
                     to="/chat"
                     search={{ prefill: d.title }}
@@ -248,6 +245,7 @@ function SearchPage() {
                   >
                     <MessagesSquare className="h-3 w-3" /> 去问答
                   </Link>
+                  */}
                   <button
                     onClick={() => toast.success("已加入笔记草稿")}
                     className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-1.5 text-[12px] font-medium text-foreground hover:bg-muted"

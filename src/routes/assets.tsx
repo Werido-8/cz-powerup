@@ -54,7 +54,7 @@ import {
 
 const assetsSearchSchema = z.object({
   tab: z
-    .enum(["fav", "note", "quizsets", "wrong", "records"])
+    .enum(["fav", "note", "wrong", "records"])
     .optional()
     .catch(undefined),
 });
@@ -65,7 +65,7 @@ export const Route = createFileRoute("/assets")({
   head: () => ({ meta: [{ title: "个人沉淀 · 涉网运行能力智能提升平台" }] }),
 });
 
-type Tab = "fav" | "note" | "quizsets" | "wrong" | "records";
+type Tab = "fav" | "note" | "wrong" | "records";
 
 const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
   fav: [
@@ -73,8 +73,8 @@ const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
     { value: "规程", label: "规程" },
     // { value: "SOP", label: "SOP" },
     { value: "案例", label: "案例" },
-    { value: "问答", label: "问答" },
-    { value: "题单", label: "题单" },
+    // { value: "问答", label: "问答" },
+    // { value: "题单", label: "题单" },
     { value: "题目", label: "题目" },
   ],
   note: [
@@ -82,12 +82,6 @@ const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
     { value: "AGC", label: "AGC/两细则" },
     { value: "主变", label: "主变/操作" },
     { value: "继电保护", label: "继电保护" },
-  ],
-  quizsets: [
-    { value: "all", label: "全部" },
-    { value: "未开始", label: "未开始" },
-    { value: "进行中", label: "进行中" },
-    { value: "已完成", label: "已完成" },
   ],
   wrong: [
     { value: "all", label: "全部" },
@@ -98,7 +92,7 @@ const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
   ],
   records: [
     { value: "all", label: "全部" },
-    { value: "智能问答生成", label: "智能问答" },
+    // { value: "智能问答生成", label: "智能问答" },
     { value: "知识学习生成", label: "知识学习" },
     { value: "错题本", label: "错题本" },
     { value: "模拟考试", label: "模拟考试" },
@@ -108,7 +102,6 @@ const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
 const SEARCH_PLACEHOLDERS: Record<Tab, string> = {
   fav: "搜索收藏资料标题或专题",
   note: "搜索笔记标题或内容",
-  quizsets: "搜索题单名称",
   wrong: "搜索错题题干或知识点",
   records: "搜索练习名称",
 };
@@ -116,8 +109,9 @@ const SEARCH_PLACEHOLDERS: Record<Tab, string> = {
 const ASSET_TABS: { key: Tab; label: string; desc: string; icon: typeof Star }[] = [
   { key: "fav", label: "我的收藏", desc: "规程、SOP 与案例资料", icon: Star },
   { key: "note", label: "我的笔记", desc: "学习要点与关联资料", icon: NotebookPen },
-  { key: "quizsets", label: "我的题单", desc: "AI 智能生成练习题单", icon: Sparkles },
-  { key: "wrong", label: "错题本", desc: "错题收集与针对性复习", icon: BookMarked },
+  // 本期暂不开放：智能题单
+  // { key: "quizsets", label: "我的题单", desc: "AI 智能生成练习题单", icon: Sparkles },
+  { key: "wrong", label: "错题本", desc: "错题收集与巩固练习", icon: BookMarked },
   { key: "records", label: "练习记录", desc: "历次训练结果与统计", icon: ListChecks },
 ];
 
@@ -143,7 +137,6 @@ function AssetsPage() {
   const [tabFilters, setTabFilters] = useState<Record<Tab, string>>({
     fav: "all",
     note: "all",
-    quizsets: "all",
     wrong: "all",
     records: "all",
   });
@@ -172,9 +165,6 @@ function AssetsPage() {
 
   const wrongCount = state.wrong.length || PERSONAL_OVERVIEW.wrongToReview;
   const lastPractice = PRACTICE_RECORDS[0];
-  const activeQuiz =
-    state.quizSets.find((q) => q.status === "进行中") ??
-    state.quizSets.find((q) => q.status === "未开始");
   const latestNote = state.notes[state.notes.length - 1];
   const latestFavoriteDoc = state.favorites
     .map((id) => DOCS.find((d) => d.id === id))
@@ -196,14 +186,6 @@ function AssetsPage() {
       hint: "学习过程记录",
       detail: latestNote ? `最近：${latestNote.title}` : "暂无笔记",
       icon: <NotebookPen className="h-[18px] w-[18px]" />,
-    },
-    {
-      key: "quizsets" as const,
-      label: "智能题单",
-      value: state.quizSets.length,
-      hint: `${state.quizSets.filter((q) => q.status !== "已完成").length} 份未完成`,
-      detail: activeQuiz ? `进行中：${activeQuiz.title.slice(0, 14)}…` : "全部已完成",
-      icon: <Sparkles className="h-[18px] w-[18px]" />,
     },
     {
       key: "wrong" as const,
@@ -283,13 +265,14 @@ function AssetsPage() {
     });
   }, [state.notes, appliedQuery, activeFilter]);
 
-  const filteredQuizSets = useMemo(() => {
-    return state.quizSets.filter((q) => {
-      if (appliedQuery && !q.title.includes(appliedQuery)) return false;
-      if (activeFilter !== "all" && q.status !== activeFilter) return false;
-      return true;
-    });
-  }, [state.quizSets, appliedQuery, activeFilter]);
+  // 本期暂不开放：智能题单
+  // const filteredQuizSets = useMemo(() => {
+  //   return state.quizSets.filter((q) => {
+  //     if (appliedQuery && !q.title.includes(appliedQuery)) return false;
+  //     if (activeFilter !== "all" && q.status !== activeFilter) return false;
+  //     return true;
+  //   });
+  // }, [state.quizSets, appliedQuery, activeFilter]);
 
   const filteredWrong = useMemo(() => {
     return WRONG_QUESTION_DETAILS.filter((w) => {
@@ -301,6 +284,7 @@ function AssetsPage() {
 
   const filteredRecords = useMemo(() => {
     return PRACTICE_RECORDS.filter((r) => {
+      if (r.source === "智能问答生成") return false;
       if (appliedQuery && !r.title.includes(appliedQuery)) return false;
       if (activeFilter !== "all" && r.source !== activeFilter) return false;
       return true;
@@ -327,11 +311,11 @@ function AssetsPage() {
     <PageShell>
       <PageHeader
         title="个人沉淀"
-        subtitle="收藏、笔记、题单、错题与练习记录，集中管理你的学习成果"
+        subtitle="收藏、笔记、错题与练习记录，集中管理你的学习成果"
       />
 
       {/* 概览 */}
-      <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
+      <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {overviewStats.map((s, i) => (
           <OverviewStatCard
             key={s.key}
@@ -391,12 +375,6 @@ function AssetsPage() {
                 <ChevronRight className="h-3.5 w-3.5" />
               </ActionButton>
             )} */}
-            <Link to="/training/growth">
-              <LinkButton variant="outline">
-                <TrendingUp className="h-3.5 w-3.5" />
-                能力成长
-              </LinkButton>
-            </Link>
           </div>
         </div>
       </section>
@@ -466,6 +444,7 @@ function AssetsPage() {
                       <BookOpen className="h-3.5 w-3.5" />
                       阅读
                     </Link>
+                    {/* 本期暂不开放：智能问答
                     <Link
                       to="/chat"
                       search={{ prefill: `请基于资料《${doc.title}》总结要点` }}
@@ -474,6 +453,7 @@ function AssetsPage() {
                       <MessageSquare className="h-3.5 w-3.5" />
                       提问
                     </Link>
+                    */}
                     <button
                       type="button"
                       className={listActionClass("text")}
@@ -665,84 +645,11 @@ function AssetsPage() {
         </div>
       )}
 
-      {/* 题单 */}
+      {/* 本期暂不开放：智能题单
       {tab === "quizsets" && (
-        <div className="space-y-3">
-          {filteredQuizSets.length === 0 ? (
-            <EmptyState description="暂无智能生成题单，可在智能问答或知识学习中生成。" />
-          ) : (
-            filteredQuizSets.map((q) => (
-              <PersonalAssetCard
-                key={q.id}
-                icon={<Sparkles className="h-5 w-5" />}
-                title={q.title}
-                tags={
-                  <>
-                    <Tag variant={q.status === "进行中" ? "primary" : "outline"}>
-                      {q.status}
-                    </Tag>
-                    <Tag>{q.source}</Tag>
-                  </>
-                }
-                meta={
-                  <>
-                    <span>题目：{q.questionCount} 题</span>
-                    <span>·</span>
-                    <span>正确率：{q.accuracy != null ? `${q.accuracy}%` : "--"}</span>
-                    {q.relatedChat && (
-                      <>
-                        <span>·</span>
-                        <span>关联对话：{q.relatedChat}</span>
-                      </>
-                    )}
-                    <span>·</span>
-                    <span>生成时间：{q.createdAt}</span>
-                  </>
-                }
-                actions={
-                  <>
-                    <Link to="/assets" search={{ tab: "quizsets" }} className={listActionClass("text")}>
-                      <FileSearch className="h-3.5 w-3.5" />
-                      查看题单
-                    </Link>
-                    {q.status === "未开始" || q.status === "进行中" ? (
-                      <Link
-                        to="/training/session/$id"
-                        params={{ id: q.id }}
-                        search={{ mode: "practice", filter: q.filter, count: q.questionCount, limit: 0 }}
-                        className={listActionClass("textPrimary")}
-                      >
-                        <BookOpen className="h-3.5 w-3.5" />
-                        {q.status === "未开始" ? "开始练习" : "继续练习"}
-                      </Link>
-                    ) : (
-                      <>
-                        <Link
-                          to="/training/result/$id"
-                          params={{ id: q.id }}
-                          className={listActionClass("text")}
-                        >
-                          <FileSearch className="h-3.5 w-3.5" />
-                          查看结果
-                        </Link>
-                        <Link
-                          to="/training/session/$id"
-                          params={{ id: `再练-${q.id}` }}
-                          search={{ mode: "practice", filter: q.filter, count: q.questionCount, limit: 0 }}
-                          className={listActionClass("textPrimary")}
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                          再练一次
-                        </Link>
-                      </>
-                    )}
-                  </>
-                }
-              />
-            ))
-          )}
-        </div>
+        ...
       )}
+      */}
 
       {/* 错题本 */}
       {tab === "wrong" && (

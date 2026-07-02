@@ -920,7 +920,7 @@ export function ModuleTabs<T extends string>({
   return (
     <div
       className={cn(
-        "flex flex-wrap gap-1 border-b border-divider bg-primary-soft/25 px-2 pb-0",
+        "flex flex-wrap gap-1 border-b border-[#EDF3F5] bg-[#F5FAFB] px-3 pb-0",
         compact ? "pt-1.5" : "pt-2",
         className,
       )}
@@ -933,36 +933,41 @@ export function ModuleTabs<T extends string>({
             type="button"
             onClick={() => onChange(t.key)}
             className={cn(
-              "relative flex items-center gap-2 rounded-t-lg text-left transition-all",
-              compact ? "px-3 py-2" : "px-3.5 py-2.5",
+              "relative flex items-center gap-2.5 rounded-t-[12px] text-left transition-colors",
+              compact ? "px-4 py-2.5" : "px-5 py-3",
               active
-                ? "z-[1] -mb-px border border-divider border-b-card bg-card text-primary shadow-sm ring-1 ring-primary/15"
-                : "border border-transparent text-foreground/70 hover:bg-card/55 hover:text-foreground",
+                ? "z-[1] -mb-px border border-[#DCE8EA] border-b-white bg-white text-primary"
+                : "border border-transparent text-[#607681] hover:bg-white/50 hover:text-[#1F3440]",
             )}
           >
             {active && (
               <span
-                className="absolute inset-x-2.5 bottom-0 h-[3px] rounded-t-full bg-primary"
+                className="absolute inset-x-3 bottom-0 h-[3px] rounded-t-full bg-primary"
                 aria-hidden
               />
             )}
             <span
               className={cn(
                 "shrink-0 [&>svg]:h-4 [&>svg]:w-4",
-                active ? "text-primary" : "text-muted-foreground",
+                active ? "text-primary" : "text-[#91A3AA]",
               )}
             >
               {t.icon}
             </span>
             <div>
-              <div className={cn("text-[13px] font-semibold", active ? "text-primary" : "font-medium")}>
+              <div
+                className={cn(
+                  compact ? "text-[13px]" : "text-[14px]",
+                  active ? "font-semibold text-primary" : "font-medium text-[#1F3440]",
+                )}
+              >
                 {t.label}
               </div>
               {t.desc && (
                 <div
                   className={cn(
-                    compact ? "text-[10px] text-muted-foreground/65" : "text-[10.5px]",
-                    active && !compact ? "text-primary/65" : !compact ? "text-muted-foreground" : "",
+                    compact ? "text-[11px]" : "text-[11.5px] leading-snug",
+                    active ? "text-primary/70" : "text-[#91A3AA]",
                   )}
                 >
                   {t.desc}
@@ -981,7 +986,7 @@ export function ModulePanel({ children, className }: { children: ReactNode; clas
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-md border border-border bg-card shadow-[var(--shadow-card)]",
+        "overflow-hidden rounded-[12px] border border-[#DCE8EA] bg-white shadow-[0_8px_24px_rgba(31,52,64,0.04)]",
         className,
       )}
     >

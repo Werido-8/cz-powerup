@@ -669,6 +669,8 @@ export type Question = {
   answer: string | string[];
   analysis: string;
   knowledgePoints: string[];
+  /** mock 专项练习难度筛选 */
+  difficulty?: "easy" | "hard";
   scene?: string;
   relatedDocId?: string;
   relatedDocTitle?: string;

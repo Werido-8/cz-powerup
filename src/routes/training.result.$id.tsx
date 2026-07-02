@@ -131,12 +131,6 @@ function ResultPage() {
                 <RefreshCw className="h-3.5 w-3.5" /> 针对错题再练
               </Link>
             )}
-            <Link
-              to="/training/growth"
-              className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-2 text-[12.5px] hover:bg-muted"
-            >
-              <TrendingUp className="h-3.5 w-3.5" /> 查看能力成长
-            </Link>
           </div>
         </div>
       </div>

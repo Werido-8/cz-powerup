@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronRight,
   CheckCircle2,
@@ -12,24 +12,22 @@ import {
   
   Info,
   ClipboardList,
-  MessageSquareText,
   ListTree,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
 import { DOCS, QUESTIONS, TOPICS, type Doc } from "@/lib/mock/data";
 import { useMockStore } from "@/lib/mock/store";
+import {
+  getEffectiveDocStatus,
+  getDocPracticeSessionId,
+  getQuestionIdsForDoc,
+  isDocLearned,
+} from "@/lib/mock/learning-progress";
 import { toast } from "sonner";
 import { RichMindMap } from "@/components/learn/RichMindMap";
-import { ReviewSchedulePreview } from "@/components/learning/spaced-review";
+// 本期暂不开放：复习计划
+// import { ReviewSchedulePreview } from "@/components/learning/spaced-review";
 import { learningBtnRadius } from "@/components/learning/ui";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/learn/doc/$id")({
@@ -60,11 +58,16 @@ export const Route = createFileRoute("/learn/doc/$id")({
 
 function DocPage() {
   const { doc } = Route.useLoaderData() as { doc: Doc };
-  const { state, toggleFavorite, addNote, addToCollection, addSpacedReview, removeSpacedReview } =
+  const { state, toggleFavorite, addNote, addToCollection, removeSpacedReview, markDocLearned, clearDocPractice, pushRecentDoc } =
     useMockStore();
-  const inReviewPlan = state.reviews.some((r) => r.kind === "doc" && r.sourceId === doc.id);
-  const [learned, setLearned] = useState(doc.status === "已学" || inReviewPlan);
-  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+
+  useEffect(() => {
+    pushRecentDoc(doc.id);
+  }, [doc.id, pushRecentDoc]);
+  const learned = isDocLearned(doc.id, state);
+  const docStatus = getEffectiveDocStatus(doc.id, state);
+  // 本期暂不开放：复习计划
+  // const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [noteTitle, setNoteTitle] = useState(`《${doc.title}》学习笔记`);
@@ -72,11 +75,13 @@ function DocPage() {
 
   const fav = state.favorites.includes(doc.id);
   const topic = TOPICS.find((t) => t.id === doc.topicId);
-
-  const idx = DOCS.findIndex((d) => d.id === doc.id);
-  const prev = DOCS[idx - 1];
-  const next = DOCS[idx + 1];
-  const related = QUESTIONS.filter((q) => q.relatedDocId === doc.id).slice(0, 3);
+  const topicDocs = topic ? topic.docIds.map((id) => DOCS.find((d) => d.id === id)).filter(Boolean) as Doc[] : [];
+  const topicIdx = topicDocs.findIndex((d) => d.id === doc.id);
+  const prev = topicIdx > 0 ? topicDocs[topicIdx - 1] : undefined;
+  const next = topicIdx >= 0 && topicIdx < topicDocs.length - 1 ? topicDocs[topicIdx + 1] : undefined;
+  const relatedIds = getQuestionIdsForDoc(doc.id);
+  const related = QUESTIONS.filter((q) => relatedIds.includes(q.id));
+  const practiceComplete = related.length > 0 && related.every((q) => getEffectiveDocStatus(doc.id, state) === "已学");
   const saveNote = (alsoCollection = false) => {
     if (!noteText.trim()) {
       toast.error("请填写笔记内容");
@@ -127,7 +132,7 @@ function DocPage() {
                 {doc.source}
               </span>
               <span className={`rounded-md px-2 py-0.5 text-[10.5px] ${learned ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"}`}>
-                {learned ? (inReviewPlan ? "已学 · 复习中" : "已学") : doc.status}
+                {learned ? "已学" : docStatus}
               </span>
             </div>
             <h1 className="text-[24px] font-semibold leading-tight tracking-tight">{doc.title}</h1>
@@ -137,21 +142,36 @@ function DocPage() {
 
             {/* Action bar */}
             <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-              <Link
-                to="/training/practice"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
-              >
-                <Target className="h-3.5 w-3.5" /> 开始关联训练
-              </Link>
+              {related.length > 0 ? (
+                <Link
+                  to="/training/session/$id"
+                  params={{ id: getDocPracticeSessionId(doc.id) }}
+                  search={{
+                    mode: "practice",
+                    docId: doc.id,
+                    topicId: topic?.id ?? "",
+                    filter: "",
+                    count: related.length,
+                    limit: 0,
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  <Target className="h-3.5 w-3.5" />
+                  {practiceComplete ? "已完成练习" : docStatus === "学习中" ? "继续练习" : "开始关联练习"}
+                </Link>
+              ) : (
+                <span className="text-[12px] text-muted-foreground">暂无关联题目</span>
+              )}
               <button
                 onClick={() => {
                   if (learned) {
-                    setLearned(false);
+                    markDocLearned(doc.id, false);
                     removeSpacedReview(`doc-${doc.id}`);
-                    toast.success("已取消已学标记，并从复习计划移除");
+                    toast.success("已取消已学标记");
                     return;
                   }
-                  setReviewDialogOpen(true);
+                  markDocLearned(doc.id, true);
+                  toast.success("已标记为已学");
                 }}
                 className={cn(
                   "inline-flex items-center gap-1.5 border px-3 py-2 text-[12.5px] font-medium transition-colors",
@@ -308,7 +328,7 @@ function DocPage() {
             </div>
           )}
 
-          {/* Related Q&A */}
+          {/* 本期暂不开放：智能问答
           <div className="rounded-lg border border-border bg-card p-5">
             <div className="mb-2 flex items-center gap-1.5 text-[13px] font-semibold">
               <MessageSquareText className="h-4 w-4 text-primary" /> 相关问答
@@ -330,6 +350,7 @@ function DocPage() {
               </Link>
             </div>
           </div>
+          */}
         </aside>
       </div>
 
@@ -416,43 +437,6 @@ function DocPage() {
         </div>
       )}
 
-      <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[16px]">纳入复习计划？</DialogTitle>
-            <DialogDescription className="text-[13px] leading-relaxed">
-              已标记《{doc.title.slice(0, 24)}
-              {doc.title.length > 24 ? "…" : ""}》为已学。是否按艾宾浩斯遗忘曲线加入复习计划？系统将在以下节点提醒您回顾。
-            </DialogDescription>
-          </DialogHeader>
-          <ReviewSchedulePreview />
-          <DialogFooter className="gap-2 sm:gap-0">
-            <button
-              type="button"
-              onClick={() => {
-                setLearned(true);
-                setReviewDialogOpen(false);
-                toast.success("已标记为已学");
-              }}
-              className={cn("border border-border bg-background px-4 py-2 text-[13px] hover:bg-muted", learningBtnRadius)}
-            >
-              仅标记已学
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLearned(true);
-                addSpacedReview({ kind: "doc", sourceId: doc.id, title: doc.title });
-                setReviewDialogOpen(false);
-                toast.success("已纳入复习计划");
-              }}
-              className={cn("bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90", learningBtnRadius)}
-            >
-              纳入复习计划
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </PageShell>
   );
 }

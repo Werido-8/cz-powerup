@@ -2,8 +2,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { DEFAULT_COLLECTIONS, type Collection } from "./scenario";
 import { QUIZ_SETS, type QuizSet } from "./learning-hub";
+import { getQuestionIdsForDoc } from "./learning-progress";
 
-const KEY = "ai-grid-mock-store-v5";
+const KEY = "ai-grid-mock-store-v7";
 
 const DAY = 86400000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
@@ -49,6 +50,18 @@ export type ScenarioFavorite = {
   savedAt: string;
 };
 
+export type DocProgressEntry = {
+  readStatus: "未学" | "学习中" | "已学";
+  answeredIds: string[];
+  practiceSessionId?: string;
+  manuallyLearned?: boolean;
+};
+
+export type RecentDocEntry = {
+  docId: string;
+  visitedAt: string;
+};
+
 export type MockState = {
   favorites: string[]; // doc ids
   favoriteQuestions: string[]; // question ids
@@ -58,7 +71,9 @@ export type MockState = {
   collections: Collection[];
   scenarioFavorites: ScenarioFavorite[];
   recentScenarios: string[]; // scenarioId
+  recentDocs: RecentDocEntry[];
   quizSets: QuizSet[];
+  docProgress: Record<string, DocProgressEntry>;
 };
 
 const DEFAULT: MockState = {
@@ -203,7 +218,15 @@ const DEFAULT: MockState = {
   collections: DEFAULT_COLLECTIONS,
   scenarioFavorites: [],
   recentScenarios: [],
+  recentDocs: [
+    { docId: "d1", visitedAt: new Date(Date.now() - 3600000).toISOString() },
+    { docId: "d2", visitedAt: new Date(Date.now() - 86400000).toISOString() },
+    { docId: "d8", visitedAt: new Date(Date.now() - 86400000 * 2).toISOString() },
+    { docId: "d10", visitedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
+    { docId: "d6", visitedAt: new Date(Date.now() - 86400000 * 4).toISOString() },
+  ],
   quizSets: QUIZ_SETS.map((q) => ({ ...q })),
+  docProgress: {},
 };
 
 function read(): MockState {
@@ -228,7 +251,10 @@ function read(): MockState {
     parsed.recentScenarios = Array.isArray(parsed.recentScenarios)
       ? parsed.recentScenarios
       : DEFAULT.recentScenarios;
+    parsed.recentDocs = Array.isArray(parsed.recentDocs) ? parsed.recentDocs : DEFAULT.recentDocs;
     parsed.quizSets = Array.isArray(parsed.quizSets) ? parsed.quizSets : DEFAULT.quizSets;
+    parsed.docProgress =
+      parsed.docProgress && typeof parsed.docProgress === "object" ? parsed.docProgress : DEFAULT.docProgress;
     return parsed;
   } catch {
     return DEFAULT;
@@ -443,6 +469,13 @@ export function useMockStore() {
     write(s);
   }, []);
 
+  const pushRecentDoc = useCallback((docId: string) => {
+    const s = read();
+    const entry = { docId, visitedAt: new Date().toISOString() };
+    s.recentDocs = [entry, ...s.recentDocs.filter((x) => x.docId !== docId)].slice(0, 20);
+    write(s);
+  }, []);
+
   const resetAll = useCallback(() => {
     write(DEFAULT);
   }, []);
@@ -457,6 +490,55 @@ export function useMockStore() {
   const getQuizSetByMsgId = useCallback((msgId: string) => {
     return read().quizSets.find((q) => q.relatedMsgId === msgId);
   }, []);
+
+  const updateDocProgress = useCallback(
+    (docId: string, patch: Partial<MockState["docProgress"][string]>) => {
+      const s = read();
+      const current = s.docProgress[docId] ?? {
+        readStatus: "未学" as const,
+        answeredIds: [],
+      };
+      s.docProgress = {
+        ...s.docProgress,
+        [docId]: { ...current, ...patch },
+      };
+      write(s);
+    },
+    [],
+  );
+
+  const markDocLearned = useCallback((docId: string, learned = true) => {
+    updateDocProgress(docId, {
+      readStatus: learned ? "已学" : "未学",
+      manuallyLearned: learned,
+    });
+  }, [updateDocProgress]);
+
+  const recordDocAnswers = useCallback(
+    (docId: string, answeredIds: string[]) => {
+      const s = read();
+      const qIds = answeredIds;
+      const allDone = getQuestionIdsForDoc(docId).every((id) => qIds.includes(id));
+      updateDocProgress(docId, {
+        answeredIds: qIds,
+        readStatus: allDone ? "已学" : "学习中",
+        manuallyLearned: allDone ? true : undefined,
+      });
+    },
+    [updateDocProgress],
+  );
+
+  const clearDocPractice = useCallback(
+    (docId: string) => {
+      updateDocProgress(docId, {
+        answeredIds: [],
+        readStatus: "未学",
+        manuallyLearned: false,
+        practiceSessionId: undefined,
+      });
+    },
+    [updateDocProgress],
+  );
 
   return {
     state,
@@ -479,8 +561,13 @@ export function useMockStore() {
     addToCollection,
     saveScenarioFavorite,
     pushRecentScenario,
+    pushRecentDoc,
     resetAll,
     addQuizSet,
     getQuizSetByMsgId,
+    updateDocProgress,
+    markDocLearned,
+    recordDocAnswers,
+    clearDocPractice,
   };
 }

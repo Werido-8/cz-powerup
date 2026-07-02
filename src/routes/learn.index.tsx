@@ -16,18 +16,12 @@ import {
   Activity,
   Users,
   Clock,
-  PlayCircle,
-  Brain,
-  MessageSquare,
-  Star,
   Flame,
   type LucideIcon,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
 import { DOCS, DOC_TYPES, type LearnStatus } from "@/lib/mock/data";
 import {
-  CONTINUE_LEARNING,
-  LEARNING_STATS,
   ENRICHED_TOPICS,
   RECENT_MATERIALS,
   DOC_READ_INSIGHTS_BY_ID,
@@ -35,7 +29,6 @@ import {
 import {
   PageHeader,
   SectionHeader,
-  OverviewStatCard,
   ModuleTabs,
   ModulePanel,
   SearchBar,
@@ -43,22 +36,17 @@ import {
   TopicCard,
   ListCard,
   Tag as UiTag,
-  ProgressBar,
   EmptyState,
   listActionClass,
   learningBtnRadius,
-  HeroOverviewCard,
-  HeroOverviewBody,
-  HeroActionRail,
   TableListPager,
   TABLE_PAGE_SIZE_DEFAULT,
 } from "@/components/learning/ui";
 import { getTopicHeaderTheme } from "@/components/learning/topic-art";
-import {
-  TodayActivityCard,
-  SpacedReviewPanel,
-  TodayReviewHeroCard,
-} from "@/components/learning/spaced-review";
+// 本期暂不开放：复习计划
+// import { DocReviewSimpleList } from "@/components/learning/spaced-review";
+import { RecentLearningStrip } from "@/components/learning/recent-learning-strip";
+import { useMockStore } from "@/lib/mock/store";
 import {
   DocCardReadMeta,
   DocReadingHeatDashboard,
@@ -91,14 +79,13 @@ const TOPIC_ICONS: Record<string, LucideIcon> = {
   "t-agc": Activity,
 };
 
-type TabKey = "topic" | "all" | "mine" | "review" | "recent";
+type TabKey = "topic" | "all" | "mine" | "recent";
 type AllDocsSubView = "list" | "heat";
 
 const LEARN_TABS: { key: TabKey; label: string; desc: string; icon: typeof Layers }[] = [
   { key: "topic", label: "专题学习", desc: "按专题浏览资料与练习", icon: Layers },
   { key: "all", label: "全部资料", desc: "规程、案例全库", icon: BookOpen },
-  { key: "mine", label: "我的学习", desc: "进行中与需复习资料", icon: GraduationCap },
-  { key: "review", label: "复习计划", desc: "艾宾浩斯间隔复习与待办", icon: Brain },
+  { key: "mine", label: "我的学习资料", desc: "已阅读资料与学习进度", icon: GraduationCap },
   { key: "recent", label: "最近更新", desc: "最新入库与学习动态", icon: Clock },
 ];
 
@@ -106,7 +93,6 @@ const LEARN_TAB_FILTERS: Record<TabKey, { value: string; label: string }[]> = {
   topic: [{ value: "all", label: "全部" }],
   all: [{ value: "all", label: "全部" }, ...DOC_TYPES.map((t) => ({ value: t, label: t }))],
   mine: [{ value: "all", label: "全部" }, ...DOC_TYPES.map((t) => ({ value: t, label: t }))],
-  review: [{ value: "all", label: "全部" }],
   recent: [
     { value: "all", label: "全部" },
     { value: "规程", label: "规程" },
@@ -120,7 +106,6 @@ const SEARCH_PLACEHOLDERS: Record<TabKey, string> = {
   topic: "搜索专题或资料",
   all: "搜索规程、案例、知识点、SOP",
   mine: "搜索我的学习资料",
-  review: "搜索复习项",
   recent: "搜索最近更新资料",
 };
 
@@ -130,6 +115,7 @@ const LEARN_TABLE_HEAD_CLASS =
 const LEARN_TABLE_TH_CLASS = "px-5 py-3 text-left font-medium";
 
 function LearnPage() {
+  const { state } = useMockStore();
   const [tab, setTab] = useState<TabKey>("topic");
   const [searchInput, setSearchInput] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
@@ -137,7 +123,6 @@ function LearnPage() {
     topic: "all",
     all: "all",
     mine: "all",
-    review: "all",
     recent: "all",
   });
   const [view, setView] = useState<"card" | "table">("card");
@@ -172,7 +157,7 @@ function LearnPage() {
   );
 
   const myDocs = useMemo(
-    () => DOCS.filter((d) => d.status === "学习中" || d.status === "需复习"),
+    () => DOCS.filter((d) => d.status === "学习中" || d.status === "已学" || d.status === "需复习"),
     [],
   );
 
@@ -209,71 +194,34 @@ function LearnPage() {
     });
   }, [appliedQuery, activeFilter]);
 
+  const topicsInProgress = useMemo(
+    () => ENRICHED_TOPICS.filter((t) => t.progress > 0 && t.progress < 100).length,
+    [],
+  );
+
   return (
     <PageShell>
       <PageHeader title="知识学习" />
 
-      {/* 学习状态区：左栏继续学习 + 今日复习，右栏三张小卡 */}
-      <section className="mb-6 grid gap-4 lg:grid-cols-[1.35fr_1fr]">
-        <div className="grid gap-3 sm:grid-cols-[1.15fr_0.85fr]">
-          <HeroOverviewCard
-            action={
-              <HeroActionRail
-                label="继续阅读"
-                icon={BookOpen}
-                variant="primary"
-                to="/learn/doc/$id"
-                params={{ id: CONTINUE_LEARNING.lastDocId }}
-              />
-            }
-          >
-            <HeroOverviewBody>
-              <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-background/80 px-2.5 py-1 text-[11px] font-medium text-primary">
-                <PlayCircle className="h-3.5 w-3.5" />
-                继续学习
-              </div>
-              <h2 className="mt-3 text-[18px] font-semibold leading-snug text-foreground">
-                {CONTINUE_LEARNING.topicTitle}
-              </h2>
-              <p className="mt-1.5 text-[13px] text-muted-foreground">
-                上次学习到：{CONTINUE_LEARNING.lastDocTitle}
-              </p>
-              <div className="mt-4 max-w-md">
-                <div className="mb-1.5 flex justify-between text-[12px] text-muted-foreground">
-                  <span>专题进度</span>
-                  <span className="font-medium tabular-nums text-foreground">
-                    {CONTINUE_LEARNING.progress}%
-                  </span>
-                </div>
-                <ProgressBar value={CONTINUE_LEARNING.progress} />
-              </div>
-            </HeroOverviewBody>
-          </HeroOverviewCard>
-
-          <TodayReviewHeroCard onViewPlan={() => setTabAndReset("review")} />
+      {/* 专题概览条 */}
+      <section className="mb-5 flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card px-4 py-3 shadow-[var(--shadow-card)]">
+        <div className="flex items-center gap-2">
+          <Layers className="h-4 w-4 text-primary" />
+          <span className="text-[13px] text-muted-foreground">
+            共 <strong className="text-foreground">{ENRICHED_TOPICS.length}</strong> 个专题
+          </span>
         </div>
-
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <OverviewStatCard
-            label="已学专题"
-            value={LEARNING_STATS.learnedTopics}
-            hint={`共 ${ENRICHED_TOPICS.length} 个专题`}
-            detail={`进行中：${CONTINUE_LEARNING.topicTitle}`}
-            icon={<Layers className="h-[18px] w-[18px]" />}
-            tint={0}
-            emphasis="primary"
-          />
-          <OverviewStatCard
-            label="已读资料"
-            value={LEARNING_STATS.readDocs}
-            hint={`库内 ${DOCS.length} 份资料`}
-            detail={`最近：${CONTINUE_LEARNING.lastDocTitle.slice(0, 12)}…`}
-            icon={<BookOpen className="h-[18px] w-[18px]" />}
-            tint={1}
-          />
-          <TodayActivityCard className="col-span-2 lg:col-span-1" />
-        </div>
+        <div className="h-4 w-px bg-border" />
+        <span className="text-[13px] text-muted-foreground">
+          正在学习 <strong className="text-foreground">{topicsInProgress}</strong> 个
+        </span>
+        <div className="h-4 w-px bg-border" />
+        <span className="text-[13px] text-muted-foreground">
+          资料库 <strong className="text-foreground">{DOCS.length}</strong> 份
+        </span>
       </section>
+
+      <RecentLearningStrip state={state} />
 
       {/* Tab 面板 */}
       <section className="mb-6">
@@ -290,7 +238,7 @@ function LearnPage() {
             onChange={setTabAndReset}
           />
 
-          {tab !== "review" && tab !== "topic" && !(tab === "all" && allSubView === "heat") && (
+          {tab !== "topic" && !(tab === "all" && allSubView === "heat") && (
             <div className="flex flex-col gap-3 border-b border-divider px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
                 <SearchBar
@@ -336,9 +284,15 @@ function LearnPage() {
                   subtitle="每个专题包含资料、题目与场景练习，可一键进入学习或生成训练题"
                 />
                 {filteredTopics.length === 0 ? (
-                  <EmptyState description="暂无匹配的专题" />
+                  <EmptyState description="暂无匹配的专题，可浏览全部资料自由检索" />
                 ) : (
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                  <>
+                    {topicsInProgress === 0 && !appliedQuery && (
+                      <div className="mb-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-[13px] text-muted-foreground">
+                        您还没有正在学习的专题，选择下方专题开始学习吧。
+                      </div>
+                    )}
+                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
                     {filteredTopics.map((t) => {
                       const Icon = TOPIC_ICONS[t.id] ?? BookOpen;
                       return (
@@ -374,7 +328,8 @@ function LearnPage() {
                         </Link>
                       );
                     })}
-                  </div>
+                    </div>
+                  </>
                 )}
               </section>
             )}
@@ -388,10 +343,11 @@ function LearnPage() {
             )}
 
             {tab === "mine" && (
-              <AllDocsPanel docs={filteredMyDocs} view={view} actionLabel="继续学习" />
+              <div className="space-y-6">
+                <AllDocsPanel docs={filteredMyDocs} view={view} actionLabel="继续学习" />
+                {/* 本期暂不开放：复习计划 <DocReviewSimpleList /> */}
+              </div>
             )}
-
-            {tab === "review" && <SpacedReviewPanel embedded />}
 
             {tab === "recent" && (
               <section>
@@ -459,6 +415,7 @@ function RecentMaterialsList({ materials }: { materials: typeof RECENT_MATERIALS
                         <BookOpen className="h-3.5 w-3.5" />
                         阅读
                       </Link>
+                      {/* 本期暂不开放：智能问答
                       <Link
                         to="/chat"
                         search={{ prefill: `请基于资料《${doc.title}》总结要点` }}
@@ -467,6 +424,7 @@ function RecentMaterialsList({ materials }: { materials: typeof RECENT_MATERIALS
                         <MessageSquare className="h-3.5 w-3.5" />
                         提问
                       </Link>
+                      */}
                       <Link to="/assets" search={{ tab: "fav" }} className={listActionClass("text")}>
                         <Star className="h-3.5 w-3.5" />
                         收藏
