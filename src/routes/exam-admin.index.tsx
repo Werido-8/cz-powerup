@@ -13,7 +13,6 @@ import { AssignDialog } from "@/components/exam/exam-dialogs";
 import { PageHeader, StatCard, ModulePanel } from "@/components/learning/ui";
 import { EXAM_ADMIN_STATS, type Paper } from "@/lib/mock/examAdmin";
 import { useState } from "react";
-import { toast } from "sonner";
 
 export const Route = createFileRoute("/exam-admin/")({
   component: ExamAdminPage,
@@ -77,7 +76,9 @@ function ExamAdminPage() {
               navigate({ to: "/exam-admin/paper/$paperId/edit", params: { paperId: p.id } })
             }
             onAssign={setAssignPaper}
-            onPreview={(p) => toast.info(`预览：${p.name}（${p.questionCount} 题）`)}
+            onPreview={(p) =>
+              navigate({ to: "/exam-admin/paper/$paperId/preview", params: { paperId: p.id } })
+            }
           />
         </div>
       </ModulePanel>

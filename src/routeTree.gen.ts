@@ -45,6 +45,7 @@ import { Route as ScenarioTypicalResultIdRouteImport } from './routes/scenario.t
 import { Route as ScenarioSootblowResultIdRouteImport } from './routes/scenario.sootblow.result.$id'
 import { Route as ScenarioPeakResultIdRouteImport } from './routes/scenario.peak.result.$id'
 import { Route as ScenarioFaultResultIdRouteImport } from './routes/scenario.fault.result.$id'
+import { Route as ExamAdminPaperPaperIdPreviewRouteImport } from './routes/exam-admin.paper.$paperId.preview'
 import { Route as ExamAdminPaperPaperIdEditRouteImport } from './routes/exam-admin.paper.$paperId.edit'
 import { Route as ExamAdminPaperPaperIdPersonPersonIdRouteImport } from './routes/exam-admin.paper.$paperId.person.$personId'
 
@@ -229,6 +230,12 @@ const ScenarioFaultResultIdRoute = ScenarioFaultResultIdRouteImport.update({
   path: '/result/$id',
   getParentRoute: () => ScenarioFaultRoute,
 } as any)
+const ExamAdminPaperPaperIdPreviewRoute =
+  ExamAdminPaperPaperIdPreviewRouteImport.update({
+    id: '/paper/$paperId/preview',
+    path: '/paper/$paperId/preview',
+    getParentRoute: () => ExamAdminRoute,
+  } as any)
 const ExamAdminPaperPaperIdEditRoute =
   ExamAdminPaperPaperIdEditRouteImport.update({
     id: '/paper/$paperId/edit',
@@ -276,6 +283,7 @@ export interface FileRoutesByFullPath {
   '/scenario/fault/': typeof ScenarioFaultIndexRoute
   '/scenario/typical/': typeof ScenarioTypicalIndexRoute
   '/exam-admin/paper/$paperId/edit': typeof ExamAdminPaperPaperIdEditRoute
+  '/exam-admin/paper/$paperId/preview': typeof ExamAdminPaperPaperIdPreviewRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
   '/scenario/sootblow/result/$id': typeof ScenarioSootblowResultIdRoute
@@ -313,6 +321,7 @@ export interface FileRoutesByTo {
   '/scenario/fault': typeof ScenarioFaultIndexRoute
   '/scenario/typical': typeof ScenarioTypicalIndexRoute
   '/exam-admin/paper/$paperId/edit': typeof ExamAdminPaperPaperIdEditRoute
+  '/exam-admin/paper/$paperId/preview': typeof ExamAdminPaperPaperIdPreviewRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
   '/scenario/sootblow/result/$id': typeof ScenarioSootblowResultIdRoute
@@ -354,6 +363,7 @@ export interface FileRoutesById {
   '/scenario/fault/': typeof ScenarioFaultIndexRoute
   '/scenario/typical/': typeof ScenarioTypicalIndexRoute
   '/exam-admin/paper/$paperId/edit': typeof ExamAdminPaperPaperIdEditRoute
+  '/exam-admin/paper/$paperId/preview': typeof ExamAdminPaperPaperIdPreviewRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
   '/scenario/sootblow/result/$id': typeof ScenarioSootblowResultIdRoute
@@ -396,6 +406,7 @@ export interface FileRouteTypes {
     | '/scenario/fault/'
     | '/scenario/typical/'
     | '/exam-admin/paper/$paperId/edit'
+    | '/exam-admin/paper/$paperId/preview'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
     | '/scenario/sootblow/result/$id'
@@ -433,6 +444,7 @@ export interface FileRouteTypes {
     | '/scenario/fault'
     | '/scenario/typical'
     | '/exam-admin/paper/$paperId/edit'
+    | '/exam-admin/paper/$paperId/preview'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
     | '/scenario/sootblow/result/$id'
@@ -473,6 +485,7 @@ export interface FileRouteTypes {
     | '/scenario/fault/'
     | '/scenario/typical/'
     | '/exam-admin/paper/$paperId/edit'
+    | '/exam-admin/paper/$paperId/preview'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
     | '/scenario/sootblow/result/$id'
@@ -762,6 +775,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScenarioFaultResultIdRouteImport
       parentRoute: typeof ScenarioFaultRoute
     }
+    '/exam-admin/paper/$paperId/preview': {
+      id: '/exam-admin/paper/$paperId/preview'
+      path: '/paper/$paperId/preview'
+      fullPath: '/exam-admin/paper/$paperId/preview'
+      preLoaderRoute: typeof ExamAdminPaperPaperIdPreviewRouteImport
+      parentRoute: typeof ExamAdminRoute
+    }
     '/exam-admin/paper/$paperId/edit': {
       id: '/exam-admin/paper/$paperId/edit'
       path: '/paper/$paperId/edit'
@@ -794,6 +814,7 @@ interface ExamAdminRouteChildren {
   ExamAdminIndexRoute: typeof ExamAdminIndexRoute
   ExamAdminPaperNewRoute: typeof ExamAdminPaperNewRoute
   ExamAdminPaperPaperIdEditRoute: typeof ExamAdminPaperPaperIdEditRoute
+  ExamAdminPaperPaperIdPreviewRoute: typeof ExamAdminPaperPaperIdPreviewRoute
   ExamAdminPaperPaperIdPersonPersonIdRoute: typeof ExamAdminPaperPaperIdPersonPersonIdRoute
 }
 
@@ -801,6 +822,7 @@ const ExamAdminRouteChildren: ExamAdminRouteChildren = {
   ExamAdminIndexRoute: ExamAdminIndexRoute,
   ExamAdminPaperNewRoute: ExamAdminPaperNewRoute,
   ExamAdminPaperPaperIdEditRoute: ExamAdminPaperPaperIdEditRoute,
+  ExamAdminPaperPaperIdPreviewRoute: ExamAdminPaperPaperIdPreviewRoute,
   ExamAdminPaperPaperIdPersonPersonIdRoute:
     ExamAdminPaperPaperIdPersonPersonIdRoute,
 }

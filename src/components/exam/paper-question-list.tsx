@@ -508,6 +508,90 @@ export function PaperQuestionList({
   );
 }
 
+/** 只读卷面展示 — 管理端预览详情页 */
+export function PaperReadonlyList({ groups }: { groups: EditorGroup[] }) {
+  let globalNo = 0;
+
+  if (groups.every((g) => g.questions.length === 0)) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-[12px] bg-white px-6 py-14 text-center shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#F5FAFB]">
+          <LayoutList className="h-5 w-5 text-[#9AAAB0]" />
+        </div>
+        <p className="text-[14px] font-medium text-[#1F3440]/70">暂无题目</p>
+        <p className="mt-1 text-[12px] text-muted-foreground">请先在编辑页为试卷添加题目</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-[10px]">
+      {groups.map((g) => {
+        if (g.questions.length === 0) return null;
+        const sectionScore = g.questions.length * g.perScore;
+
+        return (
+          <section
+            key={g.type}
+            className="overflow-hidden rounded-[12px] bg-white shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]"
+          >
+            <header className="flex items-center justify-between border-b border-[#EDF3F5] bg-[#FAFCFD] px-5 py-3">
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-[1em] w-[5px] shrink-0 rounded-[1px] bg-primary" />
+                <span className="text-[14px] font-bold text-[#1F3440]">{g.type}</span>
+                <span className="text-[12px] text-muted-foreground">
+                  共 {g.questions.length} 题 · 每题 {g.perScore} 分 · 小计 {sectionScore} 分
+                </span>
+              </div>
+            </header>
+
+            <div className="divide-y divide-[#EDF3F5]">
+              {g.questions.map((q) => {
+                globalNo += 1;
+                return (
+                  <article key={q.id} className="px-5 py-4">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary-soft text-[11px] font-bold text-primary">
+                        {String(globalNo).padStart(2, "0")}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] font-medium leading-relaxed text-[#1F3440]">{q.stem}</p>
+                        <QuestionStudentPreview question={q} type={g.type} />
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-[#EDF3F5] pt-3">
+                          {q.isAIGenerated && (
+                            <span className="inline-flex h-[22px] items-center rounded-[4px] bg-[#EAF7F9] px-1.5 text-[11px] font-medium text-primary">
+                              AI 生成
+                            </span>
+                          )}
+                          <Badge
+                            variant="secondary"
+                            className="rounded-[4px] border-0 bg-[#F5FAFB] text-[11px] font-normal text-[#6B7F88]"
+                          >
+                            {q.knowledge}
+                          </Badge>
+                          <span
+                            className={cn(
+                              "rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium",
+                              diffClass(q.difficulty),
+                            )}
+                          >
+                            {q.difficulty}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">{q.score} 分</span>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function IconBtn({
   icon: Icon,
   title,

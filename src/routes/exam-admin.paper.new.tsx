@@ -534,7 +534,7 @@ function NewPaperWizardPage() {
 
   const isAiMode = source === "ai";
   const STEPS = isAiMode ? AI_STEPS : NORMAL_STEPS;
-  const STEP_HINTS = isAiMode ? AI_HINTS : NORMAL_STEP_HINTS;
+  const STEP_HINTS = isAiMode ? AI_HINTS : NORMAL_HINTS;
   const maxStep = STEPS.length;
   const currentStep = Math.min(Math.max(Number(step || 1), 1), maxStep);
 

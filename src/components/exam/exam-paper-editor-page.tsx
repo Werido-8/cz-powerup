@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { FileText, Save, ChevronLeft } from "lucide-react";
+import { FileText, Save, ChevronLeft, Send } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
 import {
@@ -9,21 +9,21 @@ import {
   PaperTypeToolbar,
   usePaperQuestionGroups,
 } from "@/components/exam/paper-question-list";
-import { AddQuestionDialog } from "@/components/exam/exam-dialogs";
-import { Input } from "@/components/ui/input";
+import { AddQuestionDialog, AssignDialog } from "@/components/exam/exam-dialogs";
+import {
+  PaperBasicInfoPanel,
+  PAPER_SPLIT_PANEL_H,
+} from "@/components/exam/paper-side-panel";
+import { cn } from "@/lib/utils";
 import {
   EMPTY_EDITOR_GROUPS,
   getPaperQuestionGroups,
-  PAPER_CATEGORIES,
   type Difficulty,
   type EditorGroup,
   type ExamGoal,
   type Paper,
   type QuestionType,
 } from "@/lib/mock/examAdmin";
-
-const GOAL_OPTIONS: ExamGoal[] = ["取证复习", "复证巩固", "岗位达标", "阶段测评", "日常自测"];
-const DIFFICULTY_OPTIONS: Difficulty[] = ["易", "中", "难"];
 
 export interface PaperBasicInfo {
   name: string;
@@ -46,10 +46,6 @@ const EMPTY_BASIC_INFO: PaperBasicInfo = {
   difficulty: "",
   note: "",
 };
-
-function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label className="mb-1 block text-[12px] font-medium text-muted-foreground">{children}</label>;
-}
 
 type ExamPaperEditorPageProps = {
   paper: Paper | null;
@@ -102,6 +98,7 @@ export function ExamPaperEditorPage({
   });
 
   const [addType, setAddType] = useState<QuestionType | null>(null);
+  const [assignPaper, setAssignPaper] = useState<Paper | null>(null);
   const initRef = useRef("");
 
   useEffect(() => {
@@ -116,21 +113,39 @@ export function ExamPaperEditorPage({
     setBasicInfo((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = () => {
+  const questionCount = groups.reduce((s, g) => s + g.questions.length, 0);
+  const totalScore = groups.reduce((s, g) => s + g.questions.length * g.perScore, 0);
+
+  const validateBeforeSave = () => {
     if (!basicInfo.name.trim()) {
       toast.error("请填写试卷名称");
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const handleDraft = () => {
+    if (!validateBeforeSave()) return;
     onSave?.(basicInfo, groups);
-    toast.success(isEdit ? "试卷已保存" : "试卷已保存为草稿");
+    toast.success(isEdit ? "试卷已暂存" : "试卷已暂存为草稿");
+  };
+
+  const handleSaveAndAssign = () => {
+    if (!validateBeforeSave()) return;
+    onSave?.(basicInfo, groups);
+    if (paper) {
+      setAssignPaper({ ...paper, name: basicInfo.name.trim() });
+    } else {
+      toast.error("请先暂存试卷后再下发");
+    }
   };
 
   const title = isEdit ? `编辑试卷 · ${paper.name}` : "新建试卷";
 
   return (
-    <PageShell>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+    <PageShell compact>
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
           <Link
             to={backTo}
             className="inline-flex items-center gap-1 text-[12px] text-muted-foreground hover:text-primary"
@@ -138,12 +153,12 @@ export function ExamPaperEditorPage({
             <ChevronLeft className="h-3.5 w-3.5" /> 考试管理
           </Link>
           <span className="text-muted-foreground/40">/</span>
-          <h1 className="flex items-center gap-2 text-[16px] font-semibold">
-            <FileText className="h-4 w-4 text-primary" />
-            {title}
+          <h1 className="flex min-w-0 items-center gap-2 truncate text-[16px] font-semibold">
+            <FileText className="h-4 w-4 shrink-0 text-primary" />
+            <span className="truncate">{title}</span>
           </h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Link
             to={backTo}
             className="rounded-lg border border-border px-4 py-2 text-[13px] hover:bg-muted"
@@ -152,99 +167,50 @@ export function ExamPaperEditorPage({
           </Link>
           <button
             type="button"
-            onClick={handleSave}
+            onClick={handleDraft}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-4 py-2 text-[13px] font-medium hover:bg-muted"
+          >
+            <Save className="h-4 w-4" /> 暂存试卷
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveAndAssign}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-medium text-primary-foreground hover:bg-primary/90"
           >
-            <Save className="h-4 w-4" /> 保存试卷
+            <Send className="h-4 w-4" /> 保存试卷并下发
           </button>
         </div>
       </div>
 
-      <div className="space-y-5">
-        <section className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-card p-4">
-          <div className="col-span-2">
-            <FieldLabel>试卷名称</FieldLabel>
-            <Input
-              value={basicInfo.name}
-              onChange={(e) => updateBasicInfo("name", e.target.value)}
-              className="h-9 text-[13px]"
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
+        <div className={cn("min-h-0 overflow-y-auto overscroll-contain pr-0.5", PAPER_SPLIT_PANEL_H)}>
+          <div className="space-y-4 pb-2">
+            <PaperTypeToolbar groups={groups} onAddGroup={addGroup} />
+            <PaperQuestionSummary summary={summary} />
+            <PaperQuestionList
+              groups={groups}
+              collapsed={collapsed}
+              onToggleCollapse={toggleCollapse}
+              onAdd={setAddType}
+              onMoveQuestion={moveQuestion}
+              onRemoveQuestion={removeQuestion}
+              onMoveGroup={moveGroup}
+              onRemoveGroup={(type) => {
+                if (groups.length <= 1) {
+                  toast.warning("至少保留一种题型");
+                  return;
+                }
+                removeGroup(type);
+              }}
             />
           </div>
-          <div>
-            <FieldLabel>考试目标</FieldLabel>
-            <select
-              value={basicInfo.goal}
-              onChange={(e) => updateBasicInfo("goal", e.target.value as ExamGoal)}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-[13px]"
-            >
-              {GOAL_OPTIONS.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <FieldLabel>分类</FieldLabel>
-            <select
-              value={basicInfo.category}
-              onChange={(e) => updateBasicInfo("category", e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-[13px]"
-            >
-              <option value="">请选择分类</option>
-              {PAPER_CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <FieldLabel>适用岗位</FieldLabel>
-            <Input value={basicInfo.position} onChange={(e) => updateBasicInfo("position", e.target.value)} className="h-9 text-[13px]" />
-          </div>
-          <div>
-            <FieldLabel>考试时长(分钟)</FieldLabel>
-            <Input value={basicInfo.duration} onChange={(e) => updateBasicInfo("duration", e.target.value)} className="h-9 text-[13px]" />
-          </div>
-          <div>
-            <FieldLabel>及格线(分)</FieldLabel>
-            <Input value={basicInfo.passLine} onChange={(e) => updateBasicInfo("passLine", e.target.value)} className="h-9 text-[13px]" />
-          </div>
-          <div>
-            <FieldLabel>难度</FieldLabel>
-            <select
-              value={basicInfo.difficulty}
-              onChange={(e) => updateBasicInfo("difficulty", e.target.value as Difficulty | "")}
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-[13px]"
-            >
-              <option value="">请选择</option>
-              {DIFFICULTY_OPTIONS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
-          <div className="col-span-2">
-            <FieldLabel>备注</FieldLabel>
-            <Input value={basicInfo.note} onChange={(e) => updateBasicInfo("note", e.target.value)} className="h-9 text-[13px]" />
-          </div>
-        </section>
+        </div>
 
-        <PaperTypeToolbar groups={groups} onAddGroup={addGroup} />
-
-        <PaperQuestionSummary summary={summary} />
-
-        <PaperQuestionList
-          groups={groups}
-          collapsed={collapsed}
-          onToggleCollapse={toggleCollapse}
-          onAdd={setAddType}
-          onMoveQuestion={moveQuestion}
-          onRemoveQuestion={removeQuestion}
-          onMoveGroup={moveGroup}
-          onRemoveGroup={(type) => {
-            if (groups.length <= 1) {
-              toast.warning("至少保留一种题型");
-              return;
-            }
-            removeGroup(type);
-          }}
+        <PaperBasicInfoPanel
+          basicInfo={basicInfo}
+          onChange={updateBasicInfo}
+          questionCount={questionCount}
+          totalScore={totalScore}
         />
       </div>
 
@@ -257,6 +223,8 @@ export function ExamPaperEditorPage({
           toast.success(`已添加 ${ids.length} 题`);
         }}
       />
+
+      <AssignDialog paper={assignPaper} onClose={() => setAssignPaper(null)} showDraft={false} />
     </PageShell>
   );
 }

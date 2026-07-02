@@ -111,9 +111,11 @@ export function AddQuestionDialog({
 export function AssignDialog({
   paper,
   onClose,
+  showDraft = true,
 }: {
   paper: Paper | null;
   onClose: () => void;
+  showDraft?: boolean;
 }) {
   return (
     <Dialog open={!!paper} onOpenChange={(v) => !v && onClose()}>
@@ -126,6 +128,7 @@ export function AssignDialog({
           <AssignPanel
             paperName={paper.name}
             onCancel={onClose}
+            showDraft={showDraft}
             onAssign={(count) => {
               toast.success(`已向 ${count} 人下发试卷`);
               onClose();
