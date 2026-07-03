@@ -623,7 +623,7 @@ export const TOPICS: Topic[] = [
     desc: "面向首次上岗人员,涵盖值班、巡检与基本异常处置流程。",
     role: "运行",
     cover: "from-[oklch(0.55_0.12_205)] to-[oklch(0.65_0.13_188)]",
-    docIds: ["d4", "d9"],
+    docIds: ["d4", "d9", "d7", "d12", "d2"],
     questionCount: 12,
     progress: 45,
   },

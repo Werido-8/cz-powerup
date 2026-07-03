@@ -20,6 +20,7 @@ const MENU: MenuItem[] = [
     to: "/learn",
     children: [
       { label: "知识学习", to: "/learn" },
+      { label: "专题维护", to: "/learn-admin" },
       { label: "题库训练", to: "/training" },
       { label: "个人沉淀", to: "/assets" },
       { label: "题库管理", to: "/question-bank" },

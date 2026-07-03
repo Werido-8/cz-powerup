@@ -1,0 +1,734 @@
+import { useMemo, useState } from "react";
+import { Link } from "@tanstack/react-router";
+import {
+  BookOpen,
+  Check,
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Eye,
+  Loader2,
+  Save,
+  Send,
+  Sparkles,
+  Square,
+  Target,
+  Trash2,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { DOCS, QUESTIONS } from "@/lib/mock/data";
+import {
+  EMPTY_TOPIC_DRAFT,
+  POSITION_OPTIONS,
+  SCENARIO_OPTIONS,
+  SPECIALTY_OPTIONS,
+  getLearnablePoolDocs,
+  getTopicAdminById,
+  type EditableTopicQuestion,
+  type TopicAdminRecord,
+  type TopicKnowledgePoint,
+  type TopicPosition,
+  type TopicScenario,
+  type TopicSpecialty,
+} from "@/lib/mock/topicAdmin";
+import {
+  TopicQuestionEditorPanel,
+  resolveTopicQuestion,
+} from "@/components/learning/topic-admin/topic-question-editor";
+
+const STEPS = ["基本信息", "选择资料", "维护知识点", "关联题目", "预览发布"] as const;
+const STEP_HINTS = [
+  "明确学习对象、业务场景与学习目标，这是专题价值的起点",
+  "从学习资料池筛选权威、清晰的精品资料，避免全量堆叠",
+  "提炼核心概念与操作要点，由培训老师人工维护确认",
+  "题目跟随文档，帮助员工验证是否真正掌握",
+  "确认内容无误后发布，员工即可在专题学习中看到",
+];
+
+const TOPIC_DRAFT_KEY = "topic-admin-draft";
+
+export type TopicEditorMode = "create" | "edit";
+
+type DraftState = Omit<TopicAdminRecord, "learnerCount" | "maintainer">;
+
+function loadDraft(topicId?: string): DraftState | null {
+  try {
+    const raw = sessionStorage.getItem(`${TOPIC_DRAFT_KEY}:${topicId ?? "new"}`);
+    return raw ? (JSON.parse(raw) as DraftState) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(draft: DraftState, topicId?: string) {
+  sessionStorage.setItem(`${TOPIC_DRAFT_KEY}:${topicId ?? "new"}`, JSON.stringify(draft));
+}
+
+function recordToDraft(record: TopicAdminRecord): DraftState {
+  const { learnerCount: _l, maintainer: _m, ...rest } = record;
+  return rest;
+}
+
+function emptyDraft(): DraftState {
+  return {
+    ...EMPTY_TOPIC_DRAFT,
+    id: `t-draft-${Date.now()}`,
+    updatedAt: new Date().toISOString().slice(0, 10),
+  };
+}
+
+function FieldLabel({
+  children,
+  required,
+  hint,
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+  hint?: string;
+}) {
+  return (
+    <div className="mb-1.5">
+      <label className="block text-[13px] font-medium text-foreground">
+        {children}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
+      </label>
+      {hint && <p className="mt-0.5 text-[11.5px] text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+export function TopicEditorWizard({
+  mode,
+  topicId,
+  onBack,
+  onPreview,
+}: {
+  mode: TopicEditorMode;
+  topicId?: string;
+  onBack: () => void;
+  onPreview: (draft: DraftState) => void;
+}) {
+  const existing = topicId ? getTopicAdminById(topicId) : undefined;
+
+  const [step, setStep] = useState(1);
+  const [draft, setDraft] = useState<DraftState>(() => {
+    const saved = loadDraft(topicId);
+    if (saved) return saved;
+    if (existing) return recordToDraft(existing);
+    return emptyDraft();
+    // 本期暂不开放：AI 辅助创建预填
+    // if (aiAssist) {
+    //   d.title = "新员工运行专业入门";
+    //   d.learningGoal = "掌握值班巡检基本流程与常见异常初步判断。";
+    //   d.intro = "面向首次上岗运行人员，围绕岗位能力与真实业务场景组织学习。";
+    // }
+  });
+  const [aiLoading, setAiLoading] = useState(false);
+  const [docSearch, setDocSearch] = useState("");
+  const [docTypeFilter, setDocTypeFilter] = useState("all");
+
+  const poolDocs = useMemo(() => getLearnablePoolDocs(), []);
+  const filteredPool = useMemo(() => {
+    const kw = docSearch.trim().toLowerCase();
+    return poolDocs.filter((d) => {
+      if (docTypeFilter !== "all" && d.docType !== docTypeFilter) return false;
+      if (!kw) return true;
+      return d.title.toLowerCase().includes(kw) || d.highlight.some((h) => h.toLowerCase().includes(kw));
+    });
+  }, [poolDocs, docSearch, docTypeFilter]);
+
+  const docTypes = useMemo(() => [...new Set(poolDocs.map((d) => d.docType))], [poolDocs]);
+
+  const updateDraft = (patch: Partial<DraftState>) => {
+    setDraft((prev) => {
+      const next = { ...prev, ...patch, updatedAt: new Date().toISOString().slice(0, 10) };
+      saveDraft(next, topicId);
+      return next;
+    });
+  };
+
+  const toggleDoc = (docId: string) => {
+    const has = draft.docIds.includes(docId);
+    const docIds = has ? draft.docIds.filter((id) => id !== docId) : [...draft.docIds, docId];
+    const docQuestions = docIds.map((id) => {
+      const existing = draft.docQuestions.find((d) => d.docId === id);
+      if (existing) return existing;
+      const qids = QUESTIONS.filter((q) => q.relatedDocId === id).map((q) => q.id);
+      return { docId: id, questionIds: qids, generated: false, confirmed: qids.length > 0 };
+    });
+    updateDraft({ docIds, docQuestions });
+  };
+
+  const togglePosition = (pos: TopicPosition) => {
+    const has = draft.positions.includes(pos);
+    updateDraft({
+      positions: has ? draft.positions.filter((p) => p !== pos) : [...draft.positions, pos],
+    });
+  };
+
+  const handleAiRecommendDocs = () => {
+    setAiLoading(true);
+    setTimeout(() => {
+      const recommended = poolDocs.slice(0, 3).map((d) => d.id);
+      const docIds = [...new Set([...draft.docIds, ...recommended])];
+      const docQuestions = docIds.map((id) => {
+        const existing = draft.docQuestions.find((d) => d.docId === id);
+        if (existing) return existing;
+        return { docId: id, questionIds: [], generated: false, confirmed: false };
+      });
+      updateDraft({ docIds, docQuestions });
+      setAiLoading(false);
+      toast.success("AI 已推荐 3 份候选资料，请人工筛选确认");
+    }, 1200);
+  };
+
+  const handleAiKnowledge = () => {
+    if (draft.docIds.length === 0) {
+      toast.error("请先选择资料");
+      return;
+    }
+    setAiLoading(true);
+    setTimeout(() => {
+      const kpSet = new Set<string>();
+      draft.docIds.forEach((docId) => {
+        const doc = DOCS.find((d) => d.id === docId);
+        doc?.highlight.slice(0, 2).forEach((h) => kpSet.add(h));
+        QUESTIONS.filter((q) => q.relatedDocId === docId)
+          .flatMap((q) => q.knowledgePoints)
+          .forEach((k) => kpSet.add(k));
+      });
+      const knowledgePoints: TopicKnowledgePoint[] = Array.from(kpSet)
+        .slice(0, 6)
+        .map((title, i) => ({
+          id: `kp-ai-${i}-${Date.now()}`,
+          title,
+          summary: `基于所选资料提炼：${title} 的核心概念与现场要点。`,
+          source: "ai",
+          confirmed: false,
+        }));
+      updateDraft({ knowledgePoints: [...draft.knowledgePoints, ...knowledgePoints] });
+      setAiLoading(false);
+      toast.success("AI 已生成知识点草稿，请逐条确认");
+    }, 1400);
+  };
+
+  const handleGenerateQuestions = (docId: string) => {
+    setAiLoading(true);
+    setTimeout(() => {
+      const qids = QUESTIONS.filter((q) => q.relatedDocId === docId).map((q) => q.id);
+      const fallback = qids.length > 0 ? qids : [`mock-q-${docId}-1`, `mock-q-${docId}-2`, `mock-q-${docId}-3`];
+      const docQuestions = draft.docQuestions.map((d) =>
+        d.docId === docId ? { ...d, questionIds: fallback, generated: true, confirmed: false } : d,
+      );
+      const questionEdits: Record<string, EditableTopicQuestion> = { ...(draft.questionEdits ?? {}) };
+      fallback.forEach((qid, i) => {
+        questionEdits[qid] = resolveTopicQuestion(qid, questionEdits, docId, i);
+      });
+      updateDraft({ docQuestions, questionEdits });
+      setAiLoading(false);
+      toast.success("已生成文档关联题目草稿");
+    }, 1000);
+  };
+
+  const canNext = () => {
+    if (step === 1) return draft.title.trim() && draft.learningGoal.trim() && draft.positions.length > 0;
+    if (step === 2) return draft.docIds.length > 0;
+    if (step === 3) return draft.knowledgePoints.length > 0;
+    if (step === 4) return draft.docQuestions.every((d) => d.questionIds.length > 0);
+    return true;
+  };
+
+  const handleSaveDraft = () => {
+    saveDraft(draft, topicId);
+    toast.success("草稿已保存");
+  };
+
+  const handlePublish = () => {
+    updateDraft({ status: "已发布", publishedAt: new Date().toISOString().slice(0, 10) });
+    toast.success("专题已发布，员工可在专题学习中查看");
+    onBack();
+  };
+
+  return (
+    <div className="mx-auto max-w-5xl">
+      {/* 步骤条 */}
+      <div className="mb-6 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            返回专题维护
+          </button>
+          <span className="text-[12px] text-muted-foreground">
+            {mode === "edit" ? "编辑专题" : "新建专题"}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {STEPS.map((label, i) => {
+            const n = i + 1;
+            const active = step === n;
+            const done = step > n;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => n < step && setStep(n)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[12px] transition-colors",
+                  active && "bg-primary-soft font-medium text-primary",
+                  done && "text-muted-foreground hover:bg-muted",
+                  !active && !done && "text-muted-foreground/60",
+                )}
+              >
+                <span
+                  className={cn(
+                    "grid h-5 w-5 place-items-center rounded-full text-[10px] font-semibold",
+                    active && "bg-primary text-primary-foreground",
+                    done && "bg-primary/20 text-primary",
+                    !active && !done && "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {done ? <Check className="h-3 w-3" /> : n}
+                </span>
+                <span className="hidden sm:inline">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-[12.5px] text-muted-foreground">{STEP_HINTS[step - 1]}</p>
+      </div>
+
+      {/* 步骤内容 */}
+      <div className="mb-6 rounded-lg border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        {step === 1 && (
+          <div className="space-y-5">
+            <FieldLabel required>专题名称</FieldLabel>
+            <Input
+              value={draft.title}
+              onChange={(e) => updateDraft({ title: e.target.value })}
+              placeholder="如：新员工运行专业入门、电气专业基础"
+              className="text-[13px]"
+            />
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <FieldLabel required>所属专业</FieldLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {SPECIALTY_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => updateDraft({ specialty: s as TopicSpecialty })}
+                      className={cn(
+                        "rounded-md border px-2.5 py-1 text-[12px] transition-colors",
+                        draft.specialty === s
+                          ? "border-primary bg-primary-soft text-primary"
+                          : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <FieldLabel required>业务场景</FieldLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {SCENARIO_OPTIONS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => updateDraft({ scenario: s as TopicScenario })}
+                      className={cn(
+                        "rounded-md border px-2.5 py-1 text-[12px] transition-colors",
+                        draft.scenario === s
+                          ? "border-primary bg-primary-soft text-primary"
+                          : "border-border hover:bg-muted",
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel required>适用岗位</FieldLabel>
+              <div className="flex flex-wrap gap-1.5">
+                {POSITION_OPTIONS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => togglePosition(p)}
+                    className={cn(
+                      "rounded-md border px-2.5 py-1 text-[12px] transition-colors",
+                      draft.positions.includes(p)
+                        ? "border-primary bg-primary-soft text-primary"
+                        : "border-border hover:bg-muted",
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <FieldLabel required hint="员工学完后要能识别什么、判断什么、执行什么">
+                学习目标
+              </FieldLabel>
+              <textarea
+                value={draft.learningGoal}
+                onChange={(e) => updateDraft({ learningGoal: e.target.value })}
+                rows={3}
+                placeholder="学完后应掌握的核心能力与可解决的现场问题"
+                className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+
+            <div>
+              <FieldLabel>专题简介</FieldLabel>
+              <textarea
+                value={draft.intro}
+                onChange={(e) => updateDraft({ intro: e.target.value })}
+                rows={2}
+                placeholder="简短说明适用对象与专题价值"
+                className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                value={docSearch}
+                onChange={(e) => setDocSearch(e.target.value)}
+                placeholder="搜索资料标题、标签…"
+                className="h-8 max-w-xs text-[12px]"
+              />
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setDocTypeFilter("all")}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-[11.5px]",
+                    docTypeFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  全部
+                </button>
+                {docTypes.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setDocTypeFilter(t)}
+                    className={cn(
+                      "rounded-md px-2 py-1 text-[11.5px]",
+                      docTypeFilter === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handleAiRecommendDocs}
+                disabled={aiLoading}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/50 px-3 py-1.5 text-[12px] text-primary hover:bg-primary-soft"
+              >
+                {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                AI 推荐资料
+              </button>
+            </div>
+
+            <p className="text-[12px] text-muted-foreground">
+              已选 <strong className="text-foreground">{draft.docIds.length}</strong> 份资料
+              · 学习资料池仅展示可学习、已入库的知识类资料
+            </p>
+
+            <div className="max-h-[min(28rem,50vh)] space-y-2 overflow-y-auto pr-1">
+              {filteredPool.map((doc) => {
+                const selected = draft.docIds.includes(doc.id);
+                return (
+                  <button
+                    key={doc.id}
+                    type="button"
+                    onClick={() => toggleDoc(doc.id)}
+                    className={cn(
+                      "flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors",
+                      selected ? "border-primary/40 bg-primary-soft/25" : "border-divider hover:bg-muted/30",
+                    )}
+                  >
+                    {selected ? (
+                      <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    ) : (
+                      <Square className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] font-medium text-foreground">{doc.title}</p>
+                      <p className="mt-0.5 line-clamp-1 text-[11.5px] text-muted-foreground">{doc.snippet}</p>
+                      <div className="mt-1.5 flex flex-wrap gap-2 text-[10.5px] text-muted-foreground">
+                        <span>{doc.docType}</span>
+                        <span>{doc.source}</span>
+                        <span>{doc.updatedAt}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] text-muted-foreground">
+                共 {draft.knowledgePoints.length} 条知识点，请确认后发布
+              </p>
+              <button
+                type="button"
+                onClick={handleAiKnowledge}
+                disabled={aiLoading}
+                className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/50 px-3 py-1.5 text-[12px] text-primary"
+              >
+                {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                AI 提炼知识点
+              </button>
+            </div>
+
+            {draft.knowledgePoints.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border py-10 text-center text-[13px] text-muted-foreground">
+                暂无知识点，可手动添加或使用 AI 根据已选资料生成
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {draft.knowledgePoints.map((kp, index) => (
+                  <li key={kp.id} className="rounded-lg border border-divider p-3">
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const knowledgePoints = draft.knowledgePoints.map((k) =>
+                            k.id === kp.id ? { ...k, confirmed: !k.confirmed } : k,
+                          );
+                          updateDraft({ knowledgePoints });
+                        }}
+                        className={cn(
+                          "mt-0.5 rounded border px-2 py-0.5 text-[10.5px]",
+                          kp.confirmed
+                            ? "border-success/40 bg-success-soft text-success"
+                            : "border-border text-muted-foreground",
+                        )}
+                      >
+                        {kp.confirmed ? "已确认" : "待确认"}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <Input
+                          value={kp.title}
+                          onChange={(e) => {
+                            const knowledgePoints = [...draft.knowledgePoints];
+                            knowledgePoints[index] = { ...kp, title: e.target.value, source: "manual" };
+                            updateDraft({ knowledgePoints });
+                          }}
+                          className="mb-1.5 h-8 text-[13px] font-medium"
+                        />
+                        <textarea
+                          value={kp.summary}
+                          onChange={(e) => {
+                            const knowledgePoints = [...draft.knowledgePoints];
+                            knowledgePoints[index] = { ...kp, summary: e.target.value, source: "manual" };
+                            updateDraft({ knowledgePoints });
+                          }}
+                          rows={2}
+                          className="w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-[12px] outline-none"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateDraft({
+                            knowledgePoints: draft.knowledgePoints.filter((k) => k.id !== kp.id),
+                          })
+                        }
+                        className="text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <button
+              type="button"
+              onClick={() =>
+                updateDraft({
+                  knowledgePoints: [
+                    ...draft.knowledgePoints,
+                    {
+                      id: `kp-manual-${Date.now()}`,
+                      title: "",
+                      summary: "",
+                      source: "manual",
+                      confirmed: false,
+                    },
+                  ],
+                })
+              }
+              className="text-[12.5px] text-primary hover:underline"
+            >
+              + 手动添加知识点
+            </button>
+          </div>
+        )}
+
+        {step === 4 && (
+          <TopicQuestionEditorPanel
+            docIds={draft.docIds}
+            docQuestions={draft.docQuestions}
+            questionEdits={draft.questionEdits}
+            aiLoading={aiLoading}
+            onGenerate={handleGenerateQuestions}
+            onUpdate={(patch) => updateDraft(patch)}
+          />
+        )}
+
+        {step === 5 && (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-primary/20 bg-primary-soft/20 p-4">
+              <h3 className="mb-1 text-[16px] font-semibold text-foreground">{draft.title}</h3>
+              <p className="text-[13px] text-muted-foreground">{draft.intro}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                <span className="rounded-md bg-card px-2 py-0.5">{draft.specialty}</span>
+                <span className="rounded-md bg-card px-2 py-0.5">{draft.scenario}</span>
+                {draft.positions.map((p) => (
+                  <span key={p} className="rounded-md bg-card px-2 py-0.5">
+                    {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <PreviewStat icon={BookOpen} label="资料" value={draft.docIds.length} />
+              <PreviewStat icon={Target} label="知识点" value={draft.knowledgePoints.length} />
+              <PreviewStat
+                icon={ClipboardList}
+                label="题目"
+                value={draft.docQuestions.reduce((n, d) => n + d.questionIds.length, 0)}
+              />
+            </div>
+
+            <div>
+              <h4 className="mb-2 text-[13px] font-semibold">学习目标</h4>
+              <p className="text-[13px] text-muted-foreground">{draft.learningGoal}</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onPreview(draft)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-[12.5px] hover:bg-muted"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                员工端预览
+              </button>
+              {topicId && (
+                <Link
+                  to="/learn/topic/$id"
+                  params={{ id: topicId }}
+                  target="_blank"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-[12.5px] hover:bg-muted"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  打开现有专题页
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 底部操作 */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={handleSaveDraft}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-[12.5px] hover:bg-muted"
+        >
+          <Save className="h-3.5 w-3.5" />
+          保存草稿
+        </button>
+
+        <div className="flex gap-2">
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => setStep((s) => s - 1)}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-[12.5px] hover:bg-muted"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              上一步
+            </button>
+          )}
+          {step < 5 ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!canNext()) {
+                  toast.error("请完成当前步骤必填项");
+                  return;
+                }
+                setStep((s) => s + 1);
+              }}
+              className="inline-flex items-center gap-1 rounded-md bg-primary px-4 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              下一步
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handlePublish}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Send className="h-3.5 w-3.5" />
+              发布专题
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof BookOpen;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-lg border border-divider bg-muted/20 px-4 py-3 text-center">
+      <Icon className="mx-auto mb-1 h-4 w-4 text-primary" />
+      <div className="text-[20px] font-semibold tabular-nums text-foreground">{value}</div>
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+    </div>
+  );
+}
