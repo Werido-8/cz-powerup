@@ -1,5 +1,6 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import {
   ChevronRight,
   CheckCircle2,
@@ -28,9 +29,15 @@ import { RichMindMap } from "@/components/learn/RichMindMap";
 // 本期暂不开放：复习计划
 // import { ReviewSchedulePreview } from "@/components/learning/spaced-review";
 import { learningBtnRadius } from "@/components/learning/ui";
+import { MyQuestionContributionsPanel } from "@/components/learning/my-question-contributions";
 import { cn } from "@/lib/utils";
 
+const docSearchSchema = z.object({
+  focus: z.enum(["contributions"]).optional().catch(undefined),
+});
+
 export const Route = createFileRoute("/learn/doc/$id")({
+  validateSearch: docSearchSchema,
   loader: ({ params }) => {
     const doc = DOCS.find((d) => d.id === params.id);
     if (!doc) throw notFound();
@@ -58,12 +65,20 @@ export const Route = createFileRoute("/learn/doc/$id")({
 
 function DocPage() {
   const { doc } = Route.useLoaderData() as { doc: Doc };
+  const search = useSearch({ from: "/learn/doc/$id" });
   const { state, toggleFavorite, addNote, addToCollection, removeSpacedReview, markDocLearned, clearDocPractice, pushRecentDoc } =
     useMockStore();
 
   useEffect(() => {
     pushRecentDoc(doc.id);
   }, [doc.id, pushRecentDoc]);
+
+  useEffect(() => {
+    if (search.focus === "contributions") {
+      const el = document.getElementById("my-question-contributions");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [search.focus, doc.id]);
   const learned = isDocLearned(doc.id, state);
   const docStatus = getEffectiveDocStatus(doc.id, state);
   // 本期暂不开放：复习计划
@@ -290,11 +305,17 @@ function DocPage() {
 
           </div>
 
-          {/* Related questions */}
+          {/* 我提交的题目（员工贡献 + 审核反馈） */}
+          <MyQuestionContributionsPanel
+            docId={doc.id}
+            defaultExpanded={search.focus === "contributions"}
+          />
+
+          {/* Related questions — 已发布关联题 */}
           {related.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-5">
               <div className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold">
-                <ClipboardList className="h-4 w-4 text-primary" /> 关联题目
+                <ClipboardList className="h-4 w-4 text-primary" /> 已发布关联题
               </div>
               <div className="space-y-2">
                 {related.map((q) => (

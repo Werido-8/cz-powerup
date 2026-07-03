@@ -55,6 +55,29 @@ export type RecentMaterial = {
   status: LearnStatus;
 };
 
+/** 最近更新：专题与资料混合动态 */
+export type RecentUpdateKind = "topic_new" | "topic_updated" | "doc_new" | "doc_version";
+
+export type RecentUpdateItem = {
+  id: string;
+  kind: RecentUpdateKind;
+  title: string;
+  summary?: string;
+  topicId?: string;
+  topicTitle?: string;
+  docId?: string;
+  typeLabel?: RecentMaterial["typeLabel"];
+  source?: string;
+  updatedAt: string;
+};
+
+export const RECENT_UPDATE_KIND_LABEL: Record<RecentUpdateKind, string> = {
+  topic_new: "新增专题",
+  topic_updated: "专题更新",
+  doc_new: "新增资料",
+  doc_version: "版本更新",
+};
+
 export type WrongQuestionDetail = {
   qid: string;
   stem: string;
@@ -249,17 +272,6 @@ export const PRACTICE_RECORDS: PracticeRecord[] = [
     duration: "6 分钟",
     filter: "AGC",
   },
-  // {
-  //   id: "pr2",
-  //   title: "主变停送电确认项专项",
-  //   source: "知识学习生成",
-  //   completedAt: "昨天 16:20",
-  //   questionCount: 8,
-  //   accuracy: 75,
-  //   wrongCount: 2,
-  //   duration: "11 分钟",
-  //   filter: "主变停役",
-  // },
   {
     id: "pr3",
     title: "差动保护复盘练习",
@@ -283,6 +295,13 @@ export const PRACTICE_RECORDS: PracticeRecord[] = [
     filter: "",
   },
 ];
+
+/** 首页与记录页暂不展示的来源（智能问答生成等暂缓能力） */
+const HIDDEN_PRACTICE_SOURCES = new Set(["智能问答生成"]);
+
+export function getVisiblePracticeRecords(records: PracticeRecord[] = PRACTICE_RECORDS) {
+  return records.filter((r) => !HIDDEN_PRACTICE_SOURCES.has(r.source));
+}
 
 export const QUIZ_SETS: QuizSet[] = [
   {
@@ -392,6 +411,105 @@ export const ENRICHED_TOPICS: EnrichedTopic[] = [
     progress: 35,
     updatedAt: "2024-09-12",
   },
+  {
+    id: "t-chem",
+    title: "化学水处理专题",
+    desc: "凝结水、补给水与循环水水质指标控制及异常处置。",
+    roleTags: ["化学", "运行"],
+    docCount: 12,
+    questionCount: 96,
+    scenarioCount: 4,
+    progress: 18,
+    updatedAt: "2024-08-28",
+  },
+  {
+    id: "t-boiler",
+    title: "锅炉运行基础",
+    desc: "燃烧调整、汽温汽压控制与典型异常工况处理。",
+    roleTags: ["锅炉", "运行"],
+    docCount: 14,
+    questionCount: 124,
+    scenarioCount: 5,
+    progress: 52,
+    updatedAt: "2024-08-05",
+  },
+  {
+    id: "t-relay",
+    title: "继电保护专项强化",
+    desc: "主保护、后备保护配置原则与定值核对要点。",
+    roleTags: ["继保", "涉网"],
+    docCount: 11,
+    questionCount: 108,
+    scenarioCount: 6,
+    progress: 12,
+    updatedAt: "2024-07-22",
+  },
+  {
+    id: "t-dispatch",
+    title: "调度纪律与合规",
+    desc: "调度命令执行、信息汇报与涉网安全合规要求。",
+    roleTags: ["调度", "涉网"],
+    docCount: 9,
+    questionCount: 72,
+    scenarioCount: 3,
+    progress: 0,
+    updatedAt: "2024-09-01",
+  },
+  {
+    id: "t-safety",
+    title: "安全生产与两票",
+    desc: "工作票、操作票办理流程与现场安全措施落实。",
+    roleTags: ["运行", "典型操作"],
+    docCount: 13,
+    questionCount: 88,
+    scenarioCount: 4,
+    progress: 68,
+    updatedAt: "2024-08-15",
+  },
+  {
+    id: "t-inspect",
+    title: "设备巡检规范",
+    desc: "日常巡检路线、记录要点与缺陷上报闭环。",
+    roleTags: ["运行", "检修"],
+    docCount: 10,
+    questionCount: 64,
+    scenarioCount: 2,
+    progress: 40,
+    updatedAt: "2024-07-30",
+  },
+  {
+    id: "t-net",
+    title: "涉网稳定性专题",
+    desc: "一次调频、PSS 与涉网性能试验相关知识点。",
+    roleTags: ["涉网", "调度"],
+    docCount: 12,
+    questionCount: 102,
+    scenarioCount: 5,
+    progress: 22,
+    updatedAt: "2024-09-05",
+  },
+  {
+    id: "t-meter",
+    title: "电能计量与关口",
+    desc: "关口表计、互感器误差与电量结算核对流程。",
+    roleTags: ["电气", "运行"],
+    docCount: 7,
+    questionCount: 56,
+    scenarioCount: 2,
+    progress: 8,
+    updatedAt: "2024-06-18",
+  },
+  {
+    id: "t-turbine",
+    title: "汽机专业基础",
+    desc: "汽轮机启停、振动监测与真空系统运行要点。",
+    roleTags: ["汽机", "运行"],
+    docCount: 11,
+    questionCount: 92,
+    scenarioCount: 4,
+    progress: 30,
+    updatedAt: "2024-08-10",
+  },
 ];
 
 export const RECENT_MATERIALS: RecentMaterial[] = [
@@ -402,13 +520,6 @@ export const RECENT_MATERIALS: RecentMaterial[] = [
     updatedAt: "2026-06-30",
     status: "未学",
   },
-  // {
-  //   docId: "d2",
-  //   typeLabel: "SOP",
-  //   topicTitle: "典型操作专题",
-  //   updatedAt: "2026-06-30",
-  //   status: "学习中",
-  // },
   {
     docId: "d3",
     typeLabel: "案例",
@@ -429,6 +540,113 @@ export const RECENT_MATERIALS: RecentMaterial[] = [
     topicTitle: "故障复盘专题",
     updatedAt: "2026-06-30",
     status: "未学",
+  },
+];
+
+export const RECENT_UPDATES: RecentUpdateItem[] = [
+  {
+    id: "ru-1",
+    kind: "topic_new",
+    title: "涉网稳定性专题",
+    summary: "新增一次调频、PSS 与涉网性能试验相关知识点",
+    topicId: "t-net",
+    updatedAt: "2026-07-02",
+  },
+  {
+    id: "ru-2",
+    kind: "topic_updated",
+    title: "AGC / 两细则专项",
+    summary: "补充 3 份规程资料、修订 12 道关联题目",
+    topicId: "t-agc",
+    updatedAt: "2026-07-01",
+  },
+  {
+    id: "ru-3",
+    kind: "doc_new",
+    title: "《并网发电厂辅助服务管理实施细则》AGC 考核条款解读",
+    summary: "新增至 AGC / 两细则专项",
+    docId: "d1",
+    topicId: "t-agc",
+    topicTitle: "AGC / 两细则专项",
+    typeLabel: "规程",
+    source: "行业标准",
+    updatedAt: "2026-06-30",
+  },
+  {
+    id: "ru-4",
+    kind: "doc_version",
+    title: "500kV 主变停役标准化操作程序 v3.2",
+    summary: "修订停役前核对项与调度联络话术",
+    docId: "d2",
+    topicId: "t-op",
+    topicTitle: "典型操作专题",
+    typeLabel: "规程",
+    source: "厂站 SOP",
+    updatedAt: "2026-06-30",
+  },
+  {
+    id: "ru-5",
+    kind: "doc_new",
+    title: "220kV 线路保护动作复盘案例",
+    summary: "新增至故障复盘专题",
+    docId: "d3",
+    topicId: "t-fault",
+    topicTitle: "故障复盘专题",
+    typeLabel: "案例",
+    source: "典型案例",
+    updatedAt: "2026-06-29",
+  },
+  {
+    id: "ru-6",
+    kind: "topic_updated",
+    title: "典型操作专题",
+    summary: "更新母线倒闸操作资料与场景练习",
+    topicId: "t-op",
+    updatedAt: "2026-06-28",
+  },
+  {
+    id: "ru-7",
+    kind: "topic_new",
+    title: "化学水处理专题",
+    summary: "凝结水、补给水与循环水指标控制要点",
+    topicId: "t-chem",
+    updatedAt: "2026-06-27",
+  },
+  {
+    id: "ru-8",
+    kind: "doc_version",
+    title: "两细则考核知识点汇编 v2024.06",
+    summary: "同步最新考核条款与释义",
+    docId: "d8",
+    topicId: "t-agc",
+    topicTitle: "AGC / 两细则专项",
+    typeLabel: "规程",
+    source: "培训汇编",
+    updatedAt: "2026-06-26",
+  },
+  {
+    id: "ru-9",
+    kind: "doc_new",
+    title: "省调关于迎峰度夏涉网安全检查的通知",
+    summary: "新增至 AGC / 两细则专项",
+    docId: "d11",
+    topicId: "t-agc",
+    topicTitle: "AGC / 两细则专项",
+    typeLabel: "通知",
+    source: "调度通知",
+    updatedAt: "2026-06-25",
+  },
+  {
+    id: "ru-10",
+    kind: "doc_version",
+    title: "继电保护定值单核对规范",
+    summary: "更新定值变更审批与现场核对流程",
+    docId: "d10",
+    topicId: "t-fault",
+    topicTitle: "故障复盘专题",
+    typeLabel: "规程",
+    source: "厂站制度",
+    updatedAt: "2026-06-24",
   },
 ];
 

@@ -290,22 +290,26 @@ export function DocCardReadMeta({ docId, relatedCount }: { docId: string; relate
   const insight = DOC_READ_INSIGHTS_BY_ID[docId];
   if (!insight) return null;
 
-  const isHot = insight.rank <= 3;
+  // const isHot = insight.rank <= 3;
 
   return (
     <div className="mt-3 space-y-2 border-t border-divider pt-3">
       <div className="flex flex-wrap items-center gap-2">
+        {/* 暂缓：阅读热度 — 热门标签
         {isHot && (
           <span className="inline-flex items-center gap-0.5 rounded-md bg-warning-soft px-1.5 py-0.5 text-[10.5px] font-medium text-warning-foreground">
             <Flame className="h-3 w-3" />
             热门 #{insight.rank}
           </span>
         )}
+        */}
         <span className={cn("inline-flex items-center gap-1 text-[11px]", HEAT_MUTED)}>
           <Users className="h-3 w-3" />
           近 7 日 <span className={cn("font-medium tabular-nums", HEAT_TEXT)}>{insight.readers7d}</span> 人阅读
         </span>
+        {/* 暂缓：阅读热度 — 增长趋势
         <DocReadTrendBadge insight={insight} />
+        */}
         {/* {relatedCount != null && relatedCount > 0 && (
           <span className={cn("text-[11px]", HEAT_MUTED)}>· {relatedCount} 篇关联资料</span>
         )} */}

@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   ClipboardList,
-  Clock,
   FileText,
   ListChecks,
   TrendingUp,
@@ -10,7 +9,7 @@ import {
 import { PageShell } from "@/components/workbench/PageShell";
 import { ExamSplitView } from "@/components/exam/exam-split-view";
 import { AssignDialog } from "@/components/exam/exam-dialogs";
-import { PageHeader, StatCard, ModulePanel } from "@/components/learning/ui";
+import { PageHeader, OverviewStatCard, ModulePanel } from "@/components/learning/ui";
 import { EXAM_ADMIN_STATS, type Paper } from "@/lib/mock/examAdmin";
 import { useState } from "react";
 
@@ -30,21 +29,22 @@ const EXAM_STAT_ICONS: Record<string, React.ReactNode> = {
   assigned: <Users className="h-[18px] w-[18px]" />,
   finish: <ListChecks className="h-[18px] w-[18px]" />,
   correct: <TrendingUp className="h-[18px] w-[18px]" />,
-  time: <Clock className="h-[18px] w-[18px]" />,
 };
 
 function StatCards() {
   return (
-    <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+    <section className="mb-5 flex flex-nowrap items-stretch gap-3">
       {EXAM_ADMIN_STATS.map((s, i) => (
-        <StatCard
+        <OverviewStatCard
           key={s.key}
+          className="min-w-0 flex-[1_1_0%]"
           label={s.label}
           value={s.value}
           hint={s.hint}
+          detail={s.detail}
           icon={EXAM_STAT_ICONS[s.key]}
           tint={i}
-          emphasis={s.tone === "warning" ? "remind" : s.tone === "success" ? "default" : "primary"}
+          emphasis={s.tone === "warning" ? "remind" : "primary"}
         />
       ))}
     </section>

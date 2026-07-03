@@ -9,31 +9,28 @@ import {
   Trash2,
   Star,
   FileSearch,
-  Clock,
   AlertCircle,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
 import { DocDrawer } from "@/components/common/DocDrawer";
 import { DOCS, QUESTIONS, type Question } from "@/lib/mock/data";
-import { getWrongNextReviewLabel } from "@/lib/mock/spaced-review";
-import { useMockStore, type Mastery } from "@/lib/mock/store";
-import { PageHeader, PillSelect, listActionClass, EmptyState, TableListPager, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
+import { useMockStore } from "@/lib/mock/store";
+import {
+  PageHeader,
+  PillSelect,
+  listActionClass,
+  EmptyState,
+  TableListPager,
+  TABLE_PAGE_SIZE_DEFAULT,
+} from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/wrong")({
   component: WrongPage,
   head: () => ({ meta: [{ title: "错题本 · 题库训练" }] }),
 });
-
-const MASTERY_COLOR: Record<Mastery, string> = {
-  新增: "bg-destructive/10 text-destructive",
-  初步掌握: "bg-warning-soft text-warning-foreground",
-  需巩固: "bg-warning-soft text-warning-foreground",
-  基本掌握: "bg-primary-soft text-accent-foreground",
-  熟练: "bg-success-soft text-success",
-  长期掌握: "bg-success-soft text-success",
-};
 
 const TYPE_LABEL: Record<string, string> = {
   single: "单选",
@@ -42,15 +39,18 @@ const TYPE_LABEL: Record<string, string> = {
   text: "简答",
 };
 
-const FILTERS: { k: Mastery | "all"; l: string }[] = [
+const TYPE_FILTERS = [
   { k: "all", l: "全部" },
-  { k: "新增", l: "新增" },
-  { k: "初步掌握", l: "初步掌握" },
-  { k: "需巩固", l: "需巩固" },
-  { k: "基本掌握", l: "基本掌握" },
-  { k: "熟练", l: "熟练" },
-  { k: "长期掌握", l: "长期掌握" },
-];
+  { k: "single", l: "单选" },
+  { k: "multiple", l: "多选" },
+  { k: "judge", l: "判断" },
+  { k: "text", l: "简答" },
+] as const;
+
+type TypeFilter = (typeof TYPE_FILTERS)[number]["k"];
+
+const selectClass =
+  "h-8 rounded-md border border-border bg-card px-2 text-[12px] outline-none focus:border-primary/50";
 
 function resolveOptionContent(q: Question, key: string) {
   return q.options?.find((o) => o.key === key)?.label ?? key;
@@ -72,7 +72,8 @@ function formatAnswer(q: Question) {
 
 function WrongPage() {
   const { state, removeWrong, toggleFavoriteQuestion } = useMockStore();
-  const [filter, setFilter] = useState<Mastery | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [knowledgeFilter, setKnowledgeFilter] = useState("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [drawerDocId, setDrawerDocId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -83,9 +84,25 @@ function WrongPage() {
     [drawerDocId],
   );
 
+  const knowledgeOptions = useMemo(() => {
+    const set = new Set<string>();
+    state.wrong.forEach((w) => {
+      const q = QUESTIONS.find((x) => x.id === w.qid);
+      q?.knowledgePoints.forEach((k) => set.add(k));
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "zh-CN"));
+  }, [state.wrong]);
+
   const filtered = useMemo(
-    () => (filter === "all" ? state.wrong : state.wrong.filter((w) => w.mastery === filter)),
-    [state.wrong, filter],
+    () =>
+      state.wrong.filter((w) => {
+        const q = QUESTIONS.find((x) => x.id === w.qid);
+        if (!q) return false;
+        if (typeFilter !== "all" && q.type !== typeFilter) return false;
+        if (knowledgeFilter !== "all" && !q.knowledgePoints.includes(knowledgeFilter)) return false;
+        return true;
+      }),
+    [state.wrong, typeFilter, knowledgeFilter],
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
@@ -97,7 +114,7 @@ function WrongPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [filter]);
+  }, [typeFilter, knowledgeFilter]);
 
   useEffect(() => {
     setPage(1);
@@ -107,21 +124,30 @@ function WrongPage() {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
-  const counts = useMemo(() => {
+  useEffect(() => {
+    if (knowledgeFilter !== "all" && !knowledgeOptions.includes(knowledgeFilter)) {
+      setKnowledgeFilter("all");
+    }
+  }, [knowledgeFilter, knowledgeOptions]);
+
+  const typeCounts = useMemo(() => {
     const c: Record<string, number> = { all: state.wrong.length };
-    FILTERS.slice(1).forEach(({ k }) => {
-      c[k] = state.wrong.filter((w) => w.mastery === k).length;
+    TYPE_FILTERS.slice(1).forEach(({ k }) => {
+      c[k] = state.wrong.filter((w) => {
+        const q = QUESTIONS.find((x) => x.id === w.qid);
+        return q?.type === k;
+      }).length;
     });
     return c;
   }, [state.wrong]);
 
   const pillOptions = useMemo(
     () =>
-      FILTERS.map((f) => ({
+      TYPE_FILTERS.map((f) => ({
         value: f.k,
-        label: `${f.l} (${counts[f.k] ?? 0})`,
+        label: `${f.l} (${typeCounts[f.k] ?? 0})`,
       })),
-    [counts],
+    [typeCounts],
   );
 
   return (
@@ -140,7 +166,7 @@ function WrongPage() {
 
       <PageHeader
         title="错题本"
-        subtitle={`共 ${state.wrong.length} 题待巩固 · 复习间隔根据艾宾浩斯曲线动态调整`}
+        subtitle={`共 ${state.wrong.length} 题待巩固 · 支持按题型与知识点筛选复习`}
         size="md"
         action={
           state.wrong.length > 0 ? (
@@ -158,12 +184,27 @@ function WrongPage() {
       />
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="border-b border-border bg-muted/20 px-4 py-2.5">
+        <div className="flex flex-col gap-3 border-b border-border bg-muted/20 px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center">
           <PillSelect
             options={pillOptions}
-            value={filter}
-            onChange={(v) => setFilter(v as Mastery | "all")}
+            value={typeFilter}
+            onChange={(v) => setTypeFilter(v as TypeFilter)}
           />
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 text-[11.5px] text-muted-foreground">知识点</span>
+            <select
+              value={knowledgeFilter}
+              onChange={(e) => setKnowledgeFilter(e.target.value)}
+              className={cn(selectClass, "min-w-[120px] max-w-[200px]")}
+            >
+              <option value="all">全部知识点</option>
+              {knowledgeOptions.map((kp) => (
+                <option key={kp} value={kp}>
+                  {kp}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="p-4">
@@ -185,14 +226,6 @@ function WrongPage() {
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                          <span
-                            className={cn(
-                              "rounded px-1.5 py-px text-[10px] font-medium",
-                              MASTERY_COLOR[w.mastery],
-                            )}
-                          >
-                            {w.mastery}
-                          </span>
                           <span className="rounded border border-border/80 bg-muted/30 px-1.5 py-px text-[10px] text-muted-foreground">
                             {TYPE_LABEL[q.type] ?? q.type}
                           </span>
@@ -207,7 +240,7 @@ function WrongPage() {
                         </div>
 
                         <div className="text-[13.5px] font-medium leading-snug text-foreground">{q.stem}</div>
-                  
+
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-[10.5px] text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
                             <AlertCircle className="h-3 w-3 shrink-0 text-muted-foreground/55" />
@@ -215,7 +248,7 @@ function WrongPage() {
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <Clock className="h-3 w-3 shrink-0 text-muted-foreground/55" />
-                            下次复习 {getWrongNextReviewLabel(w)}
+                            最近答错 {w.lastWrongAt}
                           </span>
                         </div>
 
@@ -243,8 +276,6 @@ function WrongPage() {
                             </button>
                           )}
                         </div>
-
-                       
                       </div>
 
                       <div className="flex flex-wrap items-center gap-1.5 lg:shrink-0 lg:justify-end">
@@ -326,7 +357,7 @@ function WrongPage() {
           )}
 
           <p className="mt-4 text-[11.5px] text-muted-foreground">
-            错题由系统自动收录；掌握度随复习进度自动更新，「收藏」会同步至
+            错题由练习与考试答错自动收录；「收藏」会同步至
             <Link to="/assets" search={{ tab: "fav" }} className="mx-0.5 text-primary hover:underline">
               个人沉淀 · 我的收藏
             </Link>

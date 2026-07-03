@@ -1,5 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { z } from "zod";
 import {
   BookOpen,
   GraduationCap,
@@ -17,22 +19,37 @@ import {
   Users,
   Clock,
   Flame,
+  Star,
+  FlaskConical,
+  Shield,
+  ClipboardCheck,
+  AlertCircle,
+  Gauge,
+  Zap,
+  Layers3,
+  PlusCircle,
   type LucideIcon,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
 import { DOCS, DOC_TYPES, type LearnStatus } from "@/lib/mock/data";
 import {
   ENRICHED_TOPICS,
-  RECENT_MATERIALS,
+  RECENT_UPDATES,
+  RECENT_UPDATE_KIND_LABEL,
   DOC_READ_INSIGHTS_BY_ID,
+  type EnrichedTopic,
+  type RecentUpdateItem,
+  type RecentUpdateKind,
 } from "@/lib/mock/learning-hub";
+import { getEffectiveDocStatus } from "@/lib/mock/learning-progress";
 import {
   PageHeader,
+  OverviewStatCard,
   SectionHeader,
   ModuleTabs,
   ModulePanel,
   SearchBar,
-  PillSelect,
+  AdaptiveFilterSelect,
   TopicCard,
   ListCard,
   Tag as UiTag,
@@ -41,19 +58,30 @@ import {
   learningBtnRadius,
   TableListPager,
   TABLE_PAGE_SIZE_DEFAULT,
+  CardBatchPager,
 } from "@/components/learning/ui";
 import { getTopicHeaderTheme } from "@/components/learning/topic-art";
 // 本期暂不开放：复习计划
 // import { DocReviewSimpleList } from "@/components/learning/spaced-review";
-import { RecentLearningStrip } from "@/components/learning/recent-learning-strip";
+import { LearnRecentOverviewCard } from "@/components/learning/learn-recent-overview";
 import { useMockStore } from "@/lib/mock/store";
 import {
   DocCardReadMeta,
-  DocReadingHeatDashboard,
 } from "@/components/learning/doc-reading-insights";
+import {
+  getDocIdsWithReturnedContributions,
+  getReturnedContributionCount,
+  getReturnedCountByDoc,
+} from "@/lib/mock/my-question-contributions";
 import { cn } from "@/lib/utils";
 
+const learnSearchSchema = z.object({
+  tab: z.enum(["topic", "all", "mine", "recent"]).optional().catch(undefined),
+  filter: z.string().optional().catch(undefined),
+});
+
 export const Route = createFileRoute("/learn/")({
+  validateSearch: learnSearchSchema,
   component: LearnPage,
   head: () => ({ meta: [{ title: "知识学习 · 涉网运行能力智能提升平台" }] }),
 });
@@ -77,46 +105,78 @@ const TOPIC_ICONS: Record<string, LucideIcon> = {
   "t-op": Wrench,
   "t-fault": AlertTriangle,
   "t-agc": Activity,
+  "t-chem": FlaskConical,
+  "t-boiler": Flame,
+  "t-relay": Shield,
+  "t-dispatch": Zap,
+  "t-safety": ClipboardCheck,
+  "t-inspect": ClipboardCheck,
+  "t-net": Activity,
+  "t-meter": Gauge,
+  "t-turbine": Gauge,
 };
 
+const TOPIC_ROLE_FILTERS = [
+  "运行",
+  "继保",
+  "涉网",
+  "调度",
+  "典型操作",
+  "故障处置",
+  "化学",
+  "锅炉",
+  "汽机",
+  "电气",
+  "检修",
+] as const;
+
 type TabKey = "topic" | "all" | "mine" | "recent";
-type AllDocsSubView = "list" | "heat";
 
 const LEARN_TABS: { key: TabKey; label: string; desc: string; icon: typeof Layers }[] = [
   { key: "topic", label: "专题学习", desc: "按专题浏览资料与练习", icon: Layers },
   { key: "all", label: "全部资料", desc: "规程、案例全库", icon: BookOpen },
   { key: "mine", label: "我的学习资料", desc: "已阅读资料与学习进度", icon: GraduationCap },
-  { key: "recent", label: "最近更新", desc: "最新入库与学习动态", icon: Clock },
+  { key: "recent", label: "最近更新", desc: "近期新增或更新的专题与资料", icon: Clock },
 ];
 
 const LEARN_TAB_FILTERS: Record<TabKey, { value: string; label: string }[]> = {
-  topic: [{ value: "all", label: "全部" }],
+  topic: [
+    { value: "all", label: "全部" },
+    ...TOPIC_ROLE_FILTERS.map((role) => ({ value: role, label: role })),
+  ],
   all: [{ value: "all", label: "全部" }, ...DOC_TYPES.map((t) => ({ value: t, label: t }))],
-  mine: [{ value: "all", label: "全部" }, ...DOC_TYPES.map((t) => ({ value: t, label: t }))],
+  mine: [
+    { value: "all", label: "全部" },
+    ...DOC_TYPES.map((t) => ({ value: t, label: t })),
+    { value: "pending_questions", label: "待改题目" },
+  ],
   recent: [
     { value: "all", label: "全部" },
-    { value: "规程", label: "规程" },
-    // { value: "SOP", label: "SOP" },
-    { value: "案例", label: "案例" },
-    { value: "通知", label: "通知" },
+    { value: "topic_new", label: "新增专题" },
+    { value: "topic_updated", label: "专题更新" },
+    { value: "doc_new", label: "新增资料" },
+    { value: "doc_version", label: "版本更新" },
   ],
 };
 
 const SEARCH_PLACEHOLDERS: Record<TabKey, string> = {
-  topic: "搜索专题或资料",
+  topic: "搜索专题名称、简介或岗位标签",
   all: "搜索规程、案例、知识点、SOP",
   mine: "搜索我的学习资料",
-  recent: "搜索最近更新资料",
+  recent: "搜索专题、资料或更新说明",
 };
 
 const LEARN_TABLE_CARD_CLASS = "overflow-hidden rounded-md";
 const LEARN_TABLE_HEAD_CLASS =
   "sticky top-0 z-10 bg-muted/95 text-[11.5px] text-muted-foreground backdrop-blur-sm";
 const LEARN_TABLE_TH_CLASS = "px-5 py-3 text-left font-medium";
+const TOPIC_CARD_PAGE_SIZE = 8;
 
 function LearnPage() {
-  const { state } = useMockStore();
-  const [tab, setTab] = useState<TabKey>("topic");
+  const { state, updateDocProgress } = useMockStore();
+  const navigate = useNavigate();
+  const search = useSearch({ from: "/learn/" });
+  const [tab, setTab] = useState<TabKey>(search.tab ?? "topic");
   const [searchInput, setSearchInput] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
   const [tabFilters, setTabFilters] = useState<Record<TabKey, string>>({
@@ -126,18 +186,56 @@ function LearnPage() {
     recent: "all",
   });
   const [view, setView] = useState<"card" | "table">("card");
-  const [allSubView, setAllSubView] = useState<AllDocsSubView>("list");
+  /** 演示用：第三格概览在「资料库 / 待修改题目」间切换；auto 跟随真实退回数 */
+  const [overviewPreview, setOverviewPreview] = useState<"auto" | "library" | "pending">("auto");
 
   const activeFilter = tabFilters[tab];
   const setActiveFilter = (value: string) => {
     setTabFilters((prev) => ({ ...prev, [tab]: value }));
   };
 
+  useEffect(() => {
+    if (search.tab) setTab(search.tab);
+    if (search.tab === "mine" && search.filter) {
+      setTabFilters((prev) => ({ ...prev, mine: search.filter! }));
+    }
+  }, [search.tab, search.filter]);
+
   const setTabAndReset = (t: TabKey) => {
     setTab(t);
     setSearchInput("");
     setAppliedQuery("");
-    setAllSubView("list");
+    navigate({ to: "/learn", search: { tab: t }, replace: true });
+  };
+
+  const pendingQuestionCount = getReturnedContributionCount();
+  const docIdsWithPending = useMemo(() => getDocIdsWithReturnedContributions(), []);
+
+  const showPendingOverview =
+    overviewPreview === "pending" ||
+    (overviewPreview === "auto" && pendingQuestionCount > 0);
+
+  const displayPendingCount =
+    overviewPreview === "pending" && pendingQuestionCount === 0 ? 2 : pendingQuestionCount;
+
+  const goToPendingMine = () => {
+    setTab("mine");
+    setTabFilters((prev) => ({ ...prev, mine: "pending_questions" }));
+    setSearchInput("");
+    setAppliedQuery("");
+    navigate({
+      to: "/learn",
+      search: { tab: "mine", filter: "pending_questions" },
+      replace: true,
+    });
+  };
+
+  const toggleOverviewSlot = () => {
+    setOverviewPreview((prev) => {
+      const showingPending =
+        prev === "pending" || (prev === "auto" && pendingQuestionCount > 0);
+      return showingPending ? "library" : "pending";
+    });
   };
 
   const handleSearch = () => {
@@ -161,36 +259,45 @@ function LearnPage() {
     [],
   );
 
-  const filteredMyDocs = useMemo(
-    () =>
-      myDocs.filter(
+  const filteredMyDocs = useMemo(() => {
+    let list = myDocs;
+    if (activeFilter === "pending_questions") {
+      list = list.filter((d) => docIdsWithPending.includes(d.id));
+    } else if (activeFilter !== "all") {
+      list = list.filter((d) => d.docType === activeFilter);
+    }
+    if (appliedQuery) {
+      list = list.filter(
         (d) =>
-          (activeFilter === "all" || d.docType === activeFilter) &&
-          (!appliedQuery ||
-            d.title.includes(appliedQuery) ||
-            d.highlight.some((h) => h.includes(appliedQuery))),
-      ),
-    [myDocs, activeFilter, appliedQuery],
-  );
+          d.title.includes(appliedQuery) ||
+          d.highlight.some((h) => h.includes(appliedQuery)),
+      );
+    }
+    return list;
+  }, [myDocs, activeFilter, appliedQuery, docIdsWithPending]);
 
   const filteredTopics = useMemo(() => {
-    if (!appliedQuery) return ENRICHED_TOPICS;
-    return ENRICHED_TOPICS.filter(
-      (t) =>
+    return ENRICHED_TOPICS.filter((t) => {
+      if (activeFilter !== "all" && !t.roleTags.includes(activeFilter)) return false;
+      if (!appliedQuery) return true;
+      return (
         t.title.includes(appliedQuery) ||
         t.desc.includes(appliedQuery) ||
-        t.roleTags.some((r) => r.includes(appliedQuery)),
-    );
-  }, [appliedQuery]);
+        t.roleTags.some((r) => r.includes(appliedQuery))
+      );
+    });
+  }, [appliedQuery, activeFilter]);
 
-  const filteredRecentMaterials = useMemo(() => {
-    return RECENT_MATERIALS.filter((m) => {
-      const doc = DOCS.find((d) => d.id === m.docId);
-      if (!doc) return false;
-      if (appliedQuery && !doc.title.includes(appliedQuery) && !m.topicTitle.includes(appliedQuery))
-        return false;
-      if (activeFilter !== "all" && m.typeLabel !== activeFilter) return false;
-      return true;
+  const filteredRecentUpdates = useMemo(() => {
+    return RECENT_UPDATES.filter((item) => {
+      if (activeFilter !== "all" && item.kind !== activeFilter) return false;
+      if (!appliedQuery) return true;
+      const q = appliedQuery;
+      return (
+        item.title.includes(q) ||
+        (item.summary?.includes(q) ?? false) ||
+        (item.topicTitle?.includes(q) ?? false)
+      );
     });
   }, [appliedQuery, activeFilter]);
 
@@ -199,29 +306,85 @@ function LearnPage() {
     [],
   );
 
+  const pillOptions = useMemo(() => {
+    const base = LEARN_TAB_FILTERS[tab];
+    if (tab !== "mine" || pendingQuestionCount === 0) return base;
+    return base.map((o) =>
+      o.value === "pending_questions"
+        ? { ...o, label: `待改题目 (${pendingQuestionCount})` }
+        : o,
+    );
+  }, [tab, pendingQuestionCount]);
+
   return (
     <PageShell>
-      <PageHeader title="知识学习" />
+      <PageHeader
+        title="知识学习"
+        subtitle="按专题系统学习规程与案例，积累岗位专业能力"
+      />
 
-      {/* 专题概览条 */}
-      <section className="mb-5 flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card px-4 py-3 shadow-[var(--shadow-card)]">
-        <div className="flex items-center gap-2">
-          <Layers className="h-4 w-4 text-primary" />
-          <span className="text-[13px] text-muted-foreground">
-            共 <strong className="text-foreground">{ENRICHED_TOPICS.length}</strong> 个专题
-          </span>
-        </div>
-        <div className="h-4 w-px bg-border" />
-        <span className="text-[13px] text-muted-foreground">
-          正在学习 <strong className="text-foreground">{topicsInProgress}</strong> 个
-        </span>
-        <div className="h-4 w-px bg-border" />
-        <span className="text-[13px] text-muted-foreground">
-          资料库 <strong className="text-foreground">{DOCS.length}</strong> 份
-        </span>
+      {/* 学习概览：第三格为资料库 / 待修改题目互斥；点击卡片主体可演示切换 */}
+      <section className="mb-5 flex flex-nowrap items-stretch gap-3">
+        <OverviewStatCard
+          className="min-w-0 flex-[1_1_0%]"
+          label="专题总数"
+          value={ENRICHED_TOPICS.length}
+          hint="全部学习专题"
+          detail={`覆盖 ${ENRICHED_TOPICS.length} 个能力专题`}
+          icon={<Layers className="h-[18px] w-[18px]" />}
+          tint={0}
+          emphasis="primary"
+        />
+        <OverviewStatCard
+          className="min-w-0 flex-[1_1_0%]"
+          label="正在学习"
+          value={topicsInProgress}
+          hint="进度进行中"
+          detail={
+            topicsInProgress > 0
+              ? "可从最近阅读继续"
+              : "选择下方专题开始学习"
+          }
+          icon={<GraduationCap className="h-[18px] w-[18px]" />}
+          tint={1}
+          emphasis="primary"
+        />
+        {showPendingOverview ? (
+          <OverviewStatCard
+            className="min-w-0 flex-[1_1_0%]"
+            label="待修改题目"
+            value={displayPendingCount}
+            hint="审核退回待处理"
+            detail={
+              pendingQuestionCount > 0
+                ? "点击跳转我的学习资料"
+                : "演示：点击卡片切换为资料库"
+            }
+            icon={<AlertCircle className="h-[18px] w-[18px]" />}
+            tint={2}
+            emphasis="remind"
+            onClick={toggleOverviewSlot}
+            onDetailClick={pendingQuestionCount > 0 ? goToPendingMine : undefined}
+          />
+        ) : (
+          <OverviewStatCard
+            className="min-w-0 flex-[1_1_0%]"
+            label="资料库"
+            value={DOCS.length}
+            hint="可学资料总量"
+            detail={
+              overviewPreview !== "auto"
+                ? "演示：点击卡片切换为待修改题目"
+                : "规程 / 案例 / 通知"
+            }
+            icon={<FileText className="h-[18px] w-[18px]" />}
+            tint={2}
+            emphasis="primary"
+            onClick={toggleOverviewSlot}
+          />
+        )}
+        <LearnRecentOverviewCard className="min-w-0 flex-[2.4_1_0%]" state={state} />
       </section>
-
-      <RecentLearningStrip state={state} />
 
       {/* Tab 面板 */}
       <section className="mb-6">
@@ -238,8 +401,7 @@ function LearnPage() {
             onChange={setTabAndReset}
           />
 
-          {tab !== "topic" && !(tab === "all" && allSubView === "heat") && (
-            <div className="flex flex-col gap-3 border-b border-divider px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 border-b border-divider px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 flex-1 flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
                 <SearchBar
                   value={searchInput}
@@ -247,115 +409,92 @@ function LearnPage() {
                   onSearch={handleSearch}
                   placeholder={SEARCH_PLACEHOLDERS[tab]}
                 />
-                {LEARN_TAB_FILTERS[tab].length > 1 && (
-                  <PillSelect
-                    options={LEARN_TAB_FILTERS[tab]}
+                {pillOptions.length > 1 && (
+                  <AdaptiveFilterSelect
+                    options={pillOptions}
                     value={activeFilter}
                     onChange={setActiveFilter}
+                    comboPlaceholder={
+                      tab === "topic" ? "全部岗位" : tab === "recent" ? "全部更新" : "全部类型"
+                    }
+                    comboSearchPlaceholder={
+                      tab === "topic"
+                        ? "搜索岗位或专业标签"
+                        : tab === "recent"
+                          ? "搜索更新类型"
+                          : "搜索资料类型"
+                    }
                   />
                 )}
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
-                {tab === "all" && allSubView === "list" && (
-                  <button
-                    type="button"
-                    onClick={() => setAllSubView("heat")}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                      learningBtnRadius,
-                    )}
-                  >
-                    <Flame className="h-3.5 w-3.5" />
-                    阅读热度
-                  </button>
-                )}
-                {(tab === "all" || tab === "mine") && allSubView === "list" && (
+                {(tab === "all" || tab === "mine" || tab === "topic") && (
                   <ViewToggle view={view} setView={setView} />
                 )}
               </div>
             </div>
-          )}
 
-          <div className={cn(tab === "all" && allSubView === "heat" ? "p-0" : "p-4")}>
+          <div className="p-4">
             {tab === "topic" && (
               <section>
                 <SectionHeader
                   title=""
                   subtitle="每个专题包含资料、题目与场景练习，可一键进入学习或生成训练题"
                 />
-                {filteredTopics.length === 0 ? (
-                  <EmptyState description="暂无匹配的专题，可浏览全部资料自由检索" />
-                ) : (
-                  <>
-                    {topicsInProgress === 0 && !appliedQuery && (
-                      <div className="mb-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-[13px] text-muted-foreground">
-                        您还没有正在学习的专题，选择下方专题开始学习吧。
-                      </div>
-                    )}
-                    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                    {filteredTopics.map((t) => {
-                      const Icon = TOPIC_ICONS[t.id] ?? BookOpen;
-                      return (
-                        <Link
-                          key={t.id}
-                          to="/learn/topic/$id"
-                          params={{ id: t.id }}
-                          className="block"
-                        >
-                          <TopicCard
-                            title={t.title}
-                            desc={t.desc}
-                            roleTags={t.roleTags}
-                            docCount={t.docCount}
-                            questionCount={t.questionCount}
-                            scenarioCount={t.scenarioCount}
-                            scenarioLabel={t.scenarioLabel}
-                            progress={t.progress}
-                            updatedAt={t.updatedAt}
-                            icon={<Icon className="h-5 w-5" />}
-                            headerTheme={getTopicHeaderTheme(t.id)}
-                            action={
-                              <span
-                                className={cn(
-                                  "inline-flex w-full items-center justify-center gap-1 border border-primary/20 bg-primary-soft/50 px-3 py-2 text-[12.5px] font-medium text-accent-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground",
-                                  learningBtnRadius,
-                                )}
-                              >
-                                进入学习 <ChevronRight className="h-3.5 w-3.5" />
-                              </span>
-                            }
-                          />
-                        </Link>
-                      );
-                    })}
-                    </div>
-                  </>
+                {topicsInProgress === 0 &&
+                  !appliedQuery &&
+                  activeFilter === "all" &&
+                  filteredTopics.length > 0 && (
+                  <div className="mb-4 rounded-lg border border-dashed border-border bg-muted/20 px-4 py-3 text-[13px] text-muted-foreground">
+                    您还没有正在学习的专题，选择下方专题开始学习吧。
+                  </div>
                 )}
+                <TopicPanel topics={filteredTopics} view={view} />
               </section>
             )}
 
-            {tab === "all" && allSubView === "heat" && (
-              <DocReadingHeatDashboard onBack={() => setAllSubView("list")} />
-            )}
-
-            {tab === "all" && allSubView === "list" && (
+            {tab === "all" && (
               <AllDocsPanel docs={filteredDocs} view={view} showReadMeta />
             )}
 
             {tab === "mine" && (
               <div className="space-y-6">
-                <AllDocsPanel docs={filteredMyDocs} view={view} actionLabel="继续学习" />
+                {activeFilter === "pending_questions" && pendingQuestionCount > 0 && (
+                  <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3 text-[13px] text-destructive/90">
+                    以下资料有题目被审核退回,请点击进入资料页修改后重新提交。
+                  </div>
+                )}
+                <AllDocsPanel
+                  docs={filteredMyDocs}
+                  view={view}
+                  showContributionMeta
+                  emptyDescription={
+                    activeFilter === "pending_questions"
+                      ? "暂无待修改的题目,继续保持"
+                      : "暂无符合条件的资料"
+                  }
+                />
                 {/* 本期暂不开放：复习计划 <DocReviewSimpleList /> */}
               </div>
             )}
 
             {tab === "recent" && (
               <section>
-                <SectionHeader title="最近更新" subtitle="按更新时间排序的资料列表" />
-                {filteredRecentMaterials.length === 0 ? (
-                  <EmptyState description="暂无符合条件的资料" />
+                <SectionHeader
+                  title="最近更新"
+                  subtitle="展示近期新增或更新的专题与学习资料，可按类型筛选"
+                />
+                {filteredRecentUpdates.length === 0 ? (
+                  <EmptyState description="暂无符合条件的更新记录" />
                 ) : (
-                  <RecentMaterialsList materials={filteredRecentMaterials} />
+                  <RecentUpdatesList
+                    items={filteredRecentUpdates}
+                    state={state}
+                    onAddToLearning={(docId) => {
+                      updateDocProgress(docId, { readStatus: "学习中" });
+                      toast.success("已加入我的学习资料");
+                    }}
+                  />
                 )}
               </section>
             )}
@@ -366,69 +505,162 @@ function LearnPage() {
   );
 }
 
-function RecentMaterialsList({ materials }: { materials: typeof RECENT_MATERIALS }) {
+const UPDATE_KIND_STYLE: Record<RecentUpdateKind, string> = {
+  topic_new: "bg-primary-soft text-primary",
+  topic_updated: "bg-accent/15 text-accent-foreground",
+  doc_new: "bg-success-soft text-success",
+  doc_version: "bg-warning-soft text-warning-foreground",
+};
+
+function RecentUpdatesList({
+  items,
+  state,
+  onAddToLearning,
+}: {
+  items: RecentUpdateItem[];
+  state: ReturnType<typeof useMockStore>["state"];
+  onAddToLearning: (docId: string) => void;
+}) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const pageItems = items.slice(startIndex, startIndex + pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   return (
     <ListCard className={LEARN_TABLE_CARD_CLASS}>
-      <div className="max-h-[min(32rem,60vh)] overflow-y-auto">
+      <div className="max-h-[min(36rem,65vh)] overflow-y-auto">
         <table className="w-full text-[13px]">
           <thead className={LEARN_TABLE_HEAD_CLASS}>
             <tr>
               <th className={LEARN_TABLE_TH_CLASS}>标题</th>
-              <th className={LEARN_TABLE_TH_CLASS}>文件类型</th>
-              <th className={LEARN_TABLE_TH_CLASS}>文件性质</th>
+              <th className={LEARN_TABLE_TH_CLASS}>更新类型</th>
               <th className={LEARN_TABLE_TH_CLASS}>关联专题</th>
+              <th className={LEARN_TABLE_TH_CLASS}>文件类型</th>
               <th className={LEARN_TABLE_TH_CLASS}>更新时间</th>
-              <th className={LEARN_TABLE_TH_CLASS}>学习状态</th>
               <th className={cn(LEARN_TABLE_TH_CLASS, "text-right")}>操作</th>
             </tr>
           </thead>
           <tbody>
-            {materials.map((m) => {
-              const doc = DOCS.find((d) => d.id === m.docId);
-              if (!doc) return null;
+            {pageItems.map((item) => {
+              const isTopic = item.kind === "topic_new" || item.kind === "topic_updated";
+              const docStatus =
+                item.docId != null ? getEffectiveDocStatus(item.docId, state) : null;
+              const inLearning = docStatus === "学习中" || docStatus === "已学";
+
               return (
                 <tr
-                  key={m.docId}
+                  key={item.id}
                   className="border-t border-divider transition-colors hover:bg-muted/30"
                 >
                   <td className="px-5 py-3">
-                    <Link
-                      to="/learn/doc/$id"
-                      params={{ id: doc.id }}
-                      className="font-medium hover:text-primary"
-                    >
-                      {doc.title}
-                    </Link>
+                    {isTopic && item.topicId ? (
+                      <Link
+                        to="/learn/topic/$id"
+                        params={{ id: item.topicId }}
+                        className="font-medium hover:text-primary"
+                      >
+                        {item.title}
+                      </Link>
+                    ) : item.docId ? (
+                      <Link
+                        to="/learn/doc/$id"
+                        params={{ id: item.docId }}
+                        className="font-medium hover:text-primary"
+                      >
+                        {item.title}
+                      </Link>
+                    ) : (
+                      <span className="font-medium">{item.title}</span>
+                    )}
+                    {item.summary && (
+                      <div className="mt-0.5 line-clamp-1 text-[11.5px] text-muted-foreground">
+                        {item.summary}
+                      </div>
+                    )}
                   </td>
-                  <td className="px-5 py-3 text-muted-foreground">{m.typeLabel}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{doc.source}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{m.topicTitle}</td>
-                  <td className="px-5 py-3 tabular-nums text-muted-foreground">{m.updatedAt}</td>
                   <td className="px-5 py-3">
-                    <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[m.status]}`}>
-                      {STATUS_LABEL[m.status]}
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium",
+                        UPDATE_KIND_STYLE[item.kind],
+                      )}
+                    >
+                      {item.kind.startsWith("topic") ? (
+                        <Layers3 className="h-3 w-3" />
+                      ) : (
+                        <FileText className="h-3 w-3" />
+                      )}
+                      {RECENT_UPDATE_KIND_LABEL[item.kind]}
                     </span>
                   </td>
+                  <td className="px-5 py-3 text-muted-foreground">
+                    {item.topicTitle ? (
+                      item.topicId ? (
+                        <Link
+                          to="/learn/topic/$id"
+                          params={{ id: item.topicId }}
+                          className="hover:text-primary"
+                        >
+                          {item.topicTitle}
+                        </Link>
+                      ) : (
+                        item.topicTitle
+                      )
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                  <td className="px-5 py-3 text-muted-foreground">{item.typeLabel ?? "—"}</td>
+                  <td className="px-5 py-3 tabular-nums text-muted-foreground">{item.updatedAt}</td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex flex-wrap justify-end gap-1.5">
-                      <Link to="/learn/doc/$id" params={{ id: doc.id }} className={listActionClass("text")}>
-                        <BookOpen className="h-3.5 w-3.5" />
-                        阅读
-                      </Link>
-                      {/* 本期暂不开放：智能问答
-                      <Link
-                        to="/chat"
-                        search={{ prefill: `请基于资料《${doc.title}》总结要点` }}
-                        className={listActionClass("text")}
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" />
-                        提问
-                      </Link>
-                      */}
-                      <Link to="/assets" search={{ tab: "fav" }} className={listActionClass("text")}>
-                        <Star className="h-3.5 w-3.5" />
-                        收藏
-                      </Link>
+                      {isTopic && item.topicId ? (
+                        <Link
+                          to="/learn/topic/$id"
+                          params={{ id: item.topicId }}
+                          className={listActionClass("text")}
+                        >
+                          <BookOpen className="h-3.5 w-3.5" />
+                          进入专题
+                        </Link>
+                      ) : item.docId ? (
+                        <>
+                          <Link
+                            to="/learn/doc/$id"
+                            params={{ id: item.docId }}
+                            className={listActionClass("text")}
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                            {inLearning ? "继续学习" : "阅读"}
+                          </Link>
+                          {!inLearning && (
+                            <button
+                              type="button"
+                              onClick={() => onAddToLearning(item.docId!)}
+                              className={listActionClass("text")}
+                            >
+                              <PlusCircle className="h-3.5 w-3.5" />
+                              加入学习
+                            </button>
+                          )}
+                        </>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -437,6 +669,15 @@ function RecentMaterialsList({ materials }: { materials: typeof RECENT_MATERIALS
           </tbody>
         </table>
       </div>
+
+      <TableListPager
+        page={safePage}
+        totalPages={totalPages}
+        totalItems={items.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
     </ListCard>
   );
 }
@@ -446,19 +687,33 @@ function AllDocsPanel({
   view,
   actionLabel = "开始学习",
   showReadMeta = false,
+  showContributionMeta = false,
+  emptyDescription = "暂无符合条件的资料",
 }: {
   docs: typeof DOCS;
   view: "card" | "table";
   actionLabel?: string;
   showReadMeta?: boolean;
+  showContributionMeta?: boolean;
+  emptyDescription?: string;
 }) {
   if (docs.length === 0) {
-    return <EmptyState description="暂无符合条件的资料" />;
+    return <EmptyState description={emptyDescription} />;
   }
   return view === "card" ? (
-    <DocCardGrid docs={docs} actionLabel={actionLabel} showReadMeta={showReadMeta} />
+    <DocCardGrid
+      docs={docs}
+      actionLabel={actionLabel}
+      showReadMeta={showReadMeta}
+      showContributionMeta={showContributionMeta}
+    />
   ) : (
-    <DocList docs={docs} actionLabel={actionLabel} showReadMeta={showReadMeta} />
+    <DocList
+      docs={docs}
+      actionLabel={actionLabel}
+      showReadMeta={showReadMeta}
+      showContributionMeta={showContributionMeta}
+    />
   );
 }
 
@@ -511,14 +766,185 @@ function ViewToggle({
 const TYPE_ACCENT = "bg-primary-soft/50 text-primary";
 const CARD_PAGE_SIZE = 6;
 
+function topicEnterAction() {
+  return (
+    <span
+      className={cn(
+        "inline-flex w-full items-center justify-center gap-1 border border-primary/20 bg-primary-soft/50 px-3 py-2 text-[12.5px] font-medium text-accent-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground",
+        learningBtnRadius,
+      )}
+    >
+      进入学习 <ChevronRight className="h-3.5 w-3.5" />
+    </span>
+  );
+}
+
+function TopicPanel({ topics, view }: { topics: EnrichedTopic[]; view: "card" | "table" }) {
+  if (topics.length === 0) {
+    return <EmptyState description="暂无匹配的专题，可浏览全部资料自由检索" />;
+  }
+  return view === "card" ? <TopicCardGrid topics={topics} /> : <TopicTable topics={topics} />;
+}
+
+function TopicCardGrid({ topics }: { topics: EnrichedTopic[] }) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(topics.length / TOPIC_CARD_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * TOPIC_CARD_PAGE_SIZE;
+  const pageTopics = topics.slice(startIndex, startIndex + TOPIC_CARD_PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [topics]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  return (
+    <div className="space-y-4">
+      <div
+        key={safePage}
+        className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 animate-in fade-in duration-300"
+      >
+        {pageTopics.map((t) => {
+          const Icon = TOPIC_ICONS[t.id] ?? BookOpen;
+          return (
+            <Link
+              key={t.id}
+              to="/learn/topic/$id"
+              params={{ id: t.id }}
+              className="group block"
+            >
+              <TopicCard
+                title={t.title}
+                desc={t.desc}
+                roleTags={t.roleTags}
+                docCount={t.docCount}
+                questionCount={t.questionCount}
+                scenarioCount={t.scenarioCount}
+                scenarioLabel={t.scenarioLabel}
+                progress={t.progress}
+                updatedAt={t.updatedAt}
+                icon={<Icon className="h-5 w-5" />}
+                headerTheme={getTopicHeaderTheme(t.id)}
+                action={topicEnterAction()}
+              />
+            </Link>
+          );
+        })}
+      </div>
+
+      {totalPages > 1 && (
+        <CardBatchPager
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={topics.length}
+          pageSize={TOPIC_CARD_PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      )}
+    </div>
+  );
+}
+
+function TopicTable({ topics }: { topics: EnrichedTopic[] }) {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const totalPages = Math.max(1, Math.ceil(topics.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const pageTopics = topics.slice(startIndex, startIndex + pageSize);
+
+  useEffect(() => {
+    setPage(1);
+  }, [topics]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
+  return (
+    <ListCard className={LEARN_TABLE_CARD_CLASS}>
+      <div className="max-h-[min(32rem,60vh)] overflow-y-auto">
+        <table className="w-full text-[13px]">
+          <thead className={LEARN_TABLE_HEAD_CLASS}>
+            <tr>
+              <th className={LEARN_TABLE_TH_CLASS}>专题名称</th>
+              <th className={LEARN_TABLE_TH_CLASS}>岗位标签</th>
+              <th className={LEARN_TABLE_TH_CLASS}>资料</th>
+              <th className={LEARN_TABLE_TH_CLASS}>题目</th>
+              <th className={LEARN_TABLE_TH_CLASS}>学习进度</th>
+              <th className={LEARN_TABLE_TH_CLASS}>更新时间</th>
+              <th className={cn(LEARN_TABLE_TH_CLASS, "text-right")}>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageTopics.map((t) => (
+              <tr key={t.id} className="border-t border-divider transition-colors hover:bg-muted/30">
+                <td className="px-5 py-3">
+                  <Link
+                    to="/learn/topic/$id"
+                    params={{ id: t.id }}
+                    className="font-medium hover:text-primary"
+                  >
+                    {t.title}
+                  </Link>
+                  <div className="mt-0.5 line-clamp-1 text-[11.5px] text-muted-foreground">{t.desc}</div>
+                </td>
+                <td className="px-5 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {t.roleTags.map((tag) => (
+                      <UiTag key={tag}>{tag}</UiTag>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-5 py-3 tabular-nums text-muted-foreground">{t.docCount}</td>
+                <td className="px-5 py-3 tabular-nums text-muted-foreground">{t.questionCount}</td>
+                <td className="px-5 py-3 tabular-nums text-muted-foreground">{t.progress}%</td>
+                <td className="px-5 py-3 tabular-nums text-muted-foreground">{t.updatedAt ?? "—"}</td>
+                <td className="px-5 py-3 text-right">
+                  <Link to="/learn/topic/$id" params={{ id: t.id }} className={listActionClass("text")}>
+                    <BookOpen className="h-3.5 w-3.5" />
+                    进入学习
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <TableListPager
+        page={safePage}
+        totalPages={totalPages}
+        totalItems={topics.length}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+      />
+    </ListCard>
+  );
+}
+
 function DocList({
   docs,
   actionLabel = "开始学习",
   showReadMeta = false,
+  showContributionMeta = false,
 }: {
   docs: typeof DOCS;
   actionLabel?: string;
   showReadMeta?: boolean;
+  showContributionMeta?: boolean;
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
@@ -556,16 +982,27 @@ function DocList({
             </tr>
           </thead>
           <tbody>
-            {pageDocs.map((d) => (
+            {pageDocs.map((d) => {
+              const pendingCount = showContributionMeta ? getReturnedCountByDoc(d.id) : 0;
+              const rowAction =
+                pendingCount > 0 ? "处理待改题目" : actionLabel === "开始学习" ? "继续学习" : actionLabel;
+              return (
               <tr key={d.id} className="border-t border-divider transition-colors hover:bg-muted/30">
                 <td className="px-5 py-3">
                   <Link
                     to="/learn/doc/$id"
                     params={{ id: d.id }}
+                    search={pendingCount > 0 ? { focus: "contributions" } : undefined}
                     className="font-medium hover:text-primary"
                   >
                     {d.title}
                   </Link>
+                  {pendingCount > 0 && (
+                    <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-destructive/10 px-1.5 py-0.5 text-[10.5px] font-medium text-destructive">
+                      <AlertCircle className="h-3 w-3" />
+                      {pendingCount} 题待改
+                    </div>
+                  )}
                 </td>
                 <td className="px-5 py-3 text-muted-foreground">{d.docType}</td>
                 <td className="px-5 py-3 text-muted-foreground">{d.source}</td>
@@ -587,13 +1024,19 @@ function DocList({
                   </span>
                 </td>
                 <td className="px-5 py-3 text-right">
-                  <Link to="/learn/doc/$id" params={{ id: d.id }} className={listActionClass("text")}>
+                  <Link
+                    to="/learn/doc/$id"
+                    params={{ id: d.id }}
+                    search={pendingCount > 0 ? { focus: "contributions" } : undefined}
+                    className={listActionClass("text")}
+                  >
                     <BookOpen className="h-3.5 w-3.5" />
-                    {actionLabel}
+                    {rowAction}
                   </Link>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
@@ -610,105 +1053,16 @@ function DocList({
   );
 }
 
-function DocCardPager({
-  page,
-  totalPages,
-  totalItems,
-  pageSize,
-  onPageChange,
-}: {
-  page: number;
-  totalPages: number;
-  totalItems: number;
-  pageSize: number;
-  onPageChange: (page: number) => void;
-}) {
-  const start = (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, totalItems);
-
-  return (
-    <div className="relative mt-2 pt-6" style={{ paddingTop: "5px" }}>
-      <div
-        className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent"
-        aria-hidden
-      />
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
-          第 <span className="font-medium text-foreground">{start}–{end}</span> 份，共{" "}
-          <span className="font-medium text-foreground">{totalItems}</span> 份
-        </p>
-
-        <div className="flex items-center justify-center gap-2 sm:justify-end">
-          <button
-            type="button"
-            onClick={() => onPageChange(page - 1)}
-            disabled={page === 1}
-            aria-label="上一批"
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors",
-              "hover:border-primary/30 hover:bg-muted hover:text-foreground",
-              "disabled:pointer-events-none disabled:opacity-35",
-            )}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-
-          <div
-            className="flex items-center gap-1.5 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1.5"
-            role="tablist"
-            aria-label="快速跳转批次"
-          >
-            {Array.from({ length: totalPages }).map((_, index) => {
-              const pageNumber = index + 1;
-              const active = pageNumber === page;
-              return (
-                <button
-                  key={pageNumber}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-label={`第 ${pageNumber} 批`}
-                  title={`第 ${pageNumber} 批`}
-                  onClick={() => onPageChange(pageNumber)}
-                  className={cn(
-                    "rounded-full transition-all duration-200",
-                    active
-                      ? "h-2 w-6 bg-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.15)]"
-                      : "h-2 w-2 bg-muted-foreground/25 hover:scale-125 hover:bg-primary/45",
-                  )}
-                />
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => onPageChange(page + 1)}
-            disabled={page === totalPages}
-            aria-label="下一批"
-            className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors",
-              "hover:border-primary/30 hover:bg-muted hover:text-foreground",
-              "disabled:pointer-events-none disabled:opacity-35",
-            )}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function DocCardGrid({
   docs,
   actionLabel = "开始学习",
   showReadMeta = false,
+  showContributionMeta = false,
 }: {
   docs: typeof DOCS;
   actionLabel?: string;
   showReadMeta?: boolean;
+  showContributionMeta?: boolean;
 }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(docs.length / CARD_PAGE_SIZE));
@@ -737,11 +1091,14 @@ function DocCardGrid({
         className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3 animate-in fade-in duration-300"
       >
         {pageDocs.map((d) => {
+          const pendingCount = showContributionMeta ? getReturnedCountByDoc(d.id) : 0;
+          const cardAction = pendingCount > 0 ? "处理待改题目" : actionLabel === "开始学习" ? "继续学习" : actionLabel;
           return (
             <Link
               key={d.id}
               to="/learn/doc/$id"
               params={{ id: d.id }}
+              search={pendingCount > 0 ? { focus: "contributions" } : undefined}
               className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)] transition-colors hover:border-primary/30"
             >
               <div
@@ -776,12 +1133,25 @@ function DocCardGrid({
                     <Calendar className="h-3 w-3" /> {d.updatedAt}
                   </span>
                 </div>
-                <div className="mt-4 flex items-center justify-between border-t border-divider pt-3">
-                  <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[d.status]}`}>
-                    {d.status}
-                  </span>
-                  <span className="inline-flex items-center text-[12.5px] font-medium text-primary">
-                    {actionLabel} <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-divider pt-3">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`rounded-md px-2 py-0.5 text-[11px] ${STATUS_STYLE[d.status]}`}>
+                      {d.status}
+                    </span>
+                    {pendingCount > 0 && (
+                      <span className="inline-flex items-center gap-0.5 rounded-md bg-destructive/10 px-2 py-0.5 text-[10.5px] font-medium text-destructive">
+                        <AlertCircle className="h-3 w-3" />
+                        {pendingCount} 题待改
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center text-[12.5px] font-medium",
+                      pendingCount > 0 ? "text-destructive" : "text-primary",
+                    )}
+                  >
+                    {cardAction} <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
                   </span>
                 </div>
               </div>
@@ -791,7 +1161,7 @@ function DocCardGrid({
       </div>
 
       {totalPages > 1 && (
-        <DocCardPager
+        <CardBatchPager
           page={safePage}
           totalPages={totalPages}
           totalItems={docs.length}

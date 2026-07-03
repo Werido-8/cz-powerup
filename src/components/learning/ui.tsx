@@ -1,7 +1,16 @@
-import { type CSSProperties, type ReactNode, useMemo } from "react";
+import { type CSSProperties, type ReactNode, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, Search, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ListFilter, Search, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { TopicHeaderIllustration, type TopicHeaderTheme } from "./topic-art";
 
 const cardBase =
@@ -352,6 +361,122 @@ export function TableListPager({
   );
 }
 
+/** 卡片批次分页器（全部资料/专题/知识点等卡片模式复用） */
+export function CardBatchPager({
+  page,
+  totalPages,
+  totalItems,
+  pageSize,
+  unitLabel = "份",
+  onPageChange,
+  className,
+  compact = false,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  unitLabel?: string;
+  onPageChange: (page: number) => void;
+  className?: string;
+  compact?: boolean;
+}) {
+  const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, totalItems);
+
+  return (
+    <div
+      className={cn(compact ? "relative mt-0 pt-2" : "relative mt-2 pt-6", className)}
+      style={compact ? undefined : { paddingTop: "5px" }}
+    >
+      <div
+        className={cn(
+          "pointer-events-none absolute top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent",
+          compact ? "inset-x-4" : "inset-x-8",
+        )}
+        aria-hidden
+      />
+
+      <div
+        className={cn(
+          "flex flex-col sm:flex-row sm:items-center sm:justify-between",
+          compact ? "gap-2" : "gap-4",
+        )}
+      >
+        <p
+          className={cn(
+            "shrink-0 tabular-nums text-muted-foreground",
+            compact ? "text-[11px]" : "text-[12px]",
+          )}
+        >
+          第 <span className="font-medium text-foreground">{start}–{end}</span> {unitLabel}，共{" "}
+          <span className="font-medium text-foreground">{totalItems}</span> {unitLabel}
+        </p>
+
+        <div className="flex items-center justify-center gap-2 sm:justify-end">
+          <button
+            type="button"
+            onClick={() => onPageChange(page - 1)}
+            disabled={page === 1}
+            aria-label="上一批"
+            className={cn(
+              "inline-flex shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors",
+              "hover:border-primary/30 hover:bg-muted hover:text-foreground",
+              "disabled:pointer-events-none disabled:opacity-35",
+              compact ? "h-7 w-7" : "h-8 w-8",
+            )}
+          >
+            <ChevronLeft className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+          </button>
+
+          <div
+            className="flex items-center gap-1.5 rounded-full border border-border/80 bg-muted/30 px-2.5 py-1.5"
+            role="tablist"
+            aria-label="快速跳转批次"
+          >
+            {Array.from({ length: totalPages }).map((_, index) => {
+              const pageNumber = index + 1;
+              const active = pageNumber === page;
+              return (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-label={`第 ${pageNumber} 批`}
+                  title={`第 ${pageNumber} 批`}
+                  onClick={() => onPageChange(pageNumber)}
+                  className={cn(
+                    "rounded-full transition-all duration-200",
+                    active
+                      ? "h-2 w-6 bg-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.15)]"
+                      : "h-2 w-2 bg-muted-foreground/25 hover:scale-125 hover:bg-primary/45",
+                  )}
+                />
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onPageChange(page + 1)}
+            disabled={page === totalPages}
+            aria-label="下一批"
+            className={cn(
+              "inline-flex shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors",
+              "hover:border-primary/30 hover:bg-muted hover:text-foreground",
+              "disabled:pointer-events-none disabled:opacity-35",
+              compact ? "h-7 w-7" : "h-8 w-8",
+            )}
+          >
+            <ChevronRight className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** 同色系浅底变体，用于统计卡轻微区分（均在 primary 色族内） */
 const statTintStyles = [
   "",
@@ -405,6 +530,8 @@ function StatIconFrame({ icon, size = "md" }: { icon: ReactNode; size?: "sm" | "
     </div>
   );
 }
+
+export { StatCardDecor, StatIconFrame };
 
 export function PageTitleMark({ className }: { className?: string }) {
   return (
@@ -627,6 +754,7 @@ export function OverviewStatCard({
   icon,
   active,
   onClick,
+  onDetailClick,
   className,
   valueClassName,
   tint = 0,
@@ -641,6 +769,8 @@ export function OverviewStatCard({
   accent?: string;
   active?: boolean;
   onClick?: () => void;
+  /** 底栏独立点击（如跳转），不触发卡片 onClick */
+  onDetailClick?: () => void;
   className?: string;
   valueClassName?: string;
   tint?: number;
@@ -692,22 +822,39 @@ export function OverviewStatCard({
           <div
             className={cn(
               "mt-3 flex items-center gap-2 border-t border-divider pt-2.5",
-              onClick && "border-primary/15",
+              (onClick || onDetailClick) && "border-primary/15",
             )}
           >
-            <span
-              className={cn("h-1 w-1 shrink-0 rounded-full", onClick ? "bg-primary" : "bg-primary/50")}
-              aria-hidden
-            />
-            <span
-              className={cn(
-                "min-w-0 flex-1 truncate text-[11px]",
-                onClick ? "font-medium text-primary/90" : "text-muted-foreground",
-              )}
-            >
-              {detail}
-            </span>
-            {onClick && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary/55" aria-hidden />}
+            {onDetailClick ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDetailClick();
+                }}
+                className="flex min-w-0 flex-1 items-center gap-2 text-left"
+              >
+                <span className="h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-primary/90">{detail}</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary/55" aria-hidden />
+              </button>
+            ) : (
+              <>
+                <span
+                  className={cn("h-1 w-1 shrink-0 rounded-full", onClick ? "bg-primary" : "bg-primary/50")}
+                  aria-hidden
+                />
+                <span
+                  className={cn(
+                    "min-w-0 flex-1 truncate text-[11px]",
+                    onClick ? "font-medium text-primary/90" : "text-muted-foreground",
+                  )}
+                >
+                  {detail}
+                </span>
+                {onClick && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-primary/55" aria-hidden />}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1493,4 +1640,107 @@ export function PillSelect({
       ))}
     </div>
   );
+}
+
+/** 选项较多时用可搜索下拉，视觉与 PillSelect 同系 */
+export function FilterComboSelect({
+  options,
+  value,
+  onChange,
+  className,
+  placeholder = "全部分类",
+  searchPlaceholder = "输入关键词筛选",
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+  placeholder?: string;
+  searchPlaceholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((o) => o.value === value);
+  const isActive = value !== "all";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex h-[38px] min-w-[132px] max-w-[200px] items-center gap-2 rounded-xl border border-border bg-card px-3 text-left text-[12px] font-medium transition-colors",
+            "hover:border-primary/30 hover:bg-muted/30",
+            isActive && "border-primary/25 bg-primary-soft/40 text-accent-foreground",
+            className,
+          )}
+        >
+          <ListFilter className="h-3.5 w-3.5 shrink-0 text-primary/70" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">{selected?.label ?? placeholder}</span>
+          <ChevronDown
+            className={cn("h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+            aria-hidden
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[min(100vw-2rem,240px)] p-0" align="start">
+        <Command>
+          <CommandInput placeholder={searchPlaceholder} className="h-9 text-[13px]" />
+          <CommandList>
+            <CommandEmpty className="py-6 text-center text-[12px] text-muted-foreground">无匹配分类</CommandEmpty>
+            <CommandGroup>
+              {options.map((o) => (
+                <CommandItem
+                  key={o.value}
+                  value={o.label}
+                  onSelect={() => {
+                    onChange(o.value);
+                    setOpen(false);
+                  }}
+                  className="text-[13px]"
+                >
+                  <Check
+                    className={cn("mr-2 h-3.5 w-3.5 text-primary", value === o.value ? "opacity-100" : "opacity-0")}
+                  />
+                  {o.label}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/** 选项数超过阈值时用 FilterComboSelect，否则保留 PillSelect */
+export const FILTER_COMBO_THRESHOLD = 6;
+
+export function AdaptiveFilterSelect({
+  options,
+  value,
+  onChange,
+  className,
+  comboPlaceholder,
+  comboSearchPlaceholder,
+}: {
+  options: { value: string; label: string }[];
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
+  comboPlaceholder?: string;
+  comboSearchPlaceholder?: string;
+}) {
+  if (options.length > FILTER_COMBO_THRESHOLD) {
+    return (
+      <FilterComboSelect
+        options={options}
+        value={value}
+        onChange={onChange}
+        className={className}
+        placeholder={comboPlaceholder}
+        searchPlaceholder={comboSearchPlaceholder}
+      />
+    );
+  }
+  return <PillSelect options={options} value={value} onChange={onChange} className={className} />;
 }

@@ -26,6 +26,7 @@ import { Route as LearnAdminIndexRouteImport } from './routes/learn-admin.index'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge.index'
 import { Route as ExamAdminIndexRouteImport } from './routes/exam-admin.index'
 import { Route as TrainingWrongRouteImport } from './routes/training.wrong'
+import { Route as TrainingRecordsRouteImport } from './routes/training.records'
 import { Route as TrainingPracticeRouteImport } from './routes/training.practice'
 import { Route as TrainingGrowthRouteImport } from './routes/training.growth'
 import { Route as TrainingExamRouteImport } from './routes/training.exam'
@@ -136,6 +137,11 @@ const ExamAdminIndexRoute = ExamAdminIndexRouteImport.update({
 const TrainingWrongRoute = TrainingWrongRouteImport.update({
   id: '/training/wrong',
   path: '/training/wrong',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingRecordsRoute = TrainingRecordsRouteImport.update({
+  id: '/training/records',
+  path: '/training/records',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrainingPracticeRoute = TrainingPracticeRouteImport.update({
@@ -291,6 +297,7 @@ export interface FileRoutesByFullPath {
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
   '/training/practice': typeof TrainingPracticeRoute
+  '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
   '/exam-admin/': typeof ExamAdminIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
@@ -332,6 +339,7 @@ export interface FileRoutesByTo {
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
   '/training/practice': typeof TrainingPracticeRoute
+  '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
   '/exam-admin': typeof ExamAdminIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
@@ -378,6 +386,7 @@ export interface FileRoutesById {
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
   '/training/practice': typeof TrainingPracticeRoute
+  '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
   '/exam-admin/': typeof ExamAdminIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
@@ -425,6 +434,7 @@ export interface FileRouteTypes {
     | '/training/exam'
     | '/training/growth'
     | '/training/practice'
+    | '/training/records'
     | '/training/wrong'
     | '/exam-admin/'
     | '/knowledge/'
@@ -466,6 +476,7 @@ export interface FileRouteTypes {
     | '/training/exam'
     | '/training/growth'
     | '/training/practice'
+    | '/training/records'
     | '/training/wrong'
     | '/exam-admin'
     | '/knowledge'
@@ -511,6 +522,7 @@ export interface FileRouteTypes {
     | '/training/exam'
     | '/training/growth'
     | '/training/practice'
+    | '/training/records'
     | '/training/wrong'
     | '/exam-admin/'
     | '/knowledge/'
@@ -556,6 +568,7 @@ export interface RootRouteChildren {
   TrainingExamRoute: typeof TrainingExamRoute
   TrainingGrowthRoute: typeof TrainingGrowthRoute
   TrainingPracticeRoute: typeof TrainingPracticeRoute
+  TrainingRecordsRoute: typeof TrainingRecordsRoute
   TrainingWrongRoute: typeof TrainingWrongRoute
   LearnIndexRoute: typeof LearnIndexRoute
   ScenarioIndexRoute: typeof ScenarioIndexRoute
@@ -688,6 +701,13 @@ declare module '@tanstack/react-router' {
       path: '/training/wrong'
       fullPath: '/training/wrong'
       preLoaderRoute: typeof TrainingWrongRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/training/records': {
+      id: '/training/records'
+      path: '/training/records'
+      fullPath: '/training/records'
+      preLoaderRoute: typeof TrainingRecordsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/training/practice': {
@@ -985,6 +1005,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrainingExamRoute: TrainingExamRoute,
   TrainingGrowthRoute: TrainingGrowthRoute,
   TrainingPracticeRoute: TrainingPracticeRoute,
+  TrainingRecordsRoute: TrainingRecordsRoute,
   TrainingWrongRoute: TrainingWrongRoute,
   LearnIndexRoute: LearnIndexRoute,
   ScenarioIndexRoute: ScenarioIndexRoute,

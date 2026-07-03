@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { BookOpen, ClipboardList, Layers, Users } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
 import { TopicAdminSplitView } from "@/components/learning/topic-admin/topic-admin-split-view";
-import { PageHeader, StatCard, ModulePanel } from "@/components/learning/ui";
+import { PageHeader, OverviewStatCard, ModulePanel } from "@/components/learning/ui";
 import { TOPIC_ADMIN_STATS, type TopicAdminRecord } from "@/lib/mock/topicAdmin";
 
 export const Route = createFileRoute("/learn-admin/")({
@@ -54,14 +54,15 @@ function LearnAdminIndexPage() {
 
       <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         {TOPIC_ADMIN_STATS.map((s, i) => (
-          <StatCard
+          <OverviewStatCard
             key={s.key}
             label={s.label}
             value={s.value}
             hint={s.hint}
+            detail={s.detail}
             icon={STAT_ICONS[s.key]}
             tint={i}
-            emphasis={s.tone === "warning" ? "remind" : s.tone === "success" ? "default" : "primary"}
+            emphasis={s.tone === "warning" ? "remind" : "primary"}
           />
         ))}
       </section>

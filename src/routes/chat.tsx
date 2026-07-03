@@ -1341,6 +1341,7 @@ function AnswerBubble({
               <Star className="h-3 w-3" />
               收藏
             </button>
+            {/* 本期暂不开放：问答生成练习题
             <button
               type="button"
               onClick={onQuizAction}
@@ -1350,6 +1351,7 @@ function AnswerBubble({
               <MessagesSquare className="h-3 w-3" />
               {quizGenerating ? "生成中…" : quizReady ? "查看题单" : "生成题单"}
             </button>
+            */}
             {/* <button
               type="button"
               onClick={() => onFollowUp("基于上面的依据，继续说明：")}

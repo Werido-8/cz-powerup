@@ -88,17 +88,48 @@ export const EXAM_STATS = [
 
 /** 题库管理页专用概览（题库资产维护视角，不含考试结果类指标） */
 export const BANK_OVERVIEW_STATS: ExamStatItem[] = [
-  { key: "pending", label: "待审核题目", value: "23", hint: "AI 生成 17 · 人工 6", tone: "warning" },
-  { key: "bank", label: "题库总量", value: "1,842", hint: "本月新增 86", tone: "primary" },
-  { key: "active", label: "启用题目", value: "1,568", hint: "禁用 274", tone: "primary" },
-  { key: "optimize", label: "待优化题目", value: "36", hint: "低正确率 21 · 长期未用 15", tone: "warning" },
+  {
+    key: "pending",
+    label: "待审核题目",
+    value: "23",
+    hint: "待审核队列",
+    detail: "AI 生成 17 · 人工 6",
+    tone: "warning",
+  },
+  {
+    key: "bank",
+    label: "题库总量",
+    value: "1,842",
+    hint: "正式题库资产",
+    detail: "本月新增 86",
+    tone: "primary",
+  },
+  {
+    key: "active",
+    label: "启用题目",
+    value: "1,568",
+    hint: "当前可用题目",
+    detail: "禁用 274",
+    tone: "primary",
+  },
+  {
+    key: "optimize",
+    label: "待优化题目",
+    value: "36",
+    hint: "建议优化处理",
+    detail: "低正确率 21 · 长期未用 15",
+    tone: "warning",
+  },
 ];
 
 export type ExamStatItem = {
   key: string;
   label: string;
   value: string;
-  hint: string;
+  /** 数值下方说明 */
+  hint?: string;
+  /** 底部分隔线内补充说明 */
+  detail?: string;
   tone: "warning" | "primary" | "success";
 };
 
@@ -116,53 +147,47 @@ export function buildExamAdminStats(papers: Paper[]): ExamStatItem[] {
     withMetrics.length > 0
       ? Math.round(withMetrics.reduce((s, p) => s + p.avgCorrect, 0) / withMetrics.length)
       : 0;
-  const avgDuration =
-    withMetrics.length > 0
-      ? Math.round(withMetrics.reduce((s, p) => s + p.avgDuration, 0) / withMetrics.length)
-      : 0;
 
   return [
     {
       key: "papers",
       label: "试卷总数",
       value: String(papers.length),
-      hint: `草稿 ${draftCount} · 已结束 ${endedCount}`,
+      hint: "全部试卷",
+      detail: `草稿 ${draftCount} · 已结束 ${endedCount}`,
       tone: "primary",
     },
     {
       key: "issued",
       label: "已下发试卷",
       value: String(issuedCount),
-      hint: `进行中 ${issuedCount}`,
+      hint: "正在进行的考试",
+      detail: `进行中 ${issuedCount}`,
       tone: "primary",
     },
     {
       key: "assigned",
       label: "累计参考人次",
       value: totalAssigned.toLocaleString("zh-CN"),
-      hint: `已完成 ${totalFinished.toLocaleString("zh-CN")} 人次`,
+      hint: "下发覆盖人次",
+      detail: `已完成 ${totalFinished.toLocaleString("zh-CN")} 人次`,
       tone: "primary",
     },
     {
       key: "finish",
       label: "答题完成率",
       value: `${finishRate}%`,
-      hint: "全部已下发",
+      hint: "参考完成比例",
+      detail: "全部已下发",
       tone: "success",
     },
     {
       key: "correct",
       label: "平均正确率",
       value: `${avgCorrect}%`,
-      hint: "全部试卷",
+      hint: "全部试卷均值",
+      detail: "含已结束与进行中",
       tone: "success",
-    },
-    {
-      key: "time",
-      label: "平均用时",
-      value: `${avgDuration} 分`,
-      hint: "单卷均值",
-      tone: "primary",
     },
   ];
 }
@@ -1585,6 +1610,63 @@ export interface ReviewQuestionDetail {
   evidences: ReviewEvidence[];
   note?: string;
 }
+
+export type ReviewAuditAction =
+  | "提交审核"
+  | "保存并通过"
+  | "驳回"
+  | "退回修改"
+  | "重新提交"
+  | "合并处理";
+
+export interface ReviewAuditRecord {
+  id: string;
+  action: ReviewAuditAction;
+  operator: string;
+  time: string;
+  comment?: string;
+  statusAfter: ReviewQuestion["status"];
+}
+
+export const REVIEW_AUDIT_LOGS: Record<string, ReviewAuditRecord[]> = {
+  rq1: [],
+  rq2: [],
+  rq3: [],
+  rq4: [
+    {
+      id: "al-rq4-1",
+      action: "提交审核",
+      operator: "李工",
+      time: "2026-06-28 09:12",
+      statusAfter: "待审核",
+    },
+    {
+      id: "al-rq4-2",
+      action: "驳回",
+      operator: "王审核",
+      time: "2026-06-28 14:30",
+      comment: "选项 B 表述存在歧义,需重写。",
+      statusAfter: "已退回",
+    },
+    {
+      id: "al-rq4-3",
+      action: "重新提交",
+      operator: "李工",
+      time: "2026-06-29 10:05",
+      comment: "已修订选项 B 表述并补充解析。",
+      statusAfter: "待审核",
+    },
+  ],
+  rq5: [
+    {
+      id: "al-rq5-1",
+      action: "提交审核",
+      operator: "张工",
+      time: "2026-06-30 08:40",
+      statusAfter: "待审核",
+    },
+  ],
+};
 
 export const REVIEW_DETAILS: Record<string, ReviewQuestionDetail> = {
   rq1: {

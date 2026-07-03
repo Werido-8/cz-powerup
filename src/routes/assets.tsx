@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Star,
   NotebookPen,
-  BookMarked,
   BookOpen,
   Trash2,
   Pencil,
@@ -11,50 +10,43 @@ import {
   Sparkles,
   ListChecks,
   RotateCcw,
-  FileText,
   FolderOpen,
   Clock,
-  TrendingUp,
   MessageSquare,
-  FileSearch,
   Eye,
 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
-import { cn } from "@/lib/utils";
 import { PageShell } from "@/components/workbench/PageShell";
 import { DOCS, QUESTIONS } from "@/lib/mock/data";
 import { useMockStore, type NoteItem } from "@/lib/mock/store";
 import { NoteEditor } from "@/components/common/NoteEditor";
 import {
-  PRACTICE_RECORDS,
-  WRONG_QUESTION_DETAILS,
+  CHAT_FAVORITES,
   FAVORITE_META,
   NOTE_META,
-  GROWTH_REMINDER,
-  PERSONAL_OVERVIEW,
 } from "@/lib/mock/learning-hub";
+import { PersonalDepositionOverview } from "@/components/learning/personal-deposition-overview";
 import {
   PageHeader,
-  OverviewStatCard,
   ModuleTabs,
   ModulePanel,
   SearchBar,
   PillSelect,
   PersonalAssetCard,
-  ListCard,
-  RecordRow,
-  RECORDS_TABLE_GRID,
   listActionClass,
   Tag,
-  LinkButton,
   ActionButton,
   EmptyState,
 } from "@/components/learning/ui";
+import {
+  getPersonalDepositionOverview,
+  type PersonalOverviewCardKey,
+} from "@/lib/mock/personal-deposition";
 
 const assetsSearchSchema = z.object({
   tab: z
-    .enum(["fav", "note", "wrong", "records"])
+    .enum(["fav", "note"])
     .optional()
     .catch(undefined),
 });
@@ -65,16 +57,13 @@ export const Route = createFileRoute("/assets")({
   head: () => ({ meta: [{ title: "个人沉淀 · 涉网运行能力智能提升平台" }] }),
 });
 
-type Tab = "fav" | "note" | "wrong" | "records";
+type Tab = "fav" | "note";
 
 const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
   fav: [
     { value: "all", label: "全部" },
     { value: "规程", label: "规程" },
-    // { value: "SOP", label: "SOP" },
-    { value: "案例", label: "案例" },
-    // { value: "问答", label: "问答" },
-    // { value: "题单", label: "题单" },
+    { value: "问答摘录", label: "问答摘录" },
     { value: "题目", label: "题目" },
   ],
   note: [
@@ -83,36 +72,16 @@ const TAB_FILTER_OPTIONS: Record<Tab, { value: string; label: string }[]> = {
     { value: "主变", label: "主变/操作" },
     { value: "继电保护", label: "继电保护" },
   ],
-  wrong: [
-    { value: "all", label: "全部" },
-    { value: "AGC", label: "AGC" },
-    { value: "典型操作", label: "典型操作" },
-    { value: "继电保护", label: "继电保护" },
-    { value: "AVC", label: "AVC" },
-  ],
-  records: [
-    { value: "all", label: "全部" },
-    // { value: "智能问答生成", label: "智能问答" },
-    { value: "知识学习生成", label: "知识学习" },
-    { value: "错题本", label: "错题本" },
-    { value: "模拟考试", label: "模拟考试" },
-  ],
 };
 
 const SEARCH_PLACEHOLDERS: Record<Tab, string> = {
-  fav: "搜索收藏资料标题或专题",
+  fav: "搜索收藏标题、问答摘录或题目",
   note: "搜索笔记标题或内容",
-  wrong: "搜索错题题干或知识点",
-  records: "搜索练习名称",
 };
 
 const ASSET_TABS: { key: Tab; label: string; desc: string; icon: typeof Star }[] = [
-  { key: "fav", label: "我的收藏", desc: "规程、SOP 与案例资料", icon: Star },
+  { key: "fav", label: "我的收藏", desc: "规程、问答摘录与收藏题目", icon: Star },
   { key: "note", label: "我的笔记", desc: "学习要点与关联资料", icon: NotebookPen },
-  // 本期暂不开放：智能题单
-  // { key: "quizsets", label: "我的题单", desc: "AI 智能生成练习题单", icon: Sparkles },
-  { key: "wrong", label: "错题本", desc: "错题收集与巩固练习", icon: BookMarked },
-  { key: "records", label: "练习记录", desc: "历次训练结果与统计", icon: ListChecks },
 ];
 
 function AssetsPage() {
@@ -125,8 +94,6 @@ function AssetsPage() {
     addNote,
     updateNote,
     removeNote,
-    removeWrong,
-    resetAll,
     createCollection,
     addToCollection,
   } = useMockStore();
@@ -137,11 +104,10 @@ function AssetsPage() {
   const [tabFilters, setTabFilters] = useState<Record<Tab, string>>({
     fav: "all",
     note: "all",
-    wrong: "all",
-    records: "all",
   });
   const [editor, setEditor] = useState<{ open: boolean; note?: NoteItem }>({ open: false });
   const [activeFolder, setActiveFolder] = useState<string>("all");
+  const [activeOverviewKey, setActiveOverviewKey] = useState<PersonalOverviewCardKey | null>(null);
 
   const activeFilter = tabFilters[tab];
   const setActiveFilter = (value: string) => {
@@ -163,52 +129,43 @@ function AssetsPage() {
     setAppliedQuery(searchInput.trim());
   };
 
-  const wrongCount = state.wrong.length || PERSONAL_OVERVIEW.wrongToReview;
-  const lastPractice = PRACTICE_RECORDS[0];
-  const latestNote = state.notes[state.notes.length - 1];
-  const latestFavoriteDoc = state.favorites
-    .map((id) => DOCS.find((d) => d.id === id))
-    .filter(Boolean)[0];
+  const depositionOverview = useMemo(
+    () => getPersonalDepositionOverview(state),
+    [state],
+  );
 
-  const overviewStats = [
-    {
-      key: "fav" as const,
-      label: "收藏资料",
-      value: state.favorites.length,
-      hint: "规程与案例",
-      detail: latestFavoriteDoc ? `最近：${latestFavoriteDoc.title.slice(0, 14)}…` : "暂无收藏",
-      icon: <Star className="h-[18px] w-[18px]" />,
-    },
-    {
-      key: "note" as const,
-      label: "学习笔记",
-      value: state.notes.length,
-      hint: "学习过程记录",
-      detail: latestNote ? `最近：${latestNote.title}` : "暂无笔记",
-      icon: <NotebookPen className="h-[18px] w-[18px]" />,
-    },
-    {
-      key: "wrong" as const,
-      label: "错题待复习",
-      value: wrongCount,
-      hint: "待巩固题目",
-      detail: GROWTH_REMINDER.weakPoints[0]
-        ? `薄弱：${GROWTH_REMINDER.weakPoints[0]}`
-        : "暂无薄弱点",
-      icon: <BookMarked className="h-[18px] w-[18px]" />,
-      emphasis: wrongCount > 0 ? ("remind" as const) : ("default" as const),
-    },
-    {
-      key: "records" as const,
-      label: "练习记录",
-      value: PRACTICE_RECORDS.length,
-      hint: "近期训练回看",
-      detail: lastPractice
-        ? `最近：${lastPractice.title.slice(0, 12)}… · ${lastPractice.accuracy}%`
-        : "暂无记录",
-      icon: <ListChecks className="h-[18px] w-[18px]" />,
-    },
-  ];
+  const handleOverviewCardClick = (key: PersonalOverviewCardKey) => {
+    setActiveOverviewKey(key);
+    switch (key) {
+      case "docFav":
+        setTab("fav");
+        setTabFilters((prev) => ({ ...prev, fav: "规程" }));
+        navigate({ to: "/assets", search: { tab: "fav" }, replace: true });
+        break;
+      case "qaFav":
+        setTab("fav");
+        setTabFilters((prev) => ({ ...prev, fav: "问答摘录" }));
+        navigate({ to: "/assets", search: { tab: "fav" }, replace: true });
+        break;
+      case "notes":
+        setTabAndUrl("note");
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleViewFavorites = () => {
+    setActiveOverviewKey("docFav");
+    setTabAndUrl("fav");
+    setTabFilters((prev) => ({ ...prev, fav: "all" }));
+  };
+
+  const handleOrganize = () => {
+    setActiveOverviewKey(null);
+    setTabAndUrl("fav");
+    setTabFilters((prev) => ({ ...prev, fav: "问答摘录" }));
+  };
 
   const filteredFavorites = useMemo(() => {
     return FAVORITE_META.filter((f) => state.favorites.includes(f.docId))
@@ -221,6 +178,7 @@ function AssetsPage() {
         if (appliedQuery && !doc.title.includes(appliedQuery) && !meta.topicTitle.includes(appliedQuery)) {
           return false;
         }
+        if (activeFilter === "问答摘录" || activeFilter === "题目") return false;
         if (activeFilter === "all") return true;
         if (activeFilter === "规程") {
           return doc.docType.includes("规程") || meta.source === "智能问答依据";
@@ -228,7 +186,6 @@ function AssetsPage() {
         if (activeFilter === "SOP") {
           return doc.docType === "典型操作" || doc.docType === "厂家SOP";
         }
-        if (activeFilter === "案例") return doc.docType === "历史案例";
         if (activeFilter === "问答") return meta.source.includes("问答");
         if (activeFilter === "题单") return meta.source.includes("题单");
         return true;
@@ -274,19 +231,17 @@ function AssetsPage() {
   //   });
   // }, [state.quizSets, appliedQuery, activeFilter]);
 
-  const filteredWrong = useMemo(() => {
-    return WRONG_QUESTION_DETAILS.filter((w) => {
-      if (appliedQuery && !w.stem.includes(appliedQuery) && !w.knowledge.includes(appliedQuery)) return false;
-      if (activeFilter !== "all" && w.knowledge !== activeFilter) return false;
-      return state.wrong.some((sw) => sw.qid === w.qid) || true;
-    });
-  }, [appliedQuery, activeFilter, state.wrong]);
-
-  const filteredRecords = useMemo(() => {
-    return PRACTICE_RECORDS.filter((r) => {
-      if (r.source === "智能问答生成") return false;
-      if (appliedQuery && !r.title.includes(appliedQuery)) return false;
-      if (activeFilter !== "all" && r.source !== activeFilter) return false;
+  const filteredChatFavorites = useMemo(() => {
+    if (activeFilter !== "all" && activeFilter !== "问答摘录") return [];
+    return CHAT_FAVORITES.filter((c) => {
+      if (
+        appliedQuery &&
+        !c.question.includes(appliedQuery) &&
+        !c.summary.includes(appliedQuery) &&
+        !c.tags.join("").includes(appliedQuery)
+      ) {
+        return false;
+      }
       return true;
     });
   }, [appliedQuery, activeFilter]);
@@ -311,73 +266,16 @@ function AssetsPage() {
     <PageShell>
       <PageHeader
         title="个人沉淀"
-        subtitle="收藏、笔记、错题与练习记录，集中管理你的学习成果"
+        subtitle="收藏与笔记，集中管理你的学习成果"
       />
 
-      {/* 概览 */}
-      <section className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {overviewStats.map((s, i) => (
-          <OverviewStatCard
-            key={s.key}
-            label={s.label}
-            value={s.value}
-            hint={s.hint}
-            detail={s.detail}
-            icon={s.icon}
-            tint={i}
-            emphasis={"emphasis" in s ? s.emphasis : i === 0 ? "primary" : "default"}
-            active={tab === s.key}
-            onClick={() => setTabAndUrl(s.key)}
-          />
-        ))}
-      </section>
-
-      {/* 学习跟进 */}
-      <section className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="text-[14px] font-semibold text-foreground">学习跟进</div>
-            <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted-foreground">
-              建议今日复习{" "}
-              <span className="font-medium text-foreground">{GROWTH_REMINDER.wrongToday} 题</span>
-              错题
-              <span className="mx-2 text-border">·</span>
-              薄弱点{" "}
-              <span className="text-foreground">{GROWTH_REMINDER.weakPoints.join("、")}</span>
-              {lastPractice && (
-                <>
-                  <span className="mx-2 text-border">·</span>
-                  上次练习正确率{" "}
-                  <span className="font-medium text-foreground">{lastPractice.accuracy}%</span>
-                </>
-              )}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Link
-              to="/training/session/$id"
-              params={{ id: "今日回看" }}
-              search={{
-                mode: "review",
-                filter: "",
-                count: GROWTH_REMINDER.wrongToday,
-                limit: 0,
-              }}
-            >
-              <ActionButton>
-                <RotateCcw className="h-3.5 w-3.5" />
-                复习错题
-              </ActionButton>
-            </Link>
-            {/* {activeQuiz && (
-              <ActionButton variant="outline" onClick={() => setTabAndUrl("quizsets")}>
-                继续题单
-                <ChevronRight className="h-3.5 w-3.5" />
-              </ActionButton>
-            )} */}
-          </div>
-        </div>
-      </section>
+      <PersonalDepositionOverview
+        data={depositionOverview}
+        activeKey={activeOverviewKey}
+        onCardClick={handleOverviewCardClick}
+        onOrganize={handleOrganize}
+        onViewFavorites={handleViewFavorites}
+      />
 
       {/* Tab 面板 */}
       <section className="mb-5">
@@ -419,8 +317,10 @@ function AssetsPage() {
       {/* 收藏 */}
       {tab === "fav" && (
         <div className="space-y-3">
-          {filteredFavorites.length === 0 && filteredFavoriteQuestions.length === 0 ? (
-            <EmptyState description="还没有收藏内容，可在资料检索、学习页面或错题本点击「收藏」。" />
+          {filteredFavorites.length === 0 &&
+          filteredFavoriteQuestions.length === 0 &&
+          filteredChatFavorites.length === 0 ? (
+            <EmptyState description="还没有收藏内容，可在资料检索、学习页面、智能问答或错题本点击「收藏」。" />
           ) : (
             <>
             {filteredFavorites.map(({ doc, meta }) => (
@@ -503,8 +403,8 @@ function AssetsPage() {
                       <RotateCcw className="h-3.5 w-3.5" />
                       复习
                     </Link>
-                    <Link to="/assets" search={{ tab: "wrong" }} className={listActionClass("text")}>
-                      <BookMarked className="h-3.5 w-3.5" />
+                    <Link to="/training/wrong" className={listActionClass("text")}>
+                      <ListChecks className="h-3.5 w-3.5" />
                       错题本
                     </Link>
                     <button
@@ -518,6 +418,50 @@ function AssetsPage() {
                       <Star className="h-3.5 w-3.5 fill-current" />
                       取消收藏
                     </button>
+                  </>
+                }
+              />
+            ))}
+            {filteredChatFavorites.map((c) => (
+              <PersonalAssetCard
+                key={c.id}
+                icon={<MessageSquare className="h-5 w-5" />}
+                title={c.question}
+                tags={
+                  <>
+                    <Tag variant="primary">问答摘录</Tag>
+                    {c.tags.map((t) => (
+                      <Tag key={t} variant="outline">
+                        {t}
+                      </Tag>
+                    ))}
+                  </>
+                }
+                meta={
+                  <>
+                    <span className="line-clamp-2 text-[13px] text-foreground/80">{c.summary}</span>
+                    <span className="mt-1 inline-flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {c.source} · {c.createdAt}
+                    </span>
+                  </>
+                }
+                actions={
+                  <>
+                    <Link
+                      to="/chat"
+                      search={{ prefill: c.question }}
+                      className={listActionClass("text")}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      继续追问
+                    </Link>
+                    {/* 本期暂不开放：问答生成练习题
+                    <Link to="/training/practice" className={listActionClass("textPrimary")}>
+                      <Sparkles className="h-3.5 w-3.5" />
+                      生成练习
+                    </Link>
+                    */}
                   </>
                 }
               />
@@ -650,138 +594,6 @@ function AssetsPage() {
         ...
       )}
       */}
-
-      {/* 错题本 */}
-      {tab === "wrong" && (
-        <div className="space-y-3">
-          {filteredWrong.length === 0 ? (
-            <EmptyState description="暂无错题，继续保持！" />
-          ) : (
-            filteredWrong.map((w) => (
-              <PersonalAssetCard
-                key={w.qid}
-                icon={<BookMarked className="h-5 w-5" />}
-                title={w.stem}
-                tags={
-                  <>
-                    <Tag>{w.typeLabel}</Tag>
-                    {/* <Tag variant="outline">{w.errorReason}</Tag> */}
-                    <Tag variant="outline">{w.knowledge}</Tag>
-                  </>
-                }
-                meta={
-                  <>
-                    <span>来源：{w.sourceQuiz}</span>
-                    <span>·</span>
-                    <span>最近错误：{w.lastWrongAt}</span>
-                    <span>·</span>
-                    <span>复习 {w.reviewCount} 次</span>
-                  </>
-                }
-                actions={
-                  <>
-                    <Link
-                      to="/training/session/$id"
-                      params={{ id: `解析-${w.qid}` }}
-                      search={{ mode: "review", filter: "", count: 1, limit: 0 }}
-                      className={listActionClass("text")}
-                    >
-                      <FileSearch className="h-3.5 w-3.5" />
-                      查看解析
-                    </Link>
-                    <Link
-                      to="/training/session/$id"
-                      params={{ id: `复习-${w.qid}` }}
-                      search={{ mode: "review", filter: "", count: 1, limit: 0 }}
-                      className={listActionClass("textPrimary")}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      再练一次
-                    </Link>
-                    <button
-                      type="button"
-                      className={listActionClass("text")}
-                      onClick={() => toast.success("已加入今日复习")}
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      加入今日复习
-                    </button>
-                    <button
-                      type="button"
-                      className={listActionClass("text")}
-                      onClick={() => {
-                        removeWrong(w.qid);
-                        toast.success("已从错题本移除");
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      移除
-                    </button>
-                  </>
-                }
-              />
-            ))
-          )}
-        </div>
-      )}
-
-      {/* 练习记录 */}
-      {tab === "records" && (
-        <ListCard className="rounded-md shadow-none">
-          <div
-            className={cn(
-              "hidden border-b border-divider px-5 py-3 text-[11.5px] font-medium text-muted-foreground lg:grid lg:items-center lg:gap-4",
-              RECORDS_TABLE_GRID,
-            )}
-          >
-            <span>练习名称</span>
-            <span>来源</span>
-            <span>完成时间</span>
-            <span>题数</span>
-            <span>正确率</span>
-            <span>错题</span>
-            <span>用时</span>
-            <span className="text-right">操作</span>
-          </div>
-          {filteredRecords.length === 0 ? (
-            <div className="p-8">
-              <EmptyState description="暂无练习记录" />
-            </div>
-          ) : (
-            filteredRecords.map((r) => (
-              <RecordRow
-                key={r.id}
-                cells={[
-                  r.title,
-                  r.source,
-                  r.completedAt,
-                  `${r.questionCount} 题`,
-                  `${r.accuracy}%`,
-                  `错题 ${r.wrongCount}`,
-                  r.duration,
-                ]}
-                actions={
-                  <>
-                    <Link to="/training/result/$id" params={{ id: r.id }} className={listActionClass("text")}>
-                      <FileSearch className="h-3.5 w-3.5" />
-                      查看结果
-                    </Link>
-                    <Link
-                      to="/training/session/$id"
-                      params={{ id: `再练-${r.id}` }}
-                      search={{ mode: "practice", filter: r.filter, count: r.questionCount, limit: 0 }}
-                      className={listActionClass("textPrimary")}
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      再练一次
-                    </Link>
-                  </>
-                }
-              />
-            ))
-          )}
-        </ListCard>
-      )}
           </div>
         </ModulePanel>
       </section>

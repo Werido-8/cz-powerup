@@ -108,6 +108,7 @@ import {
   DRAFT_PAPERS,
   REVIEW_DETAILS,
   REVIEW_SIMILAR,
+  REVIEW_AUDIT_LOGS,
   aggregateStats,
   type Difficulty,
   type Paper,
@@ -205,12 +206,14 @@ function ActionBtn({
   onClick,
   tone = "default",
   variant = "ghost",
+  disabled = false,
 }: {
   icon: typeof Eye;
   label: string;
   onClick?: () => void;
   tone?: "default" | "danger" | "primary";
   variant?: "ghost" | "text";
+  disabled?: boolean;
 }) {
   const cls =
     variant === "text"
@@ -228,11 +231,27 @@ function ActionBtn({
     variant === "text"
       ? "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-1 py-0.5 text-[12px] font-medium transition-colors"
       : "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[12px] transition-colors";
-  return (
-    <button type="button" onClick={onClick} className={`${base} ${cls}`}>
+  const button = (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`${base} ${cls} disabled:cursor-not-allowed disabled:opacity-40`}
+    >
       <Icon className="h-3.5 w-3.5" />
       {label}
     </button>
+  );
+
+  if (!disabled) return button;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">{button}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top">暂无审核记录</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -258,6 +277,7 @@ export function ReviewModule() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const [evidenceOf, setEvidenceOf] = useState<ReviewItem | null>(null);
+  const [auditOf, setAuditOf] = useState<ReviewItem | null>(null);
   const [editOf, setEditOf] = useState<ReviewItem | null>(null);
   const [deleteOf, setDeleteOf] = useState<ReviewItem | null>(null);
   const [mergeOf, setMergeOf] = useState<ReviewItem | null>(null);
@@ -355,7 +375,6 @@ export function ReviewModule() {
               <Th>难度</Th>
               <Th>来源资料</Th>
               {/* <Th>相似题风险</Th> */}
-              <Th>生成方式</Th>
               <Th>审核状态</Th>
               <Th className="text-right">操作</Th>
             </tr>
@@ -363,6 +382,8 @@ export function ReviewModule() {
           <tbody>
             {rows.map((q) => {
               const done = q.status === "已入库" || q.status === "已合并" || q.status === "已退回";
+              const auditLogs = REVIEW_AUDIT_LOGS[q.id] ?? [];
+              const hasAuditHistory = auditLogs.length > 0;
               return (
                 <tr key={q.id} className="border-t border-border align-top">
                   <Td>
@@ -385,11 +406,16 @@ export function ReviewModule() {
                   {/* <Td>
                     <span className={`rounded-md px-2 py-0.5 text-[11px] ${riskClass(q.similarRisk)}`}>{q.similarRisk}</span>
                   </Td> */}
-                  <Td className="whitespace-nowrap text-[12px] text-muted-foreground">{q.origin}</Td>
                   <Td><ReviewStatusBadge status={q.status} /></Td>
                   <Td>
                     <div className="flex flex-wrap justify-end gap-0.5">
                       <ActionBtn icon={FileSearch} label="查看依据" onClick={() => setEvidenceOf(q)} />
+                      <ActionBtn
+                        icon={History}
+                        label="审核记录"
+                        disabled={!hasAuditHistory}
+                        onClick={() => setAuditOf(q)}
+                      />
                       {!done && (
                         <>
                           <ActionBtn icon={ClipboardCheck} label="审核" tone="primary" onClick={() => setEditOf(q)} />
@@ -411,6 +437,7 @@ export function ReviewModule() {
         onClose={() => setEvidenceOf(null)}
         onReview={(r) => { setEvidenceOf(null); setEditOf(r); }}
       />
+      <AuditRecordDrawer q={auditOf} onClose={() => setAuditOf(null)} />
       <ReviewEditDrawer
         q={editOf}
         onClose={() => setEditOf(null)}
@@ -503,10 +530,83 @@ function ReviewSummary({ q }: { q: ReviewItem }) {
         <span>知识点: <span className="text-foreground">{q.knowledge}</span></span>
         <span>难度: <span className={`rounded px-1.5 py-0.5 text-[10.5px] ${diffClass(q.difficulty)}`}>{q.difficulty}</span></span>
         <span>来源: <span className="text-foreground">{q.source}</span></span>
-        <span>生成方式: <span className="text-foreground">{q.origin}</span></span>
         <span>状态: <ReviewStatusBadge status={q.status} /></span>
       </div>
     </div>
+  );
+}
+
+function AuditRecordDrawer({
+  q,
+  onClose,
+}: {
+  q: ReviewItem | null;
+  onClose: () => void;
+}) {
+  const logs = q ? (REVIEW_AUDIT_LOGS[q.id] ?? []) : [];
+
+  return (
+    <Sheet open={!!q} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="flex w-full flex-col gap-0 p-0 sm:max-w-lg">
+        {q && (
+          <>
+            <SheetHeader className="border-b border-border px-6 py-4">
+              <SheetTitle>审核记录</SheetTitle>
+              <SheetDescription>查看该题目的历史审核流转记录</SheetDescription>
+            </SheetHeader>
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
+              <ReviewSummary q={q} />
+
+              {logs.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted-foreground">
+                  暂无审核记录
+                </div>
+              ) : (
+                <ol className="relative space-y-0 border-l border-border pl-4">
+                  {logs.map((log, index) => (
+                    <li key={log.id} className="relative pb-5 last:pb-0">
+                      <span
+                        className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-primary"
+                        aria-hidden
+                      />
+                      <div className="rounded-lg border border-border bg-card px-3.5 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[13px] font-medium text-foreground">{log.action}</span>
+                          <span className="text-[11.5px] tabular-nums text-muted-foreground">{log.time}</span>
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px] text-muted-foreground">
+                          <span>操作人: {log.operator}</span>
+                          <span>·</span>
+                          <span className="inline-flex items-center gap-1">
+                            状态:
+                            <ReviewStatusBadge status={log.statusAfter} />
+                          </span>
+                        </div>
+                        {log.comment && (
+                          <div className="mt-2 rounded-md bg-muted/40 px-2.5 py-2 text-[12px] leading-relaxed text-muted-foreground">
+                            {log.comment}
+                          </div>
+                        )}
+                      </div>
+                      {index < logs.length - 1 && <div className="h-1" aria-hidden />}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+            <div className="flex items-center justify-end border-t border-border px-6 py-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+              >
+                关闭
+              </button>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 

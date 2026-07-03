@@ -77,7 +77,10 @@ export type TopicAdminStats = {
   key: string;
   label: string;
   value: string | number;
+  /** 数值下方说明 */
   hint?: string;
+  /** 底部分隔线内补充说明 */
+  detail?: string;
   tone?: "default" | "warning" | "success";
 };
 
@@ -102,14 +105,18 @@ const SCENARIO_MAP: Record<string, TopicScenario> = {
   "t-agc": "专项提升",
 };
 
+/** 专题补充知识点（mock 演示分页；接真实接口后由后端返回完整列表） */
+const TOPIC_EXTRA_KNOWLEDGE: Record<string, string[]> = {
+  "t-newbie": ["主责尽责", "厂站巡检", "定期检修", "扩停设备", "隐患治理"],
+};
+
 function buildKnowledgePoints(topicId: string, docIds: string[]): TopicKnowledgePoint[] {
   const kpSet = new Set<string>();
   QUESTIONS.filter((q) => docIds.some((id) => q.relatedDocId === id)).forEach((q) =>
     q.knowledgePoints.forEach((k) => kpSet.add(k)),
   );
-  return Array.from(kpSet)
-    .slice(0, 6)
-    .map((title, i) => ({
+  (TOPIC_EXTRA_KNOWLEDGE[topicId] ?? []).forEach((k) => kpSet.add(k));
+  return Array.from(kpSet).map((title, i) => ({
       id: `${topicId}-kp-${i}`,
       title,
       summary: `掌握「${title}」相关概念与现场应用要点。`,
@@ -203,24 +210,35 @@ export const TOPIC_ADMIN_RECORDS: TopicAdminRecord[] = [
 ];
 
 export const TOPIC_ADMIN_STATS: TopicAdminStats[] = [
-  { key: "total", label: "专题总数", value: TOPIC_ADMIN_RECORDS.length, hint: "含草稿与下架" },
+  {
+    key: "total",
+    label: "专题总数",
+    value: TOPIC_ADMIN_RECORDS.length,
+    hint: "全部维护专题",
+    detail: "含草稿与下架",
+  },
   {
     key: "published",
     label: "已发布",
     value: TOPIC_ADMIN_RECORDS.filter((t) => t.status === "已发布").length,
+    hint: "对外可见",
+    detail: "学员端可学习",
     tone: "success",
   },
   {
     key: "draft",
     label: "草稿",
     value: TOPIC_ADMIN_RECORDS.filter((t) => t.status === "草稿").length,
+    hint: "待完善发布",
+    detail: "编辑后可发布",
     tone: "warning",
   },
   {
     key: "learners",
     label: "在学人数",
-    value: TOPIC_ADMIN_RECORDS.reduce((n, t) => n + t.learnerCount, 0),
-    hint: "已发布专题累计",
+    value: TOPIC_ADMIN_RECORDS.reduce((n, t) => n + (t.learnerCount || 0), 0),
+    hint: "活跃学习人数",
+    detail: "已发布专题累计",
   },
 ];
 
