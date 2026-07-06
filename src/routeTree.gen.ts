@@ -40,7 +40,9 @@ import { Route as TrainingResultIdRouteImport } from './routes/training.result.$
 import { Route as LearnTopicIdRouteImport } from './routes/learn.topic.$id'
 import { Route as LearnDocIdRouteImport } from './routes/learn.doc.$id'
 import { Route as LearnAdminTopicNewRouteImport } from './routes/learn-admin.topic.new'
+import { Route as KnowledgeSpacePublicRouteImport } from './routes/knowledge.space.public'
 import { Route as KnowledgeLibLibIdRouteImport } from './routes/knowledge.lib.$libId'
+import { Route as KnowledgeKbKbIdRouteImport } from './routes/knowledge.kb.$kbId'
 import { Route as KnowledgeFileFileIdRouteImport } from './routes/knowledge.file.$fileId'
 import { Route as KnowledgeDeptDeptIdRouteImport } from './routes/knowledge.dept.$deptId'
 import { Route as ExamAdminPaperNewRouteImport } from './routes/exam-admin.paper.new'
@@ -50,8 +52,11 @@ import { Route as ScenarioSootblowResultIdRouteImport } from './routes/scenario.
 import { Route as ScenarioPeakResultIdRouteImport } from './routes/scenario.peak.result.$id'
 import { Route as ScenarioFaultResultIdRouteImport } from './routes/scenario.fault.result.$id'
 import { Route as LearnAdminTopicTopicIdEditRouteImport } from './routes/learn-admin.topic.$topicId.edit'
+import { Route as KnowledgeSpaceDepartmentDepartmentIdRouteImport } from './routes/knowledge.space.department.$departmentId'
 import { Route as ExamAdminPaperPaperIdPreviewRouteImport } from './routes/exam-admin.paper.$paperId.preview'
 import { Route as ExamAdminPaperPaperIdEditRouteImport } from './routes/exam-admin.paper.$paperId.edit'
+import { Route as KnowledgeKbKbIdFileFileIdRouteImport } from './routes/knowledge.kb.$kbId.file.$fileId'
+import { Route as KnowledgeKbKbIdDirDirIdRouteImport } from './routes/knowledge.kb.$kbId.dir.$dirId'
 import { Route as ExamAdminPaperPaperIdPersonPersonIdRouteImport } from './routes/exam-admin.paper.$paperId.person.$personId'
 
 const SearchRoute = SearchRouteImport.update({
@@ -209,9 +214,19 @@ const LearnAdminTopicNewRoute = LearnAdminTopicNewRouteImport.update({
   path: '/topic/new',
   getParentRoute: () => LearnAdminRoute,
 } as any)
+const KnowledgeSpacePublicRoute = KnowledgeSpacePublicRouteImport.update({
+  id: '/space/public',
+  path: '/space/public',
+  getParentRoute: () => KnowledgeRoute,
+} as any)
 const KnowledgeLibLibIdRoute = KnowledgeLibLibIdRouteImport.update({
   id: '/lib/$libId',
   path: '/lib/$libId',
+  getParentRoute: () => KnowledgeRoute,
+} as any)
+const KnowledgeKbKbIdRoute = KnowledgeKbKbIdRouteImport.update({
+  id: '/kb/$kbId',
+  path: '/kb/$kbId',
   getParentRoute: () => KnowledgeRoute,
 } as any)
 const KnowledgeFileFileIdRoute = KnowledgeFileFileIdRouteImport.update({
@@ -261,6 +276,12 @@ const LearnAdminTopicTopicIdEditRoute =
     path: '/topic/$topicId/edit',
     getParentRoute: () => LearnAdminRoute,
   } as any)
+const KnowledgeSpaceDepartmentDepartmentIdRoute =
+  KnowledgeSpaceDepartmentDepartmentIdRouteImport.update({
+    id: '/space/department/$departmentId',
+    path: '/space/department/$departmentId',
+    getParentRoute: () => KnowledgeRoute,
+  } as any)
 const ExamAdminPaperPaperIdPreviewRoute =
   ExamAdminPaperPaperIdPreviewRouteImport.update({
     id: '/paper/$paperId/preview',
@@ -273,6 +294,17 @@ const ExamAdminPaperPaperIdEditRoute =
     path: '/paper/$paperId/edit',
     getParentRoute: () => ExamAdminRoute,
   } as any)
+const KnowledgeKbKbIdFileFileIdRoute =
+  KnowledgeKbKbIdFileFileIdRouteImport.update({
+    id: '/file/$fileId',
+    path: '/file/$fileId',
+    getParentRoute: () => KnowledgeKbKbIdRoute,
+  } as any)
+const KnowledgeKbKbIdDirDirIdRoute = KnowledgeKbKbIdDirDirIdRouteImport.update({
+  id: '/dir/$dirId',
+  path: '/dir/$dirId',
+  getParentRoute: () => KnowledgeKbKbIdRoute,
+} as any)
 const ExamAdminPaperPaperIdPersonPersonIdRoute =
   ExamAdminPaperPaperIdPersonPersonIdRouteImport.update({
     id: '/paper/$paperId/person/$personId',
@@ -309,7 +341,9 @@ export interface FileRoutesByFullPath {
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
+  '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
   '/knowledge/lib/$libId': typeof KnowledgeLibLibIdRoute
+  '/knowledge/space/public': typeof KnowledgeSpacePublicRoute
   '/learn-admin/topic/new': typeof LearnAdminTopicNewRoute
   '/learn/doc/$id': typeof LearnDocIdRoute
   '/learn/topic/$id': typeof LearnTopicIdRoute
@@ -319,12 +353,15 @@ export interface FileRoutesByFullPath {
   '/scenario/typical/': typeof ScenarioTypicalIndexRoute
   '/exam-admin/paper/$paperId/edit': typeof ExamAdminPaperPaperIdEditRoute
   '/exam-admin/paper/$paperId/preview': typeof ExamAdminPaperPaperIdPreviewRoute
+  '/knowledge/space/department/$departmentId': typeof KnowledgeSpaceDepartmentDepartmentIdRoute
   '/learn-admin/topic/$topicId/edit': typeof LearnAdminTopicTopicIdEditRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
   '/scenario/sootblow/result/$id': typeof ScenarioSootblowResultIdRoute
   '/scenario/typical/result/$id': typeof ScenarioTypicalResultIdRoute
   '/exam-admin/paper/$paperId/person/$personId': typeof ExamAdminPaperPaperIdPersonPersonIdRoute
+  '/knowledge/kb/$kbId/dir/$dirId': typeof KnowledgeKbKbIdDirDirIdRoute
+  '/knowledge/kb/$kbId/file/$fileId': typeof KnowledgeKbKbIdFileFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -351,7 +388,9 @@ export interface FileRoutesByTo {
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
+  '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
   '/knowledge/lib/$libId': typeof KnowledgeLibLibIdRoute
+  '/knowledge/space/public': typeof KnowledgeSpacePublicRoute
   '/learn-admin/topic/new': typeof LearnAdminTopicNewRoute
   '/learn/doc/$id': typeof LearnDocIdRoute
   '/learn/topic/$id': typeof LearnTopicIdRoute
@@ -361,12 +400,15 @@ export interface FileRoutesByTo {
   '/scenario/typical': typeof ScenarioTypicalIndexRoute
   '/exam-admin/paper/$paperId/edit': typeof ExamAdminPaperPaperIdEditRoute
   '/exam-admin/paper/$paperId/preview': typeof ExamAdminPaperPaperIdPreviewRoute
+  '/knowledge/space/department/$departmentId': typeof KnowledgeSpaceDepartmentDepartmentIdRoute
   '/learn-admin/topic/$topicId/edit': typeof LearnAdminTopicTopicIdEditRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
   '/scenario/sootblow/result/$id': typeof ScenarioSootblowResultIdRoute
   '/scenario/typical/result/$id': typeof ScenarioTypicalResultIdRoute
   '/exam-admin/paper/$paperId/person/$personId': typeof ExamAdminPaperPaperIdPersonPersonIdRoute
+  '/knowledge/kb/$kbId/dir/$dirId': typeof KnowledgeKbKbIdDirDirIdRoute
+  '/knowledge/kb/$kbId/file/$fileId': typeof KnowledgeKbKbIdFileFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -398,7 +440,9 @@ export interface FileRoutesById {
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
+  '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
   '/knowledge/lib/$libId': typeof KnowledgeLibLibIdRoute
+  '/knowledge/space/public': typeof KnowledgeSpacePublicRoute
   '/learn-admin/topic/new': typeof LearnAdminTopicNewRoute
   '/learn/doc/$id': typeof LearnDocIdRoute
   '/learn/topic/$id': typeof LearnTopicIdRoute
@@ -408,12 +452,15 @@ export interface FileRoutesById {
   '/scenario/typical/': typeof ScenarioTypicalIndexRoute
   '/exam-admin/paper/$paperId/edit': typeof ExamAdminPaperPaperIdEditRoute
   '/exam-admin/paper/$paperId/preview': typeof ExamAdminPaperPaperIdPreviewRoute
+  '/knowledge/space/department/$departmentId': typeof KnowledgeSpaceDepartmentDepartmentIdRoute
   '/learn-admin/topic/$topicId/edit': typeof LearnAdminTopicTopicIdEditRoute
   '/scenario/fault/result/$id': typeof ScenarioFaultResultIdRoute
   '/scenario/peak/result/$id': typeof ScenarioPeakResultIdRoute
   '/scenario/sootblow/result/$id': typeof ScenarioSootblowResultIdRoute
   '/scenario/typical/result/$id': typeof ScenarioTypicalResultIdRoute
   '/exam-admin/paper/$paperId/person/$personId': typeof ExamAdminPaperPaperIdPersonPersonIdRoute
+  '/knowledge/kb/$kbId/dir/$dirId': typeof KnowledgeKbKbIdDirDirIdRoute
+  '/knowledge/kb/$kbId/file/$fileId': typeof KnowledgeKbKbIdFileFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -446,7 +493,9 @@ export interface FileRouteTypes {
     | '/exam-admin/paper/new'
     | '/knowledge/dept/$deptId'
     | '/knowledge/file/$fileId'
+    | '/knowledge/kb/$kbId'
     | '/knowledge/lib/$libId'
+    | '/knowledge/space/public'
     | '/learn-admin/topic/new'
     | '/learn/doc/$id'
     | '/learn/topic/$id'
@@ -456,12 +505,15 @@ export interface FileRouteTypes {
     | '/scenario/typical/'
     | '/exam-admin/paper/$paperId/edit'
     | '/exam-admin/paper/$paperId/preview'
+    | '/knowledge/space/department/$departmentId'
     | '/learn-admin/topic/$topicId/edit'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
     | '/scenario/sootblow/result/$id'
     | '/scenario/typical/result/$id'
     | '/exam-admin/paper/$paperId/person/$personId'
+    | '/knowledge/kb/$kbId/dir/$dirId'
+    | '/knowledge/kb/$kbId/file/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -488,7 +540,9 @@ export interface FileRouteTypes {
     | '/exam-admin/paper/new'
     | '/knowledge/dept/$deptId'
     | '/knowledge/file/$fileId'
+    | '/knowledge/kb/$kbId'
     | '/knowledge/lib/$libId'
+    | '/knowledge/space/public'
     | '/learn-admin/topic/new'
     | '/learn/doc/$id'
     | '/learn/topic/$id'
@@ -498,12 +552,15 @@ export interface FileRouteTypes {
     | '/scenario/typical'
     | '/exam-admin/paper/$paperId/edit'
     | '/exam-admin/paper/$paperId/preview'
+    | '/knowledge/space/department/$departmentId'
     | '/learn-admin/topic/$topicId/edit'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
     | '/scenario/sootblow/result/$id'
     | '/scenario/typical/result/$id'
     | '/exam-admin/paper/$paperId/person/$personId'
+    | '/knowledge/kb/$kbId/dir/$dirId'
+    | '/knowledge/kb/$kbId/file/$fileId'
   id:
     | '__root__'
     | '/'
@@ -534,7 +591,9 @@ export interface FileRouteTypes {
     | '/exam-admin/paper/new'
     | '/knowledge/dept/$deptId'
     | '/knowledge/file/$fileId'
+    | '/knowledge/kb/$kbId'
     | '/knowledge/lib/$libId'
+    | '/knowledge/space/public'
     | '/learn-admin/topic/new'
     | '/learn/doc/$id'
     | '/learn/topic/$id'
@@ -544,12 +603,15 @@ export interface FileRouteTypes {
     | '/scenario/typical/'
     | '/exam-admin/paper/$paperId/edit'
     | '/exam-admin/paper/$paperId/preview'
+    | '/knowledge/space/department/$departmentId'
     | '/learn-admin/topic/$topicId/edit'
     | '/scenario/fault/result/$id'
     | '/scenario/peak/result/$id'
     | '/scenario/sootblow/result/$id'
     | '/scenario/typical/result/$id'
     | '/exam-admin/paper/$paperId/person/$personId'
+    | '/knowledge/kb/$kbId/dir/$dirId'
+    | '/knowledge/kb/$kbId/file/$fileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -801,11 +863,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LearnAdminTopicNewRouteImport
       parentRoute: typeof LearnAdminRoute
     }
+    '/knowledge/space/public': {
+      id: '/knowledge/space/public'
+      path: '/space/public'
+      fullPath: '/knowledge/space/public'
+      preLoaderRoute: typeof KnowledgeSpacePublicRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
     '/knowledge/lib/$libId': {
       id: '/knowledge/lib/$libId'
       path: '/lib/$libId'
       fullPath: '/knowledge/lib/$libId'
       preLoaderRoute: typeof KnowledgeLibLibIdRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
+    '/knowledge/kb/$kbId': {
+      id: '/knowledge/kb/$kbId'
+      path: '/kb/$kbId'
+      fullPath: '/knowledge/kb/$kbId'
+      preLoaderRoute: typeof KnowledgeKbKbIdRouteImport
       parentRoute: typeof KnowledgeRoute
     }
     '/knowledge/file/$fileId': {
@@ -871,6 +947,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LearnAdminTopicTopicIdEditRouteImport
       parentRoute: typeof LearnAdminRoute
     }
+    '/knowledge/space/department/$departmentId': {
+      id: '/knowledge/space/department/$departmentId'
+      path: '/space/department/$departmentId'
+      fullPath: '/knowledge/space/department/$departmentId'
+      preLoaderRoute: typeof KnowledgeSpaceDepartmentDepartmentIdRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
     '/exam-admin/paper/$paperId/preview': {
       id: '/exam-admin/paper/$paperId/preview'
       path: '/paper/$paperId/preview'
@@ -884,6 +967,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/exam-admin/paper/$paperId/edit'
       preLoaderRoute: typeof ExamAdminPaperPaperIdEditRouteImport
       parentRoute: typeof ExamAdminRoute
+    }
+    '/knowledge/kb/$kbId/file/$fileId': {
+      id: '/knowledge/kb/$kbId/file/$fileId'
+      path: '/file/$fileId'
+      fullPath: '/knowledge/kb/$kbId/file/$fileId'
+      preLoaderRoute: typeof KnowledgeKbKbIdFileFileIdRouteImport
+      parentRoute: typeof KnowledgeKbKbIdRoute
+    }
+    '/knowledge/kb/$kbId/dir/$dirId': {
+      id: '/knowledge/kb/$kbId/dir/$dirId'
+      path: '/dir/$dirId'
+      fullPath: '/knowledge/kb/$kbId/dir/$dirId'
+      preLoaderRoute: typeof KnowledgeKbKbIdDirDirIdRouteImport
+      parentRoute: typeof KnowledgeKbKbIdRoute
     }
     '/exam-admin/paper/$paperId/person/$personId': {
       id: '/exam-admin/paper/$paperId/person/$personId'
@@ -927,12 +1024,29 @@ const ExamAdminRouteWithChildren = ExamAdminRoute._addFileChildren(
   ExamAdminRouteChildren,
 )
 
+interface KnowledgeKbKbIdRouteChildren {
+  KnowledgeKbKbIdDirDirIdRoute: typeof KnowledgeKbKbIdDirDirIdRoute
+  KnowledgeKbKbIdFileFileIdRoute: typeof KnowledgeKbKbIdFileFileIdRoute
+}
+
+const KnowledgeKbKbIdRouteChildren: KnowledgeKbKbIdRouteChildren = {
+  KnowledgeKbKbIdDirDirIdRoute: KnowledgeKbKbIdDirDirIdRoute,
+  KnowledgeKbKbIdFileFileIdRoute: KnowledgeKbKbIdFileFileIdRoute,
+}
+
+const KnowledgeKbKbIdRouteWithChildren = KnowledgeKbKbIdRoute._addFileChildren(
+  KnowledgeKbKbIdRouteChildren,
+)
+
 interface KnowledgeRouteChildren {
   KnowledgeMineRoute: typeof KnowledgeMineRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
   KnowledgeDeptDeptIdRoute: typeof KnowledgeDeptDeptIdRoute
   KnowledgeFileFileIdRoute: typeof KnowledgeFileFileIdRoute
+  KnowledgeKbKbIdRoute: typeof KnowledgeKbKbIdRouteWithChildren
   KnowledgeLibLibIdRoute: typeof KnowledgeLibLibIdRoute
+  KnowledgeSpacePublicRoute: typeof KnowledgeSpacePublicRoute
+  KnowledgeSpaceDepartmentDepartmentIdRoute: typeof KnowledgeSpaceDepartmentDepartmentIdRoute
 }
 
 const KnowledgeRouteChildren: KnowledgeRouteChildren = {
@@ -940,7 +1054,11 @@ const KnowledgeRouteChildren: KnowledgeRouteChildren = {
   KnowledgeIndexRoute: KnowledgeIndexRoute,
   KnowledgeDeptDeptIdRoute: KnowledgeDeptDeptIdRoute,
   KnowledgeFileFileIdRoute: KnowledgeFileFileIdRoute,
+  KnowledgeKbKbIdRoute: KnowledgeKbKbIdRouteWithChildren,
   KnowledgeLibLibIdRoute: KnowledgeLibLibIdRoute,
+  KnowledgeSpacePublicRoute: KnowledgeSpacePublicRoute,
+  KnowledgeSpaceDepartmentDepartmentIdRoute:
+    KnowledgeSpaceDepartmentDepartmentIdRoute,
 }
 
 const KnowledgeRouteWithChildren = KnowledgeRoute._addFileChildren(
