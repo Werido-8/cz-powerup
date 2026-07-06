@@ -3,7 +3,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Clock, ChevronLeft, ChevronRight, AlertTriangle, Save, X } from "lucide-react";
 import { z } from "zod";
 import { PageShell } from "@/components/workbench/PageShell";
+import { ExamSessionPaperView } from "@/components/exam/exam-session-paper";
 import { QUESTIONS, TOPICS, type Question, type QuestionType } from "@/lib/mock/data";
+import {
+  fallbackExamSessionPaper,
+  flattenExamQuestions,
+  gradeExamAnswer,
+  isExamAnswerFilled,
+  resolveExamSessionPaper,
+} from "@/lib/mock/exam-session";
 import { getQuestionIdsForDoc } from "@/lib/mock/learning-progress";
 import { filterPracticeQuestions, type PracticeDifficulty } from "@/lib/mock/practice-filter";
 import { useMockStore } from "@/lib/mock/store";
@@ -40,6 +48,12 @@ function SessionPage() {
   >;
   const navigate = useNavigate();
   const { addWrong, recordDocAnswers } = useMockStore();
+
+  const isExamMode = mode === "exam";
+  const examPaper = useMemo(() => {
+    if (!isExamMode) return null;
+    return resolveExamSessionPaper(id) ?? fallbackExamSessionPaper(decodeURIComponent(id), count);
+  }, [isExamMode, id, count]);
 
   const topic = topicId ? TOPICS.find((t) => t.id === topicId) : undefined;
   const isTopicPractice = Boolean(topicId && topic);
@@ -90,9 +104,16 @@ function SessionPage() {
 
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  const [examAnswers, setExamAnswers] = useState<Record<string, string | string[]>>({});
   const [elapsed, setElapsed] = useState(0);
   const [confirmExit, setConfirmExit] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
+
+  const examFlat = useMemo(
+    () => (examPaper ? flattenExamQuestions(examPaper.groups) : []),
+    [examPaper],
+  );
+  const examLimitMinutes = examPaper?.duration ?? limit;
 
   useEffect(() => {
     if (!isTopicPractice || !topicId || draftLoaded) return;
@@ -112,10 +133,22 @@ function SessionPage() {
     return () => clearInterval(t);
   }, []);
 
-  const remaining = limit > 0 ? Math.max(0, limit * 60 - elapsed) : 0;
+  const remaining = isExamMode
+    ? examLimitMinutes > 0
+      ? Math.max(0, examLimitMinutes * 60 - elapsed)
+      : 0
+    : limit > 0
+      ? Math.max(0, limit * 60 - elapsed)
+      : 0;
 
-  const setAns = (val: string | string[]) =>
+  const setAns = (val: string | string[]) => {
+    if (!q) return;
     setAnswers((a) => ({ ...a, [q.id]: val }));
+  };
+
+  const setExamAns = (questionId: string, val: string | string[]) => {
+    setExamAnswers((a) => ({ ...a, [questionId]: val }));
+  };
 
   const saveDraft = () => {
     if (!topicId) return;
@@ -128,6 +161,33 @@ function SessionPage() {
   };
 
   const submit = () => {
+    if (isExamMode && examPaper) {
+      const wrongIds: string[] = [];
+      examFlat.forEach(({ groupType, question }) => {
+        if (groupType === "简答题" || groupType === "案例分析题" || groupType === "填空题") return;
+        const a = examAnswers[question.id];
+        const correct = gradeExamAnswer(groupType, question.answer, a);
+        if (!correct) {
+          wrongIds.push(question.id);
+          addWrong(question.id);
+        }
+      });
+      sessionStorage.setItem(
+        `result-${id}`,
+        JSON.stringify({
+          wrongIds,
+          total: examFlat.length,
+          answers: examAnswers,
+          qids: examFlat.map((item) => item.question.id),
+          elapsed,
+          mode,
+          paperId: examPaper.employeePaperId,
+        }),
+      );
+      navigate({ to: "/training/result/$id", params: { id } });
+      return;
+    }
+
     const wrongIds: string[] = [];
     questions.forEach((qq) => {
       if (qq.type === "text") return;
@@ -186,15 +246,51 @@ function SessionPage() {
     return `${m}:${sec}`;
   };
 
-  const answered = Object.keys(answers).filter((k) => {
-    const v = answers[k];
-    return Array.isArray(v) ? v.length > 0 : v != null && v !== "";
-  }).length;
+  const answered = isExamMode
+    ? examFlat.filter((item) => isExamAnswerFilled(examAnswers[item.question.id])).length
+    : Object.keys(answers).filter((k) => {
+        const v = answers[k];
+        return Array.isArray(v) ? v.length > 0 : v != null && v !== "";
+      }).length;
 
-  const sessionTitle = isTopicPractice ? topic?.title ?? "专题练习" : decodeURIComponent(id);
+  const sessionTitle = isTopicPractice
+    ? (topic?.title ?? "专题练习")
+    : isExamMode && examPaper
+      ? examPaper.title
+      : decodeURIComponent(id);
   const modeLabel = isTopicPractice
     ? "专题练习"
     : ({ practice: "专项练习", exam: "我的考试", review: "复习" } as const)[mode];
+
+  if (isExamMode && examPaper) {
+    return (
+      <PageShell compact>
+        <ExamSessionPaperView
+          meta={examPaper}
+          groups={examPaper.groups}
+          answers={examAnswers}
+          onAnswerChange={setExamAns}
+          onSubmit={submit}
+          onExit={() => setConfirmExit(true)}
+          remaining={remaining}
+          formatTime={fmt}
+        />
+
+        {confirmExit && (
+          <ExitConfirmDialog
+            mode={mode}
+            isTopicPractice={false}
+            answered={answered}
+            total={examFlat.length}
+            topicId={undefined}
+            onCancel={() => setConfirmExit(false)}
+            onSaveDraft={() => {}}
+            onAbandon={() => navigate({ to: "/training/exam" })}
+          />
+        )}
+      </PageShell>
+    );
+  }
 
   if (!q) {
     return (
@@ -418,53 +514,99 @@ function SessionPage() {
       </div>
 
       {confirmExit && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-[var(--shadow-card-hover)]">
-            <div className="inline-flex items-center gap-2 text-[14px] font-semibold">
-              <AlertTriangle className="h-4 w-4 text-warning" /> 确认退出本次{({ practice: "练习", exam: "考试", review: "复习" } as const)[mode]}?
-            </div>
-            <p className="mt-2 text-[12.5px] text-muted-foreground">
-              {isTopicPractice
-                ? `当前进度（${answered} / ${questions.length}）可选择暂存后退出，或放弃进度。`
-                : `当前进度(${answered} / ${questions.length})将不会保存。`}
-            </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
-                onClick={() => setConfirmExit(false)}
-                className="rounded-lg border border-border bg-background px-3 py-1.5 text-[12.5px] hover:bg-muted"
-              >
-                继续答题
-              </button>
-              {isTopicPractice && topicId ? (
-                <>
-                  <button
-                    onClick={() => {
-                      saveDraft();
-                      navigate({ to: "/learn/topic/$id", params: { id: topicId } });
-                    }}
-                    className="rounded-lg border border-primary/40 bg-primary-soft px-3 py-1.5 text-[12.5px] font-medium text-accent-foreground hover:bg-primary-soft/80"
-                  >
-                    暂存并退出
-                  </button>
-                  <button
-                    onClick={() => navigate({ to: "/learn/topic/$id", params: { id: topicId } })}
-                    className="rounded-lg bg-destructive px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90"
-                  >
-                    放弃进度
-                  </button>
-                </>
-              ) : (
-                <Link
-                  to="/training"
-                  className="rounded-lg bg-destructive px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90"
-                >
-                  确认退出
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
+        <ExitConfirmDialog
+          mode={mode}
+          isTopicPractice={isTopicPractice}
+          answered={answered}
+          total={questions.length}
+          topicId={topicId}
+          onCancel={() => setConfirmExit(false)}
+          onSaveDraft={() => {
+            saveDraft();
+            navigate({ to: "/learn/topic/$id", params: { id: topicId! } });
+          }}
+          onAbandon={() => {
+            if (isTopicPractice && topicId) {
+              navigate({ to: "/learn/topic/$id", params: { id: topicId } });
+            }
+          }}
+        />
       )}
     </PageShell>
+  );
+}
+
+function ExitConfirmDialog({
+  mode,
+  isTopicPractice,
+  answered,
+  total,
+  topicId,
+  onCancel,
+  onSaveDraft,
+  onAbandon,
+}: {
+  mode: "practice" | "exam" | "review";
+  isTopicPractice: boolean;
+  answered: number;
+  total: number;
+  topicId?: string;
+  onCancel: () => void;
+  onSaveDraft: () => void;
+  onAbandon: () => void;
+}) {
+  const modeName = isTopicPractice ? "练习" : ({ practice: "练习", exam: "考试", review: "复习" } as const)[mode];
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/30 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-[var(--shadow-card-hover)]">
+        <div className="inline-flex items-center gap-2 text-[14px] font-semibold">
+          <AlertTriangle className="h-4 w-4 text-warning" /> 确认退出本次{modeName}?
+        </div>
+        <p className="mt-2 text-[12.5px] text-muted-foreground">
+          {isTopicPractice
+            ? `当前进度（${answered} / ${total}）可选择暂存后退出，或放弃进度。`
+            : `当前进度（${answered} / ${total}）将不会保存。`}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-lg border border-border bg-background px-3 py-1.5 text-[12.5px] hover:bg-muted"
+          >
+            继续答题
+          </button>
+          {isTopicPractice && topicId ? (
+            <>
+              <button
+                onClick={onSaveDraft}
+                className="rounded-lg border border-primary/40 bg-primary-soft px-3 py-1.5 text-[12.5px] font-medium text-accent-foreground hover:bg-primary-soft/80"
+              >
+                暂存并退出
+              </button>
+              <button
+                onClick={onAbandon}
+                className="rounded-lg bg-destructive px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90"
+              >
+                放弃进度
+              </button>
+            </>
+          ) : mode === "exam" ? (
+            <Link
+              to="/training/exam"
+              className="rounded-lg bg-destructive px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90"
+            >
+              确认退出
+            </Link>
+          ) : (
+            <Link
+              to="/training"
+              className="rounded-lg bg-destructive px-3 py-1.5 text-[12.5px] font-medium text-white hover:opacity-90"
+            >
+              确认退出
+            </Link>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

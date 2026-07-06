@@ -1,5 +1,7 @@
 // Mock data for the exam administration (考试管理) page.
 
+import { buildExamPaper100Groups, EXAM_PAPER_100_COUNT } from "./exam-paper-100";
+
 export type QuestionType = "单选题" | "多选题" | "判断题" | "填空题" | "案例分析题" | "简答题";
 export type Difficulty = "易" | "中" | "难";
 
@@ -331,7 +333,7 @@ export const PAPERS: Paper[] = [
     name: "AGC / 两细则取证复习考试",
     goal: "取证复习",
     category: "调频调压",
-    questionCount: 20,
+    questionCount: EXAM_PAPER_100_COUNT,
     duration: 30,
     createdAt: "2026-06-10",
     source: "智能组卷",
@@ -804,47 +806,7 @@ export const EMPTY_EDITOR_GROUPS: EditorGroup[] = [
   { type: "简答题", perScore: 5, questions: [] },
 ];
 
-export const EDITOR_GROUPS: EditorGroup[] = [
-  {
-    type: "单选题",
-    perScore: 2,
-    questions: [
-      { id: "e1", stem: "AGC 投入后机组出力与调度指令偏差持续超 ±3% 应优先采取?", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", score: 2, options: [{ key: "A", text: "检查 AGC 通道" }, { key: "B", text: "调整死区" }, { key: "C", text: "汇报调度" }, { key: "D", text: "切至手动" }], answer: "A" },
-      { id: "e2", stem: "一次调频的负荷响应应在频率越限后多少秒内开始?", knowledge: "一次调频", difficulty: "中", source: "两细则考核知识点汇编 v2024.05", score: 2, options: [{ key: "A", text: "5 秒" }, { key: "B", text: "15 秒" }, { key: "C", text: "30 秒" }, { key: "D", text: "60 秒" }], answer: "B" },
-      { id: "e3", stem: "AGC 控制方式下机组响应速率不满足要求的考核方式?", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", score: 2, options: [{ key: "A", text: "按 K 值法" }, { key: "B", text: "按固定分" }, { key: "C", text: "不考核" }, { key: "D", text: "按容量比" }], answer: "A" },
-    ],
-  },
-  {
-    type: "多选题",
-    perScore: 3,
-    questions: [
-      { id: "e4", stem: "下列关于安控装置联动配合的描述,正确的有哪些?", knowledge: "安控配合", difficulty: "中", source: "安控装置运行规程 v2023.09", score: 3 },
-      { id: "e5", stem: "主变停役前必须确认的安全措施包括哪些?", knowledge: "主变停役", difficulty: "难", source: "厂站运行规程(华东 A 厂) v2024.07", score: 3 },
-    ],
-  },
-  {
-    type: "判断题",
-    perScore: 1,
-    questions: [
-      { id: "e6", stem: "一次调频死区设置过大会导致机组在小扰动下不动作。", knowledge: "一次调频", difficulty: "易", source: "两细则考核知识点汇编 v2024.05", score: 1, options: [{ key: "T", text: "正确" }, { key: "F", text: "错误" }], answer: "T" },
-      { id: "e7", stem: "差动保护属于主保护,具备绝对选择性。", knowledge: "差动保护", difficulty: "易", source: "差动保护误动复盘案例库 v2023.11", score: 1, options: [{ key: "T", text: "正确" }, { key: "F", text: "错误" }], answer: "F" },
-    ],
-  },
-  {
-    type: "填空题",
-    perScore: 2,
-    questions: [
-      { id: "e8", stem: "一次调频的转速不等率一般整定为 ____%。", knowledge: "一次调频", difficulty: "中", source: "两细则考核知识点汇编 v2024.05", score: 2 },
-    ],
-  },
-  {
-    type: "简答题",
-    perScore: 5,
-    questions: [
-      { id: "e9", stem: "安控装置切机切负荷动作后,运行人员的汇报与处理流程是什么?", knowledge: "安控配合", difficulty: "中", source: "安控装置运行规程 v2023.09", score: 5 },
-    ],
-  },
-];
+export const EDITOR_GROUPS: EditorGroup[] = buildExamPaper100Groups() as EditorGroup[];
 
 // ---------- AI swap candidates ----------
 export interface SwapCandidate {

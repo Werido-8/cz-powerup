@@ -58,7 +58,7 @@ const PAPERS: EmployeePaper[] = [
   {
     id: "AGC-取证复习卷",
     title: "AGC / 两细则取证复习考试",
-    count: 20,
+    count: 44,
     limit: 30,
     weight: "AGC",
     level: "中",
