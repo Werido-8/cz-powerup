@@ -2,14 +2,13 @@
   FileQuestion,
   Folder,
   FolderOpen,
-  FolderPlus,
   Home,
-  MessageCircle,
   Plus,
   Upload,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { KB_VIEWER, type KnowledgeBase, type KnowledgeFile } from "@/lib/mock/knowledge-space";
 import {
   canUploadToKnowledgeBase,
@@ -54,9 +53,9 @@ export function KnowledgeDirectoryTree({
     department?.name ?? (base?.spaceType === "public" ? "公共空间" : base?.spaceType === "personal" ? "我的资料" : "知识库");
 
   return (
-    <aside className="flex w-[232px] shrink-0 flex-col border-r border-[#E2ECEF] bg-[#F7FAFB]">
+    <aside className="flex w-[232px] shrink-0 flex-col border-r border-[#DCE8EA] bg-[#F7FAFB]">
       <div className="px-3 pb-3 pt-4">
-        <div className="text-[11px] text-[#8EA1A8]">{spaceName}</div>
+        <div className="text-[11px] text-[#91A3AA]">{spaceName}</div>
         <div className="mt-1">
           {base ? (
             <KnowledgeBaseSwitcher current={base} compact />
@@ -66,11 +65,11 @@ export function KnowledgeDirectoryTree({
             </div>
           )}
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 flex gap-2">
           <button
             type="button"
             onClick={() => toast.message("新建目录（演示占位）")}
-            className="inline-flex h-8 items-center justify-center gap-1 rounded-full bg-[#349BAC] text-[12px] font-semibold text-white shadow-[0_8px_18px_-12px_rgba(52,155,172,0.8)] transition-all hover:bg-[#2F8D9D]"
+            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-[#349BAC] text-[13px] font-medium text-white transition-colors hover:bg-[#2F8D9D]"
           >
             <Plus className="h-3.5 w-3.5 stroke-[1.9]" />
             新建
@@ -80,7 +79,7 @@ export function KnowledgeDirectoryTree({
             onClick={() =>
               toast.message(canUpload ? "上传文件（演示占位）" : "申请上传权限（演示占位）")
             }
-            className="inline-flex h-8 items-center justify-center gap-1 rounded-full border border-[#E2ECEF] bg-white text-[12px] font-semibold text-[#607681] shadow-[0_8px_18px_-16px_rgba(31,52,64,0.5)] transition-colors hover:bg-[#FBFDFD]"
+            className="inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-[10px] border border-[#DCE8EA] bg-white text-[13px] font-medium text-[#607681] transition-colors hover:border-[#B8D8DE] hover:text-[#1F3440]"
           >
             <Upload className="h-3.5 w-3.5 stroke-[1.9]" />
             上传
@@ -89,12 +88,35 @@ export function KnowledgeDirectoryTree({
       </div>
 
       <div className="border-y border-[#EDF3F5] px-2 py-2">
-        <SidebarMenuItem icon={Home} label="主页" active={!selectedDirectoryId && !selectedFileId} onClick={() => onSelectDirectory(null)} />
-        <SidebarMenuItem icon={MessageCircle} label="问 AI" disabled />
-        <SidebarMenuItem icon={FolderPlus} label="目录" active={Boolean(selectedDirectoryId || selectedFileId)} />
+        <SidebarMenuItem
+          icon={Home}
+          label="主页"
+          active={!selectedDirectoryId && !selectedFileId}
+          onClick={() => onSelectDirectory(null)}
+        />
       </div>
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-3">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        <div className="mb-1 flex h-8 items-center justify-between px-2">
+          <span className="text-[12px] font-semibold text-[#607681]">目录</span>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => toast.message("新建目录（演示占位）")}
+                  className="grid h-6 w-6 place-items-center rounded-[6px] text-[#91A3AA] transition-colors hover:bg-[#EDF3F5] hover:text-[#168A99]"
+                  aria-label="新建目录"
+                >
+                  <Plus className="h-3.5 w-3.5 stroke-[1.9]" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="bg-[#1F3440] text-white">
+                新建目录
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
         <TreeDirectory
           name="全部文件"
           count={allCount}
@@ -105,7 +127,7 @@ export function KnowledgeDirectoryTree({
           onDragLeave={() => setDragTarget(null)}
         />
         {tree.map((node) => (
-          <div key={node.directory.id} className="mt-1">
+          <div key={node.directory.id} className="mt-0.5">
             <TreeDirectory
               name={node.directory.name}
               count={getFileCountForDirectory(node.directory.id)}
@@ -115,7 +137,7 @@ export function KnowledgeDirectoryTree({
               onDragEnter={() => setDragTarget(node.directory.id)}
               onDragLeave={() => setDragTarget(null)}
             />
-            <div className="ml-3 border-l border-[#EDF3F5] py-1 pl-2">
+            <div className="ml-3 border-l border-[#EDF3F5] py-0.5 pl-2">
               {node.files.map((file) => (
                 <TreeFile
                   key={file.id}
@@ -155,14 +177,19 @@ function SidebarMenuItem({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "mb-1 flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] transition-colors last:mb-0",
+        "mb-0.5 flex h-[36px] w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[13px] transition-colors last:mb-0",
         active
-          ? "bg-white font-semibold text-[#349BAC] shadow-[0_8px_22px_-18px_rgba(31,52,64,0.55)] ring-1 ring-[#E4F0F2]"
-          : "text-[#607681] hover:bg-white/80 hover:text-[#1F3440]",
-        disabled && "cursor-not-allowed opacity-55 hover:bg-transparent hover:text-[#607681]",
+          ? "bg-[#EAF7F9] font-medium text-[#168A99]"
+          : "text-[#1F3440] hover:bg-[#EDF3F5]",
+        disabled && "cursor-not-allowed opacity-55 hover:bg-transparent",
       )}
     >
-      <Icon className="h-4 w-4 shrink-0 stroke-[1.8]" />
+      <Icon
+        className={cn(
+          "h-4 w-4 shrink-0 stroke-[1.8]",
+          active ? "text-[#168A99]" : "text-[#91A3AA]",
+        )}
+      />
       <span>{label}</span>
     </button>
   );
@@ -192,11 +219,11 @@ function TreeDirectory({
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       className={cn(
-        "flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[12.5px] transition-colors",
+        "flex h-[36px] w-full items-center gap-2 rounded-[10px] px-2.5 text-left text-[13px] transition-colors",
         active
-          ? "bg-white font-semibold text-[#349BAC] shadow-[0_8px_22px_-20px_rgba(31,52,64,0.55)] ring-1 ring-[#E4F0F2]"
-          : "text-[#607681] hover:bg-white/80 hover:text-[#1F3440]",
-        dragActive && "outline outline-1 outline-[#349BAC] bg-[rgba(52,155,172,0.08)]",
+          ? "bg-[#EAF7F9] font-medium text-[#168A99]"
+          : "text-[#1F3440] hover:bg-[#EDF3F5]",
+        dragActive && "bg-[rgba(52,155,172,0.08)] outline outline-1 outline-[#B8D8DE]",
       )}
     >
       {active ? (
@@ -205,7 +232,14 @@ function TreeDirectory({
         <Folder className="h-4 w-4 shrink-0 text-[#C58B18] stroke-[1.8]" />
       )}
       <span className="min-w-0 flex-1 truncate">{name}</span>
-      <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] tabular-nums text-[#8EA1A8] ring-1 ring-[#E2ECEF]">
+      <span
+        className={cn(
+          "shrink-0 rounded-[6px] px-1.5 py-0.5 text-[10px] tabular-nums",
+          active
+            ? "bg-[rgba(52,155,172,0.12)] text-[#168A99]"
+            : "bg-[#EDF3F5] text-[#607681]",
+        )}
+      >
         {count}
       </span>
     </button>
@@ -221,10 +255,10 @@ function TreeFile({ file, active, onClick }: { file: KnowledgeFile; active: bool
       onClick={onClick}
       title={file.name}
       className={cn(
-        "flex min-h-8 w-full items-center gap-2 rounded-lg px-2 py-1 text-left text-[12px] transition-colors",
+        "flex min-h-[34px] w-full items-center gap-2 rounded-[8px] px-2 py-1 text-left text-[12px] transition-colors",
         active
-          ? "bg-white font-semibold text-[#349BAC] shadow-[0_8px_22px_-20px_rgba(31,52,64,0.55)] ring-1 ring-[#E4F0F2]"
-          : "text-[#607681] hover:bg-white/80 hover:text-[#1F3440]",
+          ? "bg-[rgba(52,155,172,0.08)] font-medium text-[#168A99]"
+          : "text-[#607681] hover:bg-[#EDF3F5] hover:text-[#1F3440]",
       )}
     >
       <FileTypeIcon type={file.type} size="sm" />
