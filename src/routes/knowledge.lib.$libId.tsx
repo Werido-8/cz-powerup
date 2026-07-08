@@ -1,10 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/knowledge/lib/$libId")({
-  beforeLoad: ({ params }) => {
-    throw redirect({
-      to: "/knowledge/kb/$kbId",
-      params: { kbId: params.libId },
-    });
+  beforeLoad: () => {
+    throw redirect({ to: "/knowledge" });
   },
 });

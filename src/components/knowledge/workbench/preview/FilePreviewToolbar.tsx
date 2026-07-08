@@ -1,0 +1,89 @@
+import { Link } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  Download,
+  MoreHorizontal,
+  Pencil,
+  Star,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  KbBaseSwitcher,
+  KbIconButton,
+  KbStatusTag,
+  KbVersionSelect,
+} from "@/components/knowledge/ui";
+import type { KbBaseSwitcherGroup } from "@/components/knowledge/ui";
+import {
+  parseStatusLabel,
+  parseStatusTone,
+  publishStatusLabel,
+  publishStatusTone,
+} from "@/lib/knowledge/status";
+import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
+import type { KnowledgeBase, KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
+
+export function FilePreviewToolbar({
+  currentBase,
+  currentFile,
+  versions,
+  currentVersionId,
+  baseGroups,
+  onBaseChange,
+  onVersionChange,
+  canEdit,
+}: {
+  currentBase: KnowledgeBase;
+  currentFile: KnowledgeFile;
+  versions: KnowledgeFileVersion[];
+  currentVersionId?: string;
+  baseGroups: KbBaseSwitcherGroup[];
+  onBaseChange: (baseId: string) => void;
+  onVersionChange: (versionId: string) => void;
+  canEdit: boolean;
+}) {
+  const typeConfig = kbFileTypeConfig[currentFile.type ?? "other"];
+
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-kb-border bg-card px-3">
+      <Link
+        to="/knowledge"
+        className="inline-flex h-9 items-center gap-1.5 rounded-[8px] px-2.5 text-[12.5px] font-medium text-kb-muted transition-colors hover:bg-kb-surface-hover hover:text-kb-heading"
+      >
+        <ArrowLeft className="h-4 w-4 stroke-[1.8]" />
+        返回知识总览
+      </Link>
+      <div className="h-5 w-px bg-divider" />
+      <KbBaseSwitcher value={currentBase.id} groups={baseGroups} onChange={onBaseChange} />
+      <span className="text-kb-muted">/</span>
+      <h1 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-kb-heading">
+        {currentFile.name}
+      </h1>
+      <KbStatusTag tone={publishStatusTone(currentFile.status)}>
+        {publishStatusLabel(currentFile.status)}
+      </KbStatusTag>
+      <KbStatusTag tone="neutral">{currentFile.version ?? "v1"}</KbStatusTag>
+      <KbStatusTag tone="accent">{typeConfig.label}</KbStatusTag>
+      <KbVersionSelect
+        versions={versions}
+        value={currentVersionId}
+        onChange={onVersionChange}
+      />
+      <KbIconButton icon={Download} label="下载" onClick={() => toast.message("开始下载文件")} />
+      <KbIconButton
+        icon={Star}
+        label={currentFile.favorite ? "已收藏" : "收藏"}
+        active={currentFile.favorite}
+        onClick={() => toast.success("收藏状态已更新")}
+      />
+      {canEdit && (
+        <KbIconButton
+          icon={Pencil}
+          label="编辑元数据"
+          onClick={() => toast.message("打开元数据编辑面板")}
+        />
+      )}
+      <KbIconButton icon={MoreHorizontal} label="更多" onClick={() => toast.message("更多操作")} />
+    </header>
+  );
+}

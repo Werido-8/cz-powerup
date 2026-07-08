@@ -40,6 +40,15 @@
   --color-remind: var(--remind);
   --color-remind-soft: var(--remind-soft);
   --color-remind-foreground: var(--remind-foreground);
+  --color-kb-heading: var(--kb-heading);
+  --color-kb-body: var(--kb-body);
+  --color-kb-muted: var(--kb-muted);
+  --color-kb-surface: var(--kb-surface);
+  --color-kb-surface-hover: var(--kb-surface-hover);
+  --color-kb-table-head: var(--kb-table-head);
+  --color-kb-border: var(--kb-border);
+  --color-kb-preview-bg: var(--kb-preview-bg);
+  --color-danger-soft: var(--danger-soft);
   --shadow-card: 0 1px 2px 0 oklch(0.5 0.05 230 / 0.03);
   --shadow-card-hover: 0 1px 3px 0 oklch(0.5 0.05 230 / 0.05), 0 4px 12px -2px oklch(0.5 0.05 230 / 0.06);
   --shadow-glow: 0 0 0 1px oklch(0.58 0.12 188 / 0.2), 0 8px 24px -6px oklch(0.58 0.12 188 / 0.25);
@@ -78,6 +87,15 @@
   --divider: #edf3f5;
   --input: #dce8ea;
   --ring: #349bac;
+  --kb-heading: #102a33;
+  --kb-body: #334e59;
+  --kb-muted: #6b7f88;
+  --kb-surface: #f5fafb;
+  --kb-surface-hover: #f2fafb;
+  --kb-table-head: #f7fbfc;
+  --kb-border: #dcebed;
+  --kb-preview-bg: #eef5f6;
+  --danger-soft: #fff3f3;
 }
 
 .dark {

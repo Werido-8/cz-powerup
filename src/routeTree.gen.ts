@@ -33,6 +33,8 @@ import { Route as TrainingExamRouteImport } from './routes/training.exam'
 import { Route as ScenarioPeakRouteImport } from './routes/scenario.peak'
 import { Route as ScenarioFaultRouteImport } from './routes/scenario.fault'
 import { Route as KnowledgeMineRouteImport } from './routes/knowledge.mine'
+import { Route as KnowledgeAllRouteImport } from './routes/knowledge.all'
+import { Route as KnowledgeAdminRouteImport } from './routes/knowledge.admin'
 import { Route as ScenarioTypicalIndexRouteImport } from './routes/scenario.typical.index'
 import { Route as ScenarioFaultIndexRouteImport } from './routes/scenario.fault.index'
 import { Route as TrainingSessionIdRouteImport } from './routes/training.session.$id'
@@ -179,6 +181,16 @@ const KnowledgeMineRoute = KnowledgeMineRouteImport.update({
   path: '/mine',
   getParentRoute: () => KnowledgeRoute,
 } as any)
+const KnowledgeAllRoute = KnowledgeAllRouteImport.update({
+  id: '/all',
+  path: '/all',
+  getParentRoute: () => KnowledgeRoute,
+} as any)
+const KnowledgeAdminRoute = KnowledgeAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => KnowledgeRoute,
+} as any)
 const ScenarioTypicalIndexRoute = ScenarioTypicalIndexRouteImport.update({
   id: '/scenario/typical/',
   path: '/scenario/typical/',
@@ -323,6 +335,8 @@ export interface FileRoutesByFullPath {
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/knowledge/admin': typeof KnowledgeAdminRoute
+  '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
@@ -371,6 +385,8 @@ export interface FileRoutesByTo {
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/knowledge/admin': typeof KnowledgeAdminRoute
+  '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/exam': typeof TrainingExamRoute
@@ -422,6 +438,8 @@ export interface FileRoutesById {
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/knowledge/admin': typeof KnowledgeAdminRoute
+  '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
@@ -475,6 +493,8 @@ export interface FileRouteTypes {
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/knowledge/admin'
+    | '/knowledge/all'
     | '/knowledge/mine'
     | '/scenario/fault'
     | '/scenario/peak'
@@ -523,6 +543,8 @@ export interface FileRouteTypes {
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/knowledge/admin'
+    | '/knowledge/all'
     | '/knowledge/mine'
     | '/scenario/peak'
     | '/training/exam'
@@ -573,6 +595,8 @@ export interface FileRouteTypes {
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/knowledge/admin'
+    | '/knowledge/all'
     | '/knowledge/mine'
     | '/scenario/fault'
     | '/scenario/peak'
@@ -814,6 +838,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeMineRouteImport
       parentRoute: typeof KnowledgeRoute
     }
+    '/knowledge/all': {
+      id: '/knowledge/all'
+      path: '/all'
+      fullPath: '/knowledge/all'
+      preLoaderRoute: typeof KnowledgeAllRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
+    '/knowledge/admin': {
+      id: '/knowledge/admin'
+      path: '/admin'
+      fullPath: '/knowledge/admin'
+      preLoaderRoute: typeof KnowledgeAdminRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
     '/scenario/typical/': {
       id: '/scenario/typical/'
       path: '/scenario/typical'
@@ -1039,6 +1077,8 @@ const KnowledgeKbKbIdRouteWithChildren = KnowledgeKbKbIdRoute._addFileChildren(
 )
 
 interface KnowledgeRouteChildren {
+  KnowledgeAdminRoute: typeof KnowledgeAdminRoute
+  KnowledgeAllRoute: typeof KnowledgeAllRoute
   KnowledgeMineRoute: typeof KnowledgeMineRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
   KnowledgeDeptDeptIdRoute: typeof KnowledgeDeptDeptIdRoute
@@ -1050,6 +1090,8 @@ interface KnowledgeRouteChildren {
 }
 
 const KnowledgeRouteChildren: KnowledgeRouteChildren = {
+  KnowledgeAdminRoute: KnowledgeAdminRoute,
+  KnowledgeAllRoute: KnowledgeAllRoute,
   KnowledgeMineRoute: KnowledgeMineRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
   KnowledgeDeptDeptIdRoute: KnowledgeDeptDeptIdRoute,
