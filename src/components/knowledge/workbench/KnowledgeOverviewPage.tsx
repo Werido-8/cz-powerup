@@ -1,6 +1,7 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   ChevronRight,
+  Database,
   Folder,
   FolderOpen,
   Library,
@@ -9,6 +10,7 @@ import {
   PinOff,
   ShieldCheck,
   Star,
+  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -52,8 +54,8 @@ import type {
   KnowledgeFile,
   KnowledgeSortBy,
 } from "@/lib/knowledge/types";
-import { kbCardShell, kbRadius, kbSpacing } from "@/lib/knowledge/tokens";
-import { ModulePanel, TableListPager, CardBatchPager, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
+import { kbCardShell, kbRadius } from "@/lib/knowledge/tokens";
+import { TableListPager, CardBatchPager, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 import {
   FileViewModeToggle,
@@ -62,9 +64,45 @@ import {
   type FileViewMode,
 } from "./KnowledgeFileTable";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
-import { KnowledgeSecondaryNav } from "./KnowledgeSecondaryNav";
 
 const CARD_PAGE_SIZE = 8;
+
+function OverviewSidebarQuickLinks() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const links = [
+    { to: "/knowledge/mine", label: "我的空间", icon: UserRound, active: pathname.startsWith("/knowledge/mine") },
+    { to: "/knowledge/all", label: "全库资料", icon: Database, active: pathname.startsWith("/knowledge/all") },
+  ] as const;
+
+  return (
+    <div className="space-y-0.5 border-b border-[#E8F0F2] p-2">
+      {links.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.to}
+            to={item.to}
+            className={cn(
+              "flex h-8 w-full items-center gap-2 rounded-[8px] px-2.5 text-[12.5px] transition-colors",
+              item.active
+                ? "bg-primary-soft font-medium text-accent-foreground"
+                : "text-kb-body hover:bg-[#F4FAFB]",
+            )}
+          >
+            <Icon
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 stroke-[1.8]",
+                item.active ? "text-primary" : "text-kb-muted",
+              )}
+            />
+            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
 
 export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: string }) {
   const navigate = useNavigate();
@@ -140,6 +178,11 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     });
   };
 
+  const handleSelectBase = (baseId: string) => {
+    setSelectedBaseId(baseId);
+    navigate({ to: "/knowledge/kb/$kbId", params: { kbId: baseId }, replace: true });
+  };
+
   const handleOpenFile = (file: KnowledgeFile) => {
     navigate({
       to: "/knowledge/file/$fileId",
@@ -161,15 +204,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   return (
     <>
-      <KbSidebar
-        width="browse"
-        withDecor
-        header={
-          <div className="border-b border-[#E8F0F2] bg-white/85 p-2.5 backdrop-blur-[2px]">
-            <KnowledgeSecondaryNav />
-          </div>
-        }
-      >
+      <KbSidebar width="browse" withDecor header={<OverviewSidebarQuickLinks />}>
         <KbSidebarSection title="快速访问">
           {pinnedBases.length === 0 ? (
             <p className="px-2.5 py-1 text-[11px] text-kb-muted">悬浮知识库可置顶</p>
@@ -189,7 +224,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                 <button
                   key={base.id}
                   type="button"
-                  onClick={() => setSelectedBaseId(base.id)}
+                  onClick={() => handleSelectBase(base.id)}
                   className={cn(
                     "flex h-8 w-full items-center gap-2 rounded-[8px] px-2.5 text-left text-[12.5px] transition-colors",
                     selectedBaseId === base.id
@@ -209,139 +244,136 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
           <KnowledgeCategoryTree
             selectedBaseId={selectedBaseId}
             pinnedIds={pinnedIds}
-            onSelectBase={(base) => setSelectedBaseId(base.id)}
+            onSelectBase={(base) => handleSelectBase(base.id)}
             onTogglePin={handleTogglePin}
           />
         </KbSidebarSection>
       </KbSidebar>
 
-      <main className="scrollbar-thin relative min-w-0 flex-1 overflow-y-auto bg-[#F4F9FA]">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(ellipse_at_top,_rgba(52,155,172,0.06),_transparent_60%)]"
-        />
-        <div className={cn("relative mx-auto w-full max-w-none", kbSpacing.page, "space-y-3")}>
-          {!selectedBase ? (
+      <main className="scrollbar-thin flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
+        {!selectedBase ? (
+          <div className="flex flex-1 items-center justify-center p-8">
             <KbEmptyState
               title="请选择知识库"
               description="从左侧快速访问或分类知识库树中选择一个知识库，右侧会展示该库资料。"
             />
-          ) : !canViewBaseFiles(selectedBase) ? (
+          </div>
+        ) : !canViewBaseFiles(selectedBase) ? (
+          <div className="p-5">
             <NoPermissionState base={selectedBase} onApply={() => setPermissionBase(selectedBase)} />
-          ) : (
-            <>
-              <KnowledgeBaseDetailHeader
-                base={selectedBase}
-                fileCount={selectedBase.fileCount ?? selectedFiles.length}
-                pinned={isPinnedId(pinnedIds, selectedBase.id)}
-                canUpload={canUploadToBase(selectedBase)}
-                onTogglePin={() => handleTogglePin(selectedBase.id)}
-                onUpload={() => toast.message("打开上传面板")}
-              />
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <KnowledgeBaseDetailHeader
+              base={selectedBase}
+              fileCount={selectedBase.fileCount ?? selectedFiles.length}
+              pinned={isPinnedId(pinnedIds, selectedBase.id)}
+              canUpload={canUploadToBase(selectedBase)}
+              onTogglePin={() => handleTogglePin(selectedBase.id)}
+              onUpload={() => toast.message("打开上传面板")}
+              onSelectBase={handleSelectBase}
+            />
 
-              <ModulePanel className="overflow-hidden">
-              <KbDragUploadOverlay
-                onFiles={canUploadToBase(selectedBase) ? handleUploadFiles : undefined}
-                disabled={!canUploadToBase(selectedBase)}
-              >
-                <div className="border-b border-divider px-4 py-3">
-                  <KbFilterBar
-                    className="mb-0"
-                    searchValue={query}
-                    onSearchChange={setQuery}
-                    searchPlaceholder="搜索本库文件"
-                    searchClassName="max-w-[300px] !rounded-[8px]"
-                    filters={
-                      <>
-                        <KbFilterCombo
-                          value={professionalType}
-                          onChange={setProfessionalType}
-                          placeholder="全部专业"
-                          options={[
-                            { value: "all", label: "全部专业" },
-                            ...professionalTypes.map((item) => ({ value: item, label: item })),
-                          ]}
-                        />
-                        <KbFilterCombo
-                          value={tag}
-                          onChange={setTag}
-                          placeholder="全部标签"
-                          options={[
-                            { value: "all", label: "全部标签" },
-                            ...tags.map((item) => ({ value: item, label: item })),
-                          ]}
-                        />
-                      </>
-                    }
-                    trailing={
-                      <>
-                        <KbFilterCombo
-                          value={sortBy}
-                          onChange={(v) => setSortBy(v as KnowledgeSortBy)}
-                          placeholder="排序"
-                          className="min-w-[108px]"
-                          options={[
-                            { value: "updated", label: "最近更新" },
-                            { value: "name", label: "文件名称" },
-                            { value: "uploader", label: "上传人" },
-                          ]}
-                        />
-                        <FileViewModeToggle value={viewMode} onChange={setViewMode} />
-                      </>
-                    }
-                  />
-                </div>
-
-                {viewMode === "list" ? (
-                  <>
-                    <KnowledgeFileTable
-                      files={pagedFiles}
-                      showLibrary={false}
-                      overviewMode
-                      onOpen={handleOpenFile}
-                      empty={emptyFiles}
-                    />
-                    {selectedFiles.length > 0 && (
-                      <TableListPager
-                        page={safePage}
-                        totalPages={totalPages}
-                        totalItems={selectedFiles.length}
-                        pageSize={pageSize}
-                        onPageChange={setPage}
-                        onPageSizeChange={(size) => {
-                          setPageSize(size);
-                          setPage(1);
-                        }}
+            <KbDragUploadOverlay
+              onFiles={canUploadToBase(selectedBase) ? handleUploadFiles : undefined}
+              disabled={!canUploadToBase(selectedBase)}
+              className="flex min-h-0 flex-1 flex-col"
+            >
+              <div className="border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
+                <KbFilterBar
+                  className="mb-0"
+                  searchValue={query}
+                  onSearchChange={setQuery}
+                  searchPlaceholder="搜索本库文件"
+                  searchClassName="max-w-[280px] !rounded-[8px]"
+                  filters={
+                    <>
+                      <KbFilterCombo
+                        value={professionalType}
+                        onChange={setProfessionalType}
+                        placeholder="全部专业"
+                        options={[
+                          { value: "all", label: "全部专业" },
+                          ...professionalTypes.map((item) => ({ value: item, label: item })),
+                        ]}
                       />
-                    )}
-                  </>
+                      <KbFilterCombo
+                        value={tag}
+                        onChange={setTag}
+                        placeholder="全部标签"
+                        options={[
+                          { value: "all", label: "全部标签" },
+                          ...tags.map((item) => ({ value: item, label: item })),
+                        ]}
+                      />
+                    </>
+                  }
+                  trailing={
+                    <>
+                      <KbFilterCombo
+                        value={sortBy}
+                        onChange={(v) => setSortBy(v as KnowledgeSortBy)}
+                        placeholder="排序"
+                        className="min-w-[108px]"
+                        options={[
+                          { value: "updated", label: "最近更新" },
+                          { value: "name", label: "文件名称" },
+                          { value: "uploader", label: "上传人" },
+                        ]}
+                      />
+                      <FileViewModeToggle value={viewMode} onChange={setViewMode} />
+                    </>
+                  }
+                />
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {viewMode === "list" ? (
+                  <KnowledgeFileTable
+                    files={pagedFiles}
+                    showLibrary={false}
+                    overviewMode
+                    onOpen={handleOpenFile}
+                    empty={emptyFiles}
+                  />
                 ) : (
-                  <>
-                    <KnowledgeFileCardGrid
-                      files={pagedFiles}
-                      onOpen={handleOpenFile}
-                      empty={emptyFiles}
-                    />
-                    {selectedFiles.length > 0 && (
-                      <div className="px-4 pb-3">
-                        <CardBatchPager
-                          page={safePage}
-                          totalPages={totalPages}
-                          totalItems={selectedFiles.length}
-                          pageSize={CARD_PAGE_SIZE}
-                          unitLabel="个文件"
-                          onPageChange={setPage}
-                          compact
-                        />
-                      </div>
-                    )}
-                  </>
+                  <KnowledgeFileCardGrid
+                    files={pagedFiles}
+                    onOpen={handleOpenFile}
+                    empty={emptyFiles}
+                  />
                 )}
-              </KbDragUploadOverlay>
-              </ModulePanel>
-            </>
-          )}
-        </div>
+              </div>
+
+              {selectedFiles.length > 0 &&
+                (viewMode === "list" ? (
+                  <TableListPager
+                    page={safePage}
+                    totalPages={totalPages}
+                    totalItems={selectedFiles.length}
+                    pageSize={pageSize}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                      setPageSize(size);
+                      setPage(1);
+                    }}
+                  />
+                ) : (
+                  <div className="border-t border-divider px-4 py-2">
+                    <CardBatchPager
+                      page={safePage}
+                      totalPages={totalPages}
+                      totalItems={selectedFiles.length}
+                      pageSize={CARD_PAGE_SIZE}
+                      unitLabel="个文件"
+                      onPageChange={setPage}
+                      compact
+                    />
+                  </div>
+                ))}
+            </KbDragUploadOverlay>
+          </div>
+        )}
       </main>
 
       {permissionBase && (

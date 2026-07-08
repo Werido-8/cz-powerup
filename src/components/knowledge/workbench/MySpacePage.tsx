@@ -46,7 +46,6 @@ import type {
 } from "@/lib/knowledge/types";
 
 import { KnowledgeFileTable } from "./KnowledgeFileTable";
-import { KnowledgeSecondaryNav } from "./KnowledgeSecondaryNav";
 import { KnowledgeUploadPanel } from "./KnowledgeUploadPanel";
 
 type MySpaceSelection =
@@ -115,14 +114,11 @@ export function MySpacePage() {
       <KbSidebar
         width="browse"
         header={
-          <div className="border-b border-divider p-2.5">
-            <KnowledgeSecondaryNav />
-            <div className="mt-3 border-t border-divider pt-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-kb-muted">
-                个人空间
-              </p>
-              <h1 className="mt-1 text-[15px] font-semibold text-kb-heading">我的空间</h1>
-            </div>
+          <div className="border-b border-divider p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-kb-muted">
+              个人空间
+            </p>
+            <h1 className="mt-1 text-[15px] font-semibold text-kb-heading">我的空间</h1>
           </div>
         }
       >

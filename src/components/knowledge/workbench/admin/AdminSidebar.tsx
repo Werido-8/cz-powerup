@@ -1,7 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { kbSpacing } from "@/lib/knowledge/tokens";
-import { KnowledgeSecondaryNav } from "../KnowledgeSecondaryNav";
 
 export function AdminSidebar({
   children,
@@ -17,15 +16,12 @@ export function AdminSidebar({
         kbSpacing.sidebarAdmin,
       )}
     >
-      <div className="border-b border-divider p-2.5">
-        <KnowledgeSecondaryNav />
-        <div className="mt-3 border-t border-divider pt-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-kb-muted">
-            管理员工作台
-          </p>
-          <h1 className="mt-1 text-[15px] font-semibold text-kb-heading">知识库管理</h1>
-          <p className="mt-1 text-[12px] text-kb-muted">{subtitle}</p>
-        </div>
+      <div className="border-b border-divider p-4">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-kb-muted">
+          管理员工作台
+        </p>
+        <h1 className="mt-1 text-[15px] font-semibold text-kb-heading">知识库管理</h1>
+        <p className="mt-1.5 text-[12px] text-kb-muted">{subtitle}</p>
       </div>
       <nav className="space-y-0.5 p-3">{children}</nav>
     </aside>

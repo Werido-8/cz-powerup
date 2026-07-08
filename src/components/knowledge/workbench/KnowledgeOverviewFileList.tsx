@@ -68,19 +68,21 @@ export function KnowledgeFileTable({
   showLibrary = true,
   overviewMode = false,
   empty,
+  className,
 }: {
   files: KnowledgeFile[];
   onOpen: (file: KnowledgeFile) => void;
   showLibrary?: boolean;
   overviewMode?: boolean;
   empty?: ReactNode;
+  className?: string;
 }) {
   if (files.length === 0) return <>{empty}</>;
 
   if (overviewMode) {
     return (
       <KbDataTable
-        className="border-0 shadow-none"
+        className={cn("border-0 shadow-none", className)}
         minWidth={GRID_OVERVIEW}
         header={
           <>
@@ -108,6 +110,7 @@ export function KnowledgeFileTable({
 
   return (
     <KbDataTable
+      className={className}
       minWidth={grid}
       header={
         <>

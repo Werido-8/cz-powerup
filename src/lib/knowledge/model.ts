@@ -219,6 +219,107 @@ export function getBasesForCategory(categoryId: string) {
   return getBrowsableBases().filter((base) => base.categoryId === categoryId);
 }
 
+export function getCategoryChain(categoryId: string): KnowledgeCategory[] {
+  const chain: KnowledgeCategory[] = [];
+  let current = getCategoryById(categoryId);
+  while (current) {
+    chain.unshift(current);
+    current = current.parentId ? getCategoryById(current.parentId) : undefined;
+  }
+  return chain;
+}
+
+export function getSiblingCategories(categoryId: string): KnowledgeCategory[] {
+  const category = getCategoryById(categoryId);
+  if (!category) return [];
+  return getCategoryChildren(category.parentId);
+}
+
+export function getFirstBrowsableBaseInCategory(categoryId: string): KnowledgeBase | undefined {
+  const direct = getBasesForCategory(categoryId);
+  if (direct.length > 0) return direct[0];
+  for (const child of getCategoryChildren(categoryId)) {
+    const found = getFirstBrowsableBaseInCategory(child.id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+export interface KnowledgeBreadcrumbOption {
+  id: string;
+  label: string;
+  kind: "category" | "base";
+}
+
+export interface KnowledgeBreadcrumbSegment {
+  id: string;
+  label: string;
+  kind: "scope" | "category" | "base";
+  options: KnowledgeBreadcrumbOption[];
+}
+
+export function buildKnowledgeBaseBreadcrumb(base: KnowledgeBase): KnowledgeBreadcrumbSegment[] {
+  if (base.scope === "personal") {
+    return [
+      {
+        id: "scope-personal",
+        label: "我的空间",
+        kind: "scope",
+        options: [],
+      },
+      {
+        id: `base-${base.id}`,
+        label: base.name,
+        kind: "base",
+        options: getPersonalBases().map((item) => ({
+          id: item.id,
+          label: item.name,
+          kind: "base" as const,
+        })),
+      },
+    ];
+  }
+
+  const segments: KnowledgeBreadcrumbSegment[] = [];
+
+  if (base.categoryId) {
+    for (const category of getCategoryChain(base.categoryId)) {
+      segments.push({
+        id: `cat-${category.id}`,
+        label: category.name,
+        kind: "category",
+        options: getSiblingCategories(category.id).map((item) => ({
+          id: item.id,
+          label: item.name,
+          kind: "category" as const,
+        })),
+      });
+    }
+  }
+
+  const baseSiblings = base.categoryId
+    ? getBasesForCategory(base.categoryId)
+    : getBrowsableBases().filter((item) => !item.categoryId);
+
+  segments.push({
+    id: `base-${base.id}`,
+    label: base.name,
+    kind: "base",
+    options: baseSiblings.map((item) => ({
+      id: item.id,
+      label: item.name,
+      kind: "base" as const,
+    })),
+  });
+
+  return segments;
+}
+
+export function resolveBreadcrumbSelection(option: KnowledgeBreadcrumbOption): string | undefined {
+  if (option.kind === "base") return option.id;
+  return getFirstBrowsableBaseInCategory(option.id)?.id;
+}
+
 export function permissionGroupLabel(group: KnowledgePermissionGroup) {
   const labels: Record<KnowledgePermissionGroup, string> = {
     view: "浏览组",
