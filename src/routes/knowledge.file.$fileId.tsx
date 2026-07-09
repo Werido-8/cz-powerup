@@ -1,13 +1,38 @@
-import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
-import { getKnowledgeFileById } from "@/lib/mock/knowledge-utils";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { z } from "zod";
+import { FileDetailPage } from "@/components/knowledge/workbench/FileDetailPage";
+import { getFileById } from "@/lib/knowledge/model";
+
+const fileSearchSchema = z.object({
+  kbId: z.string().optional().catch(undefined),
+  version: z.string().optional().catch(undefined),
+});
 
 export const Route = createFileRoute("/knowledge/file/$fileId")({
-  beforeLoad: ({ params }) => {
-    const file = getKnowledgeFileById(params.fileId);
+  validateSearch: fileSearchSchema,
+  loader: ({ params }) => {
+    const file = getFileById(params.fileId);
     if (!file) throw notFound();
-    throw redirect({
-      to: "/knowledge/kb/$kbId/file/$fileId",
-      params: { kbId: file.kbId, fileId: file.id },
-    });
+    return { file };
   },
+  component: KnowledgeFileRoute,
+  head: ({ loaderData }) => ({
+    meta: [
+      {
+        title: `${loaderData?.file.name ?? "文件详情"} · 知识库 · 涉网运行能力智能提升平台`,
+      },
+    ],
+  }),
 });
+
+function KnowledgeFileRoute() {
+  const params = Route.useParams();
+  const search = Route.useSearch();
+  return (
+    <FileDetailPage
+      fileId={params.fileId}
+      initialKnowledgeBaseId={search.kbId}
+      versionId={search.version}
+    />
+  );
+}

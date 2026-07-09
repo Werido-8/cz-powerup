@@ -12,7 +12,16 @@ interface MenuItem {
 const MENU: MenuItem[] = [
   { label: "首页工作台", to: "/" },
   { label: "资料检索", to: "/search" },
-  { label: "知识库", to: "/knowledge" },
+  {
+    label: "知识库",
+    to: "/knowledge",
+    children: [
+      { label: "知识总览", to: "/knowledge" },
+      { label: "全库资料", to: "/knowledge/all" },
+      { label: "我的空间", to: "/knowledge/mine" },
+      { label: "知识库管理", to: "/knowledge/admin" },
+    ],
+  },
   // 本期暂不开放：智能问答
   // { label: "智能问答", to: "/chat" },
   {
@@ -95,7 +104,16 @@ function NavLink({
           <div className="overflow-hidden rounded-lg border border-border bg-popover shadow-[0_8px_24px_-4px_oklch(0.5_0.05_230_/_0.15)]">
             <div className="flex flex-col py-1.5">
               {m.children?.map((c) => {
-                const cActive = isItemActive(pathname, c.to);
+                const cActive =
+                  c.to === "/knowledge"
+                    ? pathname === "/knowledge" ||
+                      pathname === "/knowledge/" ||
+                      pathname.startsWith("/knowledge/kb/") ||
+                      pathname.startsWith("/knowledge/lib/") ||
+                      pathname.startsWith("/knowledge/dept/") ||
+                      pathname.startsWith("/knowledge/space/") ||
+                      pathname.startsWith("/knowledge/file/")
+                    : isItemActive(pathname, c.to);
                 return (
                   <Link
                     key={c.to}

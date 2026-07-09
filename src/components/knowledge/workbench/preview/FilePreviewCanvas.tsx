@@ -1,0 +1,131 @@
+import { ChevronLeft, ChevronRight, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
+import { useState } from "react";
+import { KbEmptyState, KbIconButton, KbStatusTag } from "@/components/knowledge/ui";
+import {
+  parseStatusLabel,
+  parseStatusTone,
+  publishStatusLabel,
+  publishStatusTone,
+} from "@/lib/knowledge/status";
+import type { KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
+import { kbRadius } from "@/lib/knowledge/tokens";
+import { cn } from "@/lib/utils";
+
+export function FilePreviewCanvas({
+  file,
+  version,
+  historyVersion,
+}: {
+  file: KnowledgeFile;
+  version?: KnowledgeFileVersion;
+  historyVersion?: boolean;
+}) {
+  const [page, setPage] = useState(1);
+  const [zoom, setZoom] = useState(100);
+  const totalPages = 12;
+
+  if (file.status === "parseFailed") {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <KbEmptyState
+          title="文件解析失败"
+          description={
+            file.parseError ??
+            "当前文件暂时无法在线预览，请下载原文件或联系管理员处理。"
+          }
+        />
+      </div>
+    );
+  }
+
+  return (
+    <section className="scrollbar-thin flex min-w-0 flex-1 flex-col overflow-hidden bg-kb-preview-bg">
+      <div className="flex h-11 shrink-0 items-center justify-center gap-2 border-b border-kb-border/60 bg-card/50 px-4">
+        <KbIconButton
+          icon={ChevronLeft}
+          label="上一页"
+          disabled={page <= 1}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+        />
+        <span className="text-[12px] tabular-nums text-kb-muted">
+          第 {page} 页 / 共 {totalPages} 页
+        </span>
+        <KbIconButton
+          icon={ChevronRight}
+          label="下一页"
+          disabled={page >= totalPages}
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+        />
+        <div className="mx-2 h-4 w-px bg-divider" />
+        <KbIconButton
+          icon={ZoomOut}
+          label="缩小"
+          onClick={() => setZoom((z) => Math.max(50, z - 10))}
+        />
+        <span className="min-w-[40px] text-center text-[12px] tabular-nums text-kb-muted">
+          {zoom}%
+        </span>
+        <KbIconButton
+          icon={ZoomIn}
+          label="放大"
+          onClick={() => setZoom((z) => Math.min(200, z + 10))}
+        />
+        <KbIconButton icon={Maximize2} label="适合宽度" onClick={() => setZoom(100)} />
+      </div>
+
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        {historyVersion && (
+          <div
+            className={cn(
+              "mx-auto mb-4 max-w-[840px] rounded-[8px] border border-warning/30 bg-warning-soft px-4 py-3 text-[12.5px] text-warning-foreground",
+            )}
+          >
+            当前为历史版本，只读预览，可下载，不参与默认 AI 问答召回。
+          </div>
+        )}
+        <article
+          className={cn(
+            "mx-auto min-h-[800px] w-full max-w-[820px] bg-card px-14 py-11 shadow-card ring-1 ring-kb-border",
+            kbRadius.md,
+          )}
+          style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}
+        >
+          <div className="mb-6 flex items-center justify-between border-b border-divider pb-3 text-[11px] text-kb-muted">
+            <span>
+              第 {page} 页 / 共 {totalPages} 页
+            </span>
+            <span>{version?.version ?? file.version}</span>
+          </div>
+          <h2 className="text-[24px] font-semibold leading-tight text-kb-heading">
+            {file.name.replace(/\.(pdf|docx|xlsx|pptx)$/i, "")}
+          </h2>
+          <div className="mt-3 flex flex-wrap gap-4 text-[12px] text-kb-muted">
+            <span>上传人：{file.uploaderName}</span>
+            <span>更新时间：{file.updatedAt}</span>
+            <span>文件大小：{file.size}</span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <KbStatusTag tone={publishStatusTone(file.status)}>
+              {publishStatusLabel(file.status)}
+            </KbStatusTag>
+            <KbStatusTag tone={parseStatusTone(file.parseStatus)}>
+              {parseStatusLabel(file.parseStatus)}
+            </KbStatusTag>
+          </div>
+          <p className="mt-8 text-[14px] leading-[1.9] text-kb-body">{file.summary}</p>
+          <div className="mt-6 rounded-[8px] border border-primary/20 border-l-[3px] border-l-primary bg-primary-soft/40 px-4 py-3 text-[13px] leading-relaxed text-kb-body">
+            此处为在线预览画布。接入真实接口后，可替换为 PDF 阅读器、Office 预览服务或媒体播放器。
+          </div>
+          <h3 className="mt-8 text-[16px] font-semibold text-kb-heading">1. 适用范围</h3>
+          <p className="mt-3 text-[13.5px] leading-[1.9] text-kb-body/90">
+            操作人员应了解文件适用范围、执行边界和部门协同要求。对条款存在疑问时，应向主管部门确认后执行。
+          </p>
+          <h3 className="mt-7 text-[16px] font-semibold text-kb-heading">2. 执行要求</h3>
+          <p className="mt-3 text-[13.5px] leading-[1.9] text-kb-body/90">
+            各部门应结合现场实际制定实施细则，定期复盘执行情况，并将更新内容沉淀回对应知识库。
+          </p>
+        </article>
+      </div>
+    </section>
+  );
+}
