@@ -8,6 +8,7 @@ import {
   PERMISSION_REQUESTS,
   RECENT_FILE_IDS,
 } from "./data";
+import { publishStatusLabel } from "./status";
 import type {
   FilePublishStatus,
   KnowledgeBase,
@@ -88,6 +89,10 @@ export function getPinnedBases() {
 
 export function getPersonalBases() {
   return KNOWLEDGE_BASES.filter((base) => base.scope === "personal" && base.status === "enabled");
+}
+
+export function getPersonalBasesForDirectory(directoryId: string) {
+  return getPersonalBases().filter((base) => base.personalDirectoryId === directoryId);
 }
 
 export function getReadableBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
@@ -193,10 +198,30 @@ export function filterFiles(
 export function sortKnowledgeFiles(files: KnowledgeFile[], sortBy: KnowledgeSortBy) {
   const next = [...files];
   if (sortBy === "name") return next.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
-  if (sortBy === "uploader") {
-    return next.sort((a, b) => (a.uploaderName ?? "").localeCompare(b.uploaderName ?? "", "zh-CN"));
+  if (sortBy === "size") {
+    return next.sort((a, b) => parseFileSize(b.size) - parseFileSize(a.size));
+  }
+  if (sortBy === "status") {
+    return next.sort((a, b) =>
+      publishStatusLabel(a.status).localeCompare(publishStatusLabel(b.status), "zh-CN"),
+    );
   }
   return next.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+}
+
+function parseFileSize(size?: string) {
+  if (!size) return 0;
+  const match = size.trim().match(/^([\d.]+)\s*(B|KB|MB|GB)?$/i);
+  if (!match) return 0;
+  const value = Number.parseFloat(match[1]);
+  const unit = (match[2] ?? "B").toUpperCase();
+  const multipliers: Record<string, number> = {
+    B: 1,
+    KB: 1024,
+    MB: 1024 ** 2,
+    GB: 1024 ** 3,
+  };
+  return value * (multipliers[unit] ?? 1);
 }
 
 export function getProfessionalTypes(files = KNOWLEDGE_FILES) {

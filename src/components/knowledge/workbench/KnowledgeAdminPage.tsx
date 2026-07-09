@@ -19,7 +19,9 @@ import {
   getPermissionRequestsForBase,
   isKnowledgeAdmin,
 } from "@/lib/knowledge/model";
+import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeBase, KnowledgeBaseStatus } from "@/lib/knowledge/types";
+import { cn } from "@/lib/utils";
 import { AdminNavButton, AdminSidebar } from "./admin/AdminSidebar";
 import { ApprovalCenterSection } from "./admin/ApprovalCenterSection";
 import { KnowledgeBaseAdminSection } from "./admin/KnowledgeBaseAdminSection";
@@ -38,7 +40,7 @@ export function KnowledgeAdminPage() {
 
   if (!canViewKnowledgeAdmin()) {
     return (
-      <main className="flex min-w-0 flex-1 items-center justify-center bg-kb-surface p-6">
+      <main className={cn(kbMainPanel, "items-center justify-center p-6")}>
         <KbEmptyState
           title="暂无管理端权限"
           description="知识库管理仅知识库管理员和部门管理员可见。"
@@ -54,7 +56,7 @@ export function KnowledgeAdminPage() {
   ).length;
 
   return (
-    <main className="flex min-w-0 flex-1 overflow-hidden bg-kb-surface">
+    <main className={cn(kbMainPanel, "overflow-hidden")}>
       <AdminSidebar
         subtitle={isKnowledgeAdmin() ? "全库范围" : `${CURRENT_KNOWLEDGE_USER.departmentName}范围`}
       >

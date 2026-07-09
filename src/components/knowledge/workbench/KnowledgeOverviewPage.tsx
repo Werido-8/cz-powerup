@@ -10,6 +10,7 @@ import {
   PinOff,
   ShieldCheck,
   Star,
+  Upload,
   UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -54,11 +55,13 @@ import type {
   KnowledgeFile,
   KnowledgeSortBy,
 } from "@/lib/knowledge/types";
-import { kbCardShell, kbRadius } from "@/lib/knowledge/tokens";
-import { TableListPager, CardBatchPager, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
+import { kbCardShell, kbMainPanel, kbRadius } from "@/lib/knowledge/tokens";
+import { TableListPager, CardBatchPager, TABLE_PAGE_SIZE_DEFAULT, ActionButton } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 import {
   FileViewModeToggle,
+  FileListSortButton,
+  FileListRefreshButton,
   KnowledgeFileCardGrid,
   KnowledgeFileTable,
   type FileViewMode,
@@ -121,6 +124,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const [viewMode, setViewMode] = useState<FileViewMode>("list");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const [refreshSeed, setRefreshSeed] = useState(0);
   const [permissionBase, setPermissionBase] = useState<KnowledgeBase | null>(null);
 
   useEffect(() => {
@@ -195,6 +199,12 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     toast.success(`已选择 ${files.length} 个文件，上传面板即将打开`);
   };
 
+  const handleRefresh = () => {
+    setPage(1);
+    setRefreshSeed((v) => v + 1);
+    toast.message("列表已刷新");
+  };
+
   const emptyFiles = (
     <KbEmptyState
       title="当前筛选下暂无文件"
@@ -250,7 +260,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
         </KbSidebarSection>
       </KbSidebar>
 
-      <main className="scrollbar-thin flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
+      <main className={cn("scrollbar-thin", kbMainPanel)}>
         {!selectedBase ? (
           <div className="flex flex-1 items-center justify-center p-8">
             <KbEmptyState
@@ -267,10 +277,6 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             <KnowledgeBaseDetailHeader
               base={selectedBase}
               fileCount={selectedBase.fileCount ?? selectedFiles.length}
-              pinned={isPinnedId(pinnedIds, selectedBase.id)}
-              canUpload={canUploadToBase(selectedBase)}
-              onTogglePin={() => handleTogglePin(selectedBase.id)}
-              onUpload={() => toast.message("打开上传面板")}
               onSelectBase={handleSelectBase}
             />
 
@@ -310,24 +316,21 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                   }
                   trailing={
                     <>
-                      <KbFilterCombo
-                        value={sortBy}
-                        onChange={(v) => setSortBy(v as KnowledgeSortBy)}
-                        placeholder="排序"
-                        className="min-w-[108px]"
-                        options={[
-                          { value: "updated", label: "最近更新" },
-                          { value: "name", label: "文件名称" },
-                          { value: "uploader", label: "上传人" },
-                        ]}
-                      />
+                      {canUploadToBase(selectedBase) && (
+                        <ActionButton variant="primary" size="sm" onClick={() => toast.message("打开上传面板")}>
+                          <Upload className="h-3.5 w-3.5 stroke-[1.8]" />
+                          上传
+                        </ActionButton>
+                      )}
                       <FileViewModeToggle value={viewMode} onChange={setViewMode} />
+                      <FileListSortButton value={sortBy} onChange={setSortBy} />
+                      <FileListRefreshButton onClick={handleRefresh} />
                     </>
                   }
                 />
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto">
+              <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
                 {viewMode === "list" ? (
                   <KnowledgeFileTable
                     files={pagedFiles}

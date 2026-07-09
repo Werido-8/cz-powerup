@@ -7,7 +7,7 @@ export function KnowledgeAppLayout({ children }: { children: ReactNode }) {
     <div
       className={cn(
         "flex h-full min-h-0 flex-col overflow-hidden border border-[#DCE8EA] bg-white",
-        "shadow-[0_4px_20px_-12px_rgba(31,52,64,0.18)]",
+        "shadow-[0_4px_20px_-12px_rgba(31,52,64,0.12)]",
         kbRadius.lg,
       )}
     >

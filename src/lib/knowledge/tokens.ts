@@ -31,6 +31,9 @@ export const kbTableRow =
   "min-h-[52px] border-b border-divider transition-colors hover:bg-kb-surface-hover last:border-b-0";
 export const kbRowHeight = "min-h-[52px]";
 
+/** 知识库主内容区 */
+export const kbMainPanel = "flex min-w-0 flex-1 flex-col overflow-hidden bg-white";
+
 export const kbToneClasses: Record<KnowledgeStatusTone, string> = {
   neutral: "bg-muted text-muted-foreground",
   accent: "bg-primary-soft text-[#1498A8]",

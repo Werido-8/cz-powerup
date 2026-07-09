@@ -230,15 +230,31 @@ export function KnowledgeFileCardGrid({
   files,
   onOpen,
   empty,
+  compact,
+  columns = "responsive",
 }: {
   files: KnowledgeFile[];
   onOpen: (file: KnowledgeFile) => void;
   empty?: ReactNode;
+  compact?: boolean;
+  /** responsive：随屏宽 1→2→3→4 列；4：大屏固定 4 列 */
+  columns?: "responsive" | 4;
 }) {
   if (files.length === 0) return <>{empty}</>;
 
+  const columnClass =
+    columns === 4
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+      : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+
   return (
-    <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 [&>*]:transition-transform">
+    <div
+      className={cn(
+        "grid [&>*]:transition-transform",
+        columnClass,
+        compact ? "gap-3 p-3" : "gap-4 p-4",
+      )}
+    >
       {files.map((file) => (
         <KnowledgeOverviewFileCard key={file.id} file={file} onOpen={onOpen} />
       ))}

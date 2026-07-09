@@ -19,7 +19,7 @@ export type KnowledgeParseStatus = "waiting" | "parsing" | "success" | "failed";
 
 export type KnowledgeFileType = "pdf" | "docx" | "xlsx" | "pptx" | "image" | "other";
 
-export type KnowledgeSortBy = "updated" | "name" | "uploader";
+export type KnowledgeSortBy = "updated" | "size" | "name" | "status";
 
 export interface KnowledgeUser {
   id: string;
@@ -57,6 +57,8 @@ export interface KnowledgeBase {
   updatedAt?: string;
   ownerName?: string;
   isPinned?: boolean;
+  /** 个人知识库所属目录（仅 scope=personal 时使用） */
+  personalDirectoryId?: string;
 }
 
 export interface KnowledgeFileVersion {

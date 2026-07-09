@@ -11,7 +11,9 @@ import {
   getFirstReadableFileInBase,
   getReadableBases,
 } from "@/lib/knowledge/model";
+import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
+import { cn } from "@/lib/utils";
 import { FileAIAssistantPanel } from "./preview/FileAIAssistantPanel";
 import { FilePreviewCanvas } from "./preview/FilePreviewCanvas";
 import { FilePreviewToolbar } from "./preview/FilePreviewToolbar";
@@ -94,7 +96,7 @@ export function FileDetailPage({
 
   if (!currentBase || !currentFile) {
     return (
-      <main className="flex min-w-0 flex-1 items-center justify-center bg-kb-surface p-6">
+      <main className={cn(kbMainPanel, "items-center justify-center p-6")}>
         <KbEmptyState
           title="文件不存在或暂不可访问"
           description="请从知识总览、全库资料或我的空间重新选择文件。"
@@ -122,7 +124,7 @@ export function FileDetailPage({
   };
 
   return (
-    <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-kb-surface">
+    <main className={cn(kbMainPanel, "overflow-hidden")}>
       <FilePreviewToolbar
         currentBase={currentBase}
         currentFile={currentFile}
