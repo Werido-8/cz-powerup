@@ -67,6 +67,7 @@ import {
   type FileViewMode,
 } from "./KnowledgeFileTable";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
+import { KnowledgeOverviewTitleBanner } from "./KnowledgeOverviewTitleBanner";
 
 const CARD_PAGE_SIZE = 8;
 
@@ -214,7 +215,16 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   return (
     <>
-      <KbSidebar width="browse" withDecor header={<OverviewSidebarQuickLinks />}>
+      <KbSidebar
+        width="browse"
+        withDecor
+        header={
+          <>
+            <KnowledgeOverviewTitleBanner />
+            <OverviewSidebarQuickLinks />
+          </>
+        }
+      >
         <KbSidebarSection title="快速访问">
           {pinnedBases.length === 0 ? (
             <p className="px-2.5 py-1 text-[11px] text-kb-muted">悬浮知识库可置顶</p>
