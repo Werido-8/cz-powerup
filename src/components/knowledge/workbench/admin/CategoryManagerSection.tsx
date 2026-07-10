@@ -13,7 +13,19 @@ import type { KnowledgeCategory } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import { kbCardShell, kbRadius } from "@/lib/knowledge/tokens";
 
-export function CategoryManagerSection() {
+export function CategoryManagerSection({ embedded = false }: { embedded?: boolean }) {
+  const tree = (
+    <div className={cn(kbCardShell, kbRadius.md, embedded ? "m-4 p-3" : "p-3")}>
+      {getCategoryChildren().map((category) => (
+        <CategoryNode key={category.id} category={category} level={0} />
+      ))}
+    </div>
+  );
+
+  if (embedded) {
+    return <div className="min-h-0 flex-1 overflow-y-auto">{tree}</div>;
+  }
+
   return (
     <KbPageContent>
       <KbPageHeader
@@ -27,11 +39,7 @@ export function CategoryManagerSection() {
           </KbButton>
         }
       />
-      <div className={cn(kbCardShell, kbRadius.md, "p-3")}>
-        {getCategoryChildren().map((category) => (
-          <CategoryNode key={category.id} category={category} level={0} />
-        ))}
-      </div>
+      {tree}
     </KbPageContent>
   );
 }

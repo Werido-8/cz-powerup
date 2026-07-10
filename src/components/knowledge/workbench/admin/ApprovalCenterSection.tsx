@@ -27,8 +27,10 @@ const UPLOAD_GRID =
 
 export function ApprovalCenterSection({
   manageableBases,
+  embedded = false,
 }: {
   manageableBases: KnowledgeBase[];
+  embedded?: boolean;
 }) {
   const [tab, setTab] = useState("uploads");
   const manageableIds = new Set(manageableBases.map((base) => base.id));
@@ -46,14 +48,8 @@ export function ApprovalCenterSection({
     [permissionRequests.length],
   );
 
-  return (
-    <KbPageContent>
-      <KbPageHeader
-        label="状态流转"
-        title="审批台"
-        description="集中处理文件上传审批与权限申请，审批通过后进入解析或授权生效。"
-      />
-
+  const body = (
+    <>
       <KbStatStrip
         items={[
           { label: "待审批", value: stats.pending, icon: Clock },
@@ -63,22 +59,63 @@ export function ApprovalCenterSection({
         ]}
       />
 
-      <div className="mb-4">
-        <KbSegmentControl
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: "uploads", label: "文件上传" },
-            { value: "permissions", label: "权限申请" },
-          ]}
-        />
-      </div>
+      <KbSegmentControl
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: "uploads", label: "文件上传" },
+          { value: "permissions", label: "权限申请" },
+        ]}
+      />
 
       {tab === "uploads" ? (
         <UploadApprovalTable items={UPLOAD_APPROVALS} />
       ) : (
         <PermissionApprovalTable items={permissionRequests} />
       )}
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 space-y-3 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
+          <KbStatStrip
+            items={[
+              { label: "待审批", value: stats.pending, icon: Clock },
+              { label: "今日新增", value: stats.today, icon: FileUp },
+              { label: "文件上传", value: stats.uploads, icon: FileUp },
+              { label: "权限申请", value: stats.permissions, icon: ShieldCheck },
+            ]}
+          />
+          <KbSegmentControl
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: "uploads", label: "文件上传" },
+              { value: "permissions", label: "权限申请" },
+            ]}
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-x-auto">
+          {tab === "uploads" ? (
+            <UploadApprovalTable items={UPLOAD_APPROVALS} />
+          ) : (
+            <PermissionApprovalTable items={permissionRequests} />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <KbPageContent>
+      <KbPageHeader
+        label="状态流转"
+        title="审批台"
+        description="集中处理文件上传审批与权限申请，审批通过后进入解析或授权生效。"
+      />
+      <div className="mb-4">{body}</div>
     </KbPageContent>
   );
 }

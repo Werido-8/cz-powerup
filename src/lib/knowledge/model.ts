@@ -6,6 +6,7 @@ import {
   KNOWLEDGE_FILES,
   PARSE_EXCEPTIONS,
   PERMISSION_REQUESTS,
+  PERSONAL_DIRECTORIES,
   RECENT_FILE_IDS,
 } from "./data";
 import { publishStatusLabel } from "./status";
@@ -19,6 +20,7 @@ import type {
   KnowledgeUser,
   ParseException,
   PermissionRequest,
+  PersonalDirectory,
 } from "./types";
 
 export function isKnowledgeAdmin(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
@@ -91,8 +93,44 @@ export function getPersonalBases() {
   return KNOWLEDGE_BASES.filter((base) => base.scope === "personal" && base.status === "enabled");
 }
 
+export const PERSONAL_DIRECTORY_ROOT_ID = "personal-root";
+export const PERSONAL_TREE_ALL_ID = "__tree-personal-all__";
+export const PROFESSIONAL_TREE_ALL_ID = "__tree-professional-all__";
+
+export function isTreeAggregateId(id?: string) {
+  return id === PERSONAL_TREE_ALL_ID || id === PROFESSIONAL_TREE_ALL_ID;
+}
+
 export function getPersonalBasesForDirectory(directoryId: string) {
   return getPersonalBases().filter((base) => base.personalDirectoryId === directoryId);
+}
+
+export function getPersonalDirectoryChildren(parentId?: string): PersonalDirectory[] {
+  return PERSONAL_DIRECTORIES.filter((directory) =>
+    parentId ? directory.parentId === parentId : !directory.parentId,
+  );
+}
+
+export function getPersonalDirectoryTreeDirectories() {
+  return getPersonalDirectoryChildren(PERSONAL_DIRECTORY_ROOT_ID);
+}
+
+export function getPersonalTreeBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+  return getPersonalBases().filter((base) => canViewBaseFiles(base, user));
+}
+
+export function getProfessionalTreeBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+  return KNOWLEDGE_BASES.filter(
+    (base) => base.scope !== "personal" && base.status === "enabled" && canViewBaseFiles(base, user),
+  );
+}
+
+export function getFilesForPersonalTree(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+  return getPersonalTreeBases(user).flatMap((base) => getFilesForBase(base.id));
+}
+
+export function getFilesForProfessionalTree(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+  return getProfessionalTreeBases(user).flatMap((base) => getFilesForBase(base.id));
 }
 
 export function getReadableBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {

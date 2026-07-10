@@ -33,7 +33,13 @@ function failureTypeTone(type?: ParseException["failureType"]) {
   return "danger" as const;
 }
 
-export function ParseExceptionSection({ items }: { items: ParseException[] }) {
+export function ParseExceptionSection({
+  items,
+  embedded = false,
+}: {
+  items: ParseException[];
+  embedded?: boolean;
+}) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [failureType, setFailureType] = useState("all");
@@ -62,14 +68,8 @@ export function ParseExceptionSection({ items }: { items: ParseException[] }) {
     };
   }, [items]);
 
-  return (
-    <KbPageContent>
-      <KbPageHeader
-        label="异常处理"
-        title="解析异常"
-        description="展示解析失败文件，支持查看失败原因、重试解析和日志排查。"
-      />
-
+  const toolbar = (
+    <>
       <KbStatStrip
         items={[
           { label: "解析失败", value: stats.total, icon: FileWarning },
@@ -80,9 +80,11 @@ export function ParseExceptionSection({ items }: { items: ParseException[] }) {
       />
 
       <KbFilterBar
+        className={embedded ? "mb-0" : undefined}
         searchValue={query}
         onSearchChange={setQuery}
         searchPlaceholder="搜索文件名 / 所属知识库"
+        searchClassName="max-w-[280px] !rounded-[8px]"
         filters={
           <>
             <KbFilterSelect
@@ -119,8 +121,11 @@ export function ParseExceptionSection({ items }: { items: ParseException[] }) {
           </KbButton>
         }
       />
+    </>
+  );
 
-      <KbDataTable
+  const table = (
+    <KbDataTable
         minWidth={GRID}
         header={
           <>
@@ -190,7 +195,29 @@ export function ParseExceptionSection({ items }: { items: ParseException[] }) {
             </span>
           </KbDataTableRow>
         ))}
-      </KbDataTable>
+    </KbDataTable>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 space-y-3 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
+          {toolbar}
+        </div>
+        <div className="min-h-0 flex-1 overflow-x-auto">{table}</div>
+      </div>
+    );
+  }
+
+  return (
+    <KbPageContent>
+      <KbPageHeader
+        label="异常处理"
+        title="解析异常"
+        description="展示解析失败文件，支持查看失败原因、重试解析和日志排查。"
+      />
+      {toolbar}
+      {table}
     </KbPageContent>
   );
 }

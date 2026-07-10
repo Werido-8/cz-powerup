@@ -1,6 +1,5 @@
 import { CircleOff, KeyRound, Library, Pencil, Plus, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
 import {
   KbButton,
   KbDataTable,
@@ -34,12 +33,14 @@ export function KnowledgeBaseAdminSection({
   onEdit,
   onToggleStatus,
   onPermission,
+  embedded = false,
 }: {
   bases: KnowledgeBase[];
   onCreate: () => void;
   onEdit: (base: KnowledgeBase) => void;
   onToggleStatus: (base: KnowledgeBase) => void;
   onPermission: (base: KnowledgeBase) => void;
+  embedded?: boolean;
 }) {
   const [departmentId, setDepartmentId] = useState("all");
   const [categoryId, setCategoryId] = useState("all");
@@ -64,20 +65,8 @@ export function KnowledgeBaseAdminSection({
   const enabledCount = bases.filter((b) => b.status === "enabled").length;
   const totalFiles = bases.reduce((sum, b) => sum + (b.fileCount ?? 0), 0);
 
-  return (
-    <KbPageContent>
-      <KbPageHeader
-        label="管理后台"
-        title="知识库"
-        description="管理知识库基础信息、使用状态、所属部门、权限范围与文件资产。"
-        action={
-          <KbButton onClick={onCreate}>
-            <Plus className="h-4 w-4 stroke-[1.8]" />
-            新建库
-          </KbButton>
-        }
-      />
-
+  const toolbar = (
+    <>
       <KbStatStrip
         items={[
           { label: "知识库总数", value: bases.length, icon: Library },
@@ -88,10 +77,11 @@ export function KnowledgeBaseAdminSection({
       />
 
       <KbFilterBar
+        className={embedded ? "mb-0" : undefined}
         searchValue={query}
         onSearchChange={setQuery}
         searchPlaceholder="搜索知识库名称 / 简介 / 部门"
-        searchClassName="max-w-[320px]"
+        searchClassName="max-w-[320px] !rounded-[8px]"
         filters={
           <>
             <KbFilterSelect
@@ -125,8 +115,11 @@ export function KnowledgeBaseAdminSection({
           </>
         }
       />
+    </>
+  );
 
-      <KbDataTable
+  const table = (
+    <KbDataTable
         minWidth={GRID}
         header={
           <>
@@ -183,7 +176,35 @@ export function KnowledgeBaseAdminSection({
             </span>
           </KbDataTableRow>
         ))}
-      </KbDataTable>
+    </KbDataTable>
+  );
+
+  if (embedded) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 space-y-3 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
+          {toolbar}
+        </div>
+        <div className="min-h-0 flex-1 overflow-x-auto">{table}</div>
+      </div>
+    );
+  }
+
+  return (
+    <KbPageContent>
+      <KbPageHeader
+        label="管理后台"
+        title="知识库"
+        description="管理知识库基础信息、使用状态、所属部门、权限范围与文件资产。"
+        action={
+          <KbButton onClick={onCreate}>
+            <Plus className="h-4 w-4 stroke-[1.8]" />
+            新建库
+          </KbButton>
+        }
+      />
+      {toolbar}
+      {table}
     </KbPageContent>
   );
 }

@@ -1,15 +1,11 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
-import { toast } from "sonner";
 import { KbButton, KbEmptyState } from "@/components/knowledge/ui";
-import type { KbBaseSwitcherGroup } from "@/components/knowledge/ui";
 import {
   canManageBase,
   getBaseById,
   getFileById,
   getFilesForBase,
-  getFirstReadableFileInBase,
-  getReadableBases,
 } from "@/lib/knowledge/model";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
@@ -29,6 +25,7 @@ export function FileDetailPage({
   versionId?: string;
 }) {
   const navigate = useNavigate({ from: "/knowledge/file/$fileId" });
+  const router = useRouter();
   const routeFile = getFileById(fileId);
   const routeBase = initialKnowledgeBaseId ? getBaseById(initialKnowledgeBaseId) : undefined;
   const fileBase = routeFile ? getBaseById(routeFile.knowledgeBaseId) : undefined;
@@ -41,27 +38,14 @@ export function FileDetailPage({
     versions.find((version) => version.isCurrent) ??
     versions[0];
   const historyVersion = currentVersion ? !currentVersion.isCurrent : false;
-  const readableBases = getReadableBases().filter(
-    (base) => base.scope !== "personal" || base.id === currentBase?.id,
-  );
 
-  const baseGroups = useMemo((): KbBaseSwitcherGroup[] => {
-    const recentIds =
-      typeof window !== "undefined"
-        ? (JSON.parse(window.localStorage.getItem("knowledge-recent-base-ids") ?? "[]") as string[])
-        : [];
-    const recent = recentIds
-      .map((id) => readableBases.find((b) => b.id === id))
-      .filter(Boolean) as typeof readableBases;
-    const deptBases = readableBases.filter((b) => b.scope === "department");
-    const publicBases = readableBases.filter((b) => b.scope === "public");
-    const groups: KbBaseSwitcherGroup[] = [];
-    if (recent.length) groups.push({ label: "最近访问", bases: recent });
-    if (deptBases.length) groups.push({ label: "运行部", bases: deptBases.slice(0, 4) });
-    if (publicBases.length) groups.push({ label: "公共制度", bases: publicBases });
-    if (!groups.length) groups.push({ label: "知识库", bases: readableBases });
-    return groups;
-  }, [readableBases]);
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      router.history.back();
+      return;
+    }
+    navigate({ to: "/knowledge" });
+  };
 
   useEffect(() => {
     if (!currentFile || typeof window === "undefined") return;
@@ -100,28 +84,11 @@ export function FileDetailPage({
         <KbEmptyState
           title="文件不存在或暂不可访问"
           description="请从知识总览、全库资料或我的空间重新选择文件。"
-          action={
-            <Link to="/knowledge">
-              <KbButton>返回知识总览</KbButton>
-            </Link>
-          }
+          action={<KbButton onClick={handleGoBack}>返回</KbButton>}
         />
       </main>
     );
   }
-
-  const switchBase = (baseId: string) => {
-    const nextFile = getFirstReadableFileInBase(baseId);
-    if (!nextFile) {
-      toast.message("该知识库暂无可打开文件");
-      return;
-    }
-    navigate({
-      to: "/knowledge/file/$fileId",
-      params: { fileId: nextFile.id },
-      search: { kbId: baseId },
-    });
-  };
 
   return (
     <main className={cn(kbMainPanel, "overflow-hidden")}>
@@ -130,8 +97,7 @@ export function FileDetailPage({
         currentFile={currentFile}
         versions={versions}
         currentVersionId={currentVersion?.id}
-        baseGroups={baseGroups}
-        onBaseChange={switchBase}
+        onBack={handleGoBack}
         onVersionChange={(vid) =>
           navigate({ search: (prev) => ({ ...prev, version: vid }) })
         }

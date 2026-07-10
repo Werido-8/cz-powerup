@@ -1,25 +1,18 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Clock3,
-  Database,
-  Folder,
-  FolderPlus,
   Heart,
-  Library,
-  Plus,
+  Layers,
   Upload,
   UploadCloud,
-  UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
   ActionButton,
   CardBatchPager,
-  StatIconFrame,
   TABLE_PAGE_SIZE_DEFAULT,
   TableListPager,
-  Tag,
 } from "@/components/learning/ui";
 import {
   KbButton,
@@ -31,21 +24,21 @@ import {
   KbFilterCombo,
   KbSegmentControl,
   KbSidebar,
-  KbSidebarItem,
   KbSidebarSection,
   KbStatusTag,
   KbTableCellFile,
 } from "@/components/knowledge/ui";
-import { KNOWLEDGE_BASES, PERSONAL_DIRECTORIES, UPLOAD_RECORDS } from "@/lib/knowledge/data";
+import { KNOWLEDGE_BASES, UPLOAD_RECORDS } from "@/lib/knowledge/data";
 import {
   filterFiles,
   getAllTags,
   getFavoriteFiles,
   getFilesForBase,
+  getFilesForPersonalTree,
   getPersonalBases,
-  getPersonalBasesForDirectory,
   getProfessionalTypes,
   getRecentFiles,
+  PERSONAL_TREE_ALL_ID,
   sortKnowledgeFiles,
 } from "@/lib/knowledge/model";
 import { publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
@@ -65,11 +58,19 @@ import {
   KnowledgeFileTable,
   type FileViewMode,
 } from "./KnowledgeFileTable";
+import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
+import { KnowledgeTreeNavItem } from "./KnowledgeCategoryTree";
+import { KnowledgeSectionDetailHeader } from "./KnowledgeSectionDetailHeader";
+import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
+import { KnowledgeTreeSectionActions } from "./KnowledgeTreeSectionActions";
+import { MySpaceTitleBanner } from "./MySpaceTitleBanner";
+import { PersonalDirectoryTree } from "./PersonalDirectoryTree";
 
 type MySpaceSelection =
   | { kind: "recent" }
   | { kind: "uploads" }
   | { kind: "favorites" }
+  | { kind: "personalAll" }
   | { kind: "personalBase"; baseId: string };
 
 const CARD_PAGE_SIZE = 8;
@@ -87,73 +88,6 @@ const uploadStatusOptions: Array<{ value: string; label: string }> = [
 const UPLOAD_GRID =
   "grid-cols-[minmax(240px,1.4fr)_minmax(160px,1fr)_100px_130px_minmax(180px,1fr)] min-w-[900px]";
 
-function MySpaceQuickLinks() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  const links = [
-    { to: "/knowledge/mine", label: "我的空间", icon: UserRound, active: pathname.startsWith("/knowledge/mine") },
-    { to: "/knowledge/all", label: "全库资料", icon: Database, active: pathname.startsWith("/knowledge/all") },
-  ] as const;
-
-  return (
-    <div className="space-y-0.5 border-b border-[#E8F0F2] p-2">
-      {links.map((item) => {
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.to}
-            to={item.to}
-            className={cn(
-              "flex h-8 w-full items-center gap-2 rounded-[8px] px-2.5 text-[12.5px] transition-colors",
-              item.active
-                ? "bg-primary-soft font-medium text-accent-foreground"
-                : "text-kb-body hover:bg-[#F4FAFB]",
-            )}
-          >
-            <Icon
-              className={cn(
-                "h-3.5 w-3.5 shrink-0 stroke-[1.8]",
-                item.active ? "text-primary" : "text-kb-muted",
-              )}
-            />
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function MySpacePanelHeader({
-  icon,
-  title,
-  description,
-  meta,
-  action,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  meta?: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <section className="shrink-0 border-b border-divider px-4 py-3">
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
-          <StatIconFrame icon={icon} size="sm" />
-          <div className="min-w-0">
-            <h1 className="text-[20px] font-semibold tracking-tight text-foreground">{title}</h1>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-muted-foreground">{description}</p>
-            {meta && <div className="mt-2 flex flex-wrap items-center gap-2">{meta}</div>}
-          </div>
-        </div>
-        {action}
-      </div>
-    </section>
-  );
-}
-
 export function MySpacePage() {
   const navigate = useNavigate({ from: "/knowledge/mine" });
   const personalBases = useMemo(() => getPersonalBases(), []);
@@ -170,10 +104,13 @@ export function MySpacePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.location.hash === "#personal" && personalBases[0]) {
-      setSelection({ kind: "personalBase", baseId: personalBases[0].id });
+    if (window.location.hash === "#personal") {
+      setSelection({ kind: "personalAll" });
     }
-  }, [personalBases]);
+    if (window.location.hash === "#uploads") {
+      setSelection({ kind: "uploads" });
+    }
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -203,6 +140,10 @@ export function MySpacePage() {
       ? personalBases.find((base) => base.id === selection.baseId)
       : undefined;
 
+  const personalAllFiles = useMemo(() => {
+    return sortKnowledgeFiles(filterFiles(getFilesForPersonalTree(), { query }), sortBy);
+  }, [query, sortBy]);
+
   const personalFiles = useMemo(() => {
     if (!selectedBase) return [];
     return sortKnowledgeFiles(
@@ -225,86 +166,65 @@ export function MySpacePage() {
     <>
       <KbSidebar
         width="browse"
+        withDecor
         header={
-          <div className="border-b border-[#E8F0F2] px-4 py-3.5">
-            <p className="text-[11px] font-medium text-kb-muted">个人空间</p>
-            <div className="mt-1.5 flex items-center gap-2">
-              <StatIconFrame icon={<UserRound className="stroke-[1.8]" />} size="sm" />
-              <h1 className="text-[15px] font-semibold text-kb-heading">我的空间</h1>
-            </div>
-          </div>
+          <>
+            <MySpaceTitleBanner />
+            <KnowledgeSidebarQuickLinks />
+          </>
         }
       >
-        <MySpaceQuickLinks />
-
-        <KbSidebarSection>
-          <KbSidebarItem
-            icon={Clock3}
-            label="最近访问"
-            active={selection.kind === "recent"}
-            onClick={() => setSelection({ kind: "recent" })}
-          />
-          <KbSidebarItem
-            icon={UploadCloud}
-            label="我的上传"
-            active={selection.kind === "uploads"}
-            onClick={() => setSelection({ kind: "uploads" })}
-          />
-          <KbSidebarItem
-            icon={Heart}
-            label="我的收藏"
-            active={selection.kind === "favorites"}
-            onClick={() => setSelection({ kind: "favorites" })}
-          />
+        <KbSidebarSection title="个人事务">
+          <div className="space-y-0.5 px-1">
+            <KnowledgeTreeNavItem
+              icon={Clock3}
+              label="最近访问"
+              selected={selection.kind === "recent"}
+              onClick={() => setSelection({ kind: "recent" })}
+            />
+            <KnowledgeTreeNavItem
+              icon={UploadCloud}
+              label="我的上传"
+              selected={selection.kind === "uploads"}
+              onClick={() => setSelection({ kind: "uploads" })}
+            />
+            <KnowledgeTreeNavItem
+              icon={Heart}
+              label="我的收藏"
+              selected={selection.kind === "favorites"}
+              onClick={() => setSelection({ kind: "favorites" })}
+            />
+          </div>
         </KbSidebarSection>
 
         <KbSidebarSection
-          title="个人目录与知识库"
+          title="个人知识库"
           className="border-t border-[#E8F0F2] pt-2"
+          action={
+            <KnowledgeTreeSectionActions
+              directoryLabel="新建个人目录"
+              knowledgeBaseLabel="新建个人知识库"
+              onAddDirectory={() => toast.success("已预留新建个人目录入口")}
+              onAddKnowledgeBase={() => toast.success("已预留新建个人知识库入口")}
+            />
+          }
         >
-          <div className="mb-1 flex items-center justify-end gap-1 px-1">
-            <KbButton
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => toast.success("已预留新建个人目录入口")}
-              aria-label="新建个人目录"
-            >
-              <FolderPlus className="h-3.5 w-3.5 stroke-[1.8]" />
-            </KbButton>
-            <KbButton
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => toast.success("已预留新建个人知识库入口")}
-              aria-label="新建个人知识库"
-            >
-              <Plus className="h-3.5 w-3.5 stroke-[1.8]" />
-            </KbButton>
-          </div>
-          {PERSONAL_DIRECTORIES.map((directory) => {
-            const bases = getPersonalBasesForDirectory(directory.id);
-            if (bases.length === 0) return null;
-            return (
-              <div key={directory.id} className="mb-1.5">
-                <div className="flex h-8 items-center gap-2 px-3 text-[12px] font-medium text-kb-muted">
-                  <Folder className="h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                  <span className="min-w-0 truncate">{directory.name}</span>
-                </div>
-                {bases.map((base) => (
-                  <KbSidebarItem
-                    key={base.id}
-                    icon={Library}
-                    label={base.name}
-                    badge={base.fileCount ?? 0}
-                    active={selection.kind === "personalBase" && selection.baseId === base.id}
-                    onClick={() => setSelection({ kind: "personalBase", baseId: base.id })}
-                    indent={1}
-                  />
-                ))}
-              </div>
-            );
-          })}
+          <PersonalDirectoryTree
+            selectedBaseId={
+              selection.kind === "personalBase"
+                ? selection.baseId
+                : selection.kind === "personalAll"
+                  ? PERSONAL_TREE_ALL_ID
+                  : undefined
+            }
+            onSelectBase={(baseId) => {
+              if (baseId === PERSONAL_TREE_ALL_ID) {
+                setSelection({ kind: "personalAll" });
+              } else {
+                setSelection({ kind: "personalBase", baseId });
+              }
+            }}
+          />
         </KbSidebarSection>
       </KbSidebar>
 
@@ -364,6 +284,25 @@ export function MySpacePage() {
           />
         )}
 
+        {selection.kind === "personalAll" && (
+          <PersonalAllPanel
+            files={personalAllFiles}
+            query={query}
+            sortBy={sortBy}
+            viewMode={viewMode}
+            page={page}
+            pageSize={pageSize}
+            refreshSeed={refreshSeed}
+            onQueryChange={setQuery}
+            onSortChange={setSortBy}
+            onViewModeChange={setViewMode}
+            onPageChange={setPage}
+            onPageSizeChange={setPageSize}
+            onRefresh={handleRefresh}
+            onOpen={openFile}
+          />
+        )}
+
         {selection.kind === "personalBase" && selectedBase && (
           <PersonalBasePanel
             base={selectedBase}
@@ -386,6 +325,7 @@ export function MySpacePage() {
             onRefresh={handleRefresh}
             onOpen={openFile}
             onUploadFiles={handleUploadFiles}
+            onSelectBase={(baseId) => setSelection({ kind: "personalBase", baseId })}
           />
         )}
       </main>
@@ -433,25 +373,23 @@ function FileListSection({
   emptyDescription: string;
 }) {
   const sorted = useMemo(() => sortKnowledgeFiles(files, sortBy), [files, sortBy]);
+  const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / effectivePageSize) || 1);
+  const safePage = Math.min(page, totalPages);
   const pagedFiles = useMemo(() => {
-    const size = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
-    const start = (page - 1) * size;
-    return sorted.slice(start, start + size);
-  }, [sorted, viewMode, page, pageSize]);
+    const start = (safePage - 1) * effectivePageSize;
+    return sorted.slice(start, start + effectivePageSize);
+  }, [effectivePageSize, safePage, sorted]);
 
   const empty = <KbEmptyState title={emptyTitle} description={emptyDescription} />;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <MySpacePanelHeader
+      <KnowledgeSectionDetailHeader
         icon={icon}
         title={title}
+        badge={`共 ${files.length} 篇`}
         description={description}
-        meta={
-          <Tag variant="outline" className="h-6 rounded-[6px] px-2.5 text-[11px]">
-            共 {files.length} 篇
-          </Tag>
-        }
       />
 
       <div className="shrink-0 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
@@ -467,38 +405,42 @@ function FileListSection({
         />
       </div>
 
-      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === "list" ? (
           <KnowledgeFileTable
             files={pagedFiles}
             onOpen={onOpen}
             showLibrary={showLibrary}
             empty={empty}
-            className="rounded-none border-0 shadow-none"
           />
         ) : (
           <KnowledgeFileCardGrid files={pagedFiles} onOpen={onOpen} empty={empty} />
         )}
       </div>
 
-      <div className="shrink-0 border-t border-divider bg-white px-4 py-2">
-        {viewMode === "list" ? (
+      {sorted.length > 0 &&
+        (viewMode === "list" ? (
           <TableListPager
-            total={sorted.length}
-            page={page}
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={sorted.length}
             pageSize={pageSize}
             onPageChange={onPageChange}
             onPageSizeChange={onPageSizeChange}
           />
         ) : (
-          <CardBatchPager
-            total={sorted.length}
-            page={page}
-            pageSize={CARD_PAGE_SIZE}
-            onPageChange={onPageChange}
-          />
-        )}
-      </div>
+          <div className="border-t border-divider px-4 py-2">
+            <CardBatchPager
+              page={safePage}
+              totalPages={totalPages}
+              totalItems={sorted.length}
+              pageSize={CARD_PAGE_SIZE}
+              unitLabel="个文件"
+              onPageChange={onPageChange}
+              compact
+            />
+          </div>
+        ))}
     </div>
   );
 }
@@ -520,15 +462,11 @@ function MyUploadPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <MySpacePanelHeader
+      <KnowledgeSectionDetailHeader
         icon={<UploadCloud className="stroke-[1.8]" />}
         title="我的上传"
+        badge={`共 ${records.length} 条记录`}
         description="跟踪上传后的审批、解析、驳回和发布状态。个人库上传免审批，公共和部门库按权限进入审批。"
-        meta={
-          <Tag variant="outline" className="h-6 rounded-[6px] px-2.5 text-[11px]">
-            共 {records.length} 条记录
-          </Tag>
-        }
       />
 
       <div className="shrink-0 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
@@ -589,6 +527,119 @@ function UploadRecordRow({ record }: { record: UploadRecord }) {
   );
 }
 
+function PersonalAllPanel({
+  files,
+  query,
+  sortBy,
+  viewMode,
+  page,
+  pageSize,
+  refreshSeed,
+  onQueryChange,
+  onSortChange,
+  onViewModeChange,
+  onPageChange,
+  onPageSizeChange,
+  onRefresh,
+  onOpen,
+}: {
+  files: KnowledgeFile[];
+  query: string;
+  sortBy: KnowledgeSortBy;
+  viewMode: FileViewMode;
+  page: number;
+  pageSize: number;
+  refreshSeed: number;
+  onQueryChange: (value: string) => void;
+  onSortChange: (value: KnowledgeSortBy) => void;
+  onViewModeChange: (mode: FileViewMode) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  onRefresh: () => void;
+  onOpen: (file: KnowledgeFile) => void;
+}) {
+  const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
+  const totalPages = Math.max(1, Math.ceil(files.length / effectivePageSize) || 1);
+  const safePage = Math.min(page, totalPages);
+  const pagedFiles = useMemo(() => {
+    const start = (safePage - 1) * effectivePageSize;
+    return files.slice(start, start + effectivePageSize);
+  }, [effectivePageSize, files, safePage]);
+
+  const empty = (
+    <KbEmptyState
+      title="个人库暂无文件"
+      description="当前个人知识库下还没有可查看的文件。"
+    />
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <KnowledgeSectionDetailHeader
+        icon={<Layers className="stroke-[1.8]" />}
+        title="全部"
+        badge={`共 ${files.length} 篇`}
+        description="汇总展示个人知识库中有权访问的全部文件。"
+      />
+
+      <div className="shrink-0 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
+        <KbFilterBar
+          className="mb-0"
+          searchValue={query}
+          onSearchChange={onQueryChange}
+          searchPlaceholder="搜索个人库文件"
+          searchClassName="max-w-[280px] !rounded-[8px]"
+          trailing={
+            <>
+              <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />
+              <FileListSortButton value={sortBy} onChange={onSortChange} />
+              <FileListRefreshButton onClick={onRefresh} />
+            </>
+          }
+        />
+      </div>
+
+      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
+        {viewMode === "list" ? (
+          <KnowledgeFileTable
+            files={pagedFiles}
+            onOpen={onOpen}
+            showLibrary
+            overviewMode
+            empty={empty}
+          />
+        ) : (
+          <KnowledgeFileCardGrid files={pagedFiles} onOpen={onOpen} empty={empty} />
+        )}
+      </div>
+
+      {files.length > 0 &&
+        (viewMode === "list" ? (
+          <TableListPager
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={files.length}
+            pageSize={pageSize}
+            onPageChange={onPageChange}
+            onPageSizeChange={onPageSizeChange}
+          />
+        ) : (
+          <div className="border-t border-divider px-4 py-2">
+            <CardBatchPager
+              page={safePage}
+              totalPages={totalPages}
+              totalItems={files.length}
+              pageSize={CARD_PAGE_SIZE}
+              unitLabel="个文件"
+              onPageChange={onPageChange}
+              compact
+            />
+          </div>
+        ))}
+    </div>
+  );
+}
+
 function PersonalBasePanel({
   base,
   files,
@@ -610,6 +661,7 @@ function PersonalBasePanel({
   onRefresh,
   onOpen,
   onUploadFiles,
+  onSelectBase,
 }: {
   base: KnowledgeBase;
   files: KnowledgeFile[];
@@ -631,6 +683,7 @@ function PersonalBasePanel({
   onRefresh: () => void;
   onOpen: (file: KnowledgeFile) => void;
   onUploadFiles: (files: FileList) => void;
+  onSelectBase: (baseId: string) => void;
 }) {
   const allFiles = getFilesForBase(base.id);
   const professionalTypes = getProfessionalTypes(allFiles);
@@ -639,11 +692,13 @@ function PersonalBasePanel({
     (item) => item.scope !== "personal" && item.status === "enabled" && item.permission.canUpload,
   );
 
+  const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
+  const totalPages = Math.max(1, Math.ceil(files.length / effectivePageSize) || 1);
+  const safePage = Math.min(page, totalPages);
   const pagedFiles = useMemo(() => {
-    const size = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
-    const start = (page - 1) * size;
-    return files.slice(start, start + size);
-  }, [files, viewMode, page, pageSize]);
+    const start = (safePage - 1) * effectivePageSize;
+    return files.slice(start, start + effectivePageSize);
+  }, [effectivePageSize, files, safePage]);
 
   const empty = (
     <KbEmptyState
@@ -657,35 +712,19 @@ function PersonalBasePanel({
       onFiles={onUploadFiles}
       className="flex min-h-0 flex-1 flex-col"
     >
-      <MySpacePanelHeader
-        icon={<Library className="stroke-[1.8]" />}
-        title={base.name}
-        description={
-          base.description ?? "个人知识库仅本人可见，文件可申请移动到公共或专业知识库。"
-        }
-        meta={
-          <>
-            <Tag variant="primary" className="h-6 px-2.5 text-[11px]">
-              {allFiles.length} 个文件
-            </Tag>
-            {base.updatedAt && (
-              <Tag variant="outline" className="h-6 rounded-[6px] px-2.5 text-[11px]">
-                更新于 {base.updatedAt}
-              </Tag>
-            )}
-          </>
-        }
+      <KnowledgeBaseDetailHeader
+        base={base}
+        fileCount={allFiles.length}
+        onSelectBase={onSelectBase}
         action={
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <KbButton
-              variant="outline"
-              size="sm"
-              disabled={movableBases.length === 0}
-              onClick={() => toast.success("已打开移动到公共库流程")}
-            >
-              移动到公共库
-            </KbButton>
-          </div>
+          <KbButton
+            variant="outline"
+            size="sm"
+            disabled={movableBases.length === 0}
+            onClick={() => toast.success("已打开移动到公共库流程")}
+          >
+            移动到公共库
+          </KbButton>
         }
       />
 
@@ -736,7 +775,7 @@ function PersonalBasePanel({
         />
       </div>
 
-      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === "list" ? (
           <KnowledgeFileTable
             files={pagedFiles}
@@ -744,31 +783,35 @@ function PersonalBasePanel({
             showLibrary={false}
             overviewMode
             empty={empty}
-            className="rounded-none border-0 shadow-none"
           />
         ) : (
           <KnowledgeFileCardGrid files={pagedFiles} onOpen={onOpen} empty={empty} />
         )}
       </div>
 
-      <div className="shrink-0 border-t border-divider bg-white px-4 py-2">
-        {viewMode === "list" ? (
+      {files.length > 0 &&
+        (viewMode === "list" ? (
           <TableListPager
-            total={files.length}
-            page={page}
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={files.length}
             pageSize={pageSize}
             onPageChange={onPageChange}
             onPageSizeChange={onPageSizeChange}
           />
         ) : (
-          <CardBatchPager
-            total={files.length}
-            page={page}
-            pageSize={CARD_PAGE_SIZE}
-            onPageChange={onPageChange}
-          />
-        )}
-      </div>
+          <div className="border-t border-divider px-4 py-2">
+            <CardBatchPager
+              page={safePage}
+              totalPages={totalPages}
+              totalItems={files.length}
+              pageSize={CARD_PAGE_SIZE}
+              unitLabel="个文件"
+              onPageChange={onPageChange}
+              compact
+            />
+          </div>
+        ))}
     </KbDragUploadOverlay>
   );
 }

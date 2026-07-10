@@ -43,16 +43,21 @@ export function KbSidebarSection({
   title,
   children,
   className,
+  action,
 }: {
   title?: string;
   children: ReactNode;
   className?: string;
+  action?: ReactNode;
 }) {
   return (
     <div className={cn("p-3", className)}>
       {title && (
-        <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-kb-muted">
-          {title}
+        <div className="mb-2 flex items-center justify-between gap-2 px-1">
+          <div className="min-w-0 text-[11px] font-semibold uppercase tracking-wide text-kb-muted">
+            {title}
+          </div>
+          {action}
         </div>
       )}
       <div className="space-y-0.5">{children}</div>
