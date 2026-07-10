@@ -1,6 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
-  Layers,
   ShieldCheck,
   Star,
   Upload,
@@ -54,10 +53,10 @@ import {
   KnowledgeFileTable,
   type FileViewMode,
 } from "./KnowledgeFileTable";
+import { KnowledgeAggregateDetailHeader } from "./KnowledgeAggregateDetailHeader";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
 import { KnowledgeCategoryTree } from "./KnowledgeCategoryTree";
 import { KnowledgeOverviewTitleBanner } from "./KnowledgeOverviewTitleBanner";
-import { KnowledgeSectionDetailHeader } from "./KnowledgeSectionDetailHeader";
 import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 import { KnowledgeTreeSectionActions } from "./KnowledgeTreeSectionActions";
 import { PersonalDirectoryTree } from "./PersonalDirectoryTree";
@@ -284,7 +283,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
           </div>
         ) : isAggregate ? (
           <TreeAggregatePanel
-            title="全部"
+            scopeLabel={isPersonalAll ? "个人知识库" : "专业知识库"}
             description={
               isPersonalAll
                 ? "汇总展示个人知识库中有权访问的全部文件。"
@@ -297,6 +296,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             page={page}
             pageSize={pageSize}
             refreshSeed={refreshSeed}
+            onNavigateRoot={() => handleSelectTreeId(getDefaultOverviewBaseId())}
             onQueryChange={setQuery}
             onSortChange={setSortBy}
             onViewModeChange={setViewMode}
@@ -431,7 +431,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 }
 
 function TreeAggregatePanel({
-  title,
+  scopeLabel,
   description,
   files,
   query,
@@ -440,6 +440,7 @@ function TreeAggregatePanel({
   page,
   pageSize,
   refreshSeed,
+  onNavigateRoot,
   onQueryChange,
   onSortChange,
   onViewModeChange,
@@ -448,7 +449,7 @@ function TreeAggregatePanel({
   onRefresh,
   onOpen,
 }: {
-  title: string;
+  scopeLabel: string;
   description: string;
   files: KnowledgeFile[];
   query: string;
@@ -457,6 +458,7 @@ function TreeAggregatePanel({
   page: number;
   pageSize: number;
   refreshSeed: number;
+  onNavigateRoot?: () => void;
   onQueryChange: (value: string) => void;
   onSortChange: (value: KnowledgeSortBy) => void;
   onViewModeChange: (mode: FileViewMode) => void;
@@ -482,11 +484,11 @@ function TreeAggregatePanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <KnowledgeSectionDetailHeader
-        icon={<Layers className="stroke-[1.8]" />}
-        title={title}
-        badge={`共 ${files.length} 篇`}
+      <KnowledgeAggregateDetailHeader
+        fileCount={files.length}
         description={description}
+        scopeLabel={scopeLabel}
+        onNavigateRoot={onNavigateRoot}
       />
 
       <div className="border-b border-divider bg-[#FAFCFD] px-4 py-2.5">

@@ -14,7 +14,7 @@ export function KnowledgePageTitleBanner({
 }) {
   return (
     <section className="shrink-0 px-3 pb-2.5 pt-3">
-      <div className="relative h-[88px] overflow-hidden rounded-[14px]">
+      <div className="relative h-[88px] overflow-hidden rounded-[14px] border border-[#E6F0F2] shadow-[0_2px_10px_rgba(0,0,0,0.06)]">
         <img
           src={backgroundSrc}
           alt=""

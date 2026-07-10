@@ -1,7 +1,5 @@
-import { Clock, Library } from "lucide-react";
+import { Clock, Library, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
-import kbHeaderBackground from "@/assets/image.png";
-import { StatIconFrame, Tag } from "@/components/learning/ui";
 import {
   Tooltip,
   TooltipContent,
@@ -9,7 +7,36 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { KnowledgeBase } from "@/lib/knowledge/types";
+import { cn } from "@/lib/utils";
 import { KnowledgeBaseBreadcrumb } from "./KnowledgeBaseBreadcrumb";
+import { KnowledgeDetailBannerShell } from "./KnowledgeDetailBannerShell";
+
+function scopeLabel(base: KnowledgeBase) {
+  if (base.scope === "personal") return "个人知识库";
+  if (base.scope === "public") return "公共制度";
+  return base.departmentName ?? "部门知识库";
+}
+
+function KnowledgeBannerCapsule({
+  children,
+  tone = "primary",
+}: {
+  children: ReactNode;
+  tone?: "primary" | "neutral";
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex h-6 items-center rounded-full border px-2.5 text-[11px] font-medium",
+        tone === "primary"
+          ? "border-[#C5E6EE] bg-[#F0FAFB] text-[#1498A8]"
+          : "border-[#E6F0F2] bg-white text-[#4E5969]",
+      )}
+    >
+      {children}
+    </span>
+  );
+}
 
 export function KnowledgeBaseDetailHeader({
   base,
@@ -26,66 +53,61 @@ export function KnowledgeBaseDetailHeader({
   const ownerLabel = base.ownerName ?? "-";
 
   return (
-    <section className="relative overflow-hidden border-b border-divider">
-      <img
-        src={kbHeaderBackground}
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover object-[right_center] select-none"
-        draggable={false}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0 w-[min(72%,680px)] bg-gradient-to-r from-white/88 via-white/45 to-transparent"
-      />
+    <KnowledgeDetailBannerShell>
+      <KnowledgeBaseBreadcrumb base={base} onSelectBase={onSelectBase} className="mb-3" />
 
-      <div className="relative z-[1] px-5 py-4">
-        <KnowledgeBaseBreadcrumb base={base} onSelectBase={onSelectBase} className="mb-3" />
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-3.5">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary-soft text-primary">
+            <Library className="h-5 w-5 stroke-[1.8]" />
+          </div>
 
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-start gap-3.5">
-            <StatIconFrame icon={<Library className="stroke-[1.8]" />} />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-[#002140]">
+                {base.name}
+              </h1>
+              <KnowledgeBannerCapsule tone="primary">{fileCount} 个文件</KnowledgeBannerCapsule>
+              <KnowledgeBannerCapsule tone="neutral">{scopeLabel(base)}</KnowledgeBannerCapsule>
+            </div>
 
-            <div className="min-w-0 flex-1 pt-0.5">
-              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className="text-[20px] font-semibold tracking-tight text-foreground">
-                  {base.name}
-                </h1>
-                <Tag variant="primary" className="h-6 px-2.5 text-[11px]">
-                  {fileCount} 个文件
-                </Tag>
-              </div>
-
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-5 gap-y-1">
-                {base.description && (
-                  <TooltipProvider delayDuration={200}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <p className="w-[65%] shrink-0 truncate text-[13px] text-muted-foreground">
-                          {base.description}
-                        </p>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-sm text-[12px] leading-relaxed">
+            <div className="mt-2 flex min-w-0 items-center">
+              {base.description ? (
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="min-w-0 max-w-[min(100%,420px)] shrink-0 truncate text-[14px] leading-relaxed text-[#4E5969]">
                         {base.description}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-sm text-[12px] leading-relaxed">
+                      {base.description}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : null}
 
-                <div className="flex shrink-0 items-center gap-2.5 text-[11.5px] text-muted-foreground">
-                  <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                    <Clock className="h-3 w-3 shrink-0 stroke-[1.8]" />
-                    最后更新：{updatedLabel}
-                  </span>
-                  <span className="h-3 w-px bg-border" aria-hidden />
-                  <span className="whitespace-nowrap">创建人：{ownerLabel}</span>
+              <div
+                className={cn(
+                  "flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 text-[12px] text-[#4E5969]",
+                  base.description && "ml-10 lg:ml-16 xl:ml-24",
+                )}
+              >
+                <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <Clock className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-[#8A96A3]" />
+                  <span>最后更新：{updatedLabel}</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <UserRound className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-[#8A96A3]" />
+                  <span>创建人：{ownerLabel}</span>
                 </div>
               </div>
             </div>
           </div>
-          {action}
         </div>
+
+        {action && <div className="shrink-0 self-start">{action}</div>}
       </div>
-    </section>
+    </KnowledgeDetailBannerShell>
   );
 }

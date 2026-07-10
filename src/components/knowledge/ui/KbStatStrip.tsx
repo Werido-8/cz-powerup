@@ -1,21 +1,50 @@
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { kbCardShell, kbRadius } from "@/lib/knowledge/tokens";
+import { kbCardShell, kbFlatCardShell, kbRadius } from "@/lib/knowledge/tokens";
 
 export interface KbStatItem {
   label: string;
   value: string | number;
   icon?: LucideIcon;
+  iconTone?: "primary" | "success" | "warning" | "info";
 }
+
+const statIconToneClasses: Record<
+  NonNullable<KbStatItem["iconTone"]>,
+  string
+> = {
+  primary: "bg-primary-soft text-primary",
+  success: "bg-[#EAFBF1] text-[#19A974]",
+  warning: "bg-[#FFF7ED] text-[#C76A16]",
+  info: "bg-[#F1F7FF] text-[#2F6FB0]",
+};
 
 export function KbStatStrip({
   items,
   className,
+  variant = "default",
 }: {
   items: KbStatItem[];
   className?: string;
+  variant?: "default" | "flat" | "divided";
 }) {
+  if (variant === "divided") {
+    return (
+      <div
+        className={cn(
+          "grid divide-x divide-[#E8F0F2]",
+          items.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4",
+          className,
+        )}
+      >
+        {items.map((item) => (
+          <KbStatCardDivided key={item.label} {...item} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -25,23 +54,57 @@ export function KbStatStrip({
       )}
     >
       {items.map((item) => (
-        <KbStatCard key={item.label} {...item} />
+        <KbStatCard key={item.label} {...item} variant={variant} />
       ))}
     </div>
   );
 }
 
-function KbStatCard({ label, value, icon: Icon }: KbStatItem) {
+function KbStatCardDivided({ label, value, icon: Icon, iconTone = "primary" }: KbStatItem) {
+  return (
+    <div className="flex h-[76px] items-center gap-3 px-5">
+      {Icon && (
+        <div
+          className={cn(
+            "grid h-9 w-9 shrink-0 place-items-center rounded-[8px]",
+            statIconToneClasses[iconTone],
+          )}
+        >
+          <Icon className="h-4 w-4 stroke-[1.8]" />
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="text-[12px] font-medium text-kb-muted">{label}</div>
+        <div className="mt-1 text-[24px] font-bold tabular-nums leading-none tracking-tight text-kb-heading">
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KbStatCard({
+  label,
+  value,
+  icon: Icon,
+  iconTone = "primary",
+  variant = "default",
+}: KbStatItem & { variant?: "default" | "flat" }) {
   return (
     <div
       className={cn(
-        kbCardShell,
+        variant === "flat" ? kbFlatCardShell : kbCardShell,
         kbRadius.sm,
         "flex h-[72px] items-center gap-3 px-4",
       )}
     >
       {Icon && (
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] bg-primary-soft text-primary">
+        <div
+          className={cn(
+            "grid h-9 w-9 shrink-0 place-items-center rounded-[8px]",
+            statIconToneClasses[iconTone],
+          )}
+        >
           <Icon className="h-4 w-4 stroke-[1.8]" />
         </div>
       )}

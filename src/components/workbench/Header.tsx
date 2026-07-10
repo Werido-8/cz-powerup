@@ -17,9 +17,9 @@ const MENU: MenuItem[] = [
     to: "/knowledge",
     children: [
       { label: "知识总览", to: "/knowledge" },
-      { label: "全库资料", to: "/knowledge/all" },
+      // { label: "全库资料", to: "/knowledge/all" },
       { label: "我的空间", to: "/knowledge/mine" },
-      { label: "知识库管理", to: "/knowledge/admin" },
+      { label: "知识管理", to: "/knowledge/admin" },
     ],
   },
   // 本期暂不开放：智能问答

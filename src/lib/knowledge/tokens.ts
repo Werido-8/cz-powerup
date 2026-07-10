@@ -25,6 +25,9 @@ export const kbRadius = {
 } as const;
 
 export const kbCardShell = "border border-kb-border bg-card shadow-card";
+export const kbDetailBannerShell =
+  "relative overflow-hidden rounded-[12px] border border-[#E6F0F2] bg-white shadow-[0_2px_8px_rgba(0,0,0,0.03)]";
+export const kbFlatCardShell = "border border-[#E6F0F2] bg-white";
 export const kbTableShell = `${kbCardShell} ${kbRadius.md} overflow-hidden`;
 export const kbTableHead = "bg-muted/40 text-muted-foreground text-[11.5px] font-medium";
 export const kbTableRow =

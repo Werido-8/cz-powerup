@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { label: "知识总览", to: "/knowledge", icon: LayoutDashboard },
-  { label: "全库资料", to: "/knowledge/all", icon: Database },
+  // { label: "全库资料", to: "/knowledge/all", icon: Database },
   { label: "我的空间", to: "/knowledge/mine", icon: FolderKanban },
-  { label: "知识库管理", to: "/knowledge/admin", icon: Settings2, adminOnly: true },
+  { label: "知识管理", to: "/knowledge/admin", icon: Settings2, adminOnly: true },
 ] as const;
 
 export function KnowledgeModuleNav() {

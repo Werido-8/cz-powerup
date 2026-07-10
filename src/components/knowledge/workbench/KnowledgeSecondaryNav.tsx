@@ -7,7 +7,7 @@ const items = [
   { to: "/knowledge", label: "知识总览", icon: LayoutGrid, exact: true },
   { to: "/knowledge/all", label: "全库资料", icon: Database },
   { to: "/knowledge/mine", label: "我的空间", icon: FolderOpen },
-  { to: "/knowledge/admin", label: "知识库管理", icon: Network, adminOnly: true },
+  { to: "/knowledge/admin", label: "知识管理", icon: Network, adminOnly: true },
 ] as const;
 
 export function KnowledgeSecondaryNav({ className }: { className?: string }) {

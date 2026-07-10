@@ -20,7 +20,7 @@ export function AdminSidebar({
         <p className="text-[11px] font-semibold uppercase tracking-wide text-kb-muted">
           管理员工作台
         </p>
-        <h1 className="mt-1 text-[15px] font-semibold text-kb-heading">知识库管理</h1>
+        <h1 className="mt-1 text-[15px] font-semibold text-kb-heading">知识管理</h1>
         <p className="mt-1.5 text-[12px] text-kb-muted">{subtitle}</p>
       </div>
       <nav className="space-y-0.5 p-3">{children}</nav>

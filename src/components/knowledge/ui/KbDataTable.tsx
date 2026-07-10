@@ -8,23 +8,30 @@ export function KbDataTable({
   empty,
   className,
   minWidth,
+  variant = "card",
 }: {
   header: ReactNode;
   children: ReactNode;
   empty?: ReactNode;
   className?: string;
   minWidth?: string;
+  variant?: "card" | "flat";
 }) {
   const hasChildren = Array.isArray(children)
     ? children.some(Boolean)
     : Boolean(children);
 
   return (
-    <div className={cn(kbTableShell, "w-full overflow-x-auto", className)}>
+    <div
+      className={cn(
+        variant === "flat" ? "w-full overflow-x-auto bg-white" : kbTableShell,
+        className,
+      )}
+    >
       <div
         className={cn(
-          "grid items-center border-b border-divider px-4 py-3",
-          kbTableHead,
+          "grid items-center border-b border-[#E8F0F2] px-5 py-2.5",
+          variant === "flat" ? "bg-[#F8FAFB] text-[12px] font-medium text-kb-muted" : kbTableHead,
           minWidth,
         )}
       >
@@ -40,11 +47,13 @@ export function KbDataTableRow({
   className,
   dimmed,
   onClick,
+  variant = "default",
 }: {
   children: ReactNode;
   className?: string;
   dimmed?: boolean;
   onClick?: () => void;
+  variant?: "default" | "flat";
 }) {
   const Comp = onClick ? "button" : "div";
   return (
@@ -52,9 +61,11 @@ export function KbDataTableRow({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={cn(
-        "grid w-full items-center px-4 text-left text-[12.5px] text-kb-body",
-        kbTableRow,
-        dimmed && "opacity-60 bg-muted/30",
+        "grid w-full items-center text-left text-kb-body transition-colors",
+        variant === "flat"
+          ? "min-h-[56px] border-b border-[#EEF2F4] px-5 text-[13px] last:border-b-0 hover:bg-[#F8FAFB]"
+          : cn("px-4 text-[12.5px]", kbTableRow),
+        dimmed && (variant === "flat" ? "bg-muted/20 opacity-70" : "opacity-60 bg-muted/30"),
         onClick && "cursor-pointer",
         className,
       )}

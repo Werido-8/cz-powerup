@@ -5,7 +5,7 @@ import { KnowledgePageTitleBanner } from "./KnowledgePageTitleBanner";
 export function KnowledgeAdminTitleBanner({ subtitle }: { subtitle: ReactNode }) {
   return (
     <KnowledgePageTitleBanner
-      title="知识库管理"
+      title="知识管理"
       iconSrc={knowledgeMgmtIcon}
       subtitle={subtitle}
     />

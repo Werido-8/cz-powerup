@@ -5,7 +5,7 @@ import {
   Plus,
   ShieldCheck,
 } from "lucide-react";
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { KbButton, KbEmptyState, KbSidebar, KbSidebarItem, KbSidebarSection } from "@/components/knowledge/ui";
 import { CURRENT_KNOWLEDGE_USER, PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
@@ -25,8 +25,8 @@ import { ParseExceptionSection } from "./admin/ParseExceptionSection";
 import { CategoryManagerSection } from "./admin/CategoryManagerSection";
 import { KnowledgeBaseFormDrawer } from "./admin/KnowledgeBaseFormDrawer";
 import { PermissionConfigDrawer } from "./admin/PermissionConfigDrawer";
+import { KnowledgeAdminSectionHeader } from "./KnowledgeAdminSectionHeader";
 import { KnowledgeAdminTitleBanner } from "./KnowledgeAdminTitleBanner";
-import { KnowledgeSectionDetailHeader } from "./KnowledgeSectionDetailHeader";
 import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 
 type AdminSection = "categories" | "bases" | "approvals" | "exceptions";
@@ -41,7 +41,7 @@ const SECTION_META: Record<
     icon: <FolderTree className="stroke-[1.8]" />,
   },
   bases: {
-    title: "知识库",
+    title: "库清单",
     description: "管理知识库基础信息、使用状态、所属部门、权限范围与文件资产。",
     icon: <Library className="stroke-[1.8]" />,
   },
@@ -73,7 +73,7 @@ export function KnowledgeAdminPage() {
     <>
       {CURRENT_KNOWLEDGE_USER.departmentName}范围
       <br />
-      部门知识库管理
+      部门范围管理
     </>
   );
 
@@ -84,13 +84,6 @@ export function KnowledgeAdminPage() {
   ).length;
   const approvalBadge = UPLOAD_APPROVALS.length + permissionRequestCount;
 
-  const sectionBadge = useMemo(() => {
-    if (visibleSection === "bases") return `共 ${bases.length} 个库`;
-    if (visibleSection === "approvals") return `待处理 ${approvalBadge} 条`;
-    if (visibleSection === "exceptions") return `异常 ${parseExceptions.length} 条`;
-    return undefined;
-  }, [approvalBadge, bases.length, parseExceptions.length, visibleSection]);
-
   const sectionMeta = SECTION_META[visibleSection];
 
   if (!canViewKnowledgeAdmin()) {
@@ -98,7 +91,7 @@ export function KnowledgeAdminPage() {
       <main className={cn(kbMainPanel, "items-center justify-center p-6")}>
         <KbEmptyState
           title="暂无管理端权限"
-          description="知识库管理仅知识库管理员和部门管理员可见。"
+          description="知识管理仅知识库管理员和部门管理员可见。"
         />
       </main>
     );
@@ -127,7 +120,7 @@ export function KnowledgeAdminPage() {
           )}
           <KbSidebarItem
             icon={Library}
-            label="知识库"
+            label="库清单"
             active={visibleSection === "bases"}
             onClick={() => setSection("bases")}
           />
@@ -152,16 +145,14 @@ export function KnowledgeAdminPage() {
 
       <main className={cn("scrollbar-thin", kbMainPanel)}>
         <div className="flex min-h-0 flex-1 flex-col">
-          <KnowledgeSectionDetailHeader
-            icon={sectionMeta.icon}
+          <KnowledgeAdminSectionHeader
             title={sectionMeta.title}
-            badge={sectionBadge}
             description={sectionMeta.description}
             action={
               visibleSection === "bases" ? (
                 <KbButton onClick={() => setFormBase("new")}>
                   <Plus className="h-4 w-4 stroke-[1.8]" />
-                  新建库
+                  新建知识库
                 </KbButton>
               ) : visibleSection === "categories" ? (
                 <KbButton onClick={() => toast.success("已预留新建根分类入口")}>
