@@ -1,0 +1,85 @@
+@startuml
+start
+
+partition "普通员工" {
+  :选择目标知识库;
+  :上传文件;
+}
+
+partition "系统" {
+  if (是否有上传权限?) then (否)
+    :提示无上传权限;
+    stop
+  else (是)
+  endif
+
+  if (是否同名文件?) then (是)
+    partition "普通员工" {
+      :选择上传为新版本或重命名;
+    }
+  else (否)
+  endif
+
+  if (是否个人知识库?) then (是)
+    :免审批;
+    :进入解析中;
+  else (否)
+    :进入待审批状态;
+    note right
+      非个人知识库（公共、专业等）
+      均需管理员审批
+    end note
+  endif
+}
+
+if (是否需要审批?) then (是)
+  partition "知识库管理员" {
+    :查看待审批上传;
+    if (审批是否通过?) then (通过)
+      :审批通过;
+    else (驳回)
+      :填写驳回原因;
+      partition "系统" {
+        :状态变为已驳回;
+        :通知上传者;
+      }
+      partition "普通员工" {
+        :在我的上传中查看驳回原因;
+        note right
+          本次上传流程结束
+          一期不提供后续上传处理入口
+          如需再次提交须重新发起上传
+        end note
+      }
+      stop
+    endif
+  }
+
+  partition "系统" {
+    :进入解析中;
+  }
+else (否)
+endif
+
+partition "系统" {
+  if (解析是否成功?) then (成功)
+    :状态变为已发布;
+    :对有浏览权限用户可见;
+    :可预览 / 可下载 / 可收藏;
+    note right
+      解析完成前
+      不支持正文内容检索
+    end note
+  else (失败)
+    :状态变为解析失败;
+    :仅上传者和管理员可见;
+    :通知管理员处理;
+  endif
+}
+
+partition "普通员工" {
+  :在我的上传中跟踪状态;
+}
+
+stop
+@enduml

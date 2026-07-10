@@ -1,0 +1,131 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam nodesep 30
+skinparam ranksep 50
+skinparam package {
+  BackgroundColor #F8FAFC
+  BorderColor #CBD5E1
+}
+
+actor "普通员工" as Employee
+actor "知识库管理员" as KBAdmin
+
+rectangle "知识库模块" {
+
+  package "知识总览" {
+    usecase "浏览知识库\n（知识总览）" as UC_BrowseKB
+    usecase "查看全部\n可访问文档" as UC_AllDocs
+    usecase "搜索/筛选\n排序文档" as UC_SearchDocs
+    usecase "固定常用\n知识库" as UC_PinKB
+    usecase "固定常用文档" as UC_PinDoc
+    usecase "查看最近访问" as UC_Recent
+    usecase "查看更多\n访问历史" as UC_RecentMore
+  }
+
+  package "权限申请" {
+    usecase "查看无权限\n知识库并申请" as UC_NoPermKB
+    usecase "申请知识库权限" as UC_RequestPerm
+  }
+
+  package "文件详情" {
+    usecase "查看文件详情" as UC_FileDetail
+    usecase "在线预览文件" as UC_Preview
+    usecase "库内切换文档" as UC_SwitchInKB
+    usecase "查看解析状态" as UC_ParseStatus
+    usecase "下载文件" as UC_Download
+    usecase "收藏/取消\n收藏文件" as UC_Favorite
+    usecase "查看历史版本" as UC_HistoryVersion
+  }
+
+  package "上传" {
+    usecase "上传文档" as UC_Upload
+    usecase "查看我的\n上传记录" as UC_UploadRecord
+    usecase "查看审批/\n解析状态" as UC_ApprovalStatus
+    usecase "查看驳回原因" as UC_RejectReason
+  }
+
+  package "我的空间" {
+    usecase "管理个人知识库" as UC_PersonalKB
+    usecase "查看我的收藏" as UC_MyFavorite
+  }
+
+  package "知识库管理" {
+    usecase "维护分类" as UC_Category
+    usecase "新建/编辑/\n停用知识库" as UC_ManageKB
+    usecase "审批非个人\n库上传" as UC_ApproveUpload
+    usecase "管理库内文档" as UC_ManageDoc
+    usecase "处理解析异常" as UC_ParseFail
+    usecase "审批权限申请" as UC_ApprovePerm
+    usecase "角色授权\n知识库" as UC_RoleGrant
+    usecase "个人授权\n知识库" as UC_UserGrant
+  }
+}
+
+' 布局：主用例在左，子用例往右挂
+UC_BrowseKB -[hidden]right-> UC_AllDocs
+UC_AllDocs -[hidden]right-> UC_PinKB
+UC_AllDocs -[hidden]down-> UC_SearchDocs
+UC_PinKB -[hidden]down-> UC_PinDoc
+UC_PinDoc -[hidden]down-> UC_Recent
+UC_Recent -[hidden]down-> UC_RecentMore
+
+UC_NoPermKB -[hidden]right-> UC_RequestPerm
+
+UC_FileDetail -[hidden]right-> UC_Preview
+UC_Preview -[hidden]right-> UC_Download
+UC_Preview -[hidden]down-> UC_SwitchInKB
+UC_SwitchInKB -[hidden]down-> UC_ParseStatus
+UC_Download -[hidden]down-> UC_Favorite
+UC_Favorite -[hidden]down-> UC_HistoryVersion
+
+UC_Upload -[hidden]right-> UC_ApprovalStatus
+UC_ApprovalStatus -[hidden]down-> UC_RejectReason
+UC_UploadRecord -[hidden]up-> UC_Upload
+
+UC_PersonalKB -[hidden]down-> UC_MyFavorite
+
+UC_ManageKB -[hidden]right-> UC_RoleGrant
+UC_RoleGrant -[hidden]down-> UC_UserGrant
+
+' 演员只关联主用例
+Employee --> UC_BrowseKB
+Employee --> UC_NoPermKB
+Employee --> UC_FileDetail
+Employee --> UC_Upload
+Employee --> UC_UploadRecord
+Employee --> UC_PersonalKB
+Employee --> UC_MyFavorite
+
+KBAdmin --> UC_Category
+KBAdmin --> UC_ManageKB
+KBAdmin --> UC_ApproveUpload
+KBAdmin --> UC_ManageDoc
+KBAdmin --> UC_ParseFail
+KBAdmin --> UC_ApprovePerm
+
+' include / extend 关系
+UC_BrowseKB .> UC_AllDocs : <<include>>
+UC_BrowseKB .> UC_SearchDocs : <<include>>
+UC_BrowseKB .> UC_PinKB : <<extend>>
+UC_BrowseKB .> UC_PinDoc : <<extend>>
+UC_BrowseKB .> UC_Recent : <<extend>>
+UC_Recent .> UC_RecentMore : <<extend>>
+
+UC_NoPermKB .> UC_RequestPerm : <<include>>
+
+UC_FileDetail .> UC_Preview : <<include>>
+UC_FileDetail .> UC_SwitchInKB : <<include>>
+UC_FileDetail .> UC_ParseStatus : <<include>>
+UC_FileDetail .> UC_Download : <<extend>>
+UC_FileDetail .> UC_Favorite : <<extend>>
+UC_FileDetail .> UC_HistoryVersion : <<extend>>
+
+UC_Upload .> UC_ApprovalStatus : <<include>>
+UC_ApprovalStatus .> UC_RejectReason : <<extend>>
+
+UC_ManageKB .> UC_RoleGrant : <<extend>>
+UC_ManageKB .> UC_UserGrant : <<extend>>
+
+@enduml
