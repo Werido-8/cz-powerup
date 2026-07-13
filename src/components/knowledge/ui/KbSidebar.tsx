@@ -71,6 +71,7 @@ export function KbSidebarItem({
   active,
   badge,
   badgeTone = "neutral",
+  badgeTooltip,
   onClick,
   indent = 0,
   trailing,
@@ -80,6 +81,7 @@ export function KbSidebarItem({
   active?: boolean;
   badge?: string | number;
   badgeTone?: "neutral" | "danger";
+  badgeTooltip?: string;
   onClick?: () => void;
   indent?: number;
   trailing?: ReactNode;
@@ -104,6 +106,7 @@ export function KbSidebarItem({
       <span className="min-w-0 flex-1 truncate text-left">{label}</span>
       {badge !== undefined && (
         <span
+          title={badgeTooltip}
           className={cn(
             "shrink-0 rounded-full px-1.5 text-[10px] font-medium",
             badgeTone === "danger"

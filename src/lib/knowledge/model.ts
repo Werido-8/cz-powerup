@@ -1,20 +1,20 @@
 import {
   CURRENT_KNOWLEDGE_USER,
   FAVORITE_FILE_IDS,
-  KNOWLEDGE_BASES,
-  KNOWLEDGE_CATEGORIES,
-  KNOWLEDGE_FILES,
   PARSE_EXCEPTIONS,
   PERMISSION_REQUESTS,
   PERSONAL_DIRECTORIES,
   RECENT_FILE_IDS,
 } from "./data";
+import { getStoreBases, getStoreCategories, getStoreFiles } from "./store";
 import { publishStatusLabel } from "./status";
 import type {
   FilePublishStatus,
+  FileSearchMode,
   KnowledgeBase,
   KnowledgeCategory,
   KnowledgeFile,
+  KnowledgeMetadataField,
   KnowledgePermissionGroup,
   KnowledgeSortBy,
   KnowledgeUser,
@@ -41,7 +41,7 @@ export function canSeeCategoryManager(user: KnowledgeUser = CURRENT_KNOWLEDGE_US
 
 export function canManageBase(base: KnowledgeBase, user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
   if (isKnowledgeAdmin(user)) return true;
-  return isDepartmentAdmin(user) && base.departmentId === user.departmentId;
+  return isDepartmentAdmin(user) && base.scope !== "personal";
 }
 
 export function canBrowseBase(base: KnowledgeBase) {
@@ -58,7 +58,7 @@ export function canViewBaseFiles(
 export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
   if (base.scope === "personal") return true;
   if (isKnowledgeAdmin(user)) return true;
-  if (isDepartmentAdmin(user) && base.departmentId === user.departmentId) return true;
+  if (isDepartmentAdmin(user) && base.scope !== "personal") return true;
   return base.permission.canUpload;
 }
 
@@ -66,31 +66,47 @@ export function canConfigureBasePermission(
   base: KnowledgeBase,
   user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
 ) {
+  // 公共库对全员开放，不提供权限配置能力；仅专业库支持配置权限
+  if (base.scope === "public") return false;
   return base.permission.canConfigurePermission || canManageBase(base, user);
 }
 
+export function canManageFileList(
+  base?: KnowledgeBase,
+  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+) {
+  if (user.role === "employee") return false;
+  if (base?.scope === "personal") return true;
+  if (!base) return canViewKnowledgeAdmin(user);
+  return canManageBase(base, user);
+}
+
+export function isFileEnabled(file: KnowledgeFile) {
+  return file.enabled !== false;
+}
+
 export function getBaseById(id: string) {
-  return KNOWLEDGE_BASES.find((base) => base.id === id);
+  return getStoreBases().find((base) => base.id === id);
 }
 
 export function getFileById(id: string) {
-  return KNOWLEDGE_FILES.find((file) => file.id === id);
+  return getStoreFiles().find((file) => file.id === id);
 }
 
 export function getCategoryById(id: string) {
-  return KNOWLEDGE_CATEGORIES.find((category) => category.id === id);
+  return getStoreCategories().find((category) => category.id === id);
 }
 
 export function getBrowsableBases() {
-  return KNOWLEDGE_BASES.filter((base) => base.scope !== "personal" && canBrowseBase(base));
+  return getStoreBases().filter((base) => base.scope !== "personal" && canBrowseBase(base));
 }
 
 export function getPinnedBases() {
-  return KNOWLEDGE_BASES.filter((base) => base.isPinned && base.status === "enabled");
+  return getStoreBases().filter((base) => base.isPinned && base.status === "enabled");
 }
 
 export function getPersonalBases() {
-  return KNOWLEDGE_BASES.filter((base) => base.scope === "personal" && base.status === "enabled");
+  return getStoreBases().filter((base) => base.scope === "personal" && base.status === "enabled");
 }
 
 export const PERSONAL_DIRECTORY_ROOT_ID = "personal-root";
@@ -111,6 +127,18 @@ export function getPersonalDirectoryChildren(parentId?: string): PersonalDirecto
   );
 }
 
+export function getPersonalDirectoryPathLabel(directoryId: string): string {
+  const chain: string[] = [];
+  let current = PERSONAL_DIRECTORIES.find((d) => d.id === directoryId);
+  while (current) {
+    chain.unshift(current.name);
+    current = current.parentId
+      ? PERSONAL_DIRECTORIES.find((d) => d.id === current!.parentId)
+      : undefined;
+  }
+  return chain.join(" / ");
+}
+
 export function getPersonalDirectoryTreeDirectories() {
   return getPersonalDirectoryChildren(PERSONAL_DIRECTORY_ROOT_ID);
 }
@@ -120,7 +148,7 @@ export function getPersonalTreeBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USE
 }
 
 export function getProfessionalTreeBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  return KNOWLEDGE_BASES.filter(
+  return getStoreBases().filter(
     (base) => base.scope !== "personal" && base.status === "enabled" && canViewBaseFiles(base, user),
   );
 }
@@ -134,15 +162,16 @@ export function getFilesForProfessionalTree(user: KnowledgeUser = CURRENT_KNOWLE
 }
 
 export function getReadableBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  return KNOWLEDGE_BASES.filter(
+  return getStoreBases().filter(
     (base) => base.status === "enabled" && canViewBaseFiles(base, user),
   );
 }
 
 export function getManageableBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  if (isKnowledgeAdmin(user)) return KNOWLEDGE_BASES;
+  const allBases = getStoreBases();
+  if (isKnowledgeAdmin(user)) return allBases;
   if (isDepartmentAdmin(user)) {
-    return KNOWLEDGE_BASES.filter((base) => base.departmentId === user.departmentId);
+    return allBases.filter((base) => base.scope !== "personal");
   }
   return [];
 }
@@ -153,18 +182,19 @@ export function isFileVisibleToUser(
 ) {
   const base = getBaseById(file.knowledgeBaseId);
   if (!base || base.status !== "enabled") return false;
+  if (!isFileEnabled(file) && !canManageBase(base, user)) return false;
   if (file.status === "published") return canViewBaseFiles(base, user);
   return file.uploaderId === user.id || canManageBase(base, user);
 }
 
 export function getFilesForBase(baseId: string, user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  return KNOWLEDGE_FILES.filter(
+  return getStoreFiles().filter(
     (file) => file.knowledgeBaseId === baseId && isFileVisibleToUser(file, user),
   );
 }
 
 export function getAllPublishedFiles(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  return KNOWLEDGE_FILES.filter((file) => {
+  return getStoreFiles().filter((file) => {
     const base = getBaseById(file.knowledgeBaseId);
     return (
       base?.status === "enabled" &&
@@ -196,6 +226,33 @@ export function getDefaultOverviewBaseId(user: KnowledgeUser = CURRENT_KNOWLEDGE
   );
 }
 
+/** 用户置顶的文件（同步到左侧「快速访问」） */
+export function getPinnedFiles(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+  return getStoreFiles().filter(
+    (file) => file.pinned && file.isCurrentVersion !== false && isFileVisibleToUser(file, user),
+  );
+}
+
+/** 文件可移动到的目标知识库：已启用、可管理/可上传、排除当前库 */
+export function getMoveTargetBases(
+  currentBaseId?: string,
+  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+) {
+  const sourceBase = currentBaseId ? getBaseById(currentBaseId) : undefined;
+  const sourceIsPersonal = sourceBase?.scope === "personal";
+
+  return getStoreBases().filter((base) => {
+    if (base.id === currentBaseId) return false;
+    if (base.status !== "enabled") return false;
+    // 个人空间文件只能移动到其他个人库；专业/公共库文件只能移动到其他专业/公共库
+    if (sourceBase) {
+      if (sourceIsPersonal && base.scope !== "personal") return false;
+      if (!sourceIsPersonal && base.scope === "personal") return false;
+    }
+    return canManageFileList(base, user) || base.permission.canUpload;
+  });
+}
+
 export function getFirstReadableFileInBase(baseId: string) {
   return (
     getFilesForBase(baseId).find((file) => file.status === "published") ??
@@ -207,44 +264,73 @@ export function filterFiles(
   files: KnowledgeFile[],
   filters: {
     query?: string;
+    searchMode?: FileSearchMode;
     categoryId?: string;
     baseId?: string;
-    professionalType?: string;
-    tag?: string;
     status?: FilePublishStatus | "all";
+    metadataFilters?: Record<string, string>;
   },
 ) {
   const query = filters.query?.trim().toLowerCase();
+  const searchMode = filters.searchMode ?? "fulltext";
   return files.filter((file) => {
     const base = getBaseById(file.knowledgeBaseId);
     if (filters.categoryId && base?.categoryId !== filters.categoryId) return false;
     if (filters.baseId && file.knowledgeBaseId !== filters.baseId) return false;
-    if (filters.professionalType && file.professionalType !== filters.professionalType)
-      return false;
-    if (filters.tag && !file.tags?.includes(filters.tag)) return false;
     if (filters.status && filters.status !== "all" && file.status !== filters.status) return false;
+
+    if (filters.metadataFilters) {
+      const metadataFieldMap = new Map(
+        (base?.metadataFields ?? []).map((field) => [field.id, field]),
+      );
+      for (const [fieldId, rawValue] of Object.entries(filters.metadataFilters)) {
+        const value = rawValue?.trim();
+        if (!value || value === "all") continue;
+        const fileValue = file.metadata?.[fieldId];
+        const isText = metadataFieldMap.get(fieldId)?.type === "text";
+        if (Array.isArray(fileValue)) {
+          const matched = isText
+            ? fileValue.some((item) => item.toLowerCase().includes(value.toLowerCase()))
+            : fileValue.includes(value);
+          if (!matched) return false;
+        } else if (isText) {
+          if (!fileValue || !fileValue.toLowerCase().includes(value.toLowerCase())) return false;
+        } else if (fileValue !== value) {
+          return false;
+        }
+      }
+    }
+
     if (!query) return true;
+
+    if (searchMode === "filename") {
+      return file.name.toLowerCase().includes(query);
+    }
+
     return (
       file.name.toLowerCase().includes(query) ||
       file.summary?.toLowerCase().includes(query) ||
-      file.knowledgeBaseName?.toLowerCase().includes(query) ||
-      file.tags?.some((tag) => tag.toLowerCase().includes(query))
+      file.fullTextContent?.toLowerCase().includes(query) ||
+      file.knowledgeBaseName?.toLowerCase().includes(query)
     );
   });
 }
 
 export function sortKnowledgeFiles(files: KnowledgeFile[], sortBy: KnowledgeSortBy) {
-  const next = [...files];
-  if (sortBy === "name") return next.sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
-  if (sortBy === "size") {
-    return next.sort((a, b) => parseFileSize(b.size) - parseFileSize(a.size));
-  }
+  const compare = resolveFileComparator(sortBy);
+  return [...files].sort(compare);
+}
+
+function resolveFileComparator(
+  sortBy: KnowledgeSortBy,
+): (a: KnowledgeFile, b: KnowledgeFile) => number {
+  if (sortBy === "name") return (a, b) => a.name.localeCompare(b.name, "zh-CN");
+  if (sortBy === "size") return (a, b) => parseFileSize(b.size) - parseFileSize(a.size);
   if (sortBy === "status") {
-    return next.sort((a, b) =>
-      publishStatusLabel(a.status).localeCompare(publishStatusLabel(b.status), "zh-CN"),
-    );
+    return (a, b) =>
+      publishStatusLabel(a.status).localeCompare(publishStatusLabel(b.status), "zh-CN");
   }
-  return next.sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
+  return (a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "");
 }
 
 function parseFileSize(size?: string) {
@@ -262,20 +348,39 @@ function parseFileSize(size?: string) {
   return value * (multipliers[unit] ?? 1);
 }
 
-export function getProfessionalTypes(files = KNOWLEDGE_FILES) {
-  return Array.from(new Set(files.map((file) => file.professionalType).filter(Boolean))).sort(
-    (a, b) => String(a).localeCompare(String(b), "zh-CN"),
-  ) as string[];
+export function getMetadataFieldsForBase(baseId: string): KnowledgeMetadataField[] {
+  return getBaseById(baseId)?.metadataFields ?? [];
 }
 
-export function getAllTags(files = KNOWLEDGE_FILES) {
-  return Array.from(new Set(files.flatMap((file) => file.tags ?? []))).sort((a, b) =>
-    a.localeCompare(b, "zh-CN"),
-  );
+export function getMetadataFilterOptions(
+  files: KnowledgeFile[],
+  field: KnowledgeMetadataField,
+): string[] {
+  const values = new Set<string>();
+  for (const file of files) {
+    const raw = file.metadata?.[field.id];
+    if (Array.isArray(raw)) {
+      raw.forEach((item) => values.add(item));
+    } else if (raw) {
+      values.add(raw);
+    }
+  }
+  const fromData = Array.from(values);
+  if (field.options?.length) {
+    const merged = new Set([...field.options, ...fromData]);
+    return Array.from(merged).sort((a, b) => a.localeCompare(b, "zh-CN"));
+  }
+  return fromData.sort((a, b) => a.localeCompare(b, "zh-CN"));
+}
+
+export function countActiveMetadataFilters(filters: Record<string, string>) {
+  return Object.values(filters).filter((value) => value && value !== "all").length;
 }
 
 export function getCategoryChildren(parentId?: string): KnowledgeCategory[] {
-  return KNOWLEDGE_CATEGORIES.filter((category) => category.parentId === parentId);
+  return getStoreCategories().filter((category) =>
+    parentId ? category.parentId === parentId : !category.parentId,
+  );
 }
 
 export function getBasesForCategory(categoryId: string) {
@@ -290,6 +395,43 @@ export function getCategoryChain(categoryId: string): KnowledgeCategory[] {
     current = current.parentId ? getCategoryById(current.parentId) : undefined;
   }
   return chain;
+}
+
+/** 完整目录路径，如「运行专业 / 规程制度」 */
+export function getCategoryPathLabel(categoryId: string): string {
+  return getCategoryChain(categoryId)
+    .map((category) => category.name)
+    .join(" / ");
+}
+
+export function listCategoryPathOptions(): { value: string; label: string }[] {
+  return getStoreCategories().map((category) => ({
+    value: category.id,
+    label: getCategoryPathLabel(category.id),
+  }));
+}
+
+const CATEGORY_NAME_MAX_LENGTH = 40;
+const KNOWLEDGE_BASE_DESCRIPTION_MAX_LENGTH = 500;
+
+export function getCategoryNameMaxLength() {
+  return CATEGORY_NAME_MAX_LENGTH;
+}
+
+export function getKnowledgeBaseDescriptionMaxLength() {
+  return KNOWLEDGE_BASE_DESCRIPTION_MAX_LENGTH;
+}
+
+/** 同一父级下是否已有同名目录（去空格后精确匹配） */
+export function hasSiblingCategoryName(
+  parentId: string | undefined,
+  name: string,
+  excludeId?: string,
+) {
+  const normalized = name.trim();
+  return getCategoryChildren(parentId).some(
+    (category) => category.id !== excludeId && category.name === normalized,
+  );
 }
 
 export function getSiblingCategories(categoryId: string): KnowledgeCategory[] {
@@ -385,9 +527,9 @@ export function resolveBreadcrumbSelection(option: KnowledgeBreadcrumbOption): s
 
 export function permissionGroupLabel(group: KnowledgePermissionGroup) {
   const labels: Record<KnowledgePermissionGroup, string> = {
-    view: "浏览组",
-    upload: "上传组",
-    manage: "管理组",
+    view: "浏览",
+    upload: "上传",
+    manage: "管理",
   };
   return labels[group];
 }
@@ -403,6 +545,6 @@ export function getParseExceptionsForScope(
   return PARSE_EXCEPTIONS.filter((item) => {
     const file = getFileById(item.fileId);
     const base = file ? getBaseById(file.knowledgeBaseId) : undefined;
-    return base?.departmentId === user.departmentId;
+    return base ? canManageBase(base, user) : false;
   });
 }

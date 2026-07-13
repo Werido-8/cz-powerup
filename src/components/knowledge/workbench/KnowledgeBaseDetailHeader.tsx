@@ -14,7 +14,7 @@ import { KnowledgeDetailBannerShell } from "./KnowledgeDetailBannerShell";
 function scopeLabel(base: KnowledgeBase) {
   if (base.scope === "personal") return "个人知识库";
   if (base.scope === "public") return "公共制度";
-  return base.departmentName ?? "部门知识库";
+  return "专业知识库";
 }
 
 function KnowledgeBannerCapsule({

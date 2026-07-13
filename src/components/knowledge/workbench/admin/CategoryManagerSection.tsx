@@ -23,7 +23,7 @@ export function CategoryManagerSection({ embedded = false }: { embedded?: boolea
   );
 
   if (embedded) {
-    return <div className="min-h-0 flex-1 overflow-y-auto">{tree}</div>;
+    return <div className="min-h-0 flex-1 overflow-y-auto p-4">{tree}</div>;
   }
 
   return (
@@ -31,7 +31,7 @@ export function CategoryManagerSection({ embedded = false }: { embedded?: boolea
       <KbPageHeader
         label="仅知识库管理员可见"
         title="分类管理"
-        description="分类用于组织公共和部门知识库，可嵌套维护。下属仍有知识库时禁止删除。"
+        description="分类用于组织专业知识库，可嵌套维护。下属仍有知识库时禁止删除。"
         action={
           <KbButton onClick={() => toast.success("已预留新建根分类入口")}>
             <Plus className="h-4 w-4 stroke-[1.8]" />

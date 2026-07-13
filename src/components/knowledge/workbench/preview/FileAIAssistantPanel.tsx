@@ -85,7 +85,7 @@ export function FileAIAssistantPanel({
                 <div className="text-[11px] font-medium text-kb-muted">关键点</div>
                 <ul className="list-inside list-disc text-[12px] text-kb-body">
                   <li>明确执行边界与适用范围</li>
-                  <li>关注部门协同与审批要求</li>
+                  <li>关注协同与审批要求</li>
                 </ul>
               </div>
               {file.parseStatus !== "success" && (

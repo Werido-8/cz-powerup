@@ -11,63 +11,78 @@ import {
 import { toast } from "sonner";
 import {
   KbEmptyState,
-  KbFilterBar,
+  KbFileSearchInput,
   KbFilterCombo,
 } from "@/components/knowledge/ui";
 import { KNOWLEDGE_BASES, KNOWLEDGE_CATEGORIES } from "@/lib/knowledge/data";
 import {
+  canManageFileList,
   filterFiles,
   getAllPublishedFiles,
-  getAllTags,
-  getProfessionalTypes,
+  getBaseById,
   sortKnowledgeFiles,
 } from "@/lib/knowledge/model";
+import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
-import type { KnowledgeFile, KnowledgeSortBy } from "@/lib/knowledge/types";
+import type { FileSearchMode, KnowledgeFile, KnowledgeSortBy } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
+import { FileListToolbar } from "./FileListToolbar";
+import { FileBatchDeleteDialog } from "./FileBatchDeleteDialog";
+import { FileMoveDialog } from "./FileMoveDialog";
+import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
 import {
-  FileViewModeToggle,
-  FileListSortButton,
-  FileListRefreshButton,
+  FileListToolbarActions,
   KnowledgeFileCardGrid,
   KnowledgeFileTable,
-  type FileViewMode,
 } from "./KnowledgeFileTable";
+import { useFileSelection } from "./useFileSelection";
+import { useFileViewMode } from "./useFileViewMode";
 
 const CARD_PAGE_SIZE = 16;
 
 export function AllKnowledgeFilesPage() {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<FileSearchMode>("fulltext");
   const [categoryId, setCategoryId] = useState("all");
   const [baseId, setBaseId] = useState("all");
-  const [professionalType, setProfessionalType] = useState("all");
-  const [tag, setTag] = useState("all");
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>("updated");
-  const [viewMode, setViewMode] = useState<FileViewMode>("list");
+  const [viewMode, setViewMode] = useFileViewMode();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
   const [refreshSeed, setRefreshSeed] = useState(0);
+  const [batchLoading, setBatchLoading] = useState<
+    "download" | "disable" | "delete" | "move" | null
+  >(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [moveFiles, setMoveFiles] = useState<KnowledgeFile[]>([]);
+  const [moveLoading, setMoveLoading] = useState(false);
+  const [historyFile, setHistoryFile] = useState<KnowledgeFile | null>(null);
+  const fileSelection = useFileSelection();
+  const showManageColumn = canManageFileList();
 
-  const allFiles = useMemo(() => getAllPublishedFiles(), []);
+  const allFiles = useMemo(() => getAllPublishedFiles(), [refreshSeed]);
   const files = useMemo(
     () =>
       sortKnowledgeFiles(
         filterFiles(allFiles, {
           query,
+          searchMode,
           categoryId: categoryId === "all" ? undefined : categoryId,
           baseId: baseId === "all" ? undefined : baseId,
-          professionalType: professionalType === "all" ? undefined : professionalType,
-          tag: tag === "all" ? undefined : tag,
         }),
         sortBy,
       ),
-    [allFiles, baseId, categoryId, professionalType, query, sortBy, tag],
+    [allFiles, baseId, categoryId, query, searchMode, sortBy],
   );
 
   useEffect(() => {
     setPage(1);
-  }, [query, categoryId, baseId, professionalType, tag, sortBy, viewMode]);
+  }, [query, searchMode, categoryId, baseId, sortBy, viewMode]);
+
+  useEffect(() => {
+    fileSelection.clear();
+  }, [query, searchMode, categoryId, baseId, sortBy, viewMode]);
 
   const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
   const totalPages = Math.max(1, Math.ceil(files.length / effectivePageSize) || 1);
@@ -76,6 +91,18 @@ export function AllKnowledgeFilesPage() {
     const start = (safePage - 1) * effectivePageSize;
     return files.slice(start, start + effectivePageSize);
   }, [effectivePageSize, files, safePage]);
+
+  const pageFileIds = pagedFiles.map((file) => file.id);
+  const listSelection = {
+    isSelected: fileSelection.isSelected,
+    onToggle: fileSelection.toggle,
+    onToggleAll: fileSelection.toggleAll,
+    pageIds: pageFileIds,
+  };
+  const cardSelection = {
+    isSelected: fileSelection.isSelected,
+    onToggle: fileSelection.toggle,
+  };
 
   const handleOpen = (file: KnowledgeFile) => {
     navigate({
@@ -89,6 +116,84 @@ export function AllKnowledgeFilesPage() {
     setPage(1);
     setRefreshSeed((v) => v + 1);
     toast.message("列表已刷新");
+  };
+
+  const handleToggleEnabled = (file: KnowledgeFile, enabled: boolean) => {
+    updateStoreFile(file.id, { enabled });
+    toast.message(enabled ? "文件已启用" : "文件已停用");
+  };
+
+  const handleToggleFilePin = (file: KnowledgeFile) => {
+    const nextPinned = !file.pinned;
+    updateStoreFile(file.id, { pinned: nextPinned });
+    toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
+  };
+
+  const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
+    const targetBase = getBaseById(targetBaseId);
+    setMoveLoading(true);
+    for (const file of movingFiles) {
+      updateStoreFile(file.id, {
+        knowledgeBaseId: targetBaseId,
+        knowledgeBaseName: targetBase?.name,
+      });
+    }
+    window.setTimeout(() => {
+      const label =
+        movingFiles.length > 1 ? `${movingFiles.length} 个文件` : `「${movingFiles[0]?.name}」`;
+      toast.success(`已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`);
+      setMoveLoading(false);
+      setMoveFiles([]);
+      fileSelection.clear();
+    }, 300);
+  };
+
+  const handleBatchMove = () => {
+    const ids = [...fileSelection.selectedArray];
+    const movingFiles = ids
+      .map((id) => files.find((file) => file.id === id))
+      .filter((file): file is KnowledgeFile => Boolean(file));
+    setMoveFiles(movingFiles);
+  };
+
+  const fileRowActions = {
+    ...(showManageColumn ? { onMove: (file: KnowledgeFile) => setMoveFiles([file]) } : {}),
+    onTogglePin: handleToggleFilePin,
+    onViewHistory: (file: KnowledgeFile) => setHistoryFile(file),
+  };
+
+  const handleBatchDownload = () => {
+    setBatchLoading("download");
+    window.setTimeout(() => {
+      toast.message(`开始下载 ${fileSelection.selectedCount} 个文件`);
+      setBatchLoading(null);
+    }, 400);
+  };
+
+  const handleBatchDisable = () => {
+    setBatchLoading("disable");
+    for (const id of fileSelection.selectedArray) {
+      updateStoreFile(id, { enabled: false });
+    }
+    window.setTimeout(() => {
+      toast.success(`已停用 ${fileSelection.selectedCount} 个文件`);
+      fileSelection.clear();
+      setBatchLoading(null);
+    }, 300);
+  };
+
+  const handleConfirmBatchDelete = () => {
+    const count = fileSelection.selectedCount;
+    const ids = [...fileSelection.selectedArray];
+    setBatchLoading("delete");
+    removeStoreFiles(ids);
+    window.setTimeout(() => {
+      toast.success(`已删除 ${count} 个文件`);
+      fileSelection.clear();
+      setBatchLoading(null);
+      setDeleteDialogOpen(false);
+      setRefreshSeed((v) => v + 1);
+    }, 300);
   };
 
   const emptyState = (
@@ -121,91 +226,89 @@ export function AllKnowledgeFilesPage() {
         </div>
       </section>
 
-      <div className="shrink-0 border-b border-divider px-4 py-2">
-        <KbFilterBar
-          className="mb-0"
-          searchValue={query}
-          onSearchChange={setQuery}
-          searchPlaceholder="搜索文件名、摘要、标签"
-          searchClassName="max-w-[280px] !rounded-[8px]"
-          filters={
-            <>
-              <KbFilterCombo
-                value={categoryId}
-                onChange={setCategoryId}
-                placeholder="全部分类"
-                options={[
-                  { value: "all", label: "全部分类" },
-                  ...KNOWLEDGE_CATEGORIES.map((item) => ({
-                    value: item.id,
-                    label: item.name,
-                  })),
-                ]}
-              />
-              <KbFilterCombo
-                value={baseId}
-                onChange={setBaseId}
-                placeholder="全部知识库"
-                options={[
-                  { value: "all", label: "全部知识库" },
-                  ...KNOWLEDGE_BASES.filter(
-                    (base) => base.status === "enabled" && base.permission.canView,
-                  ).map((base) => ({ value: base.id, label: base.name })),
-                ]}
-              />
-              <KbFilterCombo
-                value={professionalType}
-                onChange={setProfessionalType}
-                placeholder="全部专业"
-                options={[
-                  { value: "all", label: "全部专业" },
-                  ...getProfessionalTypes(allFiles).map((item) => ({
-                    value: item,
-                    label: item,
-                  })),
-                ]}
-              />
-              <KbFilterCombo
-                value={tag}
-                onChange={setTag}
-                placeholder="全部标签"
-                options={[
-                  { value: "all", label: "全部标签" },
-                  ...getAllTags(allFiles).map((item) => ({
-                    value: item,
-                    label: item,
-                  })),
-                ]}
-              />
-            </>
-          }
-          trailing={
-            <>
-              <span className="text-[12px] text-muted-foreground">共 {files.length} 篇</span>
-              <FileViewModeToggle value={viewMode} onChange={setViewMode} />
-              <FileListSortButton value={sortBy} onChange={setSortBy} />
-              <FileListRefreshButton onClick={handleRefresh} />
-            </>
-          }
-        />
-      </div>
+      <FileListToolbar
+        selectedCount={fileSelection.selectedCount}
+        totalCount={files.length}
+        pageFileCount={pageFileIds.length}
+        isAllResultsSelected={fileSelection.isAllResultsSelected}
+        onSelectAllResults={() => fileSelection.selectAllResults(files.map((file) => file.id))}
+        onBatchDownload={handleBatchDownload}
+        onBatchMove={showManageColumn ? handleBatchMove : undefined}
+        onBatchDisable={showManageColumn ? handleBatchDisable : undefined}
+        onBatchDelete={() => setDeleteDialogOpen(true)}
+        onClearSelection={fileSelection.clear}
+        showBatchMove={showManageColumn}
+        showBatchDisable={showManageColumn}
+        batchLoading={batchLoading}
+        left={
+          <>
+            <KbFileSearchInput
+              value={query}
+              onChange={setQuery}
+              mode={searchMode}
+              onModeChange={setSearchMode}
+            />
+            <KbFilterCombo
+              value={categoryId}
+              onChange={setCategoryId}
+              placeholder="全部分类"
+              options={[
+                { value: "all", label: "全部分类" },
+                ...KNOWLEDGE_CATEGORIES.map((item) => ({
+                  value: item.id,
+                  label: item.name,
+                })),
+              ]}
+            />
+            <KbFilterCombo
+              value={baseId}
+              onChange={setBaseId}
+              placeholder="全部知识库"
+              options={[
+                { value: "all", label: "全部知识库" },
+                ...KNOWLEDGE_BASES.filter(
+                  (base) => base.status === "enabled" && base.permission.canView,
+                ).map((base) => ({ value: base.id, label: base.name })),
+              ]}
+            />
+          </>
+        }
+        right={
+          <>
+            <span className="text-[12px] text-muted-foreground">共 {files.length} 篇</span>
+            <FileListToolbarActions
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+              onRefresh={handleRefresh}
+            />
+          </>
+        }
+      />
 
       <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === "list" ? (
           <KnowledgeFileTable
             files={pagedFiles}
             allLibraryMode
+            showManageColumn={showManageColumn}
+            selection={listSelection}
+            onToggleEnabled={handleToggleEnabled}
             onOpen={handleOpen}
             className="rounded-none border-0 shadow-none"
             empty={<div className="px-4 py-8">{emptyState}</div>}
+            {...fileRowActions}
           />
         ) : (
           <KnowledgeFileCardGrid
             files={pagedFiles}
+            selection={cardSelection}
             onOpen={handleOpen}
             columns={4}
             compact
             empty={<div className="px-4 py-8">{emptyState}</div>}
+            {...fileRowActions}
           />
         )}
       </div>
@@ -236,6 +339,20 @@ export function AllKnowledgeFilesPage() {
             />
           </div>
         ))}
+      <FileBatchDeleteDialog
+        open={deleteDialogOpen}
+        count={fileSelection.selectedCount}
+        loading={batchLoading === "delete"}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmBatchDelete}
+      />
+      <FileMoveDialog
+        files={moveFiles}
+        loading={moveLoading}
+        onClose={() => setMoveFiles([])}
+        onConfirm={handleConfirmMove}
+      />
+      <FileVersionHistoryDialog file={historyFile} onClose={() => setHistoryFile(null)} />
     </main>
   );
 }

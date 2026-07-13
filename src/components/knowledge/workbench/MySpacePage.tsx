@@ -10,15 +10,21 @@ import {
   Heart,
   MoreHorizontal,
   RefreshCw,
-  Upload,
   UploadCloud,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type UIEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ComponentProps,
+  type UIEvent,
+} from "react";
 import { toast } from "sonner";
 import {
-  ActionButton,
   CardBatchPager,
   SearchBar,
   StatCardDecor,
@@ -39,44 +45,56 @@ import {
   KbDataTableRow,
   KbDragUploadOverlay,
   KbEmptyState,
-  KbFilterBar,
-  KbFilterCombo,
+  KbFileSearchInput,
+  KbMetadataFilter,
   KbSidebar,
   KbSidebarSection,
   KbStatusTag,
   KbTableCellFile,
 } from "@/components/knowledge/ui";
-import { KNOWLEDGE_BASES, UPLOAD_RECORDS } from "@/lib/knowledge/data";
+import { UPLOAD_RECORDS } from "@/lib/knowledge/data";
 import {
+  canManageFileList,
   filterFiles,
-  getAllTags,
   getFavoriteFiles,
   getFileById,
   getFilesForBase,
   getFilesForPersonalTree,
+  getMetadataFieldsForBase,
+  getBaseById,
   getPersonalBases,
-  getProfessionalTypes,
+  getPinnedFiles,
   getRecentFiles,
   PERSONAL_TREE_ALL_ID,
   sortKnowledgeFiles,
 } from "@/lib/knowledge/model";
+import {
+  getKnowledgeStoreVersion,
+  removeStoreFiles,
+  subscribeKnowledgeStore,
+  updateStoreFile,
+} from "@/lib/knowledge/store";
 import { publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
+import { isPinnedId, loadPinnedIds, savePinnedIds, togglePinnedId } from "@/lib/knowledge/pinned";
 import { kbFileTypeConfig, kbMainPanel } from "@/lib/knowledge/tokens";
 import type {
   KnowledgeBase,
   KnowledgeFile,
   KnowledgeSortBy,
+  FileSearchMode,
   UploadRecord,
 } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import {
-  FileListRefreshButton,
-  FileListSortButton,
-  FileViewModeToggle,
+  FileListToolbarActions,
   KnowledgeFileCardGrid,
   KnowledgeFileTable,
   type FileViewMode,
 } from "./KnowledgeFileTable";
+import { FileMoveDialog } from "./FileMoveDialog";
+import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
+import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDialog";
+import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { KnowledgeAggregateDetailHeader } from "./KnowledgeAggregateDetailHeader";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
 import { KnowledgeTreeNavItem } from "./KnowledgeCategoryTree";
@@ -84,6 +102,10 @@ import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 import { KnowledgeTreeSectionActions } from "./KnowledgeTreeSectionActions";
 import { MySpaceTitleBanner } from "./MySpaceTitleBanner";
 import { PersonalDirectoryTree } from "./PersonalDirectoryTree";
+import { FileListToolbar } from "./FileListToolbar";
+import { FileBatchDeleteDialog } from "./FileBatchDeleteDialog";
+import { useFileSelection } from "./useFileSelection";
+import { useFileViewMode } from "./useFileViewMode";
 
 type MySpaceSelection =
   | { kind: "recent" }
@@ -124,18 +146,39 @@ const mySpaceSortOptions: Array<{ value: KnowledgeSortBy; label: string }> = [
 
 export function MySpacePage() {
   const navigate = useNavigate({ from: "/knowledge/mine" });
-  const personalBases = useMemo(() => getPersonalBases(), []);
+  const storeVersion = useSyncExternalStore(subscribeKnowledgeStore, getKnowledgeStoreVersion);
+  const personalBases = useMemo(() => getPersonalBases(), [storeVersion]);
   const [selection, setSelection] = useState<MySpaceSelection>({ kind: "recent" });
   const [query, setQuery] = useState("");
-  const [professionalType, setProfessionalType] = useState("all");
-  const [tag, setTag] = useState("all");
+  const [searchMode, setSearchMode] = useState<FileSearchMode>("fulltext");
+  const [metadataFilters, setMetadataFilters] = useState<Record<string, string>>({});
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>("updated");
-  const [viewMode, setViewMode] = useState<FileViewMode>("list");
+  const fileSelection = useFileSelection();
+  const [viewMode, setViewMode] = useFileViewMode();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
   const [refreshSeed, setRefreshSeed] = useState(0);
   const [uploadStatus, setUploadStatus] = useState<string>("pendingApproval");
   const [favoriteCategory, setFavoriteCategory] = useState<FavoriteCategory>("all");
+  const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedIds());
+  const [batchLoading, setBatchLoading] = useState<
+    "download" | "disable" | "delete" | "move" | null
+  >(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [moveFiles, setMoveFiles] = useState<KnowledgeFile[]>([]);
+  const [moveLoading, setMoveLoading] = useState(false);
+  const [historyFile, setHistoryFile] = useState<KnowledgeFile | null>(null);
+  const [directoryMoveTarget, setDirectoryMoveTarget] = useState<DirectoryMoveTarget | null>(null);
+  const [directoryMoveLoading, setDirectoryMoveLoading] = useState(false);
+
+  const handleTogglePin = (baseId: string) => {
+    setPinnedIds((prev) => {
+      const next = togglePinnedId(prev, baseId);
+      savePinnedIds(next);
+      toast.message(isPinnedId(prev, baseId) ? "已取消置顶" : "已置顶到快速访问");
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -143,20 +186,25 @@ export function MySpacePage() {
       setSelection({ kind: "personalAll" });
     }
     if (window.location.hash === "#uploads") {
-      setSelection({ kind: "uploads" });
+      navigate({ to: "/knowledge/uploads" });
     }
   }, []);
 
   useEffect(() => {
     setPage(1);
     setQuery("");
-    setProfessionalType("all");
-    setTag("all");
+    setSearchMode("fulltext");
+    setMetadataFilters({});
+    fileSelection.clear();
   }, [selection]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, professionalType, tag, sortBy, viewMode, uploadStatus, favoriteCategory]);
+  }, [query, searchMode, metadataFilters, sortBy, viewMode, uploadStatus, favoriteCategory]);
+
+  useEffect(() => {
+    fileSelection.clear();
+  }, [query, searchMode, metadataFilters]);
 
   const handleUploadFiles = (files: FileList) => {
     toast.success(`已选择 ${files.length} 个文件，上传面板即将打开`);
@@ -170,26 +218,142 @@ export function MySpacePage() {
     });
   };
 
+  const pinnedBases = useMemo(
+    () => personalBases.filter((base) => isPinnedId(pinnedIds, base.id)),
+    [personalBases, pinnedIds],
+  );
+  const pinnedFiles = useMemo(() => getPinnedFiles(), [storeVersion]);
+
   const selectedBase =
     selection.kind === "personalBase"
       ? personalBases.find((base) => base.id === selection.baseId)
       : undefined;
 
   const personalAllFiles = useMemo(() => {
-    return sortKnowledgeFiles(filterFiles(getFilesForPersonalTree(), { query }), sortBy);
-  }, [query, sortBy]);
+    return sortKnowledgeFiles(
+      filterFiles(getFilesForPersonalTree(), { query, searchMode }),
+      sortBy,
+    );
+  }, [query, searchMode, sortBy, storeVersion]);
 
   const personalFiles = useMemo(() => {
     if (!selectedBase) return [];
     return sortKnowledgeFiles(
       filterFiles(getFilesForBase(selectedBase.id), {
         query,
-        professionalType: professionalType === "all" ? undefined : professionalType,
-        tag: tag === "all" ? undefined : tag,
+        searchMode,
+        metadataFilters,
       }),
       sortBy,
     );
-  }, [selectedBase, query, professionalType, tag, sortBy]);
+  }, [selectedBase, query, searchMode, metadataFilters, sortBy, storeVersion]);
+
+  const activePersonalFiles =
+    selection.kind === "personalAll"
+      ? personalAllFiles
+      : selection.kind === "personalBase"
+        ? personalFiles
+        : [];
+
+  const handleToggleEnabled = (file: KnowledgeFile, enabled: boolean) => {
+    updateStoreFile(file.id, { enabled });
+    toast.message(enabled ? "文件已启用" : "文件已停用");
+  };
+
+  const handleToggleFilePin = (file: KnowledgeFile) => {
+    const nextPinned = !file.pinned;
+    updateStoreFile(file.id, { pinned: nextPinned });
+    toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
+  };
+
+  const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
+    const targetBase = getBaseById(targetBaseId);
+    setMoveLoading(true);
+    for (const file of movingFiles) {
+      updateStoreFile(file.id, {
+        knowledgeBaseId: targetBaseId,
+        knowledgeBaseName: targetBase?.name,
+      });
+    }
+    window.setTimeout(() => {
+      const label =
+        movingFiles.length > 1 ? `${movingFiles.length} 个文件` : `「${movingFiles[0]?.name}」`;
+      toast.success(`已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`);
+      setMoveLoading(false);
+      setMoveFiles([]);
+      fileSelection.clear();
+    }, 300);
+  };
+
+  const handleBatchMove = () => {
+    const ids = [...fileSelection.selectedArray];
+    const movingFiles = ids
+      .map((id) => activePersonalFiles.find((file) => file.id === id))
+      .filter((file): file is KnowledgeFile => Boolean(file));
+    setMoveFiles(movingFiles);
+  };
+
+  const showManageActions = canManageFileList(selectedBase);
+
+  const fileRowActions = {
+    ...(showManageActions ? { onMove: (file: KnowledgeFile) => setMoveFiles([file]) } : {}),
+    onTogglePin: handleToggleFilePin,
+    onViewHistory: (file: KnowledgeFile) => setHistoryFile(file),
+  };
+
+  const handleBatchDownload = () => {
+    setBatchLoading("download");
+    window.setTimeout(() => {
+      toast.message(`开始下载 ${fileSelection.selectedCount} 个文件`);
+      setBatchLoading(null);
+    }, 400);
+  };
+
+  const handleBatchDisable = () => {
+    setBatchLoading("disable");
+    for (const id of fileSelection.selectedArray) {
+      updateStoreFile(id, { enabled: false });
+    }
+    window.setTimeout(() => {
+      toast.success(`已停用 ${fileSelection.selectedCount} 个文件`);
+      fileSelection.clear();
+      setBatchLoading(null);
+    }, 300);
+  };
+
+  const handleConfirmBatchDelete = () => {
+    const count = fileSelection.selectedCount;
+    const ids = [...fileSelection.selectedArray];
+    setBatchLoading("delete");
+    removeStoreFiles(ids);
+    window.setTimeout(() => {
+      toast.success(`已删除 ${count} 个文件`);
+      fileSelection.clear();
+      setBatchLoading(null);
+      setDeleteDialogOpen(false);
+    }, 300);
+  };
+
+  const batchToolbarProps = (
+    pageIds: string[],
+    totalCount: number,
+    showDisable = true,
+  ): ComponentProps<typeof FileListToolbar> => ({
+    selectedCount: fileSelection.selectedCount,
+    totalCount,
+    pageFileCount: pageIds.length,
+    isAllResultsSelected: fileSelection.isAllResultsSelected,
+    onSelectAllResults: () =>
+      fileSelection.selectAllResults(activePersonalFiles.map((file) => file.id)),
+    onBatchDownload: handleBatchDownload,
+    onBatchMove: showDisable ? handleBatchMove : undefined,
+    onBatchDisable: showDisable ? handleBatchDisable : undefined,
+    onBatchDelete: () => setDeleteDialogOpen(true),
+    onClearSelection: fileSelection.clear,
+    showBatchMove: showDisable,
+    showBatchDisable: showDisable,
+    batchLoading,
+  });
 
   const handleRefresh = () => {
     setPage(1);
@@ -209,7 +373,17 @@ export function MySpacePage() {
           </>
         }
       >
-        <KbSidebarSection title="个人事务">
+        <PinnedQuickAccessSection
+          pinnedBases={pinnedBases}
+          pinnedFiles={pinnedFiles}
+          selectedBaseId={selection.kind === "personalBase" ? selection.baseId : undefined}
+          onSelectBase={(baseId) => setSelection({ kind: "personalBase", baseId })}
+          onOpenFile={openFile}
+          onUnpinBase={handleTogglePin}
+          onUnpinFile={handleToggleFilePin}
+        />
+
+        <KbSidebarSection title="个人事务" className="border-t border-[#E8F0F2] pt-2">
           <div className="space-y-0.5 px-1">
             <KnowledgeTreeNavItem
               icon={Clock3}
@@ -220,8 +394,8 @@ export function MySpacePage() {
             <KnowledgeTreeNavItem
               icon={UploadCloud}
               label="我的上传"
-              selected={selection.kind === "uploads"}
-              onClick={() => setSelection({ kind: "uploads" })}
+              selected={false}
+              onClick={() => navigate({ to: "/knowledge/uploads" })}
             />
             <KnowledgeTreeNavItem
               icon={Heart}
@@ -252,6 +426,7 @@ export function MySpacePage() {
                   ? PERSONAL_TREE_ALL_ID
                   : undefined
             }
+            pinnedIds={pinnedIds}
             onSelectBase={(baseId) => {
               if (baseId === PERSONAL_TREE_ALL_ID) {
                 setSelection({ kind: "personalAll" });
@@ -259,6 +434,16 @@ export function MySpacePage() {
                 setSelection({ kind: "personalBase", baseId });
               }
             }}
+            onTogglePin={handleTogglePin}
+            onCreateDirectory={(directory) =>
+              toast.success(`已预留：在「${directory.name}」下新建个人目录`)
+            }
+            onCreateKnowledgeBase={(directory) =>
+              toast.success(`已预留：在「${directory.name}」下新建个人知识库`)
+            }
+            onMoveDirectory={(directory) =>
+              setDirectoryMoveTarget({ kind: "personal", item: directory })
+            }
           />
         </KbSidebarSection>
       </KbSidebar>
@@ -286,32 +471,30 @@ export function MySpacePage() {
           />
         )}
 
-        {selection.kind === "uploads" && (
-          <MyUploadPanel
-            status={uploadStatus}
-            onStatusChange={setUploadStatus}
-            refreshSeed={refreshSeed}
-            onRefresh={handleRefresh}
-          />
-        )}
-
         {selection.kind === "personalAll" && (
           <PersonalAllPanel
             files={personalAllFiles}
             query={query}
+            searchMode={searchMode}
             sortBy={sortBy}
             viewMode={viewMode}
             page={page}
             pageSize={pageSize}
             refreshSeed={refreshSeed}
+            showManageColumn={canManageFileList()}
             onNavigateRoot={() => setSelection({ kind: "recent" })}
             onQueryChange={setQuery}
+            onSearchModeChange={setSearchMode}
             onSortChange={setSortBy}
             onViewModeChange={setViewMode}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onRefresh={handleRefresh}
             onOpen={openFile}
+            onToggleEnabled={handleToggleEnabled}
+            selection={fileSelection}
+            batchToolbarProps={batchToolbarProps}
+            fileRowActions={fileRowActions}
           />
         )}
 
@@ -320,16 +503,16 @@ export function MySpacePage() {
             base={selectedBase}
             files={personalFiles}
             query={query}
-            professionalType={professionalType}
-            tag={tag}
+            searchMode={searchMode}
+            metadataFilters={metadataFilters}
             sortBy={sortBy}
             viewMode={viewMode}
             page={page}
             pageSize={pageSize}
             refreshSeed={refreshSeed}
             onQueryChange={setQuery}
-            onProfessionalTypeChange={setProfessionalType}
-            onTagChange={setTag}
+            onSearchModeChange={setSearchMode}
+            onMetadataFiltersChange={setMetadataFilters}
             onSortChange={setSortBy}
             onViewModeChange={setViewMode}
             onPageChange={setPage}
@@ -338,9 +521,42 @@ export function MySpacePage() {
             onOpen={openFile}
             onUploadFiles={handleUploadFiles}
             onSelectBase={(baseId) => setSelection({ kind: "personalBase", baseId })}
+            onToggleEnabled={handleToggleEnabled}
+            selection={fileSelection}
+            batchToolbarProps={batchToolbarProps}
+            fileRowActions={fileRowActions}
           />
         )}
       </main>
+
+      <FileBatchDeleteDialog
+        open={deleteDialogOpen}
+        count={fileSelection.selectedCount}
+        loading={batchLoading === "delete"}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmBatchDelete}
+      />
+      <FileMoveDialog
+        files={moveFiles}
+        currentBaseId={selectedBase?.id}
+        loading={moveLoading}
+        onClose={() => setMoveFiles([])}
+        onConfirm={handleConfirmMove}
+      />
+      <FileVersionHistoryDialog file={historyFile} onClose={() => setHistoryFile(null)} />
+      <DirectoryMoveDialog
+        target={directoryMoveTarget}
+        loading={directoryMoveLoading}
+        onClose={() => setDirectoryMoveTarget(null)}
+        onConfirm={() => {
+          setDirectoryMoveLoading(true);
+          window.setTimeout(() => {
+            toast.success(`目录「${directoryMoveTarget?.item.name}」已移动`);
+            setDirectoryMoveLoading(false);
+            setDirectoryMoveTarget(null);
+          }, 300);
+        }}
+      />
     </>
   );
 }
@@ -1272,35 +1488,57 @@ function formatAccessTime(value: string | undefined, index: number) {
 function PersonalAllPanel({
   files,
   query,
+  searchMode,
   sortBy,
   viewMode,
   page,
   pageSize,
   refreshSeed,
+  showManageColumn,
   onNavigateRoot,
   onQueryChange,
+  onSearchModeChange,
   onSortChange,
   onViewModeChange,
   onPageChange,
   onPageSizeChange,
   onRefresh,
   onOpen,
+  onToggleEnabled,
+  selection,
+  batchToolbarProps,
+  fileRowActions,
 }: {
   files: KnowledgeFile[];
   query: string;
+  searchMode: FileSearchMode;
   sortBy: KnowledgeSortBy;
   viewMode: FileViewMode;
   page: number;
   pageSize: number;
   refreshSeed: number;
+  showManageColumn: boolean;
   onNavigateRoot?: () => void;
   onQueryChange: (value: string) => void;
+  onSearchModeChange: (mode: FileSearchMode) => void;
   onSortChange: (value: KnowledgeSortBy) => void;
   onViewModeChange: (mode: FileViewMode) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onRefresh: () => void;
   onOpen: (file: KnowledgeFile) => void;
+  onToggleEnabled: (file: KnowledgeFile, enabled: boolean) => void;
+  selection: ReturnType<typeof useFileSelection>;
+  batchToolbarProps: (
+    pageIds: string[],
+    totalCount: number,
+    showDisable?: boolean,
+  ) => ComponentProps<typeof FileListToolbar>;
+  fileRowActions: {
+    onMove?: (file: KnowledgeFile) => void;
+    onTogglePin: (file: KnowledgeFile) => void;
+    onViewHistory: (file: KnowledgeFile) => void;
+  };
 }) {
   const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
   const totalPages = Math.max(1, Math.ceil(files.length / effectivePageSize) || 1);
@@ -1309,6 +1547,18 @@ function PersonalAllPanel({
     const start = (safePage - 1) * effectivePageSize;
     return files.slice(start, start + effectivePageSize);
   }, [effectivePageSize, files, safePage]);
+
+  const pageFileIds = pagedFiles.map((file) => file.id);
+  const listSelection = {
+    isSelected: selection.isSelected,
+    onToggle: selection.toggle,
+    onToggleAll: selection.toggleAll,
+    pageIds: pageFileIds,
+  };
+  const cardSelection = {
+    isSelected: selection.isSelected,
+    onToggle: selection.toggle,
+  };
 
   const empty = (
     <KbEmptyState title="个人库暂无文件" description="当前个人知识库下还没有可查看的文件。" />
@@ -1328,22 +1578,26 @@ function PersonalAllPanel({
         onNavigateRoot={onNavigateRoot}
       />
 
-      <div className="shrink-0 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
-        <KbFilterBar
-          className="mb-0"
-          searchValue={query}
-          onSearchChange={onQueryChange}
-          searchPlaceholder="搜索个人库文件"
-          searchClassName="max-w-[280px] !rounded-[8px]"
-          trailing={
-            <>
-              <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />
-              <FileListSortButton value={sortBy} onChange={onSortChange} />
-              <FileListRefreshButton onClick={onRefresh} />
-            </>
-          }
-        />
-      </div>
+      <FileListToolbar
+        {...batchToolbarProps(pageFileIds, files.length, showManageColumn)}
+        left={
+          <KbFileSearchInput
+            value={query}
+            onChange={onQueryChange}
+            mode={searchMode}
+            onModeChange={onSearchModeChange}
+          />
+        }
+        right={
+          <FileListToolbarActions
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+            sortBy={sortBy}
+            onSortChange={onSortChange}
+            onRefresh={onRefresh}
+          />
+        }
+      />
 
       <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === "list" ? (
@@ -1352,10 +1606,20 @@ function PersonalAllPanel({
             onOpen={onOpen}
             showLibrary
             overviewMode
+            showManageColumn={showManageColumn}
+            selection={listSelection}
+            onToggleEnabled={onToggleEnabled}
             empty={empty}
+            {...fileRowActions}
           />
         ) : (
-          <KnowledgeFileCardGrid files={pagedFiles} onOpen={onOpen} empty={empty} />
+          <KnowledgeFileCardGrid
+            files={pagedFiles}
+            selection={cardSelection}
+            onOpen={onOpen}
+            empty={empty}
+            {...fileRowActions}
+          />
         )}
       </div>
 
@@ -1390,16 +1654,16 @@ function PersonalBasePanel({
   base,
   files,
   query,
-  professionalType,
-  tag,
+  searchMode,
+  metadataFilters,
   sortBy,
   viewMode,
   page,
   pageSize,
   refreshSeed,
   onQueryChange,
-  onProfessionalTypeChange,
-  onTagChange,
+  onSearchModeChange,
+  onMetadataFiltersChange,
   onSortChange,
   onViewModeChange,
   onPageChange,
@@ -1408,20 +1672,24 @@ function PersonalBasePanel({
   onOpen,
   onUploadFiles,
   onSelectBase,
+  onToggleEnabled,
+  selection,
+  batchToolbarProps,
+  fileRowActions,
 }: {
   base: KnowledgeBase;
   files: KnowledgeFile[];
   query: string;
-  professionalType: string;
-  tag: string;
+  searchMode: FileSearchMode;
+  metadataFilters: Record<string, string>;
   sortBy: KnowledgeSortBy;
   viewMode: FileViewMode;
   page: number;
   pageSize: number;
   refreshSeed: number;
   onQueryChange: (value: string) => void;
-  onProfessionalTypeChange: (value: string) => void;
-  onTagChange: (value: string) => void;
+  onSearchModeChange: (mode: FileSearchMode) => void;
+  onMetadataFiltersChange: (value: Record<string, string>) => void;
   onSortChange: (value: KnowledgeSortBy) => void;
   onViewModeChange: (mode: FileViewMode) => void;
   onPageChange: (page: number) => void;
@@ -1430,13 +1698,21 @@ function PersonalBasePanel({
   onOpen: (file: KnowledgeFile) => void;
   onUploadFiles: (files: FileList) => void;
   onSelectBase: (baseId: string) => void;
+  onToggleEnabled: (file: KnowledgeFile, enabled: boolean) => void;
+  selection: ReturnType<typeof useFileSelection>;
+  batchToolbarProps: (
+    pageIds: string[],
+    totalCount: number,
+    showDisable?: boolean,
+  ) => ComponentProps<typeof FileListToolbar>;
+  fileRowActions: {
+    onMove?: (file: KnowledgeFile) => void;
+    onTogglePin: (file: KnowledgeFile) => void;
+    onViewHistory: (file: KnowledgeFile) => void;
+  };
 }) {
   const allFiles = getFilesForBase(base.id);
-  const professionalTypes = getProfessionalTypes(allFiles);
-  const tags = getAllTags(allFiles);
-  const movableBases = KNOWLEDGE_BASES.filter(
-    (item) => item.scope !== "personal" && item.status === "enabled" && item.permission.canUpload,
-  );
+  const metadataFields = getMetadataFieldsForBase(base.id);
 
   const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
   const totalPages = Math.max(1, Math.ceil(files.length / effectivePageSize) || 1);
@@ -1445,6 +1721,18 @@ function PersonalBasePanel({
     const start = (safePage - 1) * effectivePageSize;
     return files.slice(start, start + effectivePageSize);
   }, [effectivePageSize, files, safePage]);
+
+  const pageFileIds = pagedFiles.map((file) => file.id);
+  const listSelection = {
+    isSelected: selection.isSelected,
+    onToggle: selection.toggle,
+    onToggleAll: selection.toggleAll,
+    pageIds: pageFileIds,
+  };
+  const cardSelection = {
+    isSelected: selection.isSelected,
+    onToggle: selection.toggle,
+  };
 
   const empty = (
     <KbEmptyState title="个人库暂无文件" description="可拖拽上传，上传后直接进入解析流程。" />
@@ -1456,64 +1744,37 @@ function PersonalBasePanel({
         base={base}
         fileCount={allFiles.length}
         onSelectBase={onSelectBase}
-        action={
-          <KbButton
-            variant="outline"
-            size="sm"
-            disabled={movableBases.length === 0}
-            onClick={() => toast.success("已打开移动到公共库流程")}
-          >
-            移动到公共库
-          </KbButton>
-        }
       />
 
-      <div className="shrink-0 border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
-        <KbFilterBar
-          className="mb-0"
-          searchValue={query}
-          onSearchChange={onQueryChange}
-          searchPlaceholder="搜索个人库文件"
-          searchClassName="max-w-[280px] !rounded-[8px]"
-          filters={
-            <>
-              <KbFilterCombo
-                value={professionalType}
-                onChange={onProfessionalTypeChange}
-                placeholder="全部专业"
-                options={[
-                  { value: "all", label: "全部专业" },
-                  ...professionalTypes.map((item) => ({ value: item, label: item })),
-                ]}
-              />
-              <KbFilterCombo
-                value={tag}
-                onChange={onTagChange}
-                placeholder="全部标签"
-                options={[
-                  { value: "all", label: "全部标签" },
-                  ...tags.map((item) => ({ value: item, label: item })),
-                ]}
-              />
-            </>
-          }
-          trailing={
-            <>
-              <ActionButton
-                variant="primary"
-                size="sm"
-                onClick={() => toast.message("打开上传面板")}
-              >
-                <Upload className="h-3.5 w-3.5 stroke-[1.8]" />
-                上传
-              </ActionButton>
-              <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />
-              <FileListSortButton value={sortBy} onChange={onSortChange} />
-              <FileListRefreshButton onClick={onRefresh} />
-            </>
-          }
-        />
-      </div>
+      <FileListToolbar
+        {...batchToolbarProps(pageFileIds, files.length, canManageFileList(base))}
+        left={
+          <>
+            <KbFileSearchInput
+              value={query}
+              onChange={onQueryChange}
+              mode={searchMode}
+              onModeChange={onSearchModeChange}
+            />
+            <KbMetadataFilter
+              fields={metadataFields}
+              files={allFiles}
+              value={metadataFilters}
+              onChange={onMetadataFiltersChange}
+            />
+          </>
+        }
+        right={
+          <FileListToolbarActions
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+            sortBy={sortBy}
+            onSortChange={onSortChange}
+            onRefresh={onRefresh}
+            onUpload={() => toast.message("打开上传面板")}
+          />
+        }
+      />
 
       <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === "list" ? (
@@ -1522,10 +1783,20 @@ function PersonalBasePanel({
             onOpen={onOpen}
             showLibrary={false}
             overviewMode
+            showManageColumn={canManageFileList(base)}
+            selection={listSelection}
+            onToggleEnabled={onToggleEnabled}
             empty={empty}
+            {...fileRowActions}
           />
         ) : (
-          <KnowledgeFileCardGrid files={pagedFiles} onOpen={onOpen} empty={empty} />
+          <KnowledgeFileCardGrid
+            files={pagedFiles}
+            selection={cardSelection}
+            onOpen={onOpen}
+            empty={empty}
+            {...fileRowActions}
+          />
         )}
       </div>
 

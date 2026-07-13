@@ -35,7 +35,7 @@ export function PermissionConfigDrawer({
       <section className={cn(kbCardShell, kbRadius.md, "bg-kb-surface p-4")}>
         <div className="text-[13px] font-semibold text-kb-heading">默认权限</div>
         <p className="mt-1 text-[12px] leading-relaxed text-kb-muted">
-          本部门成员默认具备浏览组权限；上传组和管理组通过指定成员授权。
+          授权成员默认具备浏览组权限；上传组和管理组通过指定成员授权。
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {permissionOptions.map((group) => (

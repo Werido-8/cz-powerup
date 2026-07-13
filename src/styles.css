@@ -96,6 +96,37 @@
   --kb-border: #dcebed;
   --kb-preview-bg: #eef5f6;
   --danger-soft: #fff3f3;
+
+  /* App Dialog — 系统级表单弹窗 */
+  --dialog-overlay: rgba(19, 29, 39, 0.56);
+  --dialog-border: rgba(218, 227, 232, 0.9);
+  --dialog-shadow:
+    0 24px 64px rgba(15, 35, 45, 0.22), 0 4px 16px rgba(15, 35, 45, 0.08);
+  --dialog-header-border: #e8eef1;
+  --dialog-footer-bg: #fbfcfc;
+  --dialog-title-color: #162b36;
+  --dialog-title-size: 18px;
+  --dialog-title-line-height: 26px;
+  --dialog-title-icon-shadow: 0 4px 10px rgba(52, 155, 172, 0.22);
+  --dialog-title-icon-gradient: linear-gradient(145deg, #349bac, #1e8497);
+  --form-label-color: #243945;
+  --form-label-size: 14px;
+  --form-label-line-height: 20px;
+  --form-label-icon: #647785;
+  --form-required: #e5484d;
+  --form-control-height: 40px;
+  --form-control-font-size: 13px;
+  --form-control-border: #d7e2e7;
+  --form-control-border-hover: #b7cbd2;
+  --form-control-text: #263c48;
+  --form-control-disabled-bg: #f5f7f8;
+  --form-control-disabled-border: #e3e8eb;
+  --form-control-disabled-text: #9aa8b1;
+  --form-control-focus-ring: 0 0 0 3px rgba(52, 155, 172, 0.12);
+  --form-control-error-ring: 0 0 0 3px rgba(229, 72, 77, 0.1);
+  --form-counter: #8a99a3;
+  --dialog-btn-shadow: 0 4px 10px rgba(52, 155, 172, 0.2);
+  --dialog-btn-primary-hover: #2b91a3;
 }
 
 .dark {
@@ -167,5 +198,89 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: rgba(52, 155, 172, 0.4);
+  }
+}
+
+@layer components {
+  .app-dialog-overlay {
+    background: var(--dialog-overlay);
+    backdrop-filter: blur(3px);
+  }
+
+  .app-form-control {
+    height: var(--form-control-height);
+    padding-inline: 16px;
+    border: 1px solid var(--form-control-border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: var(--form-control-font-size);
+    color: var(--form-control-text);
+    transition:
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .app-form-control:hover:not(:disabled):not(:focus-visible) {
+    border-color: var(--form-control-border-hover);
+  }
+
+  .app-form-control:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: var(--form-control-focus-ring);
+  }
+
+  .app-form-control:disabled {
+    background: var(--form-control-disabled-bg);
+    border-color: var(--form-control-disabled-border);
+    color: var(--form-control-disabled-text);
+    cursor: not-allowed;
+  }
+
+  .app-form-control--error {
+    border-color: var(--form-required);
+    box-shadow: var(--form-control-error-ring);
+  }
+
+  .app-form-control--error:focus-visible {
+    border-color: var(--form-required);
+    box-shadow: var(--form-control-error-ring);
+  }
+
+  .app-form-textarea {
+    min-height: 112px;
+    padding: 12px 14px 28px;
+    border: 1px solid var(--form-control-border);
+    border-radius: 8px;
+    background: #fff;
+    font-size: var(--form-control-font-size);
+    line-height: 20px;
+    color: var(--form-control-text);
+    resize: vertical;
+    transition:
+      border-color 0.18s ease,
+      box-shadow 0.18s ease;
+  }
+
+  .app-form-textarea:hover:not(:disabled):not(:focus-visible) {
+    border-color: var(--form-control-border-hover);
+  }
+
+  .app-form-textarea:focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: var(--form-control-focus-ring);
+  }
+
+  .app-form-textarea:disabled {
+    background: var(--form-control-disabled-bg);
+    border-color: var(--form-control-disabled-border);
+    color: var(--form-control-disabled-text);
+    cursor: not-allowed;
+  }
+
+  .app-form-textarea.app-form-control--error {
+    border-color: var(--form-required);
+    box-shadow: var(--form-control-error-ring);
   }
 }

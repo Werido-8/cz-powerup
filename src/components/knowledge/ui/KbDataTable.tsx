@@ -46,12 +46,14 @@ export function KbDataTableRow({
   children,
   className,
   dimmed,
+  selected,
   onClick,
   variant = "default",
 }: {
   children: ReactNode;
   className?: string;
   dimmed?: boolean;
+  selected?: boolean;
   onClick?: () => void;
   variant?: "default" | "flat";
 }) {
@@ -65,7 +67,8 @@ export function KbDataTableRow({
         variant === "flat"
           ? "min-h-[56px] border-b border-[#EEF2F4] px-5 text-[13px] last:border-b-0 hover:bg-[#F8FAFB]"
           : cn("px-4 text-[12.5px]", kbTableRow),
-        dimmed && (variant === "flat" ? "bg-muted/20 opacity-70" : "opacity-60 bg-muted/30"),
+        selected && "bg-[rgba(52,155,172,0.055)] hover:bg-[rgba(52,155,172,0.085)]",
+        dimmed && !selected && (variant === "flat" ? "bg-muted/20 opacity-70" : "opacity-60 bg-muted/30"),
         onClick && "cursor-pointer",
         className,
       )}

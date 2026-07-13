@@ -118,11 +118,11 @@ export function FilePreviewCanvas({
           </div>
           <h3 className="mt-8 text-[16px] font-semibold text-kb-heading">1. 适用范围</h3>
           <p className="mt-3 text-[13.5px] leading-[1.9] text-kb-body/90">
-            操作人员应了解文件适用范围、执行边界和部门协同要求。对条款存在疑问时，应向主管部门确认后执行。
+            操作人员应了解文件适用范围、执行边界和协同要求。对条款存在疑问时，应向主管部门确认后执行。
           </p>
           <h3 className="mt-7 text-[16px] font-semibold text-kb-heading">2. 执行要求</h3>
           <p className="mt-3 text-[13.5px] leading-[1.9] text-kb-body/90">
-            各部门应结合现场实际制定实施细则，定期复盘执行情况，并将更新内容沉淀回对应知识库。
+            相关单位应结合现场实际制定实施细则，定期复盘执行情况，并将更新内容沉淀回对应知识库。
           </p>
         </article>
       </div>

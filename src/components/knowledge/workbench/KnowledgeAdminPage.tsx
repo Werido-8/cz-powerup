@@ -8,14 +8,14 @@ import {
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { KbButton, KbEmptyState, KbSidebar, KbSidebarItem, KbSidebarSection } from "@/components/knowledge/ui";
-import { CURRENT_KNOWLEDGE_USER, PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
+import { PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
 import {
   canSeeCategoryManager,
   canViewKnowledgeAdmin,
   getManageableBases,
   getParseExceptionsForScope,
-  isKnowledgeAdmin,
 } from "@/lib/knowledge/model";
+import { addStoreBase, updateStoreBase } from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeBase, KnowledgeBaseStatus } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -23,9 +23,10 @@ import { ApprovalCenterSection } from "./admin/ApprovalCenterSection";
 import { KnowledgeBaseAdminSection } from "./admin/KnowledgeBaseAdminSection";
 import { ParseExceptionSection } from "./admin/ParseExceptionSection";
 import { CategoryManagerSection } from "./admin/CategoryManagerSection";
-import { KnowledgeBaseFormDrawer } from "./admin/KnowledgeBaseFormDrawer";
-import { PermissionConfigDrawer } from "./admin/PermissionConfigDrawer";
-import { KnowledgeAdminSectionHeader } from "./KnowledgeAdminSectionHeader";
+import { CreateKnowledgeBaseDialog } from "./admin/CreateKnowledgeBaseDialog";
+import { EditKnowledgeBaseDialog } from "./admin/EditKnowledgeBaseDialog";
+import { PermissionConfigDialog } from "./permission/PermissionConfigDialog";
+import { PublicPermissionDialog } from "./permission/PublicPermissionDialog";
 import { KnowledgeAdminTitleBanner } from "./KnowledgeAdminTitleBanner";
 import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 
@@ -37,12 +38,12 @@ const SECTION_META: Record<
 > = {
   categories: {
     title: "分类管理",
-    description: "分类用于组织公共和部门知识库，可嵌套维护。下属仍有知识库时禁止删除。",
+    description: "分类用于组织专业知识库，可嵌套维护。下属仍有知识库时禁止删除。",
     icon: <FolderTree className="stroke-[1.8]" />,
   },
   bases: {
     title: "库清单",
-    description: "管理知识库基础信息、使用状态、所属部门、权限范围与文件资产。",
+    description: "管理知识库基础信息、使用状态、权限范围与文件资产。",
     icon: <Library className="stroke-[1.8]" />,
   },
   approvals: {
@@ -63,17 +64,11 @@ export function KnowledgeAdminPage() {
   const [formBase, setFormBase] = useState<KnowledgeBase | "new" | null>(null);
   const [permissionBase, setPermissionBase] = useState<KnowledgeBase | null>(null);
 
-  const scopeSubtitle = isKnowledgeAdmin() ? (
+  const scopeSubtitle = (
     <>
-      全库范围
+      专业知识库管理
       <br />
       存得住、找得到、管得住
-    </>
-  ) : (
-    <>
-      {CURRENT_KNOWLEDGE_USER.departmentName}范围
-      <br />
-      部门范围管理
     </>
   );
 
@@ -91,7 +86,7 @@ export function KnowledgeAdminPage() {
       <main className={cn(kbMainPanel, "items-center justify-center p-6")}>
         <KbEmptyState
           title="暂无管理端权限"
-          description="知识管理仅知识库管理员和部门管理员可见。"
+          description="知识管理仅管理员可见。"
         />
       </main>
     );
@@ -144,81 +139,111 @@ export function KnowledgeAdminPage() {
       </KbSidebar>
 
       <main className={cn("scrollbar-thin", kbMainPanel)}>
-        <div className="flex min-h-0 flex-1 flex-col">
-          <KnowledgeAdminSectionHeader
-            title={sectionMeta.title}
-            description={sectionMeta.description}
-            action={
-              visibleSection === "bases" ? (
-                <KbButton onClick={() => setFormBase("new")}>
-                  <Plus className="h-4 w-4 stroke-[1.8]" />
-                  新建知识库
-                </KbButton>
-              ) : visibleSection === "categories" ? (
-                <KbButton onClick={() => toast.success("已预留新建根分类入口")}>
-                  <Plus className="h-4 w-4 stroke-[1.8]" />
-                  新建根分类
-                </KbButton>
-              ) : undefined
-            }
-          />
+        <div className="flex min-h-0 flex-1 flex-col bg-white">
+          <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin p-4">
+            <section className="flex min-h-full flex-col overflow-hidden rounded-[12px] border border-[#DCEBED] bg-white shadow-[0_8px_24px_rgba(31,52,64,0.025)]">
+              <div className="flex items-start justify-between gap-4 border-b border-[#E8F0F2] px-5 py-4">
+                <div className="min-w-0">
+                  <h2 className="text-[15px] font-semibold text-kb-heading">{sectionMeta.title}</h2>
+                  <p className="mt-0.5 text-[12.5px] leading-relaxed text-kb-muted">
+                    {sectionMeta.description}
+                  </p>
+                </div>
+                {visibleSection === "bases" ? (
+                  <KbButton onClick={() => setFormBase("new")}>
+                    <Plus className="h-4 w-4 stroke-[1.8]" />
+                    新建知识库
+                  </KbButton>
+                ) : visibleSection === "categories" ? (
+                  <KbButton onClick={() => toast.success("已预留新建根分类入口")}>
+                    <Plus className="h-4 w-4 stroke-[1.8]" />
+                    新建根分类
+                  </KbButton>
+                ) : null}
+              </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {visibleSection === "categories" && <CategoryManagerSection embedded />}
-            {visibleSection === "bases" && (
-              <KnowledgeBaseAdminSection
-                embedded
-                bases={bases}
-                onCreate={() => setFormBase("new")}
-                onEdit={setFormBase}
-                onToggleStatus={(base) => {
-                  const nextStatus: KnowledgeBaseStatus =
-                    base.status === "enabled" ? "disabled" : "enabled";
-                  const confirmMessage =
-                    nextStatus === "disabled"
-                      ? "停用后普通员工不可见，且不参与检索。确认停用？"
-                      : "确认重新启用该知识库？";
-                  if (typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
-                  setBases((previous) =>
-                    previous.map((item) =>
-                      item.id === base.id ? { ...item, status: nextStatus } : item,
-                    ),
-                  );
-                  toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
-                }}
-                onPermission={setPermissionBase}
-              />
-            )}
-            {visibleSection === "approvals" && (
-              <ApprovalCenterSection embedded manageableBases={bases} />
-            )}
-            {visibleSection === "exceptions" && (
-              <ParseExceptionSection embedded items={parseExceptions} />
-            )}
+              <div className="flex min-h-0 flex-1 flex-col">
+                {visibleSection === "categories" && <CategoryManagerSection embedded />}
+                {visibleSection === "bases" && (
+                  <KnowledgeBaseAdminSection
+                    embedded
+                    bases={bases}
+                    onCreate={() => setFormBase("new")}
+                    onEdit={setFormBase}
+                    onToggleStatus={(base) => {
+                      const nextStatus: KnowledgeBaseStatus =
+                        base.status === "enabled" ? "disabled" : "enabled";
+                      const confirmMessage =
+                        nextStatus === "disabled"
+                          ? "停用后普通员工不可见，且不参与检索。确认停用？"
+                          : "确认重新启用该知识库？";
+                      if (typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
+                      setBases((previous) =>
+                        previous.map((item) =>
+                          item.id === base.id ? { ...item, status: nextStatus } : item,
+                        ),
+                      );
+                      toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
+                    }}
+                    onBatchToggleStatus={(ids, nextStatus) => {
+                      const idSet = new Set(ids);
+                      setBases((previous) =>
+                        previous.map((item) =>
+                          idSet.has(item.id) ? { ...item, status: nextStatus } : item,
+                        ),
+                      );
+                    }}
+                    onPermission={setPermissionBase}
+                  />
+                )}
+                {visibleSection === "approvals" && (
+                  <ApprovalCenterSection embedded manageableBases={bases} />
+                )}
+                {visibleSection === "exceptions" && (
+                  <ParseExceptionSection embedded items={parseExceptions} />
+                )}
+              </div>
+            </section>
           </div>
         </div>
       </main>
 
-      {formBase && (
-        <KnowledgeBaseFormDrawer
-          base={formBase === "new" ? undefined : formBase}
+      {formBase === "new" && (
+        <CreateKnowledgeBaseDialog
           onClose={() => setFormBase(null)}
           onSubmit={(base) => {
-            if (formBase === "new") {
-              setBases((previous) => [base, ...previous]);
-              toast.success("知识库已创建");
-            } else {
-              setBases((previous) =>
-                previous.map((item) => (item.id === base.id ? base : item)),
-              );
-              toast.success("知识库信息已更新");
-            }
+            addStoreBase(base);
+            setBases((previous) => [base, ...previous]);
+            toast.success("知识库已创建");
             setFormBase(null);
           }}
         />
       )}
-      {permissionBase && (
-        <PermissionConfigDrawer base={permissionBase} onClose={() => setPermissionBase(null)} />
+      {formBase && formBase !== "new" && (
+        <EditKnowledgeBaseDialog
+          base={formBase}
+          onClose={() => setFormBase(null)}
+          onSubmit={(base) => {
+            updateStoreBase(base);
+            setBases((previous) =>
+              previous.map((item) => (item.id === base.id ? base : item)),
+            );
+            toast.success("知识库信息已更新");
+            setFormBase(null);
+          }}
+        />
+      )}
+      {permissionBase?.scope === "public" && (
+        <PublicPermissionDialog
+          base={permissionBase}
+          onClose={() => setPermissionBase(null)}
+        />
+      )}
+      {permissionBase && permissionBase.scope === "professional" && (
+        <PermissionConfigDialog
+          base={permissionBase}
+          onClose={() => setPermissionBase(null)}
+        />
       )}
     </>
   );

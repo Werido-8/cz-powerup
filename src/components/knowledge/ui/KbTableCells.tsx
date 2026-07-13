@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { KnowledgeFileType } from "@/lib/knowledge/types";
 import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import { cn } from "@/lib/utils";
@@ -8,6 +9,7 @@ export function KbTableCellFile({
   type = "other",
   size = "md",
   nameWeight = "semibold",
+  badge,
   className,
 }: {
   name: string;
@@ -15,6 +17,8 @@ export function KbTableCellFile({
   type?: KnowledgeFileType;
   size?: "sm" | "md";
   nameWeight?: "normal" | "medium" | "semibold";
+  /** 文件名后的内联标识（如历史版本图标） */
+  badge?: ReactNode;
   className?: string;
 }) {
   const config = kbFileTypeConfig[type ?? "other"];
@@ -40,7 +44,10 @@ export function KbTableCellFile({
         <Icon className={cn(iconSize, "stroke-[1.8]")} />
       </div>
       <div className="min-w-0">
-        <div className={cn("truncate text-kb-heading", weightClass)}>{name}</div>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={cn("truncate text-kb-heading", weightClass)}>{name}</span>
+          {badge}
+        </div>
         {subtitle && (
           <div className="mt-0.5 truncate text-[11px] text-kb-muted">{subtitle}</div>
         )}
@@ -69,19 +76,14 @@ export function KbTableCellUser({
 
 export function KbTableCellBase({
   name,
-  department,
   className,
 }: {
   name: string;
-  department?: string;
   className?: string;
 }) {
   return (
     <div className={cn("min-w-0", className)}>
       <div className="truncate font-medium text-kb-body">{name}</div>
-      {department && (
-        <div className="mt-0.5 truncate text-[11px] text-kb-muted">{department}</div>
-      )}
     </div>
   );
 }
