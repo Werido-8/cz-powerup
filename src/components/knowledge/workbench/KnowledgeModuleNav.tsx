@@ -54,7 +54,7 @@ export function KnowledgeModuleNav() {
 
       <div className="flex min-w-[180px] items-center justify-end gap-2 text-[12px] text-kb-muted">
         <span className="rounded-[8px] bg-kb-surface px-2.5 py-1 ring-1 ring-kb-border">
-          {CURRENT_KNOWLEDGE_USER.role === "knowledgeAdmin" ? "知识库管理员" : "部门管理员"}
+          {CURRENT_KNOWLEDGE_USER.role === "knowledgeAdmin" ? "知识库管理员" : "库管理员"}
         </span>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { LayoutGrid, Settings2, UploadCloud, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type PageContext = "overview" | "mine" | "admin";
+type PageContext = "overview" | "mine" | "uploads" | "admin";
 
 type QuickLink = {
   to: string;
@@ -13,6 +13,7 @@ type QuickLink = {
 };
 
 function getPageContext(pathname: string): PageContext {
+  if (pathname.startsWith("/knowledge/uploads")) return "uploads";
   if (pathname.startsWith("/knowledge/mine")) return "mine";
   if (pathname.startsWith("/knowledge/admin")) return "admin";
   return "overview";
@@ -24,14 +25,23 @@ function getQuickLinks(context: PageContext): QuickLink[] {
       return [
         { to: "/knowledge/mine", label: "我的空间", icon: UserRound },
         { to: "/knowledge/admin", label: "知识管理", icon: Settings2 },
-        { to: "/knowledge/mine", label: "我的上传", icon: UploadCloud, hash: "uploads" },
+        { to: "/knowledge/uploads", label: "我的上传", icon: UploadCloud },
       ];
     case "mine":
-      return [{ to: "/knowledge", label: "知识总览", icon: LayoutGrid }];
+      return [
+        { to: "/knowledge", label: "知识总览", icon: LayoutGrid },
+        { to: "/knowledge/uploads", label: "我的上传", icon: UploadCloud },
+      ];
+    case "uploads":
+      return [
+        { to: "/knowledge", label: "知识总览", icon: LayoutGrid },
+        { to: "/knowledge/mine", label: "我的空间", icon: UserRound },
+      ];
     case "admin":
       return [
         { to: "/knowledge", label: "知识总览", icon: LayoutGrid },
         { to: "/knowledge/mine", label: "我的空间", icon: UserRound },
+        { to: "/knowledge/uploads", label: "我的上传", icon: UploadCloud },
       ];
   }
 }

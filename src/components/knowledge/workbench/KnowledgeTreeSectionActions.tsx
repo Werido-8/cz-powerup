@@ -25,10 +25,19 @@ function SectionIconButton({
           <button
             type="button"
             aria-label={label}
-            onClick={onClick}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onClick();
+            }}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
             className={cn(
               "grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-kb-muted transition-colors",
               "hover:bg-kb-surface-hover hover:text-kb-body",
+              "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
             )}
           >
             {children}

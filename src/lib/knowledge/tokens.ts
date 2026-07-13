@@ -45,6 +45,23 @@ export const kbToneClasses: Record<KnowledgeStatusTone, string> = {
   danger: "bg-[#FFF3F3] text-[#C94747]",
 };
 
+/** 描边式状态胶囊：更轻、更精致，配合圆点使用 */
+export const kbToneOutlineClasses: Record<KnowledgeStatusTone, string> = {
+  neutral: "bg-[#F6F8F9] text-[#5E737C] ring-1 ring-inset ring-[#E2E9EC]",
+  accent: "bg-[#EBF8FA] text-[#1498A8] ring-1 ring-inset ring-[#BFE8ED]",
+  success: "bg-[#EEFBF3] text-[#159463] ring-1 ring-inset ring-[#C4EFD6]",
+  warning: "bg-[#FEF6EC] text-[#C0691A] ring-1 ring-inset ring-[#F4DEC2]",
+  danger: "bg-[#FEF2F2] text-[#C43F3F] ring-1 ring-inset ring-[#F4CFCF]",
+};
+
+export const kbToneDotClasses: Record<KnowledgeStatusTone, string> = {
+  neutral: "bg-[#9AA9AF]",
+  accent: "bg-[#1BA8B8]",
+  success: "bg-[#1FB877]",
+  warning: "bg-[#E08A28]",
+  danger: "bg-[#DD5555]",
+};
+
 export const kbFileTypeConfig: Record<
   KnowledgeFileType,
   { label: string; icon: typeof FileText; color: string }

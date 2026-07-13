@@ -1,31 +1,32 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
   ShieldCheck,
-  Star,
-  Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 import {
   KbButton,
   KbDragUploadOverlay,
   KbEmptyState,
-  KbFilterBar,
-  KbFilterCombo,
+  KbFileSearchInput,
+  KbMetadataFilter,
   KbFilterSelect,
   KbSidebar,
   KbSidebarSection,
 } from "@/components/knowledge/ui";
-import { KNOWLEDGE_BASES } from "@/lib/knowledge/data";
 import {
   canUploadToBase,
   canViewBaseFiles,
+  canManageFileList,
   filterFiles,
   getBaseById,
+  getCategoryChain,
   getDefaultOverviewBaseId,
   getFilesForBase,
   getFilesForPersonalTree,
   getFilesForProfessionalTree,
+  getMetadataFieldsForBase,
+  getPinnedFiles,
   isTreeAggregateId,
   PERSONAL_TREE_ALL_ID,
   PROFESSIONAL_TREE_ALL_ID,
@@ -37,22 +38,31 @@ import {
   savePinnedIds,
   togglePinnedId,
 } from "@/lib/knowledge/pinned";
+import {
+  addStoreBase,
+  getKnowledgeStoreVersion,
+  getStoreBases,
+  removeStoreFiles,
+  subscribeKnowledgeStore,
+  updateStoreFile,
+} from "@/lib/knowledge/store";
 import type {
   KnowledgeBase,
+  KnowledgeCategory,
   KnowledgeFile,
   KnowledgeSortBy,
+  FileSearchMode,
 } from "@/lib/knowledge/types";
 import { kbCardShell, kbMainPanel, kbRadius } from "@/lib/knowledge/tokens";
-import { TableListPager, CardBatchPager, TABLE_PAGE_SIZE_DEFAULT, ActionButton } from "@/components/learning/ui";
+import { TableListPager, CardBatchPager, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 import {
-  FileViewModeToggle,
-  FileListSortButton,
-  FileListRefreshButton,
+  FileListToolbarActions,
   KnowledgeFileCardGrid,
   KnowledgeFileTable,
   type FileViewMode,
 } from "./KnowledgeFileTable";
+import { DirectoryForm } from "./DirectoryForm";
 import { KnowledgeAggregateDetailHeader } from "./KnowledgeAggregateDetailHeader";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
 import { KnowledgeCategoryTree } from "./KnowledgeCategoryTree";
@@ -60,11 +70,43 @@ import { KnowledgeOverviewTitleBanner } from "./KnowledgeOverviewTitleBanner";
 import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 import { KnowledgeTreeSectionActions } from "./KnowledgeTreeSectionActions";
 import { PersonalDirectoryTree } from "./PersonalDirectoryTree";
+import { CreateKnowledgeBaseDialog } from "./admin/CreateKnowledgeBaseDialog";
+import { FileListToolbar } from "./FileListToolbar";
+import { FileBatchDeleteDialog } from "./FileBatchDeleteDialog";
+import { FileMoveDialog } from "./FileMoveDialog";
+import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
+import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDialog";
+import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
+import { useFileSelection } from "./useFileSelection";
+import { useFileViewMode } from "./useFileViewMode";
 
 const CARD_PAGE_SIZE = 8;
+const HIGHLIGHT_MS = 2400;
+
+type DirectoryFormState = {
+  open: boolean;
+  defaultParentId?: string;
+};
+
+type KnowledgeBaseFormState = {
+  open: boolean;
+  defaultCategoryId?: string;
+};
+
+function useKnowledgeStoreVersion() {
+  const [version, setVersion] = useState(getKnowledgeStoreVersion);
+  useEffect(() => subscribeKnowledgeStore(() => setVersion(getKnowledgeStoreVersion())), []);
+  return version;
+}
+
+function collectExpandIds(categoryId?: string) {
+  if (!categoryId) return [] as string[];
+  return getCategoryChain(categoryId).map((item) => item.id);
+}
 
 export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: string }) {
   const navigate = useNavigate();
+  const storeVersion = useKnowledgeStoreVersion();
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedIds());
   const [selectedBaseId, setSelectedBaseId] = useState(() => {
     if (initialBaseId) return initialBaseId;
@@ -74,14 +116,31 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     return getDefaultOverviewBaseId();
   });
   const [query, setQuery] = useState("");
-  const [professionalType, setProfessionalType] = useState("all");
-  const [tag, setTag] = useState("all");
+  const [searchMode, setSearchMode] = useState<FileSearchMode>("fulltext");
+  const [metadataFilters, setMetadataFilters] = useState<Record<string, string>>({});
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>("updated");
-  const [viewMode, setViewMode] = useState<FileViewMode>("list");
+  const fileSelection = useFileSelection();
+  const [viewMode, setViewMode] = useFileViewMode();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
   const [refreshSeed, setRefreshSeed] = useState(0);
   const [permissionBase, setPermissionBase] = useState<KnowledgeBase | null>(null);
+  const [directoryForm, setDirectoryForm] = useState<DirectoryFormState>({ open: false });
+  const [knowledgeBaseForm, setKnowledgeBaseForm] = useState<KnowledgeBaseFormState>({
+    open: false,
+  });
+  const [forceExpandIds, setForceExpandIds] = useState<string[]>([]);
+  const [highlightedCategoryId, setHighlightedCategoryId] = useState<string>();
+  const [highlightedBaseId, setHighlightedBaseId] = useState<string>();
+  const [batchLoading, setBatchLoading] = useState<
+    "download" | "disable" | "delete" | "move" | null
+  >(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [moveFiles, setMoveFiles] = useState<KnowledgeFile[]>([]);
+  const [moveLoading, setMoveLoading] = useState(false);
+  const [historyFile, setHistoryFile] = useState<KnowledgeFile | null>(null);
+  const [directoryMoveTarget, setDirectoryMoveTarget] = useState<DirectoryMoveTarget | null>(null);
+  const [directoryMoveLoading, setDirectoryMoveLoading] = useState(false);
 
   useEffect(() => {
     if (initialBaseId) setSelectedBaseId(initialBaseId);
@@ -93,10 +152,21 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     }
   }, [selectedBaseId]);
 
+  useEffect(() => {
+    if (!highlightedCategoryId && !highlightedBaseId) return;
+    const timer = window.setTimeout(() => {
+      setHighlightedCategoryId(undefined);
+      setHighlightedBaseId(undefined);
+    }, HIGHLIGHT_MS);
+    return () => window.clearTimeout(timer);
+  }, [highlightedCategoryId, highlightedBaseId, storeVersion]);
+
   const pinnedBases = useMemo(
-    () => KNOWLEDGE_BASES.filter((b) => isPinnedId(pinnedIds, b.id) && b.status === "enabled"),
-    [pinnedIds],
+    () => getStoreBases().filter((b) => isPinnedId(pinnedIds, b.id) && b.status === "enabled"),
+    [pinnedIds, storeVersion],
   );
+
+  const pinnedFiles = useMemo(() => getPinnedFiles(), [storeVersion]);
 
   const isPersonalAll = selectedBaseId === PERSONAL_TREE_ALL_ID;
   const isProfessionalAll = selectedBaseId === PROFESSIONAL_TREE_ALL_ID;
@@ -110,26 +180,38 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     if (isProfessionalAll) return getFilesForProfessionalTree();
     if (selectedBase) return getFilesForBase(selectedBase.id);
     return [];
-  }, [isPersonalAll, isProfessionalAll, selectedBase]);
+  }, [isPersonalAll, isProfessionalAll, selectedBase, storeVersion]);
 
   const selectedFiles = useMemo(() => {
     if (isAggregate) {
-      return sortKnowledgeFiles(filterFiles(allCurrentBaseFiles, { query }), sortBy);
+      return sortKnowledgeFiles(
+        filterFiles(allCurrentBaseFiles, { query, searchMode }),
+        sortBy,
+      );
     }
     if (!selectedBase || !canViewBaseFiles(selectedBase)) return [];
     return sortKnowledgeFiles(
       filterFiles(allCurrentBaseFiles, {
         query,
-        professionalType: professionalType === "all" ? undefined : professionalType,
-        tag: tag === "all" ? undefined : tag,
+        searchMode,
+        metadataFilters,
       }),
       sortBy,
     );
-  }, [allCurrentBaseFiles, isAggregate, professionalType, query, selectedBase, sortBy, tag]);
+  }, [allCurrentBaseFiles, isAggregate, metadataFilters, query, searchMode, selectedBase, sortBy]);
 
   useEffect(() => {
     setPage(1);
-  }, [selectedBaseId, query, professionalType, tag, sortBy, viewMode]);
+  }, [selectedBaseId, query, searchMode, metadataFilters, sortBy, viewMode]);
+
+  useEffect(() => {
+    setMetadataFilters({});
+    fileSelection.clear();
+  }, [selectedBaseId]);
+
+  useEffect(() => {
+    fileSelection.clear();
+  }, [query, searchMode, metadataFilters]);
 
   const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
   const totalPages = Math.max(1, Math.ceil(selectedFiles.length / effectivePageSize) || 1);
@@ -139,10 +221,113 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     return selectedFiles.slice(start, start + effectivePageSize);
   }, [effectivePageSize, safePage, selectedFiles]);
 
-  const professionalTypes = Array.from(
-    new Set(allCurrentBaseFiles.map((file) => file.professionalType).filter(Boolean)),
-  ) as string[];
-  const tags = Array.from(new Set(allCurrentBaseFiles.flatMap((file) => file.tags ?? [])));
+  const showManageColumn = selectedBase ? canManageFileList(selectedBase) : canManageFileList();
+  const metadataFields = selectedBase ? getMetadataFieldsForBase(selectedBase.id) : [];
+  const pageFileIds = pagedFiles.map((file) => file.id);
+  const listSelection = {
+    isSelected: fileSelection.isSelected,
+    onToggle: fileSelection.toggle,
+    onToggleAll: fileSelection.toggleAll,
+    pageIds: pageFileIds,
+  };
+  const cardSelection = {
+    isSelected: fileSelection.isSelected,
+    onToggle: fileSelection.toggle,
+  };
+
+  const handleToggleEnabled = (file: KnowledgeFile, enabled: boolean) => {
+    updateStoreFile(file.id, { enabled });
+    toast.message(enabled ? "文件已启用" : "文件已停用");
+  };
+
+  const handleToggleFilePin = (file: KnowledgeFile) => {
+    const nextPinned = !file.pinned;
+    updateStoreFile(file.id, { pinned: nextPinned });
+    toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
+  };
+
+  const handleConfirmMove = (files: KnowledgeFile[], targetBaseId: string) => {
+    const targetBase = getBaseById(targetBaseId);
+    setMoveLoading(true);
+    for (const file of files) {
+      updateStoreFile(file.id, {
+        knowledgeBaseId: targetBaseId,
+        knowledgeBaseName: targetBase?.name,
+      });
+    }
+    window.setTimeout(() => {
+      const label = files.length > 1 ? `${files.length} 个文件` : `「${files[0]?.name}」`;
+      toast.success(`已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`);
+      setMoveLoading(false);
+      setMoveFiles([]);
+      fileSelection.clear();
+    }, 300);
+  };
+
+  const handleBatchMove = () => {
+    const ids = [...fileSelection.selectedArray];
+    const files = ids
+      .map((id) => selectedFiles.find((file) => file.id === id))
+      .filter((file): file is KnowledgeFile => Boolean(file));
+    setMoveFiles(files);
+  };
+
+  const fileRowActions = {
+    ...(showManageColumn
+      ? { onMove: (file: KnowledgeFile) => setMoveFiles([file]) }
+      : {}),
+    onTogglePin: handleToggleFilePin,
+    onViewHistory: (file: KnowledgeFile) => setHistoryFile(file),
+  };
+
+  const handleBatchDownload = () => {
+    setBatchLoading("download");
+    window.setTimeout(() => {
+      toast.message(`开始下载 ${fileSelection.selectedCount} 个文件`);
+      setBatchLoading(null);
+    }, 400);
+  };
+
+  const handleBatchDisable = () => {
+    setBatchLoading("disable");
+    for (const id of fileSelection.selectedArray) {
+      updateStoreFile(id, { enabled: false });
+    }
+    window.setTimeout(() => {
+      toast.success(`已停用 ${fileSelection.selectedCount} 个文件`);
+      fileSelection.clear();
+      setBatchLoading(null);
+    }, 300);
+  };
+
+  const handleConfirmBatchDelete = () => {
+    const count = fileSelection.selectedCount;
+    const ids = [...fileSelection.selectedArray];
+    setBatchLoading("delete");
+    removeStoreFiles(ids);
+    window.setTimeout(() => {
+      toast.success(`已删除 ${count} 个文件`);
+      fileSelection.clear();
+      setBatchLoading(null);
+      setDeleteDialogOpen(false);
+    }, 300);
+  };
+
+  const batchToolbarProps = (pageIds: string[], totalCount: number) => ({
+    selectedCount: fileSelection.selectedCount,
+    totalCount,
+    pageFileCount: pageIds.length,
+    isAllResultsSelected: fileSelection.isAllResultsSelected,
+    onSelectAllResults: () => fileSelection.selectAllResults(selectedFiles.map((file) => file.id)),
+    onBatchDownload: handleBatchDownload,
+    onBatchMove: showManageColumn ? handleBatchMove : undefined,
+    onBatchDisable: showManageColumn ? handleBatchDisable : undefined,
+    onBatchDelete: () => setDeleteDialogOpen(true),
+    onClearSelection: fileSelection.clear,
+    showBatchMove: showManageColumn,
+    showBatchDisable: showManageColumn,
+    batchLoading,
+  });
 
   const handleTogglePin = (baseId: string) => {
     setPinnedIds((prev) => {
@@ -160,6 +345,32 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     } else {
       navigate({ to: "/knowledge/kb/$kbId", params: { kbId: id }, replace: true });
     }
+  };
+
+  const openDirectoryForm = (defaultParentId?: string) => {
+    setDirectoryForm({ open: true, defaultParentId });
+  };
+
+  const openKnowledgeBaseForm = (defaultCategoryId?: string) => {
+    setKnowledgeBaseForm({ open: true, defaultCategoryId });
+  };
+
+  const handleDirectorySuccess = (directory: KnowledgeCategory) => {
+    if (directory.parentId) {
+      setForceExpandIds(collectExpandIds(directory.parentId));
+    }
+    setHighlightedCategoryId(directory.id);
+  };
+
+  const handleKnowledgeBaseCreated = (base: KnowledgeBase) => {
+    addStoreBase(base);
+    toast.success("知识库已创建");
+    if (base.categoryId) {
+      setForceExpandIds(collectExpandIds(base.categoryId));
+    }
+    setHighlightedBaseId(base.id);
+    handleSelectTreeId(base.id);
+    setKnowledgeBaseForm({ open: false });
   };
 
   const handleOpenFile = (file: KnowledgeFile) => {
@@ -183,7 +394,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const emptyFiles = (
     <KbEmptyState
       title="当前筛选下暂无文件"
-      description="调整关键词、标签或专业类型后再试。"
+      description="调整搜索关键词或元数据筛选后再试。"
     />
   );
 
@@ -199,58 +410,48 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
           </>
         }
       >
-        <KbSidebarSection title="快速访问">
-          {pinnedBases.length === 0 ? (
-            <p className="px-2.5 py-1 text-[11px] text-kb-muted">悬浮知识库可置顶</p>
-          ) : (
-            pinnedBases.map((base) =>
-              base.scope === "personal" ? (
-                <button
-                  key={base.id}
-                  type="button"
-                  onClick={() => navigate({ to: "/knowledge/mine", hash: "personal" })}
-                  className="flex h-8 w-full items-center gap-2 rounded-[8px] px-2.5 text-left text-[12.5px] text-kb-body hover:bg-[#F4FAFB]"
-                >
-                  <Star className="h-3.5 w-3.5 text-primary fill-primary-soft stroke-[1.8]" />
-                  <span className="min-w-0 flex-1 truncate">{base.name}</span>
-                </button>
-              ) : (
-                <button
-                  key={base.id}
-                  type="button"
-                  onClick={() => handleSelectTreeId(base.id)}
-                  className={cn(
-                    "flex h-8 w-full items-center gap-2 rounded-[8px] px-2.5 text-left text-[12.5px] transition-colors",
-                    selectedBaseId === base.id
-                      ? "bg-primary-soft font-medium text-accent-foreground"
-                      : "text-kb-body hover:bg-[#F4FAFB]",
-                  )}
-                >
-                  <Star className="h-3.5 w-3.5 text-primary fill-primary-soft stroke-[1.8]" />
-                  <span className="min-w-0 flex-1 truncate">{base.name}</span>
-                </button>
-              ),
-            )
-          )}
-        </KbSidebarSection>
+        <PinnedQuickAccessSection
+          pinnedBases={pinnedBases}
+          pinnedFiles={pinnedFiles}
+          selectedBaseId={selectedBaseId}
+          onSelectBase={(baseId) => {
+            const base = getBaseById(baseId);
+            if (base?.scope === "personal") {
+              navigate({ to: "/knowledge/mine", hash: "personal" });
+              return;
+            }
+            handleSelectTreeId(baseId);
+          }}
+          onOpenFile={handleOpenFile}
+          onUnpinBase={handleTogglePin}
+          onUnpinFile={(file) => handleToggleFilePin(file)}
+        />
 
         <KbSidebarSection
           title="专业知识库"
           action={
             <KnowledgeTreeSectionActions
-              directoryLabel="新建分类目录"
-              knowledgeBaseLabel="新建专业知识库"
-              onAddDirectory={() => toast.success("已预留新建分类目录入口")}
-              onAddKnowledgeBase={() => toast.success("已预留新建专业知识库入口")}
+              directoryLabel="新建目录"
+              knowledgeBaseLabel="新增知识库"
+              onAddDirectory={() => openDirectoryForm()}
+              onAddKnowledgeBase={() => openKnowledgeBaseForm()}
             />
           }
         >
           <KnowledgeCategoryTree
             selectedBaseId={selectedBaseId}
             pinnedIds={pinnedIds}
+            forceExpandIds={forceExpandIds}
+            highlightedCategoryId={highlightedCategoryId}
+            highlightedBaseId={highlightedBaseId}
             onSelectBase={(base) => handleSelectTreeId(base.id)}
             onSelectAll={() => handleSelectTreeId(PROFESSIONAL_TREE_ALL_ID)}
             onTogglePin={handleTogglePin}
+            onCreateDirectory={(category) => openDirectoryForm(category.id)}
+            onCreateKnowledgeBase={(category) => openKnowledgeBaseForm(category.id)}
+            onMoveDirectory={(category) =>
+              setDirectoryMoveTarget({ kind: "category", item: category })
+            }
           />
         </KbSidebarSection>
 
@@ -268,7 +469,16 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
         >
           <PersonalDirectoryTree
             selectedBaseId={selectedBaseId}
+            pinnedIds={pinnedIds}
+            highlightedBaseId={highlightedBaseId}
             onSelectBase={handleSelectTreeId}
+            onTogglePin={handleTogglePin}
+            onCreateDirectory={(directory) =>
+              toast.success(`已预留：在「${directory.name}」下新建个人目录`)
+            }
+            onCreateKnowledgeBase={(directory) =>
+              toast.success(`已预留：在「${directory.name}」下新建个人知识库`)
+            }
           />
         </KbSidebarSection>
       </KbSidebar>
@@ -291,19 +501,27 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             }
             files={selectedFiles}
             query={query}
+            searchMode={searchMode}
             sortBy={sortBy}
             viewMode={viewMode}
             page={page}
             pageSize={pageSize}
             refreshSeed={refreshSeed}
+            showManageColumn={canManageFileList()}
             onNavigateRoot={() => handleSelectTreeId(getDefaultOverviewBaseId())}
             onQueryChange={setQuery}
+            onSearchModeChange={setSearchMode}
             onSortChange={setSortBy}
             onViewModeChange={setViewMode}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onRefresh={handleRefresh}
             onOpen={handleOpenFile}
+            onToggleEnabled={handleToggleEnabled}
+            selection={listSelection}
+            cardSelection={cardSelection}
+            batchToolbarProps={batchToolbarProps}
+            fileRowActions={fileRowActions}
           />
         ) : !selectedBase ? (
           <div className="flex flex-1 items-center justify-center p-8">
@@ -329,50 +547,39 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
               disabled={!canUploadToBase(selectedBase)}
               className="flex min-h-0 flex-1 flex-col"
             >
-              <div className="border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
-                <KbFilterBar
-                  className="mb-0"
-                  searchValue={query}
-                  onSearchChange={setQuery}
-                  searchPlaceholder="搜索本库文件"
-                  searchClassName="max-w-[280px] !rounded-[8px]"
-                  filters={
-                    <>
-                      <KbFilterCombo
-                        value={professionalType}
-                        onChange={setProfessionalType}
-                        placeholder="全部专业"
-                        options={[
-                          { value: "all", label: "全部专业" },
-                          ...professionalTypes.map((item) => ({ value: item, label: item })),
-                        ]}
-                      />
-                      <KbFilterCombo
-                        value={tag}
-                        onChange={setTag}
-                        placeholder="全部标签"
-                        options={[
-                          { value: "all", label: "全部标签" },
-                          ...tags.map((item) => ({ value: item, label: item })),
-                        ]}
-                      />
-                    </>
-                  }
-                  trailing={
-                    <>
-                      {canUploadToBase(selectedBase) && (
-                        <ActionButton variant="primary" size="sm" onClick={() => toast.message("打开上传面板")}>
-                          <Upload className="h-3.5 w-3.5 stroke-[1.8]" />
-                          上传
-                        </ActionButton>
-                      )}
-                      <FileViewModeToggle value={viewMode} onChange={setViewMode} />
-                      <FileListSortButton value={sortBy} onChange={setSortBy} />
-                      <FileListRefreshButton onClick={handleRefresh} />
-                    </>
-                  }
-                />
-              </div>
+              <FileListToolbar
+                {...batchToolbarProps(pageFileIds, selectedFiles.length)}
+                left={
+                  <>
+                    <KbFileSearchInput
+                      value={query}
+                      onChange={setQuery}
+                      mode={searchMode}
+                      onModeChange={setSearchMode}
+                    />
+                    <KbMetadataFilter
+                      fields={metadataFields}
+                      files={allCurrentBaseFiles}
+                      value={metadataFilters}
+                      onChange={setMetadataFilters}
+                    />
+                  </>
+                }
+                right={
+                  <FileListToolbarActions
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    sortBy={sortBy}
+                    onSortChange={setSortBy}
+                    onRefresh={handleRefresh}
+                    onUpload={
+                      canUploadToBase(selectedBase)
+                        ? () => toast.message("打开上传面板")
+                        : undefined
+                    }
+                  />
+                }
+              />
 
               <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
                 {viewMode === "list" ? (
@@ -380,14 +587,20 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                     files={pagedFiles}
                     showLibrary={false}
                     overviewMode
+                    showManageColumn={showManageColumn}
+                    selection={listSelection}
+                    onToggleEnabled={handleToggleEnabled}
                     onOpen={handleOpenFile}
                     empty={emptyFiles}
+                    {...fileRowActions}
                   />
                 ) : (
                   <KnowledgeFileCardGrid
                     files={pagedFiles}
+                    selection={cardSelection}
                     onOpen={handleOpenFile}
                     empty={emptyFiles}
+                    {...fileRowActions}
                   />
                 )}
               </div>
@@ -426,6 +639,56 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
       {permissionBase && (
         <PermissionApplyModal base={permissionBase} onClose={() => setPermissionBase(null)} />
       )}
+
+      <DirectoryForm
+        open={directoryForm.open}
+        defaultParentId={directoryForm.defaultParentId}
+        onClose={() => setDirectoryForm({ open: false })}
+        onSuccess={handleDirectorySuccess}
+      />
+
+      {knowledgeBaseForm.open && (
+        <CreateKnowledgeBaseDialog
+          open={knowledgeBaseForm.open}
+          defaultCategoryId={knowledgeBaseForm.defaultCategoryId}
+          onClose={() => setKnowledgeBaseForm({ open: false })}
+          onSubmit={handleKnowledgeBaseCreated}
+        />
+      )}
+
+      <FileBatchDeleteDialog
+        open={deleteDialogOpen}
+        count={fileSelection.selectedCount}
+        loading={batchLoading === "delete"}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleConfirmBatchDelete}
+      />
+
+      <FileMoveDialog
+        files={moveFiles}
+        currentBaseId={selectedBase?.id}
+        loading={moveLoading}
+        onClose={() => setMoveFiles([])}
+        onConfirm={handleConfirmMove}
+      />
+
+      <FileVersionHistoryDialog
+        file={historyFile}
+        onClose={() => setHistoryFile(null)}
+      />
+      <DirectoryMoveDialog
+        target={directoryMoveTarget}
+        loading={directoryMoveLoading}
+        onClose={() => setDirectoryMoveTarget(null)}
+        onConfirm={() => {
+          setDirectoryMoveLoading(true);
+          window.setTimeout(() => {
+            toast.success(`目录「${directoryMoveTarget?.item.name}」已移动`);
+            setDirectoryMoveLoading(false);
+            setDirectoryMoveTarget(null);
+          }, 300);
+        }}
+      />
     </>
   );
 }
@@ -435,37 +698,65 @@ function TreeAggregatePanel({
   description,
   files,
   query,
+  searchMode,
   sortBy,
   viewMode,
   page,
   pageSize,
   refreshSeed,
+  showManageColumn,
   onNavigateRoot,
   onQueryChange,
+  onSearchModeChange,
   onSortChange,
   onViewModeChange,
   onPageChange,
   onPageSizeChange,
   onRefresh,
   onOpen,
+  onToggleEnabled,
+  selection,
+  cardSelection,
+  batchToolbarProps,
+  fileRowActions,
 }: {
   scopeLabel: string;
   description: string;
   files: KnowledgeFile[];
   query: string;
+  searchMode: FileSearchMode;
   sortBy: KnowledgeSortBy;
   viewMode: FileViewMode;
   page: number;
   pageSize: number;
   refreshSeed: number;
+  showManageColumn: boolean;
   onNavigateRoot?: () => void;
   onQueryChange: (value: string) => void;
+  onSearchModeChange: (mode: FileSearchMode) => void;
   onSortChange: (value: KnowledgeSortBy) => void;
   onViewModeChange: (mode: FileViewMode) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   onRefresh: () => void;
   onOpen: (file: KnowledgeFile) => void;
+  onToggleEnabled: (file: KnowledgeFile, enabled: boolean) => void;
+  selection: {
+    isSelected: (id: string) => boolean;
+    onToggle: (id: string) => void;
+    onToggleAll: (ids: string[], checked: boolean) => void;
+    pageIds: string[];
+  };
+  cardSelection: {
+    isSelected: (id: string) => boolean;
+    onToggle: (id: string) => void;
+  };
+  batchToolbarProps: (pageIds: string[], totalCount: number) => ComponentProps<typeof FileListToolbar>;
+  fileRowActions: {
+    onMove?: (file: KnowledgeFile) => void;
+    onTogglePin: (file: KnowledgeFile) => void;
+    onViewHistory: (file: KnowledgeFile) => void;
+  };
 }) {
   const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
   const totalPages = Math.max(1, Math.ceil(files.length / effectivePageSize) || 1);
@@ -474,11 +765,12 @@ function TreeAggregatePanel({
     const start = (safePage - 1) * effectivePageSize;
     return files.slice(start, start + effectivePageSize);
   }, [effectivePageSize, files, safePage]);
+  const aggregatePageIds = pagedFiles.map((file) => file.id);
 
   const empty = (
     <KbEmptyState
       title="当前筛选下暂无文件"
-      description="调整关键词后再试。"
+      description="调整搜索关键词后再试。"
     />
   );
 
@@ -491,22 +783,26 @@ function TreeAggregatePanel({
         onNavigateRoot={onNavigateRoot}
       />
 
-      <div className="border-b border-divider bg-[#FAFCFD] px-4 py-2.5">
-        <KbFilterBar
-          className="mb-0"
-          searchValue={query}
-          onSearchChange={onQueryChange}
-          searchPlaceholder="搜索文件"
-          searchClassName="max-w-[280px] !rounded-[8px]"
-          trailing={
-            <>
-              <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />
-              <FileListSortButton value={sortBy} onChange={onSortChange} />
-              <FileListRefreshButton onClick={onRefresh} />
-            </>
-          }
-        />
-      </div>
+      <FileListToolbar
+        {...batchToolbarProps(aggregatePageIds, files.length)}
+        left={
+          <KbFileSearchInput
+            value={query}
+            onChange={onQueryChange}
+            mode={searchMode}
+            onModeChange={onSearchModeChange}
+          />
+        }
+        right={
+          <FileListToolbarActions
+            viewMode={viewMode}
+            onViewModeChange={onViewModeChange}
+            sortBy={sortBy}
+            onSortChange={onSortChange}
+            onRefresh={onRefresh}
+          />
+        }
+      />
 
       <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
         {viewMode === "list" ? (
@@ -514,11 +810,21 @@ function TreeAggregatePanel({
             files={pagedFiles}
             showLibrary
             overviewMode
+            showManageColumn={showManageColumn}
+            selection={selection}
+            onToggleEnabled={onToggleEnabled}
             onOpen={onOpen}
             empty={empty}
+            {...fileRowActions}
           />
         ) : (
-          <KnowledgeFileCardGrid files={pagedFiles} onOpen={onOpen} empty={empty} />
+          <KnowledgeFileCardGrid
+            files={pagedFiles}
+            selection={cardSelection}
+            onOpen={onOpen}
+            empty={empty}
+            {...fileRowActions}
+          />
         )}
       </div>
 

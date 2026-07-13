@@ -24,6 +24,32 @@ export function publishStatusTone(status: FilePublishStatus): KnowledgeStatusTon
   return "neutral";
 }
 
+/**
+ * 「审批状态」列专用：只表达审批维度，避免与「解析状态」列串值。
+ * 解析中 / 解析失败 属于解析维度，其审批结论都是「已通过」。
+ */
+export function approvalStatusLabel(status: FilePublishStatus) {
+  const labels: Record<FilePublishStatus, string> = {
+    pendingApproval: "待审批",
+    rejected: "已驳回",
+    parsing: "已通过",
+    parseFailed: "已通过",
+    published: "已发布",
+    archived: "已归档",
+    disabled: "已停用",
+  };
+  return labels[status];
+}
+
+export function approvalStatusTone(status: FilePublishStatus): KnowledgeStatusTone {
+  if (status === "pendingApproval") return "warning";
+  if (status === "rejected") return "danger";
+  if (status === "published") return "success";
+  if (status === "parsing" || status === "parseFailed") return "accent";
+  if (status === "disabled") return "danger";
+  return "neutral";
+}
+
 export function parseStatusLabel(status?: KnowledgeParseStatus) {
   if (!status) return "待解析";
   const labels: Record<KnowledgeParseStatus, string> = {
@@ -36,6 +62,32 @@ export function parseStatusLabel(status?: KnowledgeParseStatus) {
 }
 
 export function parseStatusTone(status?: KnowledgeParseStatus): KnowledgeStatusTone {
+  if (status === "success") return "success";
+  if (status === "failed") return "danger";
+  return "warning";
+}
+
+/** 文件列表「解析状态」列：仅展示未解析 / 解析失败 / 解析成功 */
+export type FileListParseStatus = "unparsed" | "failed" | "success";
+
+export function fileListParseStatus(file: {
+  parseStatus?: KnowledgeParseStatus;
+}): FileListParseStatus {
+  if (file.parseStatus === "success") return "success";
+  if (file.parseStatus === "failed") return "failed";
+  return "unparsed";
+}
+
+export function fileListParseStatusLabel(status: FileListParseStatus) {
+  const labels: Record<FileListParseStatus, string> = {
+    unparsed: "未解析",
+    failed: "解析失败",
+    success: "解析成功",
+  };
+  return labels[status];
+}
+
+export function fileListParseStatusTone(status: FileListParseStatus): KnowledgeStatusTone {
   if (status === "success") return "success";
   if (status === "failed") return "danger";
   return "warning";

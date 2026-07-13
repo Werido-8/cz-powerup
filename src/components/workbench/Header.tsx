@@ -19,6 +19,7 @@ const MENU: MenuItem[] = [
       { label: "知识总览", to: "/knowledge" },
       // { label: "全库资料", to: "/knowledge/all" },
       { label: "我的空间", to: "/knowledge/mine" },
+      { label: "我的上传", to: "/knowledge/uploads" },
       { label: "知识管理", to: "/knowledge/admin" },
     ],
   },

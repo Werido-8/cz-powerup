@@ -32,6 +32,7 @@ import { Route as TrainingGrowthRouteImport } from './routes/training.growth'
 import { Route as TrainingExamRouteImport } from './routes/training.exam'
 import { Route as ScenarioPeakRouteImport } from './routes/scenario.peak'
 import { Route as ScenarioFaultRouteImport } from './routes/scenario.fault'
+import { Route as KnowledgeUploadsRouteImport } from './routes/knowledge.uploads'
 import { Route as KnowledgeMineRouteImport } from './routes/knowledge.mine'
 import { Route as KnowledgeAllRouteImport } from './routes/knowledge.all'
 import { Route as KnowledgeAdminRouteImport } from './routes/knowledge.admin'
@@ -175,6 +176,11 @@ const ScenarioFaultRoute = ScenarioFaultRouteImport.update({
   id: '/scenario/fault',
   path: '/scenario/fault',
   getParentRoute: () => rootRouteImport,
+} as any)
+const KnowledgeUploadsRoute = KnowledgeUploadsRouteImport.update({
+  id: '/uploads',
+  path: '/uploads',
+  getParentRoute: () => KnowledgeRoute,
 } as any)
 const KnowledgeMineRoute = KnowledgeMineRouteImport.update({
   id: '/mine',
@@ -338,6 +344,7 @@ export interface FileRoutesByFullPath {
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
+  '/knowledge/uploads': typeof KnowledgeUploadsRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/exam': typeof TrainingExamRoute
@@ -388,6 +395,7 @@ export interface FileRoutesByTo {
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
+  '/knowledge/uploads': typeof KnowledgeUploadsRoute
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
@@ -441,6 +449,7 @@ export interface FileRoutesById {
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
+  '/knowledge/uploads': typeof KnowledgeUploadsRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/exam': typeof TrainingExamRoute
@@ -496,6 +505,7 @@ export interface FileRouteTypes {
     | '/knowledge/admin'
     | '/knowledge/all'
     | '/knowledge/mine'
+    | '/knowledge/uploads'
     | '/scenario/fault'
     | '/scenario/peak'
     | '/training/exam'
@@ -546,6 +556,7 @@ export interface FileRouteTypes {
     | '/knowledge/admin'
     | '/knowledge/all'
     | '/knowledge/mine'
+    | '/knowledge/uploads'
     | '/scenario/peak'
     | '/training/exam'
     | '/training/growth'
@@ -598,6 +609,7 @@ export interface FileRouteTypes {
     | '/knowledge/admin'
     | '/knowledge/all'
     | '/knowledge/mine'
+    | '/knowledge/uploads'
     | '/scenario/fault'
     | '/scenario/peak'
     | '/training/exam'
@@ -830,6 +842,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/scenario/fault'
       preLoaderRoute: typeof ScenarioFaultRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/knowledge/uploads': {
+      id: '/knowledge/uploads'
+      path: '/uploads'
+      fullPath: '/knowledge/uploads'
+      preLoaderRoute: typeof KnowledgeUploadsRouteImport
+      parentRoute: typeof KnowledgeRoute
     }
     '/knowledge/mine': {
       id: '/knowledge/mine'
@@ -1080,6 +1099,7 @@ interface KnowledgeRouteChildren {
   KnowledgeAdminRoute: typeof KnowledgeAdminRoute
   KnowledgeAllRoute: typeof KnowledgeAllRoute
   KnowledgeMineRoute: typeof KnowledgeMineRoute
+  KnowledgeUploadsRoute: typeof KnowledgeUploadsRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
   KnowledgeDeptDeptIdRoute: typeof KnowledgeDeptDeptIdRoute
   KnowledgeFileFileIdRoute: typeof KnowledgeFileFileIdRoute
@@ -1093,6 +1113,7 @@ const KnowledgeRouteChildren: KnowledgeRouteChildren = {
   KnowledgeAdminRoute: KnowledgeAdminRoute,
   KnowledgeAllRoute: KnowledgeAllRoute,
   KnowledgeMineRoute: KnowledgeMineRoute,
+  KnowledgeUploadsRoute: KnowledgeUploadsRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
   KnowledgeDeptDeptIdRoute: KnowledgeDeptDeptIdRoute,
   KnowledgeFileFileIdRoute: KnowledgeFileFileIdRoute,
