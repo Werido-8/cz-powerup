@@ -297,7 +297,7 @@ function UploadApprovalTable({
                 <KbIconTextButton
                   icon={Check}
                   label="通过"
-                  variant="primary-light"
+                  variant="primary-text"
                   onClick={() => {
                     onRemove(item.id);
                     toast.success("已通过，文件进入解析");
@@ -425,7 +425,7 @@ function PermissionApprovalTable({
               <KbIconTextButton
                 icon={Check}
                 label="通过"
-                variant="primary-light"
+                variant="primary-text"
                 onClick={() => {
                   onRemove(item.id);
                   toast.success("权限申请已通过");

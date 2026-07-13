@@ -14,7 +14,7 @@ import type {
 export const CURRENT_KNOWLEDGE_USER: KnowledgeUser = {
   id: "u-run-admin",
   name: "张工",
-  role: "departmentAdmin",
+  role: "knowledgeAdmin",
 };
 
 export const KNOWLEDGE_CATEGORIES: KnowledgeCategory[] = [

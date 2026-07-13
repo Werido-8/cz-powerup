@@ -98,7 +98,7 @@ export function KbIconTextButton({
 }: {
   icon: LucideIcon;
   label: string;
-  variant?: "ghost" | "primary-light" | "danger-text";
+  variant?: "ghost" | "primary-light" | "danger-text" | "primary-text";
   onClick?: () => void;
   disabled?: boolean;
   className?: string;
@@ -107,6 +107,7 @@ export function KbIconTextButton({
     ghost: "text-kb-muted hover:bg-kb-surface-hover hover:text-primary",
     "primary-light":
       "border border-primary/20 bg-primary-soft text-accent-foreground hover:bg-primary-soft/80",
+    "primary-text": "text-primary hover:text-primary/80",
     "danger-text": "text-destructive hover:bg-danger-soft",
   };
   return (

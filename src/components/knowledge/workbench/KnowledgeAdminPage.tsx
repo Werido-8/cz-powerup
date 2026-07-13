@@ -59,7 +59,9 @@ const SECTION_META: Record<
 };
 
 export function KnowledgeAdminPage() {
-  const [section, setSection] = useState<AdminSection>("bases");
+  const [section, setSection] = useState<AdminSection>(() =>
+    canSeeCategoryManager() ? "categories" : "bases",
+  );
   const [bases, setBases] = useState(() => getManageableBases());
   const [formBase, setFormBase] = useState<KnowledgeBase | "new" | null>(null);
   const [permissionBase, setPermissionBase] = useState<KnowledgeBase | null>(null);
@@ -153,11 +155,6 @@ export function KnowledgeAdminPage() {
                   <KbButton onClick={() => setFormBase("new")}>
                     <Plus className="h-4 w-4 stroke-[1.8]" />
                     新建知识库
-                  </KbButton>
-                ) : visibleSection === "categories" ? (
-                  <KbButton onClick={() => toast.success("已预留新建根分类入口")}>
-                    <Plus className="h-4 w-4 stroke-[1.8]" />
-                    新建根分类
                   </KbButton>
                 ) : null}
               </div>

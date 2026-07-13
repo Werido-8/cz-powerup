@@ -59,6 +59,16 @@ export function addStoreCategory(category: KnowledgeCategory) {
   return category;
 }
 
+export function updateStoreCategory(id: string, patch: Partial<KnowledgeCategory>) {
+  categories = categories.map((item) => (item.id === id ? { ...item, ...patch } : item));
+  emit();
+}
+
+export function removeStoreCategory(id: string) {
+  categories = categories.filter((item) => item.id !== id);
+  emit();
+}
+
 export function addStoreBase(base: KnowledgeBase) {
   bases = [base, ...bases];
   emit();

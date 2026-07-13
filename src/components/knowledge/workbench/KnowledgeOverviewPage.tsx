@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
   ShieldCheck,
 } from "lucide-react";
@@ -106,6 +106,7 @@ function collectExpandIds(categoryId?: string) {
 
 export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: string }) {
   const navigate = useNavigate();
+  const router = useRouter();
   const storeVersion = useKnowledgeStoreVersion();
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedIds());
   const [selectedBaseId, setSelectedBaseId] = useState(() => {
@@ -381,6 +382,16 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     });
   };
 
+  // 仅用于「知识总览 · 全部」汇总列表：在新浏览器 tab 中打开文件详情
+  const handleOpenFileNewTab = (file: KnowledgeFile) => {
+    const href = router.buildLocation({
+      to: "/knowledge/file/$fileId",
+      params: { fileId: file.id },
+      search: { kbId: file.knowledgeBaseId },
+    }).href;
+    window.open(href, "_blank", "noopener,noreferrer");
+  };
+
   const handleUploadFiles = (files: FileList) => {
     toast.success(`已选择 ${files.length} 个文件，上传面板即将打开`);
   };
@@ -516,7 +527,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onRefresh={handleRefresh}
-            onOpen={handleOpenFile}
+            onOpen={handleOpenFileNewTab}
             onToggleEnabled={handleToggleEnabled}
             selection={listSelection}
             cardSelection={cardSelection}

@@ -29,7 +29,7 @@ import { useFileSelection } from "../useFileSelection";
 import { KnowledgeBaseListToolbar } from "./KnowledgeBaseListToolbar";
 
 const GRID =
-  "grid-cols-[36px_minmax(260px,1.6fr)_minmax(180px,1fr)_80px_110px_minmax(140px,auto)] min-w-[900px]";
+  "grid-cols-[36px_minmax(260px,1.6fr)_minmax(180px,1fr)_80px_120px_minmax(140px,auto)] gap-x-5 min-w-[920px]";
 
 function baseIconClass(scope: KnowledgeBase["scope"]) {
   if (scope === "personal") return "bg-primary-soft text-primary";
