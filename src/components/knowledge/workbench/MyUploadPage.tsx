@@ -8,6 +8,7 @@ import {
   CircleDashed,
   ClipboardList,
   FileStack,
+  Info,
   Library,
   ListChecks,
   Loader2,
