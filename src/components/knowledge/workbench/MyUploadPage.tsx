@@ -21,7 +21,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useMemo, useRef, useState, type ReactNode } from "react";
-import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { SearchBar } from "@/components/learning/ui";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
@@ -36,9 +35,6 @@ import {
   KbDataTable,
   KbDataTableRow,
   KbEmptyState,
-  KbSidebar,
-  KbSidebarItem,
-  KbSidebarSection,
   KbStatusTag,
   KbTableCellFile,
   KbUploadCard,
@@ -47,11 +43,9 @@ import { UPLOAD_RECORDS } from "@/lib/knowledge/data";
 import {
   getBaseById,
   getFileById,
-  getMoveTargetBases,
-  getPinnedBases,
   listCategoryPathOptions,
 } from "@/lib/knowledge/model";
-import { loadRecentUploadBaseIds, pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
+import { pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
 import { getKnowledgeStoreVersion, subscribeKnowledgeStore } from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeBase, UploadRecord } from "@/lib/knowledge/types";
@@ -81,13 +75,17 @@ import {
   type UploadActionKind,
   type UploadView,
 } from "@/lib/knowledge/uploadTracking";
-import type { UploadSearch } from "@/routes/knowledge.uploads";
 import { cn } from "@/lib/utils";
 import { useSyncExternalStore } from "react";
 import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
-import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
-import { MyUploadTitleBanner } from "./MyUploadTitleBanner";
 import { UploadBasePickerDialog } from "./UploadBasePickerDialog";
+
+export type UploadSearch = {
+  panel?: string;
+  view?: UploadView;
+  status?: string;
+  q?: string;
+};
 
 /* ─── 各视图表格栅格 ─── */
 
@@ -153,8 +151,15 @@ type ActionDialog =
 
 /* ─── 主页面 ─── */
 
-export function MyUploadPage({ search }: { search: UploadSearch }) {
-  const navigate = useNavigate({ from: "/knowledge/uploads" });
+export function UploadTrackingPanel({
+  search,
+  onSearchChange,
+  embedded = false,
+}: {
+  search: UploadSearch;
+  onSearchChange: (next: UploadSearch) => void;
+  embedded?: boolean;
+}) {
   const storeVersion = useSyncExternalStore(subscribeKnowledgeStore, getKnowledgeStoreVersion);
 
   const currentView: UploadView = search.view ?? "all";
@@ -178,34 +183,6 @@ export function MyUploadPage({ search }: { search: UploadSearch }) {
     [storeVersion],
   );
 
-  const commonBases = useMemo(() => {
-    const uploadable = getMoveTargetBases();
-    const uploadableMap = new Map(uploadable.map((b) => [b.id, b]));
-    const seen = new Set<string>();
-    const result: KnowledgeBase[] = [];
-    for (const id of loadRecentUploadBaseIds()) {
-      const base = uploadableMap.get(id);
-      if (base && !seen.has(base.id)) {
-        result.push(base);
-        seen.add(base.id);
-      }
-    }
-    for (const base of getPinnedBases()) {
-      const match = uploadableMap.get(base.id);
-      if (match && !seen.has(match.id)) {
-        result.push(match);
-        seen.add(match.id);
-      }
-    }
-    for (const base of uploadable) {
-      if (!seen.has(base.id) && result.length < 5) {
-        result.push(base);
-        seen.add(base.id);
-      }
-    }
-    return result.slice(0, 5);
-  }, [storeVersion]);
-
   const records = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return UPLOAD_RECORDS.filter((record) => {
@@ -222,12 +199,12 @@ export function MyUploadPage({ search }: { search: UploadSearch }) {
   }, [currentView, statusFilter, categoryFilter, searchQuery]);
 
   const setView = (view: UploadView, status = "all") => {
-    navigate({ search: (prev) => ({ ...prev, view, status }) });
+    onSearchChange({ ...search, view, status: status === "all" ? undefined : status });
     setCategoryFilter("all");
   };
 
   const handleSearch = () => {
-    navigate({ search: (prev) => ({ ...prev, q: searchInput || undefined }) });
+    onSearchChange({ ...search, q: searchInput || undefined });
   };
 
   const handleUploadAction = (kind: UploadActionKind, record: UploadRecord) => {
@@ -254,7 +231,6 @@ export function MyUploadPage({ search }: { search: UploadSearch }) {
       "startParse",
       "reparse",
       "terminate",
-      "newVersion",
       "takedown",
       "restore",
       "replace",
@@ -270,105 +246,67 @@ export function MyUploadPage({ search }: { search: UploadSearch }) {
   };
 
   return (
-    <>
-      <KbSidebar
-        width="browse"
-        withDecor
-        header={
-          <>
-            <MyUploadTitleBanner />
-            <KnowledgeSidebarQuickLinks />
-          </>
-        }
-      >
-        <div className="px-1 pb-3">
-          <KbSidebarSection title="上传跟踪">
-            <KbSidebarItem
-              icon={ListChecks}
-              label="全部上传"
-              active={currentView === "all" && statusFilter === "all"}
-              badge={counts.all || undefined}
-              onClick={() => setView("all")}
-            />
-            <KbSidebarItem
-              icon={CircleDashed}
-              label="审核进度"
-              active={currentView === "review"}
-              badge={counts.needRejected || undefined}
-              badgeTone={counts.needRejected > 0 ? "danger" : "neutral"}
-              badgeTooltip="审核驳回，需修改后重新提交"
-              onClick={() => setView("review")}
-            />
-            <KbSidebarItem
-              icon={Loader2}
-              label="解析进度"
-              active={currentView === "parse"}
-              badge={counts.needParseError || undefined}
-              badgeTone={counts.needParseError > 0 ? "danger" : "neutral"}
-              badgeTooltip="解析异常，需重试"
-              onClick={() => setView("parse")}
-            />
-          </KbSidebarSection>
-
-          <KbSidebarSection title="待我处理">
-            <KbSidebarItem
-              icon={RefreshCw}
-              label="解析异常待重试"
-              badge={counts.needParseError || undefined}
-              badgeTone={counts.needParseError > 0 ? "danger" : "neutral"}
-              active={currentView === "parse" && statusFilter === "ERROR"}
-              onClick={() => setView("parse", "ERROR")}
-            />
-          </KbSidebarSection>
-
-          <KbSidebarSection
-            title="最近上传的知识库"
-            action={
-              <button
-                type="button"
-                aria-label="上传文件"
-                title="上传文件"
-                onClick={() => {
-                  const recent = loadRecentUploadBaseIds()[0];
-                  const uploadable = getMoveTargetBases();
-                  const recentBase = recent ? uploadable.find((b) => b.id === recent) : undefined;
-                  if (recentBase) openUploadWithBase(recentBase);
-                  else setBasePickerOpen(true);
-                }}
-                className="grid h-6 w-6 place-items-center rounded-[6px] text-kb-muted transition-colors hover:bg-primary-soft/40 hover:text-primary"
-              >
-                <UploadCloud className="h-4 w-4 stroke-[1.8]" />
-              </button>
-            }
-          >
-            {commonBases.map((base) => (
-              <div
-                key={base.id}
-                className="flex min-h-9 items-center gap-1 rounded-[8px] px-3 py-1 text-[12.5px] text-kb-body hover:bg-kb-surface-hover"
-              >
-                <Library className="h-3.5 w-3.5 shrink-0 stroke-[1.8] text-kb-muted" />
-                <span className="min-w-0 flex-1 truncate">{base.name}</span>
-                <button
-                  type="button"
-                  onClick={() => openUploadWithBase(base)}
-                  className="shrink-0 rounded-[6px] px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary-soft/40"
-                >
-                  上传到此库
-                </button>
-              </div>
-            ))}
-          </KbSidebarSection>
-        </div>
-      </KbSidebar>
-
-      <main className={cn("scrollbar-thin", kbMainPanel)}>
+    <div className="flex min-h-0 flex-1">
+      <main className={cn("scrollbar-thin min-w-0 flex-1", kbMainPanel, embedded && "w-full")}>
         <div className="flex min-h-0 flex-1 flex-col bg-white">
           <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin p-4">
             <section className="overflow-hidden rounded-[12px] border border-[#DCEBED] bg-white shadow-[0_8px_24px_rgba(31,52,64,0.025)]">
-              <div className="border-b border-[#E8F0F2] px-5 py-4">
-                <h2 className="text-[15px] font-semibold text-kb-heading">{meta.title}</h2>
-                <p className="mt-0.5 text-[12.5px] text-kb-muted">{meta.description}</p>
-                <p className="mt-2 text-[12px] text-kb-muted">
+              <div className="px-5 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-[15px] font-semibold text-kb-heading">上传跟踪</h2>
+                  <button
+                    type="button"
+                    onClick={() => setBasePickerOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-primary px-3 text-[12.5px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    <UploadCloud className="h-3.5 w-3.5 stroke-[1.8]" />
+                    上传文件
+                  </button>
+                </div>
+
+                <div role="tablist" aria-label="上传跟踪" className="mt-3 flex items-center gap-1">
+                  {[
+                    { view: "all" as const, label: "全部上传", icon: ListChecks, count: counts.all },
+                    { view: "review" as const, label: "审核进度", icon: CircleDashed, count: counts.needRejected },
+                    { view: "parse" as const, label: "解析进度", icon: Loader2, count: counts.needParseError },
+                  ].map(({ view, label, icon: Icon, count }) => {
+                    const active = currentView === view;
+                    const hasAlert = view !== "all" && count > 0;
+                    return (
+                      <button
+                        key={view}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        onClick={() => setView(view)}
+                        className={cn(
+                          "inline-flex h-9 items-center gap-1.5 border-b-2 px-3 text-[12.5px] font-medium transition-colors",
+                          active
+                            ? "border-primary text-primary"
+                            : "border-transparent text-kb-muted hover:text-kb-body",
+                        )}
+                      >
+                        <Icon className={cn("h-3.5 w-3.5 stroke-[1.8]", view === "parse" && active && "animate-spin")} />
+                        {label}
+                        {count > 0 && (
+                          <span
+                            className={cn(
+                              "min-w-4 rounded-full px-1.5 py-px text-center text-[10px] leading-4",
+                              hasAlert ? "bg-danger-soft text-destructive" : "bg-primary-soft text-primary",
+                            )}
+                          >
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="border-y border-[#E8F0F2] px-5 py-3">
+                <p className="text-[12.5px] text-kb-muted">{meta.description}</p>
+                <p className="mt-1 text-[12px] text-kb-muted">
                   共 <span className="font-medium text-kb-body">{records.length}</span> 条
                   {meta.countUnit}
                 </p>
@@ -384,7 +322,12 @@ export function MyUploadPage({ search }: { search: UploadSearch }) {
                 />
                 <FilterPills
                   value={statusFilter}
-                  onChange={(v) => navigate({ search: (prev) => ({ ...prev, status: v === "all" ? undefined : v }) })}
+                  onChange={(v) =>
+                    onSearchChange({
+                      ...search,
+                      status: v === "all" ? undefined : v,
+                    })
+                  }
                   options={getViewStatusOptions(currentView)}
                   label={getViewStatusFilterLabel(currentView)}
                 />
@@ -466,7 +409,7 @@ export function MyUploadPage({ search }: { search: UploadSearch }) {
           setRefreshSeed((v) => v + 1);
         }}
       />
-    </>
+    </div>
   );
 }
 
@@ -675,7 +618,7 @@ function UploadFlowDialog({ base, onClose, onChangeBase }: { base: KnowledgeBase
           <KbUploadCard
             compact={false}
             title="拖入文件或选择上传"
-            hint={base.scope === "personal" ? "个人库上传免审批，提交后系统自动解析。" : "提交后进入审批，审批通过后系统自动解析。"}
+            hint={base.scope === "personal" ? "个人库上传免审批，提交后系统自动解析。" : "提交后将先解析，解析完成后进入审批。"}
             onUpload={() => {
               pushRecentUploadBaseId(base.id);
               toast.success(base.scope === "personal" ? "文件已进入解析队列" : "文件已提交上传流程");
@@ -759,10 +702,6 @@ function TrackingActionDialogs({ dialog, onClose, onConfirm }: { dialog: ActionD
       return <InfoDialog open title="查看解析结果" titleIcon={FileStack} onClose={onClose}><ParseResultBody record={record} /></InfoDialog>;
     case "approveRecord":
       return <InfoDialog open title="查看审批记录" titleIcon={ClipboardList} onClose={onClose}><ApproveRecordBody record={record} /></InfoDialog>;
-    case "resubmit":
-      return <ResubmitBody open record={record} onClose={onClose} onConfirm={() => onConfirm("已重新提交审核")} />;
-    case "newVersion":
-      return <NewVersionBody open record={record} onClose={onClose} onConfirm={() => onConfirm("新版本已提交审核")} />;
     case "replace":
       return <NewVersionBody open record={record} title="替换文件" onClose={onClose} onConfirm={() => onConfirm("文件已替换并重新提交")} />;
     default:
@@ -827,7 +766,7 @@ function ReasonBody({ record, file }: { record: UploadRecord; file: ReturnType<t
       </div>
       {(isParseErr || isReject) && (
         <p className="text-[12.5px] text-kb-muted">
-          {isReject ? "请根据驳回原因修改后重新提交。" : "修正文件后可点击「重新解析」。"}
+          {isReject ? "驳回后流程已结束，如需重新上传请新建文件。" : "修正文件后可点击「重新解析」。"}
         </p>
       )}
     </div>

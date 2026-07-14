@@ -1,18 +1,32 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { BookOpen, Database, FolderKanban, LayoutDashboard, Settings2 } from "lucide-react";
-import { CURRENT_KNOWLEDGE_USER } from "@/lib/knowledge/data";
+import { BookOpen, FolderKanban, LayoutDashboard, Settings2 } from "lucide-react";
+import { useSyncExternalStore } from "react";
+import {
+  DEMO_ROLE_LABELS,
+  getCurrentKnowledgeUser,
+  getDemoRoleKey,
+  subscribeDemoRole,
+} from "@/lib/knowledge/demoRole";
 import { canViewKnowledgeAdmin } from "@/lib/knowledge/model";
 import { cn } from "@/lib/utils";
 
-const navItems = [
+type NavItem = {
+  label: string;
+  to: string;
+  icon: typeof LayoutDashboard;
+  adminOnly?: boolean;
+};
+
+const navItems: NavItem[] = [
   { label: "知识总览", to: "/knowledge", icon: LayoutDashboard },
-  // { label: "全库资料", to: "/knowledge/all", icon: Database },
   { label: "我的空间", to: "/knowledge/mine", icon: FolderKanban },
   { label: "知识管理", to: "/knowledge/admin", icon: Settings2, adminOnly: true },
-] as const;
+];
 
 export function KnowledgeModuleNav() {
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const currentUser = getCurrentKnowledgeUser();
   const visibleItems = navItems.filter((item) => !item.adminOnly || canViewKnowledgeAdmin());
 
   return (
@@ -54,7 +68,7 @@ export function KnowledgeModuleNav() {
 
       <div className="flex min-w-[180px] items-center justify-end gap-2 text-[12px] text-kb-muted">
         <span className="rounded-[8px] bg-kb-surface px-2.5 py-1 ring-1 ring-kb-border">
-          {CURRENT_KNOWLEDGE_USER.role === "knowledgeAdmin" ? "知识库管理员" : "库管理员"}
+          {DEMO_ROLE_LABELS[currentUser.role]}
         </span>
       </div>
     </div>

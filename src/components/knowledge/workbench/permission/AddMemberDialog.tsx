@@ -3,11 +3,13 @@ import { useMemo, useState } from "react";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { KbFilterSelect } from "@/components/knowledge/ui";
 import {
-  PERMISSION_LEVEL_OPTIONS,
+  DEFAULT_GRANT_TIER,
+  GRANT_TIER_SELECT_OPTIONS,
+  SHOW_GRANT_TIER_UI,
   SYSTEM_MEMBERS,
-  permissionLevelLabel,
+  tierToLevel,
+  type GrantTier,
   type KbMemberGrant,
-  type PermissionLevel,
 } from "@/lib/knowledge/permission";
 import { cn } from "@/lib/utils";
 
@@ -24,7 +26,7 @@ export function AddMemberDialog({
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [level, setLevel] = useState<PermissionLevel>("view");
+  const [tier, setTier] = useState<GrantTier>(DEFAULT_GRANT_TIER);
 
   const available = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -32,7 +34,6 @@ export function AddMemberDialog({
       (item) =>
         !normalized ||
         item.name.toLowerCase().includes(normalized) ||
-        item.department.toLowerCase().includes(normalized) ||
         item.roleName?.toLowerCase().includes(normalized),
     );
   }, [existingMemberIds, query]);
@@ -46,6 +47,7 @@ export function AddMemberDialog({
   };
 
   const handleAdd = () => {
+    const level = tierToLevel(SHOW_GRANT_TIER_UI ? tier : DEFAULT_GRANT_TIER);
     const members: KbMemberGrant[] = SYSTEM_MEMBERS.filter((item) => selected.has(item.id)).map(
       (item) => ({
         memberId: item.id,
@@ -59,7 +61,7 @@ export function AddMemberDialog({
     onAdd(members);
     setQuery("");
     setSelected(new Set());
-    setLevel("view");
+    setTier(DEFAULT_GRANT_TIER);
   };
 
   return (
@@ -85,7 +87,7 @@ export function AddMemberDialog({
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索姓名、工号或部门"
+          placeholder="搜索姓名或角色"
           className="min-w-0 flex-1 bg-transparent text-[13px] text-kb-body outline-none placeholder:text-kb-muted"
         />
       </div>
@@ -119,8 +121,7 @@ export function AddMemberDialog({
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-kb-heading">
                   {item.name}
                 </span>
-                <span className="shrink-0 text-[12px] text-kb-muted">{item.department}</span>
-                <span className="w-20 shrink-0 truncate text-right text-[12px] text-kb-muted">
+                <span className="w-24 shrink-0 truncate text-right text-[12px] text-kb-muted">
                   {item.roleName ?? "—"}
                 </span>
               </button>
@@ -129,18 +130,18 @@ export function AddMemberDialog({
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-[#EEF2F4] pt-4">
-        <span className="text-[12.5px] font-medium text-kb-heading">授予权限</span>
-        <KbFilterSelect
-          value={level}
-          onChange={(value) => setLevel(value as PermissionLevel)}
-          options={PERMISSION_LEVEL_OPTIONS.map((option) => ({
-            value: option.value,
-            label: `${permissionLevelLabel(option.value)}权限`,
-          }))}
-          className="min-w-[140px]"
-        />
-      </div>
+      {/* 二期：将 SHOW_GRANT_TIER_UI 设为 true 后恢复档位选择 */}
+      {SHOW_GRANT_TIER_UI && (
+        <div className="mt-4 flex items-center justify-between border-t border-[#EEF2F4] pt-4">
+          <span className="text-[12.5px] font-medium text-kb-heading">授予权限</span>
+          <KbFilterSelect
+            value={tier}
+            onChange={(value) => setTier(value as GrantTier)}
+            options={GRANT_TIER_SELECT_OPTIONS}
+            className="min-w-[140px]"
+          />
+        </div>
+      )}
     </AppFormDialog>
   );
 }

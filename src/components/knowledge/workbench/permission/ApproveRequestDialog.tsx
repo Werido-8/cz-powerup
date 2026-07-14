@@ -2,12 +2,14 @@ import { ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { KbFilterSelect } from "@/components/knowledge/ui";
+import type { GrantTier, PermissionRequest } from "@/lib/knowledge/types";
 import {
-  PERMISSION_LEVEL_OPTIONS,
-  permissionLevelLabel,
+  GRANT_TIER_SELECT_OPTIONS,
+  grantTierLabel,
+  levelToTier,
+  tierToLevel,
   type PermissionLevel,
 } from "@/lib/knowledge/permission";
-import type { PermissionRequest } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 
 export function ApproveRequestDialog({
@@ -19,12 +21,12 @@ export function ApproveRequestDialog({
   onClose: () => void;
   onConfirm: (level: PermissionLevel, addToMembers: boolean) => void;
 }) {
-  const [level, setLevel] = useState<PermissionLevel>("view");
+  const [tier, setTier] = useState<GrantTier>("access");
   const [addToMembers, setAddToMembers] = useState(true);
 
   useEffect(() => {
     if (request) {
-      setLevel(request.group);
+      setTier(levelToTier(request.group) ?? "access");
       setAddToMembers(true);
     }
   }, [request]);
@@ -41,7 +43,7 @@ export function ApproveRequestDialog({
           <AppDialogButton variant="outline" onClick={onClose}>
             取消
           </AppDialogButton>
-          <AppDialogButton variant="primary" onClick={() => onConfirm(level, addToMembers)}>
+          <AppDialogButton variant="primary" onClick={() => onConfirm(tierToLevel(tier), addToMembers)}>
             确认通过
           </AppDialogButton>
         </>
@@ -58,7 +60,7 @@ export function ApproveRequestDialog({
               </span>
             </span>
             <span className="text-kb-muted">申请权限</span>
-            <span className="font-medium text-kb-heading">{permissionLevelLabel(request.group)}</span>
+            <span className="font-medium text-kb-heading">{grantTierLabel(levelToTier(request.group) ?? "access")}</span>
             <span className="text-kb-muted">申请理由</span>
             <span className="leading-relaxed text-kb-body">{request.reason}</span>
           </div>
@@ -66,12 +68,9 @@ export function ApproveRequestDialog({
           <div className="flex items-center justify-between border-t border-[#EEF2F4] pt-3">
             <span className="text-[12.5px] font-medium text-kb-heading">实际授予</span>
             <KbFilterSelect
-              value={level}
-              onChange={(value) => setLevel(value as PermissionLevel)}
-              options={PERMISSION_LEVEL_OPTIONS.map((option) => ({
-                value: option.value,
-                label: `${permissionLevelLabel(option.value)}权限`,
-              }))}
+              value={tier}
+              onChange={(value) => setTier(value as GrantTier)}
+              options={GRANT_TIER_SELECT_OPTIONS}
               className="min-w-[140px]"
             />
           </div>

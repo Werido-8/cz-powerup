@@ -31,7 +31,7 @@ export function CategoryTreeSelect({
   onChange: (value: string) => void;
   placeholder?: string;
   searchPlaceholder?: string;
-  /** 新建目录时可选「专业知识库根目录」 */
+  /** 新建目录时可选「公共知识库根目录」 */
   includeRoot?: boolean;
   disabled?: boolean;
   /** form：与系统表单弹窗统一高度与样式 */
@@ -45,7 +45,7 @@ export function CategoryTreeSelect({
 
   const selectedLabel = useMemo(() => {
     if (!value) return "";
-    if (value === PROFESSIONAL_CATEGORY_ROOT_ID) return "专业知识库根目录";
+    if (value === PROFESSIONAL_CATEGORY_ROOT_ID) return "公共知识库根目录";
     return getCategoryPathLabel(value);
   }, [value, storeVersion]);
 
@@ -54,7 +54,7 @@ export function CategoryTreeSelect({
     const items: { id: string; label: string }[] = [];
 
     if (includeRoot) {
-      items.push({ id: PROFESSIONAL_CATEGORY_ROOT_ID, label: "专业知识库根目录" });
+      items.push({ id: PROFESSIONAL_CATEGORY_ROOT_ID, label: "公共知识库根目录" });
     }
 
     const walk = (parentId?: string) => {
@@ -161,7 +161,7 @@ export function CategoryTreeSelect({
             <>
               {includeRoot && (
                 <SelectRow
-                  label="专业知识库根目录"
+                  label="公共知识库根目录"
                   selected={value === PROFESSIONAL_CATEGORY_ROOT_ID}
                   onSelect={() => handleSelect(PROFESSIONAL_CATEGORY_ROOT_ID)}
                   depth={0}

@@ -1,5 +1,6 @@
 import { CheckCircle2, CircleOff, Download, FolderInput, Loader2, Trash2, X } from "lucide-react";
-import type { LucideIcon, ReactNode } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type BatchLoadingState = "download" | "disable" | "delete" | "move" | null;

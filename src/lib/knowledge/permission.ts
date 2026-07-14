@@ -1,19 +1,32 @@
-import { CURRENT_KNOWLEDGE_USER } from "./data";
-import type { KnowledgePermissionGroup } from "./types";
+import { getCurrentKnowledgeUser } from "./demoRole";
+import type { GrantTier, KnowledgePermissionGroup } from "./types";
 
-/**
- * 递进权限级别：管理 > 上传 > 浏览。
- * 每个角色 / 成员只持有一个最高级别，最终生效权限取角色与个人授权中的较高者。
- */
+export type { GrantTier };
 export type PermissionLevel = KnowledgePermissionGroup;
-
-export const PERMISSION_LEVELS: PermissionLevel[] = ["view", "upload", "manage"];
 
 const PERMISSION_LEVEL_LABELS: Record<PermissionLevel, string> = {
   view: "浏览",
   upload: "上传",
   manage: "管理",
 };
+
+export const GRANT_TIER_OPTIONS: { value: GrantTier; label: string; desc: string }[] = [
+  { value: "access", label: "访问权限", desc: "可查看、下载、收藏、上传" },
+  { value: "manage", label: "库管理", desc: "可删除、跨库移动、配置权限" },
+];
+
+export function tierToLevel(tier: GrantTier): PermissionLevel {
+  return tier === "manage" ? "manage" : "upload";
+}
+
+export function levelToTier(level: PermissionLevel | null | undefined): GrantTier | null {
+  if (!level) return null;
+  return level === "manage" ? "manage" : "access";
+}
+
+export function grantTierLabel(tier: GrantTier) {
+  return GRANT_TIER_OPTIONS.find((item) => item.value === tier)?.label ?? tier;
+}
 
 const PERMISSION_LEVEL_RANK: Record<PermissionLevel, number> = {
   view: 1,
@@ -29,10 +42,25 @@ export function permissionLevelRank(level: PermissionLevel) {
   return PERMISSION_LEVEL_RANK[level];
 }
 
-export const PERMISSION_LEVEL_OPTIONS = PERMISSION_LEVELS.map((level) => ({
-  value: level,
-  label: permissionLevelLabel(level),
+export const PERMISSION_LEVEL_OPTIONS = GRANT_TIER_OPTIONS.map((item) => ({
+  value: tierToLevel(item.value),
+  label: item.label,
 }));
+
+export const GRANT_TIER_SELECT_OPTIONS = GRANT_TIER_OPTIONS.map((item) => ({
+  value: item.value,
+  label: item.label,
+}));
+
+/**
+ * 一期演示开关：隐藏「访问权限 / 库管理」档位选择 UI。
+ * 角色/成员一旦加入授权列表，即默认获得浏览、下载、收藏、上传（`access` → `upload` level）。
+ * 二期再开放档位细分与库管理授权。
+ */
+export const SHOW_GRANT_TIER_UI = false;
+
+/** 一期默认授权档位：访问权限（含浏览、下载、收藏、上传） */
+export const DEFAULT_GRANT_TIER: GrantTier = "access";
 
 /** 取较高级别；任一为空时返回另一个 */
 export function maxPermissionLevel(
@@ -48,8 +76,6 @@ export function maxPermissionLevel(
 export interface SystemRole {
   id: string;
   name: string;
-  /** 适用范围 / 所属部门 */
-  scopeLabel: string;
   memberCount: number;
 }
 
@@ -66,7 +92,6 @@ export interface SystemMember {
 export interface KbRoleGrant {
   roleId: string;
   roleName: string;
-  scopeLabel: string;
   memberCount: number;
   level: PermissionLevel;
 }
@@ -79,7 +104,7 @@ export interface KbMemberGrant {
   roleName?: string;
   /** 由所属角色继承的权限；无则为 null */
   roleLevel: PermissionLevel | null;
-  /** 个人单独授权；未设置则为 null（此时成员仅靠角色权限存在） */
+  /** 个人单独授权；未设置则为 null */
   directLevel: PermissionLevel | null;
 }
 
@@ -94,17 +119,17 @@ export function memberEffectiveLevel(member: KbMemberGrant): PermissionLevel | n
 }
 
 export const SYSTEM_ROLES: SystemRole[] = [
-  { id: "role-run-duty", name: "运行值班员", scopeLabel: "运行部", memberCount: 24 },
-  { id: "role-run-lead", name: "运行专责", scopeLabel: "运行部", memberCount: 9 },
-  { id: "role-tech", name: "技术专责", scopeLabel: "技术部", memberCount: 8 },
-  { id: "role-dispatch", name: "调度专责", scopeLabel: "调度部", memberCount: 6 },
-  { id: "role-maint", name: "检修专责", scopeLabel: "检修部", memberCount: 10 },
-  { id: "role-kb-admin", name: "知识库管理员", scopeLabel: "全局", memberCount: 3 },
+  { id: "role-run-duty", name: "运行值班员", memberCount: 24 },
+  { id: "role-run-lead", name: "运行专责", memberCount: 9 },
+  { id: "role-tech", name: "技术专责", memberCount: 8 },
+  { id: "role-dispatch", name: "调度专责", memberCount: 6 },
+  { id: "role-maint", name: "检修专责", memberCount: 10 },
+  { id: "role-kb-admin", name: "知识库管理员", memberCount: 3 },
 ];
 
 export const SYSTEM_MEMBERS: SystemMember[] = [
-  { id: "u-run-admin", name: "张工", department: "运行部", roleName: "运行值班员" },
-  { id: "u-li", name: "李工", department: "技术部", roleName: "技术专责" },
+  { id: "u-run-admin", name: "张工", department: "运行部", roleName: "知识库管理员" },
+  { id: "u-li", name: "李工", department: "技术部", roleName: "普通员工" },
   { id: "u-wang", name: "王工", department: "调度部", roleName: "调度专责" },
   { id: "u-chen", name: "陈工", department: "运行部", roleName: "运行值班员" },
   { id: "u-zhao", name: "赵工", department: "检修部", roleName: "检修专责" },
@@ -121,7 +146,6 @@ function role(id: string, level: PermissionLevel): KbRoleGrant {
   return {
     roleId: source.id,
     roleName: source.name,
-    scopeLabel: source.scopeLabel,
     memberCount: source.memberCount,
     level,
   };
@@ -175,20 +199,37 @@ export function getGrantsForBase(baseId: string): PermissionGrants {
 
 /** 新建专业库时的初始授权：创建人默认成为管理者 */
 export function createInitialGrants(): PermissionGrants {
-  const creator = SYSTEM_MEMBERS.find((item) => item.id === CURRENT_KNOWLEDGE_USER.id);
+  const user = getCurrentKnowledgeUser();
+  const creator = SYSTEM_MEMBERS.find((item) => item.id === user.id);
   return {
     roles: [],
     members: [
       {
-        memberId: CURRENT_KNOWLEDGE_USER.id,
-        name: creator?.name ?? CURRENT_KNOWLEDGE_USER.name,
-        department: creator?.department ?? "运行部",
+        memberId: user.id,
+        name: creator?.name ?? user.name,
+        department: creator?.department ?? "—",
         roleName: creator?.roleName,
         roleLevel: null,
         directLevel: "manage",
       },
     ],
   };
+}
+
+/** 读取某用户在某库的有效权限级别 */
+export function getEffectiveLevelForUser(
+  baseId: string,
+  userId: string,
+  grants?: PermissionGrants,
+): PermissionLevel | null {
+  const config = grants ?? getGrantsForBase(baseId);
+  const memberGrant = config.members.find((item) => item.memberId === userId);
+  if (memberGrant) {
+    const effective = memberEffectiveLevel(memberGrant);
+    if (effective) return effective;
+  }
+  // 演示：角色授权未展开到用户，仅通过成员/管理员角色判断
+  return null;
 }
 
 export interface GrantsSummary {

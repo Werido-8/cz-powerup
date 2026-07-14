@@ -6,15 +6,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { scopeSectionLabel } from "@/lib/knowledge/labels";
 import type { KnowledgeBase } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import { KnowledgeBaseBreadcrumb } from "./KnowledgeBaseBreadcrumb";
 import { KnowledgeDetailBannerShell } from "./KnowledgeDetailBannerShell";
 
 function scopeLabel(base: KnowledgeBase) {
-  if (base.scope === "personal") return "个人知识库";
-  if (base.scope === "public") return "公共制度";
-  return "专业知识库";
+  return scopeSectionLabel(base.scope);
 }
 
 function KnowledgeBannerCapsule({

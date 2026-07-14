@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 import { useState } from "react";
 import { KbEmptyState, KbIconButton, KbStatusTag } from "@/components/knowledge/ui";
+import { isStorageOnlyFile } from "@/lib/knowledge/parseMerge";
 import {
   parseStatusLabel,
   parseStatusTone,
@@ -23,6 +24,18 @@ export function FilePreviewCanvas({
   const [page, setPage] = useState(1);
   const [zoom, setZoom] = useState(100);
   const totalPages = 12;
+  const storageOnly = isStorageOnlyFile(file);
+
+  if (storageOnly) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6">
+        <KbEmptyState
+          title="仅作文件存储"
+          description="该格式不支持在线预览、全文检索与智能问答，可下载原文件。"
+        />
+      </div>
+    );
+  }
 
   if (file.status === "parseFailed") {
     return (

@@ -133,7 +133,7 @@ export function EditKnowledgeBaseDialog({
     }
     setScope("professional");
     setTypeChangeFlow(null);
-    toast.success("类型将变更为专业知识库，保存后生效");
+    toast.success("类型将变更为公共知识库（按权限），保存后生效");
   };
 
   const confirmToPublic = () => {
@@ -204,7 +204,7 @@ export function EditKnowledgeBaseDialog({
                 <ShieldCheck className="h-4 w-4 text-primary" strokeWidth={1.8} />
               )}
               <span className="text-[13px] font-medium text-kb-heading">
-                {isPublic ? "公共知识库" : "专业知识库"}
+                {isPublic ? "公共知识库（全员）" : "公共知识库（按权限）"}
               </span>
             </div>
             {base.scope !== "personal" && (
@@ -237,7 +237,7 @@ export function EditKnowledgeBaseDialog({
               权限概览
             </div>
             <p className="mt-1.5 text-[12px] leading-relaxed text-kb-muted">
-              专业知识库 · {grantsSummary.roleCount} 个授权角色 ·{" "}
+              公共知识库（按权限）· {grantsSummary.roleCount} 个授权角色 ·{" "}
               {grantsSummary.directMemberCount} 名授权成员 · {grantsSummary.managerCount} 名管理者
             </p>
             <p className="mt-1 text-[11.5px] text-kb-muted">
@@ -251,7 +251,7 @@ export function EditKnowledgeBaseDialog({
         open={typeChangeFlow === "confirm-to-professional"}
         size="small"
         variant="confirm"
-        title="变更为专业知识库？"
+        title="变更为公共知识库（按权限）？"
         onClose={() => setTypeChangeFlow(null)}
         footer={
           <>
@@ -287,7 +287,7 @@ export function EditKnowledgeBaseDialog({
         }
       >
         <p className="text-[13px] leading-relaxed text-kb-body">
-          变更后，全体系统用户将获得浏览权限。当前角色和成员的自定义授权将停止生效，历史配置将保留，便于以后恢复为专业库。
+          变更后，全体系统用户将获得浏览权限。当前角色和成员的自定义授权将停止生效，历史配置将保留，便于以后恢复为按权限模式。
         </p>
       </AppFormDialog>
 
@@ -313,7 +313,7 @@ export function EditKnowledgeBaseDialog({
           }
         >
           <p className="mb-4 text-[12.5px] text-kb-muted">
-            变更为专业知识库前，请先完成角色与成员权限配置。
+            变更为公共知识库（按权限）前，请先完成角色与成员权限配置。
           </p>
           <PermissionEditor
             grants={pendingGrants}

@@ -9,11 +9,10 @@ import {
   Pencil,
   ShieldCheck,
 } from "lucide-react";
-import { toast } from "sonner";
 import { AppDialogButton } from "@/components/ui/app-dialog";
 import { AppFormInput, AppFormTextarea } from "@/components/ui/app-form";
 import { KbFormDialog, KbFormField } from "@/components/knowledge/ui";
-import { CURRENT_KNOWLEDGE_USER } from "@/lib/knowledge/data";
+import { getCurrentKnowledgeUser } from "@/lib/knowledge/demoRole";
 import {
   getCategoryPathLabel,
   getKnowledgeBaseDescriptionMaxLength,
@@ -29,31 +28,41 @@ import { PermissionEditor, PermissionOverviewStrip } from "../permission/Permiss
 
 type SelectableScope = Exclude<KnowledgeBaseScope, "personal">;
 type WizardStep = 1 | 2;
+/** 第二步：访问管控方式（对应会议「完全公开 / 需要权限」） */
+type AccessMode = "open" | "restricted";
 
 type FieldErrors = {
   categoryId?: string;
   name?: string;
 };
 
-const SCOPE_OPTIONS: {
-  value: SelectableScope;
+const ACCESS_MODE_OPTIONS: {
+  value: AccessMode;
   label: string;
   desc: string;
   icon: typeof Globe;
 }[] = [
   {
-    value: "public",
-    label: "公共知识库",
-    desc: "面向全体系统用户开放浏览，无需单独分配访问权限。",
+    value: "open",
+    label: "完全公开",
+    desc: "全体系统用户可浏览，无需配置角色或成员权限。",
     icon: Globe,
   },
   {
-    value: "professional",
-    label: "专业知识库",
-    desc: "仅指定角色和成员可访问，需要配置浏览、上传和管理权限。",
+    value: "restricted",
+    label: "按权限开放",
+    desc: "仅指定角色和成员可访问，需配置授权范围。",
     icon: ShieldCheck,
   },
 ];
+
+function accessModeToScope(mode: AccessMode): SelectableScope {
+  return mode === "open" ? "public" : "professional";
+}
+
+function accessModeLabel(mode: AccessMode) {
+  return mode === "open" ? "完全公开" : "按权限开放";
+}
 
 export function CreateKnowledgeBaseDialog({
   defaultCategoryId,
@@ -70,20 +79,21 @@ export function CreateKnowledgeBaseDialog({
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState(defaultCategoryId ?? "");
   const [description, setDescription] = useState("");
-  const [scope, setScope] = useState<SelectableScope>("professional");
+  const [accessMode, setAccessMode] = useState<AccessMode>("open");
   const [grants, setGrants] = useState<PermissionGrants>(() => createInitialGrants());
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
   const descriptionMaxLength = getKnowledgeBaseDescriptionMaxLength();
-  const isProfessional = scope === "professional";
+  const needsPermissionConfig = accessMode === "restricted";
+  const scope = accessModeToScope(accessMode);
 
   useEffect(() => {
     setStep(1);
     setName("");
     setCategoryId(defaultCategoryId ?? "");
     setDescription("");
-    setScope("professional");
+    setAccessMode("open");
     setGrants(createInitialGrants());
     setFieldErrors({});
     setSubmitting(false);
@@ -126,7 +136,7 @@ export function CreateKnowledgeBaseDialog({
             canConfigurePermission: true,
           },
       updatedAt: formatNow(),
-      ownerName: CURRENT_KNOWLEDGE_USER.name,
+      ownerName: getCurrentKnowledgeUser().name,
     };
   };
 
@@ -143,7 +153,7 @@ export function CreateKnowledgeBaseDialog({
     }
     setSubmitting(true);
     const base = buildBase();
-    onSubmit(base, isProfessional ? grants : undefined);
+    onSubmit(base, needsPermissionConfig ? grants : undefined);
     setSubmitting(false);
   };
 
@@ -154,6 +164,7 @@ export function CreateKnowledgeBaseDialog({
       open={open}
       size="large"
       variant="form"
+      className="w-[700px]"
       title="新建知识库"
       titleIcon={Library}
       onClose={onClose}
@@ -163,15 +174,9 @@ export function CreateKnowledgeBaseDialog({
             <AppDialogButton variant="outline" onClick={onClose} disabled={submitting}>
               取消
             </AppDialogButton>
-            {isProfessional ? (
-              <AppDialogButton variant="primary" onClick={handleNext}>
-                下一步
-              </AppDialogButton>
-            ) : (
-              <AppDialogButton variant="primary" onClick={handleCreate} loading={submitting}>
-                创建知识库
-              </AppDialogButton>
-            )}
+            <AppDialogButton variant="primary" onClick={handleNext}>
+              下一步
+            </AppDialogButton>
           </>
         ) : (
           <>
@@ -185,74 +190,13 @@ export function CreateKnowledgeBaseDialog({
         )
       }
     >
-      {isProfessional && (
-        <WizardSteps active={step} className="mb-5" />
-      )}
+      <WizardSteps active={step} className="mb-5" />
 
       {step === 1 ? (
         <>
           <p className="mb-4 text-[12.5px] text-kb-muted">
-            创建知识库并配置基本信息与访问权限
+            填写知识库基本信息，下一步选择访问管控方式。
           </p>
-
-          <KbFormField label="知识库类型" icon={Library} required>
-            <div className="grid grid-cols-2 gap-2.5">
-              {SCOPE_OPTIONS.map((option) => {
-                const active = scope === option.value;
-                const Icon = option.icon;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setScope(option.value)}
-                    className={cn(
-                      "relative flex flex-col gap-1.5 rounded-[10px] border p-3.5 text-left transition-colors",
-                      active
-                        ? "border-primary/60 bg-primary-soft/25 ring-1 ring-primary/25"
-                        : "border-[#E1EBEE] bg-white hover:border-primary/35 hover:bg-[#F6FBFC]",
-                    )}
-                  >
-                    {active && (
-                      <span className="absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full bg-primary text-white">
-                        <Check className="h-3 w-3" strokeWidth={3} />
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1.5">
-                      <Icon
-                        className={cn(
-                          "h-4 w-4 stroke-[1.8]",
-                          active ? "text-primary" : "text-kb-muted",
-                        )}
-                      />
-                      <span
-                        className={cn(
-                          "text-[13px] font-semibold",
-                          active ? "text-primary" : "text-kb-heading",
-                        )}
-                      >
-                        {option.label}
-                      </span>
-                    </span>
-                    <span className="pr-6 text-[11.5px] leading-snug text-kb-muted">
-                      {option.desc}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {scope === "public" ? (
-              <div className="mt-3 flex items-start gap-1.5 rounded-[8px] bg-primary-soft/20 px-2.5 py-2 text-[11.5px] leading-snug text-[#2C6E7B]">
-                <Globe className="mt-[1px] h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                <span>全体系统用户拥有浏览权限，无需进行成员权限配置。</span>
-              </div>
-            ) : (
-              <div className="mt-3 flex items-start gap-1.5 rounded-[8px] bg-primary-soft/20 px-2.5 py-2 text-[11.5px] leading-snug text-[#2C6E7B]">
-                <KeyRound className="mt-[1px] h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                <span>专业知识库需要配置角色或成员权限。</span>
-              </div>
-            )}
-          </KbFormField>
 
           <KbFormField
             label="挂载目录"
@@ -300,19 +244,91 @@ export function CreateKnowledgeBaseDialog({
           <div className="mb-4 rounded-[10px] border border-[#E6F0F2] bg-[#F8FAFB] px-4 py-3">
             <div className="text-[14px] font-semibold text-kb-heading">{name.trim() || "未命名知识库"}</div>
             <div className="mt-0.5 text-[12px] text-kb-muted">
-              专业知识库{pathLabel ? ` · ${pathLabel}` : ""}
+              公共知识库 · {accessModeLabel(accessMode)}
+              {pathLabel ? ` · ${pathLabel}` : ""}
             </div>
-            <div className="mt-2">
-              <PermissionOverviewStrip grants={grants} />
-            </div>
+            {needsPermissionConfig && (
+              <div className="mt-2">
+                <PermissionOverviewStrip grants={grants} />
+              </div>
+            )}
           </div>
 
-          <PermissionEditor
-            grants={grants}
-            onChange={setGrants}
-            showRequests={false}
-            showSummary={false}
-          />
+          <KbFormField label="访问管控" icon={KeyRound} required>
+            <div className="grid grid-cols-2 gap-2.5">
+              {ACCESS_MODE_OPTIONS.map((option) => {
+                const active = accessMode === option.value;
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setAccessMode(option.value)}
+                    className={cn(
+                      "relative flex flex-col gap-1.5 rounded-[10px] border p-3.5 text-left transition-colors",
+                      active
+                        ? "border-primary/60 bg-primary-soft/25 ring-1 ring-primary/25"
+                        : "border-[#E1EBEE] bg-white hover:border-primary/35 hover:bg-[#F6FBFC]",
+                    )}
+                  >
+                    {active && (
+                      <span className="absolute right-2.5 top-2.5 grid h-5 w-5 place-items-center rounded-full bg-primary text-white">
+                        <Check className="h-3 w-3" strokeWidth={3} />
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5">
+                      <Icon
+                        className={cn(
+                          "h-4 w-4 stroke-[1.8]",
+                          active ? "text-primary" : "text-kb-muted",
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "text-[13px] font-semibold",
+                          active ? "text-primary" : "text-kb-heading",
+                        )}
+                      >
+                        {option.label}
+                      </span>
+                    </span>
+                    <span className="pr-6 text-[11.5px] leading-snug text-kb-muted">
+                      {option.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {accessMode === "open" ? (
+              <div className="mt-3 flex items-start gap-1.5 rounded-[8px] bg-primary-soft/20 px-2.5 py-2 text-[11.5px] leading-snug text-[#2C6E7B]">
+                <Globe className="mt-[1px] h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>选择完全公开后，无需配置角色或成员，创建即可对全员开放浏览。</span>
+              </div>
+            ) : (
+              <div className="mt-3 flex items-start gap-1.5 rounded-[8px] bg-primary-soft/20 px-2.5 py-2 text-[11.5px] leading-snug text-[#2C6E7B]">
+                <KeyRound className="mt-[1px] h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>按权限开放时，请为角色或成员分配访问权限；未授权用户需提交申请。</span>
+              </div>
+            )}
+          </KbFormField>
+
+          {needsPermissionConfig ? (
+            <PermissionEditor
+              grants={grants}
+              onChange={setGrants}
+              showRequests={false}
+              showSummary={false}
+            />
+          ) : (
+            <div className="rounded-[10px] border border-dashed border-[#DCEBED] bg-[#F8FAFB] px-4 py-6 text-center">
+              <Globe className="mx-auto h-8 w-8 text-primary/60 stroke-[1.5]" />
+              <p className="mt-2 text-[13px] font-medium text-kb-heading">无需配置权限</p>
+              <p className="mt-1 text-[12px] text-kb-muted">
+                该知识库将对全体用户开放浏览，可直接点击「创建知识库」完成。
+              </p>
+            </div>
+          )}
         </>
       )}
     </KbFormDialog>
@@ -324,7 +340,7 @@ function WizardSteps({ active, className }: { active: WizardStep; className?: st
     <div className={cn("flex items-center gap-3", className)}>
       <StepBadge index={1} label="基本信息" active={active === 1} done={active > 1} />
       <span className="h-px flex-1 bg-[#E1EBEE]" aria-hidden />
-      <StepBadge index={2} label="权限分配" active={active === 2} done={false} />
+      <StepBadge index={2} label="访问管控" active={active === 2} done={false} />
     </div>
   );
 }

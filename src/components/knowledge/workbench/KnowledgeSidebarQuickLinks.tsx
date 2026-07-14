@@ -1,9 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutGrid, Settings2, UploadCloud, UserRound } from "lucide-react";
+import { LayoutGrid, Settings2, UserRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useSyncExternalStore } from "react";
+import { getDemoRoleKey, subscribeDemoRole } from "@/lib/knowledge/demoRole";
+import { canViewKnowledgeAdmin } from "@/lib/knowledge/model";
 import { cn } from "@/lib/utils";
 
-type PageContext = "overview" | "mine" | "uploads" | "admin";
+type PageContext = "overview" | "mine" | "admin";
 
 type QuickLink = {
   to: string;
@@ -13,7 +16,6 @@ type QuickLink = {
 };
 
 function getPageContext(pathname: string): PageContext {
-  if (pathname.startsWith("/knowledge/uploads")) return "uploads";
   if (pathname.startsWith("/knowledge/mine")) return "mine";
   if (pathname.startsWith("/knowledge/admin")) return "admin";
   return "overview";
@@ -25,31 +27,28 @@ function getQuickLinks(context: PageContext): QuickLink[] {
       return [
         { to: "/knowledge/mine", label: "我的空间", icon: UserRound },
         { to: "/knowledge/admin", label: "知识管理", icon: Settings2 },
-        { to: "/knowledge/uploads", label: "我的上传", icon: UploadCloud },
       ];
     case "mine":
       return [
         { to: "/knowledge", label: "知识总览", icon: LayoutGrid },
-        { to: "/knowledge/uploads", label: "我的上传", icon: UploadCloud },
-      ];
-    case "uploads":
-      return [
-        { to: "/knowledge", label: "知识总览", icon: LayoutGrid },
-        { to: "/knowledge/mine", label: "我的空间", icon: UserRound },
+        { to: "/knowledge/admin", label: "知识管理", icon: Settings2 },
       ];
     case "admin":
       return [
         { to: "/knowledge", label: "知识总览", icon: LayoutGrid },
         { to: "/knowledge/mine", label: "我的空间", icon: UserRound },
-        { to: "/knowledge/uploads", label: "我的上传", icon: UploadCloud },
       ];
   }
 }
 
 export function KnowledgeSidebarQuickLinks() {
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const context = getPageContext(pathname);
-  const links = getQuickLinks(context);
+  const showAdmin = canViewKnowledgeAdmin();
+  const links = getQuickLinks(context).filter(
+    (item) => item.to !== "/knowledge/admin" || showAdmin,
+  );
 
   if (links.length === 0) return null;
 

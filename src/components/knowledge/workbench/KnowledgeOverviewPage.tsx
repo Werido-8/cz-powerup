@@ -465,7 +465,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
         />
 
         <KbSidebarSection
-          title="专业知识库"
+          title="公共知识库"
           action={
             <KnowledgeTreeSectionActions
               directoryLabel="新建目录"
@@ -527,16 +527,16 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
           <div className="flex flex-1 items-center justify-center p-8">
             <KbEmptyState
               title="请选择知识库"
-              description="从左侧个人知识库、专业知识库或快速访问中选择一个知识库，右侧会展示该库资料。"
+              description="从左侧公共知识库、个人知识库或快速访问中选择一个知识库，右侧会展示该库资料。"
             />
           </div>
         ) : isAggregate ? (
           <TreeAggregatePanel
-            scopeLabel={isPersonalAll ? "个人知识库" : "专业知识库"}
+            scopeLabel={isPersonalAll ? "个人知识库" : "公共知识库"}
             description={
               isPersonalAll
                 ? "汇总展示个人知识库中有权访问的全部文件。"
-                : "汇总展示专业知识库中有权访问的全部文件。"
+                : "汇总展示公共知识库中有权访问的全部文件。"
             }
             files={selectedFiles}
             query={query}

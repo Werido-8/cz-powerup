@@ -4,15 +4,14 @@ import { toast } from "sonner";
 import {
   KbButton,
   KbEmptyState,
-  KbFilterSelect,
   KbSegmentControl,
   KbStatusTag,
 } from "@/components/knowledge/ui";
 import {
-  PERMISSION_LEVEL_OPTIONS,
+  grantTierLabel,
   hasManager,
+  levelToTier,
   memberEffectiveLevel,
-  permissionLevelLabel,
   summarizeGrants,
   type KbMemberGrant,
   type KbRoleGrant,
@@ -31,9 +30,12 @@ type EditorTab = "roles" | "members" | "requests";
 
 function effectiveLevelTone(level: PermissionLevel | null) {
   if (level === "manage") return "accent" as const;
-  if (level === "upload") return "warning" as const;
-  if (level === "view") return "neutral" as const;
   return "neutral" as const;
+}
+
+function effectiveTierLabel(level: PermissionLevel | null) {
+  const tier = levelToTier(level);
+  return tier ? grantTierLabel(tier) : "—";
 }
 
 export function PermissionEditor({
@@ -55,7 +57,6 @@ export function PermissionEditor({
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [memberQuery, setMemberQuery] = useState("");
-  const [directOnly, setDirectOnly] = useState(false);
   const [approveRequest, setApproveRequest] = useState<PermissionRequest | null>(null);
   const [processedRequestIds, setProcessedRequestIds] = useState<Set<string>>(new Set());
 
@@ -83,7 +84,6 @@ export function PermissionEditor({
   const filteredMembers = useMemo(() => {
     const normalized = memberQuery.trim().toLowerCase();
     return grants.members.filter((item) => {
-      if (directOnly && item.directLevel == null) return false;
       if (!normalized) return true;
       return (
         item.name.toLowerCase().includes(normalized) ||
@@ -91,26 +91,10 @@ export function PermissionEditor({
         item.roleName?.toLowerCase().includes(normalized)
       );
     });
-  }, [directOnly, grants.members, memberQuery]);
-
-  const updateRoleLevel = (roleId: string, level: PermissionLevel) => {
-    onChange({
-      ...grants,
-      roles: grants.roles.map((item) => (item.roleId === roleId ? { ...item, level } : item)),
-    });
-  };
+  }, [grants.members, memberQuery]);
 
   const removeRole = (roleId: string) => {
     onChange({ ...grants, roles: grants.roles.filter((item) => item.roleId !== roleId) });
-  };
-
-  const updateMemberLevel = (memberId: string, level: PermissionLevel) => {
-    onChange({
-      ...grants,
-      members: grants.members.map((item) =>
-        item.memberId === memberId ? { ...item, directLevel: level } : item,
-      ),
-    });
   };
 
   const removeMember = (member: KbMemberGrant) => {
@@ -194,7 +178,6 @@ export function PermissionEditor({
         >
           <SummaryItem label="授权角色" value={`${summary.roleCount} 个`} />
           <SummaryItem label="单独授权成员" value={`${summary.directMemberCount} 人`} />
-          <SummaryItem label="管理者" value={`${summary.managerCount} 人`} />
           {showRequests && (
             <SummaryItem label="待处理申请" value={`${requests.length} 项`} highlight={requests.length > 0} />
           )}
@@ -231,9 +214,7 @@ export function PermissionEditor({
                 <thead>
                   <tr className="border-b border-[#EEF2F4] bg-[#F8FAFB] text-[11.5px] font-medium text-kb-muted">
                     <th className="px-4 py-2.5">角色</th>
-                    <th className="px-4 py-2.5">所属部门/范围</th>
-                    <th className="px-4 py-2.5 text-right">成员数</th>
-                    <th className="px-4 py-2.5">权限级别</th>
+                    <th className="px-4 py-2.5 text-right">人员</th>
                     <th className="px-4 py-2.5 text-right">操作</th>
                   </tr>
                 </thead>
@@ -243,17 +224,8 @@ export function PermissionEditor({
                       <td className="px-4 py-3 text-[13px] font-medium text-kb-heading">
                         {role.roleName}
                       </td>
-                      <td className="px-4 py-3 text-[12.5px] text-kb-muted">{role.scopeLabel}</td>
                       <td className="px-4 py-3 text-right text-[12.5px] tabular-nums text-kb-body">
-                        {role.memberCount}
-                      </td>
-                      <td className="px-4 py-3">
-                        <KbFilterSelect
-                          value={role.level}
-                          onChange={(value) => updateRoleLevel(role.roleId, value as PermissionLevel)}
-                          options={PERMISSION_LEVEL_OPTIONS}
-                          className="min-w-[96px]"
-                        />
+                        {role.memberCount} 人
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -278,21 +250,9 @@ export function PermissionEditor({
         <section className="min-h-0 flex-1">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="max-w-[480px] text-[12px] leading-relaxed text-kb-muted">
-              对指定人员单独授权。个人权限与角色权限同时存在时，系统采用更高一级的权限。
+              对指定人员单独授权。当前一期仅展示成员、角色与部门信息，授权后默认具备基础访问能力。
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setDirectOnly((prev) => !prev)}
-                className={cn(
-                  "h-8 rounded-[8px] border px-2.5 text-[12px] font-medium transition-colors",
-                  directOnly
-                    ? "border-primary/40 bg-primary-soft/30 text-primary"
-                    : "border-kb-border bg-white text-kb-muted hover:text-kb-body",
-                )}
-              >
-                仅看直接授权
-              </button>
               <div className="flex h-8 w-[180px] items-center gap-1.5 rounded-[8px] border border-kb-border bg-white px-2.5">
                 <Search className="h-3.5 w-3.5 shrink-0 text-kb-muted" />
                 <input
@@ -311,69 +271,50 @@ export function PermissionEditor({
 
           {filteredMembers.length === 0 ? (
             <KbEmptyState
-              title={directOnly ? "暂无直接授权成员" : "尚未添加成员授权"}
-              description={
-                directOnly
-                  ? "切换为全部成员视图，或添加新的个人授权。"
-                  : "点击「添加成员」为指定人员单独授权。"
-              }
+              title="尚未添加成员授权"
+              description="点击「添加成员」为指定人员单独授权。"
             />
           ) : (
-            <div className={cn(kbCardShell, kbRadius.md, "overflow-x-auto")}>
-              <table className="min-w-[720px] w-full text-left">
+            <div className={cn(kbCardShell, kbRadius.md, "overflow-hidden")}>
+              {/* 二期：权限档位细化后，再恢复「个人权限」与「最终权限」列及对应编辑控件。 */}
+              <table className="w-full table-fixed text-left">
+                <colgroup>
+                  <col className="w-[20%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[22%]" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-[#EEF2F4] bg-[#F8FAFB] text-[11.5px] font-medium text-kb-muted">
-                    <th className="px-4 py-2.5">成员</th>
-                    <th className="px-4 py-2.5">所属部门</th>
-                    <th className="px-4 py-2.5">角色权限</th>
-                    <th className="px-4 py-2.5">个人权限</th>
-                    <th className="px-4 py-2.5">最终权限</th>
-                    <th className="px-4 py-2.5 text-right">操作</th>
+                    <th className="px-3 py-2.5">成员名称</th>
+                    <th className="px-3 py-2.5">所属角色</th>
+                    <th className="px-3 py-2.5">所属部门</th>
+                    <th className="px-3 py-2.5">角色权限</th>
+                    <th className="px-3 py-2.5 text-right">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMembers.map((member) => {
-                    const effective = memberEffectiveLevel(member);
                     const canRemove = member.directLevel != null;
                     return (
                       <tr
                         key={member.memberId}
                         className="border-b border-[#EEF2F4] last:border-b-0"
-                      >
-                        <td className="px-4 py-3">
-                          <div className="text-[13px] font-medium text-kb-heading">{member.name}</div>
-                          {member.roleName && (
-                            <div className="text-[11.5px] text-kb-muted">{member.roleName}</div>
-                          )}
+                        >
+                        <td className="truncate px-3 py-3 text-[13px] font-medium text-kb-heading" title={member.name}>
+                          {member.name}
                         </td>
-                        <td className="px-4 py-3 text-[12.5px] text-kb-muted">{member.department}</td>
-                        <td className="px-4 py-3 text-[12.5px] text-kb-body">
-                          {member.roleLevel ? permissionLevelLabel(member.roleLevel) : "无"}
+                        <td className="truncate px-3 py-3 text-[12.5px] text-kb-body" title={member.roleName ?? "—"}>
+                          {member.roleName ?? "—"}
                         </td>
-                        <td className="px-4 py-3">
-                          {member.directLevel ? (
-                            <KbFilterSelect
-                              value={member.directLevel}
-                              onChange={(value) =>
-                                updateMemberLevel(member.memberId, value as PermissionLevel)
-                              }
-                              options={PERMISSION_LEVEL_OPTIONS}
-                              className="min-w-[96px]"
-                            />
-                          ) : (
-                            <span className="text-[12.5px] text-kb-muted">未设置</span>
-                          )}
+                        <td className="truncate px-3 py-3 text-[12.5px] text-kb-muted" title={member.department}>
+                          {member.department}
                         </td>
-                        <td className="px-4 py-3">
-                          {effective ? (
-                            <KbStatusTag tone={effectiveLevelTone(effective)} variant="outline">
-                              {permissionLevelLabel(effective)}
-                            </KbStatusTag>
-                          ) : (
-                            <span className="text-[12.5px] text-kb-muted">—</span>
-                          )}
+                        <td className="truncate px-3 py-3 text-[12.5px] text-kb-body">
+                          {member.roleLevel ? effectiveTierLabel(member.roleLevel) : "无"}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-3 py-3 text-right">
                           {canRemove ? (
                             <button
                               type="button"
@@ -384,7 +325,7 @@ export function PermissionEditor({
                               移除
                             </button>
                           ) : (
-                            <span className="text-[11.5px] text-kb-muted">请前往角色授权调整</span>
+                            <span className="text-[11.5px] text-kb-muted">角色授权</span>
                           )}
                         </td>
                       </tr>
@@ -410,7 +351,6 @@ export function PermissionEditor({
                 <thead>
                   <tr className="border-b border-[#EEF2F4] bg-[#F8FAFB] text-[11.5px] font-medium text-kb-muted">
                     <th className="px-4 py-2.5">申请人</th>
-                    <th className="px-4 py-2.5">所属部门</th>
                     <th className="px-4 py-2.5">申请权限</th>
                     <th className="px-4 py-2.5">申请理由</th>
                     <th className="px-4 py-2.5">申请时间</th>
@@ -423,10 +363,9 @@ export function PermissionEditor({
                       <td className="px-4 py-3 text-[13px] font-medium text-kb-heading">
                         {request.applicantName}
                       </td>
-                      <td className="px-4 py-3 text-[12.5px] text-kb-muted">—</td>
                       <td className="px-4 py-3">
                         <KbStatusTag tone="accent" variant="outline">
-                          {permissionLevelLabel(request.group)}
+                          {effectiveTierLabel(request.group)}
                         </KbStatusTag>
                       </td>
                       <td className="max-w-[200px] px-4 py-3 text-[12px] leading-relaxed text-kb-muted">
@@ -515,9 +454,6 @@ export function PermissionOverviewStrip({ grants }: { grants: PermissionGrants }
   const summary = summarizeGrants(grants);
   return (
     <div className="flex flex-wrap gap-4 text-[12.5px] text-kb-muted">
-      <span>
-        管理者 <strong className="font-semibold text-kb-heading">{summary.managerCount}</strong> 人
-      </span>
       <span>
         已授权角色{" "}
         <strong className="font-semibold text-kb-heading">{summary.roleCount}</strong> 个

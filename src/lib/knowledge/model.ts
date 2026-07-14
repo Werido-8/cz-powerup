@@ -1,11 +1,16 @@
 import {
-  CURRENT_KNOWLEDGE_USER,
   FAVORITE_FILE_IDS,
   PARSE_EXCEPTIONS,
   PERMISSION_REQUESTS,
   PERSONAL_DIRECTORIES,
   RECENT_FILE_IDS,
 } from "./data";
+import { getCurrentKnowledgeUser } from "./demoRole";
+import {
+  getEffectiveLevelForUser,
+  getGrantsForBase,
+  type PermissionLevel,
+} from "./permission";
 import { getStoreBases, getStoreCategories, getStoreFiles } from "./store";
 import { publishStatusLabel } from "./status";
 import type {
@@ -23,25 +28,52 @@ import type {
   PersonalDirectory,
 } from "./types";
 
-export function isKnowledgeAdmin(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  return user.role === "knowledgeAdmin";
+export function isSuperAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return user.role === "superAdmin";
 }
 
-export function isDepartmentAdmin(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function isKnowledgeAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return user.role === "knowledgeAdmin" || isSuperAdmin(user);
+}
+
+export function isDepartmentAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return user.role === "departmentAdmin";
 }
 
-export function canViewKnowledgeAdmin(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  return isKnowledgeAdmin(user) || isDepartmentAdmin(user);
+export function canViewKnowledgeAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return isKnowledgeAdmin(user) || isDepartmentAdmin(user) || isSuperAdmin(user);
 }
 
-export function canSeeCategoryManager(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
-  return isKnowledgeAdmin(user);
+export function canSeeCategoryManager(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return isKnowledgeAdmin(user) || isSuperAdmin(user);
 }
 
-export function canManageBase(base: KnowledgeBase, user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function canSeeGlobalAudit(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return isSuperAdmin(user);
+}
+
+function effectiveLevelForBase(
+  base: KnowledgeBase,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
+): PermissionLevel | null {
+  if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return "manage";
+  if (base.scope === "personal") {
+    if (base.ownerName === user.name || user.role === "employee") return "manage";
+    return "manage";
+  }
+  const fromGrants = getEffectiveLevelForUser(base.id, user.id);
+  if (fromGrants) return fromGrants;
+  if (base.permission.canManage) return "manage";
+  if (base.permission.canUpload) return "upload";
+  if (base.permission.canView) return "view";
+  return null;
+}
+
+export function canManageBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (isSuperAdmin(user)) return true;
   if (isKnowledgeAdmin(user)) return true;
-  return isDepartmentAdmin(user) && base.scope !== "personal";
+  if (base.scope === "personal") return true;
+  return effectiveLevelForBase(base, user) === "manage" || isDepartmentAdmin(user);
 }
 
 export function canBrowseBase(base: KnowledgeBase) {
@@ -50,23 +82,23 @@ export function canBrowseBase(base: KnowledgeBase) {
 
 export function canViewBaseFiles(
   base: KnowledgeBase,
-  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
   if (base.restricted) return false;
   return base.permission.canView || canManageBase(base, user);
 }
 
-export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
   if (base.restricted) return false;
   if (base.scope === "personal") return true;
-  if (isKnowledgeAdmin(user)) return true;
-  if (isDepartmentAdmin(user) && base.scope !== "personal") return true;
-  return base.permission.canUpload;
+  if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return true;
+  const level = effectiveLevelForBase(base, user);
+  return level === "upload" || level === "manage" || base.permission.canUpload;
 }
 
 export function canConfigureBasePermission(
   base: KnowledgeBase,
-  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
   // 公共库对全员开放，不提供权限配置能力；仅专业库支持配置权限
   if (base.scope === "public") return false;
@@ -75,12 +107,33 @@ export function canConfigureBasePermission(
 
 export function canManageFileList(
   base?: KnowledgeBase,
-  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
-  if (user.role === "employee") return false;
+  if (isSuperAdmin(user)) return true;
+  if (user.role === "employee" && base?.scope !== "personal") return false;
   if (base?.scope === "personal") return true;
   if (!base) return canViewKnowledgeAdmin(user);
   return canManageBase(base, user);
+}
+
+export function canDeleteFile(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (base.scope === "personal") return true;
+  return canManageBase(base, user);
+}
+
+export function canMoveCrossLibrary(
+  source: KnowledgeBase,
+  target: KnowledgeBase,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
+) {
+  if (source.scope === "personal" && target.scope !== "personal") {
+    return canUploadToBase(target, user);
+  }
+  if (source.scope !== "personal" && target.scope !== "personal") {
+    return canManageBase(source, user) && canManageBase(target, user);
+  }
+  if (source.scope !== "personal" && target.scope === "personal") return false;
+  return canManageFileList(source, user) && canManageFileList(target, user);
 }
 
 export function isFileEnabled(file: KnowledgeFile) {
@@ -145,42 +198,51 @@ export function getPersonalDirectoryTreeDirectories() {
   return getPersonalDirectoryChildren(PERSONAL_DIRECTORY_ROOT_ID);
 }
 
-export function getPersonalTreeBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getPersonalTreeBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getPersonalBases().filter((base) => canViewBaseFiles(base, user));
 }
 
-export function getProfessionalTreeBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getProfessionalTreeBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getStoreBases().filter(
     (base) => base.scope !== "personal" && base.status === "enabled" && canViewBaseFiles(base, user),
   );
 }
 
-export function getFilesForPersonalTree(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getFilesForPersonalTree(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getPersonalTreeBases(user).flatMap((base) => getFilesForBase(base.id));
 }
 
-export function getFilesForProfessionalTree(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getFilesForProfessionalTree(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getProfessionalTreeBases(user).flatMap((base) => getFilesForBase(base.id));
 }
 
-export function getReadableBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getReadableBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getStoreBases().filter(
     (base) => base.status === "enabled" && canViewBaseFiles(base, user),
   );
 }
 
-export function getManageableBases(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getManageableBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   const allBases = getStoreBases();
-  if (isKnowledgeAdmin(user)) return allBases;
+  if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return allBases;
   if (isDepartmentAdmin(user)) {
     return allBases.filter((base) => base.scope !== "personal");
   }
-  return [];
+  return allBases.filter((base) => canManageBase(base, user));
+}
+
+/** 超级管理员：全部个人库文件集合（审计） */
+export function getGlobalAuditFiles(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (!canSeeGlobalAudit(user)) return [];
+  return getStoreFiles().filter((file) => {
+    const base = getBaseById(file.knowledgeBaseId);
+    return base?.scope === "personal";
+  });
 }
 
 export function isFileVisibleToUser(
   file: KnowledgeFile,
-  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
   const base = getBaseById(file.knowledgeBaseId);
   if (!base || base.status !== "enabled") return false;
@@ -189,13 +251,13 @@ export function isFileVisibleToUser(
   return file.uploaderId === user.id || canManageBase(base, user);
 }
 
-export function getFilesForBase(baseId: string, user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getFilesForBase(baseId: string, user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getStoreFiles().filter(
     (file) => file.knowledgeBaseId === baseId && isFileVisibleToUser(file, user),
   );
 }
 
-export function getAllPublishedFiles(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getAllPublishedFiles(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getStoreFiles().filter((file) => {
     const base = getBaseById(file.knowledgeBaseId);
     return (
@@ -219,7 +281,7 @@ export function getFavoriteFiles() {
   );
 }
 
-export function getDefaultOverviewBaseId(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getDefaultOverviewBaseId(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return (
     getPinnedBases().find((base) => base.scope !== "personal" && canViewBaseFiles(base, user))
       ?.id ??
@@ -229,16 +291,16 @@ export function getDefaultOverviewBaseId(user: KnowledgeUser = CURRENT_KNOWLEDGE
 }
 
 /** 用户置顶的文件（同步到左侧「快速访问」） */
-export function getPinnedFiles(user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+export function getPinnedFiles(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getStoreFiles().filter(
     (file) => file.pinned && file.isCurrentVersion !== false && isFileVisibleToUser(file, user),
   );
 }
 
-/** 文件可移动到的目标知识库：已启用、可管理/可上传、排除当前库 */
+/** 文件可移动到的目标知识库 */
 export function getMoveTargetBases(
   currentBaseId?: string,
-  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
   const sourceBase = currentBaseId ? getBaseById(currentBaseId) : undefined;
   const sourceIsPersonal = sourceBase?.scope === "personal";
@@ -246,13 +308,29 @@ export function getMoveTargetBases(
   return getStoreBases().filter((base) => {
     if (base.id === currentBaseId) return false;
     if (base.status !== "enabled") return false;
-    // 个人空间文件只能移动到其他个人库；专业/公共库文件只能移动到其他专业/公共库
+
     if (sourceBase) {
-      if (sourceIsPersonal && base.scope !== "personal") return false;
+      if (sourceIsPersonal && base.scope === "personal") {
+        return canManageFileList(base, user);
+      }
+      if (sourceIsPersonal && base.scope !== "personal") {
+        return canUploadToBase(base, user);
+      }
       if (!sourceIsPersonal && base.scope === "personal") return false;
+      return canMoveCrossLibrary(sourceBase, base, user);
     }
-    return canManageFileList(base, user) || base.permission.canUpload;
+
+    return canManageFileList(base, user) || canUploadToBase(base, user);
   });
+}
+
+export function isSubmitToPublicMove(
+  sourceBaseId: string | undefined,
+  targetBaseId: string,
+): boolean {
+  const source = sourceBaseId ? getBaseById(sourceBaseId) : undefined;
+  const target = getBaseById(targetBaseId);
+  return source?.scope === "personal" && target?.scope !== "personal";
 }
 
 export function getFirstReadableFileInBase(baseId: string) {
@@ -529,9 +607,9 @@ export function resolveBreadcrumbSelection(option: KnowledgeBreadcrumbOption): s
 
 export function permissionGroupLabel(group: KnowledgePermissionGroup) {
   const labels: Record<KnowledgePermissionGroup, string> = {
-    view: "浏览",
-    upload: "上传",
-    manage: "管理",
+    view: "访问权限",
+    upload: "访问权限",
+    manage: "库管理",
   };
   return labels[group];
 }
@@ -541,9 +619,9 @@ export function getPermissionRequestsForBase(baseId: string): PermissionRequest[
 }
 
 export function getParseExceptionsForScope(
-  user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
 ): ParseException[] {
-  if (isKnowledgeAdmin(user)) return PARSE_EXCEPTIONS;
+  if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return PARSE_EXCEPTIONS;
   return PARSE_EXCEPTIONS.filter((item) => {
     const file = getFileById(item.fileId);
     const base = file ? getBaseById(file.knowledgeBaseId) : undefined;

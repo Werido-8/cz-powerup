@@ -3,11 +3,13 @@ import { useMemo, useState } from "react";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { KbFilterSelect } from "@/components/knowledge/ui";
 import {
-  PERMISSION_LEVEL_OPTIONS,
+  DEFAULT_GRANT_TIER,
+  GRANT_TIER_SELECT_OPTIONS,
+  SHOW_GRANT_TIER_UI,
   SYSTEM_ROLES,
-  permissionLevelLabel,
+  tierToLevel,
+  type GrantTier,
   type KbRoleGrant,
-  type PermissionLevel,
 } from "@/lib/knowledge/permission";
 import { cn } from "@/lib/utils";
 
@@ -24,15 +26,12 @@ export function AddRoleDialog({
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [level, setLevel] = useState<PermissionLevel>("view");
+  const [tier, setTier] = useState<GrantTier>(DEFAULT_GRANT_TIER);
 
   const available = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return SYSTEM_ROLES.filter((role) => !existingRoleIds.includes(role.id)).filter(
-      (role) =>
-        !normalized ||
-        role.name.toLowerCase().includes(normalized) ||
-        role.scopeLabel.toLowerCase().includes(normalized),
+      (role) => !normalized || role.name.toLowerCase().includes(normalized),
     );
   }, [existingRoleIds, query]);
 
@@ -45,17 +44,18 @@ export function AddRoleDialog({
   };
 
   const handleAdd = () => {
+    // 一期：未展示档位 UI 时固定为默认访问权限（浏览/下载/收藏/上传）
+    const level = tierToLevel(SHOW_GRANT_TIER_UI ? tier : DEFAULT_GRANT_TIER);
     const roles: KbRoleGrant[] = SYSTEM_ROLES.filter((role) => selected.has(role.id)).map((role) => ({
       roleId: role.id,
       roleName: role.name,
-      scopeLabel: role.scopeLabel,
       memberCount: role.memberCount,
       level,
     }));
     onAdd(roles);
     setQuery("");
     setSelected(new Set());
-    setLevel("view");
+    setTier(DEFAULT_GRANT_TIER);
   };
 
   return (
@@ -81,7 +81,7 @@ export function AddRoleDialog({
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="搜索角色名称或所属部门"
+          placeholder="搜索角色名称"
           className="min-w-0 flex-1 bg-transparent text-[13px] text-kb-body outline-none placeholder:text-kb-muted"
         />
       </div>
@@ -115,7 +115,6 @@ export function AddRoleDialog({
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-kb-heading">
                   {role.name}
                 </span>
-                <span className="shrink-0 text-[12px] text-kb-muted">{role.scopeLabel}</span>
                 <span className="w-14 shrink-0 text-right text-[12px] tabular-nums text-kb-muted">
                   {role.memberCount} 人
                 </span>
@@ -125,18 +124,18 @@ export function AddRoleDialog({
         )}
       </div>
 
-      <div className="mt-4 flex items-center justify-between border-t border-[#EEF2F4] pt-4">
-        <span className="text-[12.5px] font-medium text-kb-heading">授予权限</span>
-        <KbFilterSelect
-          value={level}
-          onChange={(value) => setLevel(value as PermissionLevel)}
-          options={PERMISSION_LEVEL_OPTIONS.map((option) => ({
-            value: option.value,
-            label: `${permissionLevelLabel(option.value)}权限`,
-          }))}
-          className="min-w-[140px]"
-        />
-      </div>
+      {/* 二期：将 SHOW_GRANT_TIER_UI 设为 true 后恢复「访问权限 / 库管理」选择 */}
+      {SHOW_GRANT_TIER_UI && (
+        <div className="mt-4 flex items-center justify-between border-t border-[#EEF2F4] pt-4">
+          <span className="text-[12.5px] font-medium text-kb-heading">授予权限</span>
+          <KbFilterSelect
+            value={tier}
+            onChange={(value) => setTier(value as GrantTier)}
+            options={GRANT_TIER_SELECT_OPTIONS}
+            className="min-w-[140px]"
+          />
+        </div>
+      )}
     </AppFormDialog>
   );
 }

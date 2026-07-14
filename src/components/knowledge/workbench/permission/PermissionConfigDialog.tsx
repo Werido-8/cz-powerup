@@ -62,7 +62,7 @@ export function PermissionConfigDialog({
       <div className="mb-4">
         <div className="text-[14px] font-semibold text-kb-heading">{base.name}</div>
         <div className="mt-0.5 text-[12px] text-kb-muted">
-          专业知识库
+          公共知识库（按权限）
           {base.categoryPath?.length ? ` · ${base.categoryPath.join(" / ")}` : ""}
         </div>
       </div>

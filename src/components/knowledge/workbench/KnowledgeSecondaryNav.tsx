@@ -1,16 +1,27 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Database, FolderOpen, LayoutGrid, Network } from "lucide-react";
+import { useSyncExternalStore } from "react";
+import { getDemoRoleKey, subscribeDemoRole } from "@/lib/knowledge/demoRole";
 import { cn } from "@/lib/utils";
 import { canViewKnowledgeAdmin } from "@/lib/knowledge/model";
 
-const items = [
+type SecondaryNavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutGrid;
+  exact?: boolean;
+  adminOnly?: boolean;
+};
+
+const items: SecondaryNavItem[] = [
   { to: "/knowledge", label: "知识总览", icon: LayoutGrid, exact: true },
   { to: "/knowledge/all", label: "全库资料", icon: Database },
   { to: "/knowledge/mine", label: "我的空间", icon: FolderOpen },
   { to: "/knowledge/admin", label: "知识管理", icon: Network, adminOnly: true },
-] as const;
+];
 
 export function KnowledgeSecondaryNav({ className }: { className?: string }) {
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const showAdmin = canViewKnowledgeAdmin();
 

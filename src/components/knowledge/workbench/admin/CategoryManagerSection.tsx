@@ -134,7 +134,7 @@ export function CategoryManagerSection({ embedded = false }: { embedded?: boolea
       <div className={cn(kbCardShell, kbRadius.md, "p-6")}>
         <KbEmptyState
           title="还没有任何分类"
-          description="创建根分类，用于组织专业知识库，可逐级嵌套维护。"
+          description="创建根分类，用于组织公共知识库，可逐级嵌套维护。"
           action={
             <KbButton onClick={openCreateRoot}>
               <Plus className="h-4 w-4 stroke-[1.8]" />
@@ -164,7 +164,7 @@ export function CategoryManagerSection({ embedded = false }: { embedded?: boolea
       <KbPageHeader
         label="仅知识库管理员可见"
         title="分类管理"
-        description="分类用于组织专业知识库，可嵌套维护。下属仍有子分类或知识库时禁止删除。"
+        description="分类用于组织公共知识库，可嵌套维护。下属仍有子分类或知识库时禁止删除。"
         action={
           <KbButton onClick={openCreateRoot}>
             <Plus className="h-4 w-4 stroke-[1.8]" />

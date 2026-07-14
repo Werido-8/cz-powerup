@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Download,
+  History,
   Library,
   MoreHorizontal,
   Pencil,
@@ -28,6 +29,7 @@ export function FilePreviewToolbar({
   currentVersionId,
   onBack,
   onVersionChange,
+  onOpenVersionHistory,
   canEdit,
 }: {
   currentBase: KnowledgeBase;
@@ -36,6 +38,7 @@ export function FilePreviewToolbar({
   currentVersionId?: string;
   onBack: () => void;
   onVersionChange: (versionId: string) => void;
+  onOpenVersionHistory?: () => void;
   canEdit: boolean;
 }) {
   const typeConfig = kbFileTypeConfig[currentFile.type ?? "other"];
@@ -62,13 +65,22 @@ export function FilePreviewToolbar({
       <KbStatusTag tone={publishStatusTone(currentFile.status)}>
         {publishStatusLabel(currentFile.status)}
       </KbStatusTag>
-      <KbStatusTag tone="neutral">{currentFile.version ?? "v1"}</KbStatusTag>
       <KbStatusTag tone="accent">{typeConfig.label}</KbStatusTag>
       <KbVersionSelect
         versions={versions}
         value={currentVersionId}
         onChange={onVersionChange}
       />
+      {versions.length > 1 && onOpenVersionHistory && (
+        <button
+          type="button"
+          onClick={onOpenVersionHistory}
+          className="inline-flex h-9 items-center gap-1 rounded-[8px] px-2.5 text-[12px] font-medium text-kb-muted transition-colors hover:bg-kb-surface-hover hover:text-primary"
+        >
+          <History className="h-3.5 w-3.5 stroke-[1.8]" />
+          版本历史
+        </button>
+      )}
       <KbIconButton icon={Download} label="下载" onClick={() => toast.message("开始下载文件")} />
       <KbIconButton
         icon={Star}

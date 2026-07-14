@@ -1,5 +1,5 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { KbButton, KbEmptyState } from "@/components/knowledge/ui";
 import {
   canManageBase,
@@ -10,6 +10,7 @@ import {
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
+import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
 import { FileAIAssistantPanel } from "./preview/FileAIAssistantPanel";
 import { FilePreviewCanvas } from "./preview/FilePreviewCanvas";
 import { FilePreviewToolbar } from "./preview/FilePreviewToolbar";
@@ -26,6 +27,7 @@ export function FileDetailPage({
 }) {
   const navigate = useNavigate({ from: "/knowledge/file/$fileId" });
   const router = useRouter();
+  const [historyOpen, setHistoryOpen] = useState(false);
   const routeFile = getFileById(fileId);
   const routeBase = initialKnowledgeBaseId ? getBaseById(initialKnowledgeBaseId) : undefined;
   const fileBase = routeFile ? getBaseById(routeFile.knowledgeBaseId) : undefined;
@@ -69,15 +71,6 @@ export function FileDetailPage({
     }
   }, [currentFile, currentBase]);
 
-  const relatedQuestions = useMemo(
-    () => [
-      "这份文件的关键执行要求是什么？",
-      "有哪些需要运行人员重点关注的风险？",
-      "历史版本和当前版本有什么差异？",
-    ],
-    [],
-  );
-
   if (!currentBase || !currentFile) {
     return (
       <main className={cn(kbMainPanel, "items-center justify-center p-6")}>
@@ -101,6 +94,7 @@ export function FileDetailPage({
         onVersionChange={(vid) =>
           navigate({ search: (prev) => ({ ...prev, version: vid }) })
         }
+        onOpenVersionHistory={() => setHistoryOpen(true)}
         canEdit={canManageBase(currentBase)}
       />
 
@@ -121,12 +115,17 @@ export function FileDetailPage({
           version={currentVersion}
           historyVersion={historyVersion}
         />
-        <FileAIAssistantPanel
-          file={currentFile}
-          base={currentBase}
-          questions={relatedQuestions}
-        />
+        <FileAIAssistantPanel file={currentFile} base={currentBase} />
       </div>
+
+      <FileVersionHistoryDialog
+        file={historyOpen ? currentFile : null}
+        onClose={() => setHistoryOpen(false)}
+        onPreviewVersion={(versionId) => {
+          setHistoryOpen(false);
+          navigate({ search: (prev) => ({ ...prev, version: versionId }) });
+        }}
+      />
     </main>
   );
 }

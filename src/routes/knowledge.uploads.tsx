@@ -1,22 +1,23 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { z } from "zod";
-import { MyUploadPage } from "@/components/knowledge/workbench/MyUploadPage";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import type { UploadView } from "@/lib/knowledge/uploadTracking";
 
-const uploadSearchSchema = z.object({
-  view: z.enum(["all", "review", "parse", "publish"]).optional().catch("all"),
-  status: z.string().optional().catch(undefined),
-  q: z.string().optional().catch(undefined),
-});
-
-export type UploadSearch = z.infer<typeof uploadSearchSchema>;
-
+/**
+ * /knowledge/uploads 已合并进「我的空间」，保留此路由做兼容重定向。
+ */
 export const Route = createFileRoute("/knowledge/uploads")({
-  validateSearch: uploadSearchSchema,
-  component: KnowledgeUploadsRoute,
-  head: () => ({ meta: [{ title: "我的上传 · 知识库 · 涉网运行能力智能提升平台" }] }),
+  beforeLoad: ({ search }) => {
+    const legacy = search as { view?: string; status?: string; q?: string };
+    const view = legacy.view as UploadView | undefined;
+    throw redirect({
+      to: "/knowledge/mine",
+      search: {
+        panel: "uploads",
+        view,
+        status: legacy.status,
+        q: legacy.q,
+      },
+      replace: true,
+    });
+  },
+  component: () => null,
 });
-
-function KnowledgeUploadsRoute() {
-  const search = Route.useSearch();
-  return <MyUploadPage search={search} />;
-}

@@ -68,7 +68,7 @@ export function DirectoryMoveDialog({
   }, [target]);
 
   const rootLabel =
-    target?.kind === "category" ? "专业知识库根目录" : "个人空间根目录";
+    target?.kind === "category" ? "公共知识库根目录" : "个人空间根目录";
   const rootId =
     target?.kind === "category" ? PROFESSIONAL_CATEGORY_ROOT_ID : PERSONAL_DIRECTORY_ROOT_ID;
 

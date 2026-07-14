@@ -1,4 +1,4 @@
-export type KnowledgeUserRole = "employee" | "departmentAdmin" | "knowledgeAdmin";
+export type KnowledgeUserRole = "employee" | "departmentAdmin" | "knowledgeAdmin" | "superAdmin";
 
 export type KnowledgeBaseStatus = "enabled" | "disabled";
 
@@ -14,6 +14,11 @@ export type FilePublishStatus =
   | "disabled";
 
 export type KnowledgePermissionGroup = "view" | "upload" | "manage";
+
+/** UI 二档权限：访问 / 库管理（内部仍映射到 view|upload|manage） */
+export type GrantTier = "access" | "manage";
+
+export type SubParseStatus = KnowledgeParseStatus | "skipped";
 
 export type KnowledgeParseStatus = "waiting" | "parsing" | "success" | "failed";
 
@@ -96,7 +101,16 @@ export interface KnowledgeFile {
   isCurrentVersion?: boolean;
   status: FilePublishStatus;
   parseStatus?: KnowledgeParseStatus;
+  /** 文档基础解析 */
+  docParseStatus?: SubParseStatus;
+  /** AI 智能体解析（摘要、脑图、题目等） */
+  aiParseStatus?: SubParseStatus;
   parseError?: string;
+  /** 不支持解析的格式，仅作文件存储 */
+  storageOnly?: boolean;
+  /** 审批时可编辑的 AI 字段 */
+  aiKeywords?: string[];
+  aiQuestions?: string[];
   uploaderId?: string;
   uploaderName?: string;
   updatedAt?: string;
@@ -134,6 +148,8 @@ export interface UploadRecord {
   rejectReason?: string;
   /** 关联文件的解析状态（演示数据可直接写入） */
   parseStatus?: KnowledgeParseStatus;
+  docParseStatus?: SubParseStatus;
+  aiParseStatus?: SubParseStatus;
 
   /* ─── 上传跟踪多维字段（演示数据可选写入） ─── */
   /** 最近一次状态变化时间 */
@@ -175,15 +191,24 @@ export interface PermissionRequest {
   notifyStatus: "waiting" | "sent";
 }
 
+export type ApprovalStatus = "pendingApproval" | "approved" | "rejected" | "parsing";
+
 export interface UploadApproval {
   id: string;
   fileName: string;
   knowledgeBaseName: string;
+  knowledgeBaseId?: string;
   submitterName: string;
   submittedAt: string;
   fileSize?: string;
   uploadNote?: string;
   riskHint?: string;
+  status?: ApprovalStatus;
+  parseStatus?: KnowledgeParseStatus;
+  summary?: string;
+  aiKeywords?: string[];
+  aiQuestions?: string[];
+  categoryId?: string;
 }
 
 export interface ParseException {
@@ -192,8 +217,9 @@ export interface ParseException {
   fileName: string;
   knowledgeBaseName: string;
   uploadedAt: string;
+  /** 原始失败原因（不做类型枚举） */
   reason: string;
-  failureType?: "ocr" | "timeout" | "format" | "other";
+  uploaderName?: string;
   fileSize?: string;
   version?: string;
 }

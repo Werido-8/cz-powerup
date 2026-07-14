@@ -11,7 +11,7 @@ import {
 import { AppDialogButton } from "@/components/ui/app-dialog";
 import { AppFormInput, AppFormTextarea } from "@/components/ui/app-form";
 import { KbFormDialog, KbFormField } from "@/components/knowledge/ui";
-import { CURRENT_KNOWLEDGE_USER } from "@/lib/knowledge/data";
+import { getCurrentKnowledgeUser } from "@/lib/knowledge/demoRole";
 import {
   getCategoryPathLabel,
   getKnowledgeBaseDescriptionMaxLength,
@@ -35,13 +35,13 @@ const SCOPE_OPTIONS: {
 }[] = [
   {
     value: "professional",
-    label: "专业知识库",
-    desc: "面向特定部门 / 岗位，需配置查看、上传与管理权限",
+    label: "公共知识库（专业）",
+    desc: "面向特定角色 / 岗位，需配置查看、上传与管理权限",
     icon: ShieldCheck,
   },
   {
     value: "public",
-    label: "公共库",
+    label: "公共知识库（全员）",
     desc: "面向全员开放，无需配置权限，所有人可查看",
     icon: Globe,
   },
@@ -137,7 +137,7 @@ export function KnowledgeBaseFormDrawer({
             canConfigurePermission: true,
           },
       updatedAt: base?.updatedAt ?? formatNow(),
-      ownerName: base?.ownerName ?? CURRENT_KNOWLEDGE_USER.name,
+      ownerName: base?.ownerName ?? getCurrentKnowledgeUser().name,
     });
     setSubmitting(false);
   };
@@ -212,7 +212,7 @@ export function KnowledgeBaseFormDrawer({
           {scope === "professional" ? (
             <>
               <KeyRound className="mt-[1px] h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-              <span>专业知识库需在保存后于「权限」中配置查看 / 上传 / 管理范围。</span>
+              <span>公共知识库（专业）需在保存后于「权限」中配置可查看与上传的角色 / 成员。</span>
             </>
           ) : (
             <>

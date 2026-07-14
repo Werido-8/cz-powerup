@@ -20,19 +20,7 @@ import { FileListCheckbox } from "../FileListCheckbox";
 import { useFileSelection } from "../useFileSelection";
 
 const GRID =
-  "grid-cols-[36px_minmax(260px,1.6fr)_minmax(180px,1fr)_150px_minmax(220px,auto)] min-w-[900px]";
-
-function failureTypeLabel(type?: ParseException["failureType"]) {
-  if (type === "ocr") return "OCR 识别失败";
-  if (type === "timeout") return "解析超时";
-  if (type === "format") return "格式异常";
-  return "解析失败";
-}
-
-function failureTypeTone(type?: ParseException["failureType"]) {
-  if (type === "ocr") return "warning" as const;
-  return "danger" as const;
-}
+  "grid-cols-[36px_minmax(240px,1.5fr)_minmax(140px,1fr)_100px_150px_minmax(220px,auto)] min-w-[960px]";
 
 export function ParseExceptionSection({
   items,
@@ -44,7 +32,7 @@ export function ParseExceptionSection({
   const [rows, setRows] = useState(items);
   const [query, setQuery] = useState("");
   const [baseFilter, setBaseFilter] = useState("all");
-  const [timeRange, setTimeRange] = useState("all");
+  const [submitterFilter, setSubmitterFilter] = useState("all");
   const [logItem, setLogItem] = useState<ParseException | null>(null);
   const [batchLoading, setBatchLoading] = useState<"retry" | "delete" | null>(null);
 
@@ -62,17 +50,27 @@ export function ParseExceptionSection({
     ];
   }, [rows]);
 
+  const submitterOptions = useMemo(() => {
+    const names = Array.from(
+      new Set(rows.map((item) => item.uploaderName).filter(Boolean) as string[]),
+    );
+    return [{ value: "all", label: "全部提交人" }, ...names.map((n) => ({ value: n, label: n }))];
+  }, [rows]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return rows.filter((item) => {
       if (baseFilter !== "all" && item.knowledgeBaseName !== baseFilter) return false;
+      if (submitterFilter !== "all" && item.uploaderName !== submitterFilter) return false;
       if (!q) return true;
       return (
         item.fileName.toLowerCase().includes(q) ||
-        item.knowledgeBaseName.toLowerCase().includes(q)
+        item.knowledgeBaseName.toLowerCase().includes(q) ||
+        item.uploaderName?.toLowerCase().includes(q) ||
+        item.reason.toLowerCase().includes(q)
       );
     });
-  }, [baseFilter, query, rows]);
+  }, [baseFilter, query, rows, submitterFilter]);
 
   const pageIds = useMemo(() => filtered.map((item) => item.id), [filtered]);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selection.isSelected(id));
@@ -80,7 +78,7 @@ export function ParseExceptionSection({
 
   useEffect(() => {
     selection.clear();
-  }, [baseFilter, query, timeRange]);
+  }, [baseFilter, query, submitterFilter]);
 
   const removeRows = useCallback(
     (ids: string[]) => {
@@ -190,7 +188,7 @@ export function ParseExceptionSection({
           <SearchInput
             value={query}
             onChange={setQuery}
-            placeholder="搜索文件名 / 所属知识库"
+            placeholder="搜索文件名 / 提交人 / 异常原因"
             className="h-9 min-w-[200px] max-w-[280px] flex-1 !rounded-[8px] py-0"
           />
           <KbFilterPills
@@ -200,15 +198,10 @@ export function ParseExceptionSection({
             options={baseOptions}
           />
           <KbFilterPills
-            label="时间"
-            value={timeRange}
-            onChange={setTimeRange}
-            options={[
-              { value: "all", label: "全部时间" },
-              { value: "today", label: "今天" },
-              { value: "week", label: "近 7 天" },
-              { value: "month", label: "近 30 天" },
-            ]}
+            label="提交人"
+            value={submitterFilter}
+            onChange={setSubmitterFilter}
+            options={submitterOptions}
           />
         </div>
       )}
@@ -232,6 +225,7 @@ export function ParseExceptionSection({
           </span>
           <span>文件名</span>
           <span>所属知识库</span>
+          <span>提交人</span>
           <span>上传时间</span>
           <span className="text-right">操作</span>
         </>
@@ -255,10 +249,11 @@ export function ParseExceptionSection({
             <KbTableCellFile
               name={item.fileName}
               nameWeight="normal"
-              subtitle={[item.fileSize, item.version].filter(Boolean).join(" / ")}
+              subtitle={item.reason}
               type={item.fileName.endsWith(".pdf") ? "pdf" : "xlsx"}
             />
             <span className="truncate text-kb-muted">{item.knowledgeBaseName}</span>
+            <span className="truncate text-kb-muted">{item.uploaderName ?? "—"}</span>
             <span className="text-kb-muted">{item.uploadedAt}</span>
             <span className="flex items-center justify-end gap-1">
               <KbIconTextButton
@@ -300,9 +295,7 @@ export function ParseExceptionSection({
         {logItem && (
           <div className="space-y-4 text-[13px]">
             <div className="flex items-center gap-2">
-              <KbStatusTag tone={failureTypeTone(logItem.failureType)}>
-                {failureTypeLabel(logItem.failureType)}
-              </KbStatusTag>
+              <KbStatusTag tone="danger">解析异常</KbStatusTag>
               <span className="text-kb-muted">{logItem.uploadedAt}</span>
             </div>
             <div>
@@ -315,8 +308,7 @@ export function ParseExceptionSection({
 {`[${logItem.uploadedAt}] 开始解析 ${logItem.fileName}
 [stage] 文件读取 ... ok (${logItem.fileSize ?? "-"})
 [stage] 内容抽取 ...
-[error] ${failureTypeLabel(logItem.failureType)}
-[detail] ${logItem.reason}
+[error] ${logItem.reason}
 [hint] 可在处理后点击「重试」重新解析。`}
               </pre>
             </div>

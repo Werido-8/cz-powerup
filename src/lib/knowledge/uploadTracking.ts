@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { KnowledgeStatusTone } from "./status";
 import type { UploadRecord } from "./types";
+import { getBaseById } from "./model";
 
 /* ─────────────────────────────────────────────
  * 视图与三维状态模型
@@ -50,8 +51,7 @@ export function getReviewStatus(record: UploadRecord): ReviewStatus {
 }
 
 export function getParseStage(record: UploadRecord): ParseStage {
-  // 未通过审核前，解析尚未开始
-  if (getReviewStatus(record) !== "APPROVED") return "PENDING";
+  // 先解析后审批：公共库在审核完成前即可进入解析流程
   switch (record.parseStatus) {
     case "parsing":
       return "PROCESSING";
@@ -71,10 +71,17 @@ export function getPublishStage(record: UploadRecord): PublishStage {
 }
 
 export function getCurrentStage(record: UploadRecord): CurrentStage {
-  const review = getReviewStatus(record);
-  if (review === "PENDING" || review === "REJECTED") return "REVIEW";
+  const base = getBaseById(record.targetKnowledgeBaseId);
   const parse = getParseStage(record);
+  const review = getReviewStatus(record);
+
+  if (base?.scope === "personal") {
+    if (parse === "PENDING" || parse === "PROCESSING" || parse === "ERROR") return "PARSE";
+    return "PUBLISH";
+  }
+
   if (parse === "PENDING" || parse === "PROCESSING" || parse === "ERROR") return "PARSE";
+  if (review === "PENDING" || review === "REJECTED") return "REVIEW";
   return "PUBLISH";
 }
 
@@ -296,8 +303,8 @@ export function belongsToView(view: UploadView, record: UploadRecord) {
       // 审核维度有意义（所有记录都经历过审核）
       return true;
     case "parse":
-      // 仅已通过审核（进入或将进入解析）的记录
-      return getReviewStatus(record) === "APPROVED";
+      // 先解析后审批：非驳回记录均可展示解析进度
+      return getReviewStatus(record) !== "REJECTED";
     case "publish":
       // 已发布 / 已停用 / 待发布
       return getCurrentStage(record) === "PUBLISH";
@@ -331,7 +338,7 @@ export const UPLOAD_VIEW_META: Record<UploadView, ViewMeta> = {
     title: "审核进度",
     description: "查看文件审核状态、审批记录和驳回原因",
     emptyTitle: "暂无审核记录",
-    emptyDesc: "提交到专业知识库的文件将在这里展示审核进度",
+    emptyDesc: "提交到公共知识库的文件将在这里展示审核进度",
     countUnit: "审核记录",
   },
   parse: {
@@ -339,7 +346,7 @@ export const UPLOAD_VIEW_META: Record<UploadView, ViewMeta> = {
     title: "解析进度",
     description: "跟踪文件解析过程，查看解析结果与异常原因",
     emptyTitle: "暂无解析记录",
-    emptyDesc: "审核通过后的文件将在这里展示解析进度",
+    emptyDesc: "文件上传后将先进入解析，解析完成后进入审批",
     countUnit: "解析记录",
   },
   publish: {

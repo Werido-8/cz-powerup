@@ -1,7 +1,25 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell, ChevronDown } from "lucide-react";
+import { Bell, ChevronDown, UserCog } from "lucide-react";
 import logo from "@/assets/logo.png";
+import {
+  DEMO_ROLE_LABELS,
+  DEMO_USERS,
+  getDemoRoleKey,
+  setDemoRole,
+  subscribeDemoRole,
+} from "@/lib/knowledge/demoRole";
+import { canViewKnowledgeAdmin } from "@/lib/knowledge/model";
+import type { KnowledgeUserRole } from "@/lib/knowledge/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface MenuItem {
   label: string;
@@ -19,7 +37,6 @@ const MENU: MenuItem[] = [
       { label: "知识总览", to: "/knowledge" },
       // { label: "全库资料", to: "/knowledge/all" },
       { label: "我的空间", to: "/knowledge/mine" },
-      { label: "我的上传", to: "/knowledge/uploads" },
       { label: "知识管理", to: "/knowledge/admin" },
     ],
   },
@@ -40,6 +57,8 @@ const MENU: MenuItem[] = [
   { label: "场景训练", to: "/scenario" },
   { label: "知识治理", to: "/governance" },
 ];
+
+const DEMO_ROLE_OPTIONS: KnowledgeUserRole[] = ["employee", "knowledgeAdmin", "superAdmin"];
 
 function isItemActive(pathname: string, to: string) {
   if (to === "/") return pathname === "/";
@@ -137,8 +156,62 @@ function NavLink({
   );
 }
 
+function DemoRoleSwitcher() {
+  const currentRole = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  const currentUser = DEMO_USERS[currentRole];
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <div className="flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-primary/40">
+          <div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[12px] font-semibold text-primary-foreground">
+            {currentUser.name[0]}
+          </div>
+          <span className="text-[13px] font-medium text-foreground">{currentUser.name}</span>
+          <div className="flex items-center gap-0.5 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">
+            <UserCog className="h-3 w-3" />
+            <span className="ml-0.5">{DEMO_ROLE_LABELS[currentRole]}</span>
+            <ChevronDown className="ml-0.5 h-2.5 w-2.5" />
+          </div>
+        </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44 rounded-[10px] border-[#DCEBED]">
+        <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+          演示角色切换
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup
+          value={currentRole}
+          onValueChange={(v) => setDemoRole(v as KnowledgeUserRole)}
+        >
+          {DEMO_ROLE_OPTIONS.map((role) => (
+            <DropdownMenuRadioItem key={role} value={role} className="text-[13px]">
+              <div>
+                <div className="font-medium">{DEMO_USERS[role].name}</div>
+                <div className="text-[11px] text-muted-foreground">{DEMO_ROLE_LABELS[role]}</div>
+              </div>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function Header() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  const showKnowledgeAdmin = canViewKnowledgeAdmin();
+
+  const menu = MENU.map((item) => {
+    if (item.to !== "/knowledge" || !item.children) return item;
+    return {
+      ...item,
+      children: item.children.filter(
+        (child) => child.to !== "/knowledge/admin" || showKnowledgeAdmin,
+      ),
+    };
+  });
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
@@ -158,7 +231,7 @@ export function Header() {
         </Link>
 
         <nav className="ml-4 flex flex-1 items-center gap-1">
-          {MENU.map((m) => (
+          {menu.map((m) => (
             <NavLink key={m.to} m={m} pathname={pathname} />
           ))}
         </nav>
@@ -168,16 +241,7 @@ export function Header() {
             <Bell className="h-[18px] w-[18px]" />
             <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-remind" />
           </button>
-          <div className="flex items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-2">
-            <div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[12px] font-semibold text-primary-foreground">
-              张
-            </div>
-            <span className="text-[13px] font-medium text-foreground">张工</span>
-            <button className="flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-              运行值班
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </div>
+          <DemoRoleSwitcher />
         </div>
       </div>
     </header>

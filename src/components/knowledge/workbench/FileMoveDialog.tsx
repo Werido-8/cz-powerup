@@ -1,5 +1,6 @@
 import { Check, ChevronDown, Clock3, FolderInput, Library, Lock, Search, UserRound } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -7,6 +8,7 @@ import {
   getCategoryChildren,
   getCategoryPathLabel,
   getMoveTargetBases,
+  isSubmitToPublicMove,
 } from "@/lib/knowledge/model";
 import { loadRecentMoveIds, pushRecentMoveId } from "@/lib/knowledge/recentMove";
 import { getKnowledgeStoreVersion, subscribeKnowledgeStore } from "@/lib/knowledge/store";
@@ -54,9 +56,16 @@ export function FileMoveDialog({
 
   const isBatch = files.length > 1;
   const selectedBase = target ? targetById.get(target) : undefined;
+  const isSubmitApproval = isSubmitToPublicMove(effectiveBaseId, target);
 
   const handleConfirm = () => {
     if (!target) return;
+    if (isSubmitApproval) {
+      pushRecentMoveId(target);
+      toast.success("已提交到公共知识库，等待审批");
+      onConfirm(files, target);
+      return;
+    }
     pushRecentMoveId(target);
     onConfirm(files, target);
   };
@@ -65,7 +74,7 @@ export function FileMoveDialog({
     <AppFormDialog
       open={open}
       size="small"
-      title={isBatch ? "批量移动文件" : "移动文件"}
+      title={isSubmitApproval ? "提交到公共知识库" : isBatch ? "批量移动文件" : "移动文件"}
       titleIcon={FolderInput}
       onClose={onClose}
       footer={
@@ -79,14 +88,20 @@ export function FileMoveDialog({
             disabled={!target}
             onClick={handleConfirm}
           >
-            确认移动
+            {isSubmitApproval ? "提交审批" : "确认移动"}
           </AppDialogButton>
         </>
       }
     >
       <div className="space-y-3.5">
         <p className="text-[13px] leading-relaxed text-[#526670]">
-          {isBatch ? (
+          {isSubmitApproval ? (
+            <>
+              将个人库文件提交到公共知识库
+              <strong className="mx-1 font-semibold text-foreground">{selectedBase?.name}</strong>
+              ，提交后需经管理员审批。
+            </>
+          ) : isBatch ? (
             <>
               已选择
               <strong className="mx-1 font-semibold text-foreground">{files.length}</strong>
@@ -284,7 +299,7 @@ export function BaseTreeSelect({
                 />
               ))}
 
-              {professionalTargets.length > 0 && <GroupLabel label="专业知识库" />}
+              {professionalTargets.length > 0 && <GroupLabel label="公共知识库" />}
               {rootProfessional.map((base) => (
                 <BaseRow
                   key={base.id}

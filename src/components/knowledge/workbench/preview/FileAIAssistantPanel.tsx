@@ -1,39 +1,38 @@
 import {
   BookOpenCheck,
-  BrainCircuit,
-  FileText,
   GitFork,
   GraduationCap,
-  Send,
+  Hash,
   Sparkles,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { KbStatusTag } from "@/components/knowledge/ui";
+import { isStorageOnlyFile } from "@/lib/knowledge/parseMerge";
 import type { KnowledgeBase, KnowledgeFile } from "@/lib/knowledge/types";
 import { kbRadius, kbSpacing } from "@/lib/knowledge/tokens";
 import { cn } from "@/lib/utils";
 
-type AiTab = "summary" | "qa" | "evidence" | "training";
+type AiTab = "summary" | "mindmap" | "training" | "keywords";
 
 const tabs: { id: AiTab; label: string }[] = [
   { id: "summary", label: "摘要" },
-  { id: "qa", label: "问答" },
-  { id: "evidence", label: "依据" },
+  { id: "mindmap", label: "脑图" },
   { id: "training", label: "训练题" },
+  { id: "keywords", label: "关键词" },
 ];
 
 export function FileAIAssistantPanel({
   file,
   base,
-  questions,
 }: {
   file: KnowledgeFile;
   base: KnowledgeBase;
-  questions: string[];
 }) {
   const [tab, setTab] = useState<AiTab>("summary");
-  const enabled = file.parseStatus === "success" && file.status === "published";
+  const storageOnly = isStorageOnlyFile(file);
+  const enabled =
+    !storageOnly && file.parseStatus === "success" && file.status === "published";
+  const keywords = file.aiKeywords ?? file.tags ?? [];
 
   return (
     <aside
@@ -47,8 +46,8 @@ export function FileAIAssistantPanel({
           <Sparkles className="h-4 w-4 text-primary stroke-[1.8]" />
           AI 辅助
         </div>
-        <KbStatusTag tone={enabled ? "accent" : "neutral"}>
-          {enabled ? "可用" : "待解析"}
+        <KbStatusTag tone={storageOnly ? "neutral" : enabled ? "accent" : "neutral"}>
+          {storageOnly ? "仅存储" : enabled ? "可用" : "待解析"}
         </KbStatusTag>
       </div>
 
@@ -71,65 +70,59 @@ export function FileAIAssistantPanel({
       </div>
 
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-4">
+        {storageOnly && (
+          <div className="mb-3 rounded-[8px] border border-warning/30 bg-warning-soft px-3 py-2.5 text-[12px] text-warning-foreground">
+            该格式不支持预览、检索与问答，仅作文件存储。
+          </div>
+        )}
+
         {tab === "summary" && (
-          <>
-            <section className={cn("rounded-[8px] border border-kb-border bg-kb-surface p-4", kbRadius.sm)}>
-              <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-kb-heading">
-                <BookOpenCheck className="h-4 w-4 text-primary stroke-[1.8]" />
-                文档摘要
-              </div>
-              <p className="text-[12.5px] leading-relaxed text-kb-muted">
-                {file.summary} 该资料来自 {base.name}，当前版本为 {file.version}。
-              </p>
-              <div className="mt-3 space-y-1.5">
-                <div className="text-[11px] font-medium text-kb-muted">关键点</div>
-                <ul className="list-inside list-disc text-[12px] text-kb-body">
-                  <li>明确执行边界与适用范围</li>
-                  <li>关注协同与审批要求</li>
-                </ul>
-              </div>
-              {file.parseStatus !== "success" && (
-                <div className="mt-3 rounded-[6px] border border-warning/30 bg-warning-soft px-2.5 py-2 text-[11px] text-warning-foreground">
-                  解析完成后可生成完整摘要与风险提示
-                </div>
-              )}
-            </section>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <AiAction icon={GitFork} label="生成脑图" disabled={!enabled} />
-              <AiAction icon={GraduationCap} label="相关题目" disabled={!enabled} />
-              <AiAction icon={BrainCircuit} label="推荐问题" disabled={!enabled} />
-              <AiAction icon={FileText} label="要点摘录" disabled={!enabled} />
+          <section className={cn("rounded-[8px] border border-kb-border bg-kb-surface p-4", kbRadius.sm)}>
+            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-kb-heading">
+              <BookOpenCheck className="h-4 w-4 text-primary stroke-[1.8]" />
+              文档摘要
             </div>
-          </>
-        )}
-        {tab === "qa" && (
-          <section>
-            <div className="mb-2 text-[12px] font-semibold text-kb-muted">推荐问题</div>
-            <div className="space-y-2">
-              {questions.map((question) => (
-                <button
-                  key={question}
-                  type="button"
-                  disabled={!enabled}
-                  className="w-full rounded-[8px] border border-transparent bg-kb-surface px-3 py-2.5 text-left text-[12px] leading-relaxed text-kb-body transition-colors hover:border-primary/20 hover:bg-primary-soft/30 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
+            <p className="text-[12.5px] leading-relaxed text-kb-muted">
+              {file.summary ?? "解析完成后将自动生成文档摘要。"}
+              {enabled ? ` 该资料来自 ${base.name}，当前版本为 ${file.version}。` : ""}
+            </p>
           </section>
         )}
-        {tab === "evidence" && (
-          <section className="text-[12.5px] text-kb-muted">
-            <p>依据溯源将在解析完成后展示文档段落引用与页码定位。</p>
-            <div className="mt-3 rounded-[8px] border border-kb-border bg-kb-surface p-3 text-[12px] text-kb-body">
-              第 3 页 · 执行要求章节
+
+        {tab === "mindmap" && (
+          <section className={cn("rounded-[8px] border border-kb-border bg-kb-surface p-4", kbRadius.sm)}>
+            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-kb-heading">
+              <GitFork className="h-4 w-4 text-primary stroke-[1.8]" />
+              知识脑图
             </div>
+            {enabled ? (
+              <div className="rounded-[6px] border border-dashed border-primary/25 bg-primary-soft/20 px-3 py-6 text-center text-[12px] text-kb-muted">
+                脑图预览区（演示占位）
+              </div>
+            ) : (
+              <p className="text-[12.5px] text-kb-muted">解析完成后可生成知识结构脑图。</p>
+            )}
           </section>
         )}
+
         {tab === "training" && (
-          <section className="text-[12.5px] text-kb-muted">
-            <p>基于当前文档可生成判断题、单选题与情景分析题，供培训下发使用。</p>
+          <section className={cn("rounded-[8px] border border-kb-border bg-kb-surface p-4", kbRadius.sm)}>
+            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-kb-heading">
+              <GraduationCap className="h-4 w-4 text-primary stroke-[1.8]" />
+              训练题
+            </div>
+            <p className="text-[12.5px] text-kb-muted">
+              基于当前文档可生成判断题、单选题与情景分析题。
+            </p>
+            {(file.aiQuestions ?? []).length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {file.aiQuestions!.map((q) => (
+                  <li key={q} className="rounded-[6px] bg-card px-3 py-2 text-[12px] text-kb-body">
+                    {q}
+                  </li>
+                ))}
+              </ul>
+            )}
             <button
               type="button"
               disabled={!enabled}
@@ -139,48 +132,30 @@ export function FileAIAssistantPanel({
             </button>
           </section>
         )}
-      </div>
 
-      <div className="border-t border-divider p-3">
-        <div className={cn("rounded-[8px] border border-kb-border bg-card p-2", kbRadius.sm)}>
-          <textarea
-            disabled={!enabled}
-            placeholder={enabled ? "围绕当前文档提问" : "解析完成后可提问"}
-            className="min-h-[56px] w-full resize-none bg-transparent px-1 text-[12.5px] leading-relaxed text-kb-body outline-none placeholder:text-kb-muted disabled:cursor-not-allowed"
-          />
-          <div className="flex justify-end">
-            <button
-              type="button"
-              disabled={!enabled}
-              className="grid h-8 w-8 place-items-center rounded-[8px] bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted"
-              aria-label="发送"
-            >
-              <Send className="h-3.5 w-3.5 stroke-[1.9]" />
-            </button>
-          </div>
-        </div>
+        {tab === "keywords" && (
+          <section className={cn("rounded-[8px] border border-kb-border bg-kb-surface p-4", kbRadius.sm)}>
+            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold text-kb-heading">
+              <Hash className="h-4 w-4 text-primary stroke-[1.8]" />
+              关键词
+            </div>
+            {keywords.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {keywords.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full border border-primary/20 bg-primary-soft/40 px-2.5 py-0.5 text-[11.5px] text-primary"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12.5px] text-kb-muted">解析完成后自动提取关键词。</p>
+            )}
+          </section>
+        )}
       </div>
     </aside>
-  );
-}
-
-function AiAction({
-  icon: Icon,
-  label,
-  disabled,
-}: {
-  icon: LucideIcon;
-  label: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      className="flex h-12 items-center gap-2 rounded-[8px] border border-divider bg-card px-3 text-left transition-colors hover:border-primary/20 hover:bg-kb-surface disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      <Icon className="h-4 w-4 text-primary stroke-[1.8]" />
-      <span className="text-[12px] font-medium text-kb-heading">{label}</span>
-    </button>
   );
 }

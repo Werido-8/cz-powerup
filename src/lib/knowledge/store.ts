@@ -1,7 +1,7 @@
 import { KNOWLEDGE_BASES, KNOWLEDGE_CATEGORIES, KNOWLEDGE_FILES } from "./data";
 import type { KnowledgeBase, KnowledgeCategory, KnowledgeFile } from "./types";
 
-/** 专业知识库根目录（表单选择器用，写入时 parentId 为空） */
+/** 公共知识库根目录（表单选择器用，写入时 parentId 为空） */
 export const PROFESSIONAL_CATEGORY_ROOT_ID = "__professional_category_root__";
 
 let categories: KnowledgeCategory[] = KNOWLEDGE_CATEGORIES.map((item) => ({ ...item }));

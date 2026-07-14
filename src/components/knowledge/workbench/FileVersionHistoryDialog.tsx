@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 export function FileVersionHistoryDialog({
   file,
   onClose,
+  onPreviewVersion,
 }: {
   file: KnowledgeFile | null;
   onClose: () => void;
+  onPreviewVersion?: (versionId: string) => void;
 }) {
   const versions = file?.versions ?? [];
 
@@ -66,7 +68,10 @@ export function FileVersionHistoryDialog({
                   <VersionAction
                     icon={Eye}
                     label="预览"
-                    onClick={() => toast.message(`预览 ${version.version}`)}
+                    onClick={() => {
+                      if (onPreviewVersion) onPreviewVersion(version.id);
+                      else toast.message(`预览 ${version.version}`);
+                    }}
                   />
                   <VersionAction
                     icon={Download}

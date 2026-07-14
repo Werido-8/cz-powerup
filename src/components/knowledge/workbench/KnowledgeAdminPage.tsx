@@ -5,13 +5,16 @@ import {
   Plus,
   ShieldCheck,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 import { KbButton, KbEmptyState, KbSidebar, KbSidebarItem, KbSidebarSection } from "@/components/knowledge/ui";
 import { PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
+import { getDemoRoleKey, subscribeDemoRole } from "@/lib/knowledge/demoRole";
 import {
   canSeeCategoryManager,
+  canSeeGlobalAudit,
   canViewKnowledgeAdmin,
+  getGlobalAuditFiles,
   getManageableBases,
   getParseExceptionsForScope,
 } from "@/lib/knowledge/model";
@@ -23,6 +26,7 @@ import { ApprovalCenterSection } from "./admin/ApprovalCenterSection";
 import { KnowledgeBaseAdminSection } from "./admin/KnowledgeBaseAdminSection";
 import { ParseExceptionSection } from "./admin/ParseExceptionSection";
 import { CategoryManagerSection } from "./admin/CategoryManagerSection";
+import { GlobalAuditSection } from "./admin/GlobalAuditSection";
 import { CreateKnowledgeBaseDialog } from "./admin/CreateKnowledgeBaseDialog";
 import { EditKnowledgeBaseDialog } from "./admin/EditKnowledgeBaseDialog";
 import { PermissionConfigDialog } from "./permission/PermissionConfigDialog";
@@ -30,7 +34,7 @@ import { PublicPermissionDialog } from "./permission/PublicPermissionDialog";
 import { KnowledgeAdminTitleBanner } from "./KnowledgeAdminTitleBanner";
 import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 
-type AdminSection = "categories" | "bases" | "approvals" | "exceptions";
+type AdminSection = "categories" | "bases" | "approvals" | "exceptions" | "audit";
 
 const SECTION_META: Record<
   AdminSection,
@@ -38,7 +42,7 @@ const SECTION_META: Record<
 > = {
   categories: {
     title: "分类管理",
-    description: "分类用于组织专业知识库，可嵌套维护。下属仍有知识库时禁止删除。",
+    description: "分类用于组织公共知识库，可嵌套维护。下属仍有知识库时禁止删除。",
     icon: <FolderTree className="stroke-[1.8]" />,
   },
   bases: {
@@ -48,17 +52,23 @@ const SECTION_META: Record<
   },
   approvals: {
     title: "审批台",
-    description: "集中处理文件上传审批与权限申请，审批通过后进入解析或授权生效。",
+    description: "集中处理文件上传审批与权限申请；公共库上传先解析后进入待审。",
     icon: <ShieldCheck className="stroke-[1.8]" />,
   },
   exceptions: {
     title: "解析异常",
-    description: "展示解析失败文件，支持查看失败原因、重试解析和日志排查。",
+    description: "展示解析失败文件，支持查看原始失败原因、重试解析和日志排查。",
     icon: <FileWarning className="stroke-[1.8]" />,
+  },
+  audit: {
+    title: "全局审计",
+    description: "超级管理员可查看全部用户个人知识库及库内文件，用于审计与兜底处理。",
+    icon: <Library className="stroke-[1.8]" />,
   },
 };
 
 export function KnowledgeAdminPage() {
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
   const [section, setSection] = useState<AdminSection>(() =>
     canSeeCategoryManager() ? "categories" : "bases",
   );
@@ -68,14 +78,20 @@ export function KnowledgeAdminPage() {
 
   const scopeSubtitle = (
     <>
-      专业知识库管理
+      知识库管理
       <br />
       存得住、找得到、管得住
     </>
   );
 
-  const visibleSection = section === "categories" && !canSeeCategoryManager() ? "bases" : section;
+  const visibleSection: AdminSection =
+    section === "categories" && !canSeeCategoryManager()
+      ? "bases"
+      : section === "audit" && !canSeeGlobalAudit()
+        ? "bases"
+        : section;
   const parseExceptions = getParseExceptionsForScope();
+  const auditFiles = getGlobalAuditFiles();
   const permissionRequestCount = PERMISSION_REQUESTS.filter((request) =>
     bases.some((base) => base.id === request.knowledgeBaseId),
   ).length;
@@ -137,6 +153,15 @@ export function KnowledgeAdminPage() {
             active={visibleSection === "exceptions"}
             onClick={() => setSection("exceptions")}
           />
+          {canSeeGlobalAudit() && (
+            <KbSidebarItem
+              icon={Library}
+              label="全局审计"
+              badge={auditFiles.length || undefined}
+              active={visibleSection === "audit"}
+              onClick={() => setSection("audit")}
+            />
+          )}
         </KbSidebarSection>
       </KbSidebar>
 
@@ -198,6 +223,9 @@ export function KnowledgeAdminPage() {
                 )}
                 {visibleSection === "exceptions" && (
                   <ParseExceptionSection embedded items={parseExceptions} />
+                )}
+                {visibleSection === "audit" && (
+                  <GlobalAuditSection embedded files={auditFiles} />
                 )}
               </div>
             </section>
