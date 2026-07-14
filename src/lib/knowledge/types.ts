@@ -64,6 +64,8 @@ export interface KnowledgeBase {
   updatedAt?: string;
   ownerName?: string;
   isPinned?: boolean;
+  /** 硬性锁定：即使是管理员也无法查看/上传，仅用于演示「无权访问」态 */
+  restricted?: boolean;
   /** 个人知识库所属目录（仅 scope=personal 时使用） */
   personalDirectoryId?: string;
   /** 本库文件元数据字段定义，用于筛选与编辑 */

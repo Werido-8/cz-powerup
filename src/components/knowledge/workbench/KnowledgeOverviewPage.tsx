@@ -1,19 +1,25 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
+  MessageSquareText,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
+import knowledgeNoPermissionIllustration from "@/assets/knowledge-no-permission.png";
 import {
   KbButton,
   KbDragUploadOverlay,
   KbEmptyState,
   KbFileSearchInput,
   KbMetadataFilter,
-  KbFilterSelect,
+  KbFormDialog,
+  KbFormField,
   KbSidebar,
   KbSidebarSection,
 } from "@/components/knowledge/ui";
+import { AppDialogButton } from "@/components/ui/app-dialog";
+import { AppFormTextarea } from "@/components/ui/app-form";
 import {
   canUploadToBase,
   canViewBaseFiles,
@@ -42,9 +48,12 @@ import {
   addStoreBase,
   getKnowledgeStoreVersion,
   getStoreBases,
+  removeStoreCategoryCascade,
   removeStoreFiles,
   subscribeKnowledgeStore,
+  updateStoreCategory,
   updateStoreFile,
+  PROFESSIONAL_CATEGORY_ROOT_ID,
 } from "@/lib/knowledge/store";
 import type {
   KnowledgeBase,
@@ -53,8 +62,8 @@ import type {
   KnowledgeSortBy,
   FileSearchMode,
 } from "@/lib/knowledge/types";
-import { kbCardShell, kbMainPanel, kbRadius } from "@/lib/knowledge/tokens";
-import { TableListPager, CardBatchPager, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
+import { kbMainPanel } from "@/lib/knowledge/tokens";
+import { TableListPager, CardBatchPager, PillSelect, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 import {
   FileListToolbarActions,
@@ -76,6 +85,9 @@ import { FileBatchDeleteDialog } from "./FileBatchDeleteDialog";
 import { FileMoveDialog } from "./FileMoveDialog";
 import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
 import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDialog";
+import { DirectoryRenameDialog } from "./DirectoryRenameDialog";
+import { DirectoryDeleteDialog } from "./DirectoryDeleteDialog";
+import { KnowledgeEmptyFilesState } from "./KnowledgeEmptyFilesState";
 import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { useFileSelection } from "./useFileSelection";
 import { useFileViewMode } from "./useFileViewMode";
@@ -142,6 +154,10 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const [historyFile, setHistoryFile] = useState<KnowledgeFile | null>(null);
   const [directoryMoveTarget, setDirectoryMoveTarget] = useState<DirectoryMoveTarget | null>(null);
   const [directoryMoveLoading, setDirectoryMoveLoading] = useState(false);
+  const [renameCategory, setRenameCategory] = useState<KnowledgeCategory | null>(null);
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [deleteCategory, setDeleteCategory] = useState<KnowledgeCategory | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (initialBaseId) setSelectedBaseId(initialBaseId);
@@ -402,7 +418,17 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     toast.message("列表已刷新");
   };
 
-  const emptyFiles = (
+  const isBaseTrulyEmpty = Boolean(selectedBase) && allCurrentBaseFiles.length === 0;
+  const emptyFiles = isBaseTrulyEmpty ? (
+    <KnowledgeEmptyFilesState
+      canUpload={selectedBase ? canUploadToBase(selectedBase) : false}
+      onUpload={
+        selectedBase && canUploadToBase(selectedBase)
+          ? () => toast.message("打开上传面板")
+          : undefined
+      }
+    />
+  ) : (
     <KbEmptyState
       title="当前筛选下暂无文件"
       description="调整搜索关键词或元数据筛选后再试。"
@@ -463,6 +489,8 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             onMoveDirectory={(category) =>
               setDirectoryMoveTarget({ kind: "category", item: category })
             }
+            onRenameDirectory={(category) => setRenameCategory(category)}
+            onDeleteDirectory={(category) => setDeleteCategory(category)}
           />
         </KbSidebarSection>
 
@@ -542,8 +570,13 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             />
           </div>
         ) : !canViewBaseFiles(selectedBase) ? (
-          <div className="p-5">
-            <NoPermissionState base={selectedBase} onApply={() => setPermissionBase(selectedBase)} />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <KnowledgeBaseDetailHeader
+              base={selectedBase}
+              fileCount={selectedBase.fileCount ?? 0}
+              onSelectBase={handleSelectTreeId}
+            />
+            <NoPermissionState onApply={() => setPermissionBase(selectedBase)} />
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 flex-col">
@@ -691,12 +724,57 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
         target={directoryMoveTarget}
         loading={directoryMoveLoading}
         onClose={() => setDirectoryMoveTarget(null)}
-        onConfirm={() => {
+        onConfirm={(targetParentId) => {
+          const moving = directoryMoveTarget;
           setDirectoryMoveLoading(true);
           window.setTimeout(() => {
-            toast.success(`目录「${directoryMoveTarget?.item.name}」已移动`);
+            if (moving?.kind === "category") {
+              const resolvedParentId =
+                targetParentId === PROFESSIONAL_CATEGORY_ROOT_ID ? undefined : targetParentId;
+              updateStoreCategory(moving.item.id, { parentId: resolvedParentId });
+              if (resolvedParentId) {
+                setForceExpandIds(collectExpandIds(resolvedParentId));
+              }
+              setHighlightedCategoryId(moving.item.id);
+            }
+            toast.success(`目录「${moving?.item.name}」已移动`);
             setDirectoryMoveLoading(false);
             setDirectoryMoveTarget(null);
+          }, 300);
+        }}
+      />
+
+      <DirectoryRenameDialog
+        category={renameCategory}
+        loading={renameLoading}
+        onClose={() => setRenameCategory(null)}
+        onConfirm={(name) => {
+          const target = renameCategory;
+          if (!target) return;
+          setRenameLoading(true);
+          window.setTimeout(() => {
+            updateStoreCategory(target.id, { name });
+            setHighlightedCategoryId(target.id);
+            toast.success(`目录已重命名为「${name}」`);
+            setRenameLoading(false);
+            setRenameCategory(null);
+          }, 300);
+        }}
+      />
+
+      <DirectoryDeleteDialog
+        category={deleteCategory}
+        loading={deleteLoading}
+        onClose={() => setDeleteCategory(null)}
+        onConfirm={() => {
+          const target = deleteCategory;
+          if (!target) return;
+          setDeleteLoading(true);
+          window.setTimeout(() => {
+            removeStoreCategoryCascade(target.id);
+            toast.success(`目录「${target.name}」已删除`);
+            setDeleteLoading(false);
+            setDeleteCategory(null);
           }, 300);
         }}
       />
@@ -869,23 +947,34 @@ function TreeAggregatePanel({
   );
 }
 
-function NoPermissionState({ base, onApply }: { base: KnowledgeBase; onApply: () => void }) {
+function NoPermissionState({ onApply }: { onApply: () => void }) {
   return (
-    <div className="space-y-3">
-      <div className={cn(kbCardShell, kbRadius.md, "px-4 py-3")}>
-        <h1 className="text-[17px] font-semibold text-kb-heading">{base.name}</h1>
-        <p className="mt-1 text-[12px] text-kb-muted">{base.description}</p>
-      </div>
-      <KbEmptyState
-        title="暂无浏览权限"
-        description="你可以看到该知识库的存在，但当前不能查看文件列表。提交权限申请后由对应管理员审批。"
-        action={
-          <KbButton onClick={onApply}>
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6 py-10">
+      <div className="relative flex w-full max-w-[300px] flex-col items-center">
+        <img
+          src={knowledgeNoPermissionIllustration}
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="pointer-events-none h-auto w-full select-none"
+        />
+        <div className="absolute left-1/2 top-[92%] -translate-x-1/2 -translate-y-1/2">
+          <KbButton
+            onClick={onApply}
+            className="shadow-[0_8px_20px_rgba(52,155,172,0.28)]"
+          >
             <ShieldCheck className="h-4 w-4 stroke-[1.8]" />
             申请权限
           </KbButton>
-        }
-      />
+        </div>
+      </div>
+
+      <div className="mt-5 max-w-[360px] text-center">
+        <h1 className="text-[16px] font-semibold text-kb-heading">暂无浏览权限</h1>
+        <p className="mt-2 text-[12.5px] leading-relaxed text-kb-muted">
+          提交申请，待管理员审核通过后即可查看该知识库文件。
+        </p>
+      </div>
     </div>
   );
 }
@@ -894,44 +983,53 @@ function PermissionApplyModal({ base, onClose }: { base: KnowledgeBase; onClose:
   const [group, setGroup] = useState("view");
   const [reason, setReason] = useState("");
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-kb-heading/40 px-4">
-      <div className={cn(kbCardShell, kbRadius.lg, "w-full max-w-[460px] p-5 shadow-card-hover")}>
-        <div className="text-[16px] font-semibold text-kb-heading">申请权限</div>
-        <p className="mt-1 text-[12.5px] text-kb-muted">{base.name}</p>
-        <div className="mt-4">
-          <span className="mb-1.5 block text-[12px] font-medium text-kb-muted">权限组</span>
-          <KbFilterSelect
-            value={group}
-            onChange={setGroup}
-            options={[
-              { value: "view", label: "浏览组" },
-              { value: "upload", label: "上传组" },
-            ]}
-          />
-        </div>
-        <label className="mt-3 block text-[12px] font-medium text-kb-muted">
-          申请理由
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className="mt-1 min-h-[92px] w-full resize-none rounded-[8px] border border-kb-border px-3 py-2 text-[12.5px] text-kb-body outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-            placeholder="请说明使用场景，便于管理员审批"
-          />
-        </label>
-        <div className="mt-5 flex justify-end gap-2">
-          <KbButton variant="outline" onClick={onClose}>
+    <KbFormDialog
+      open
+      size="compact"
+      variant="form"
+      title="申请权限"
+      titleIcon={ShieldCheck}
+      onClose={onClose}
+      footer={
+        <>
+          <AppDialogButton variant="outline" onClick={onClose}>
             取消
-          </KbButton>
-          <KbButton
+          </AppDialogButton>
+          <AppDialogButton
+            variant="primary"
             onClick={() => {
               toast.success(group === "view" ? "已提交浏览权限申请" : "已提交上传权限申请");
               onClose();
             }}
           >
             提交申请
-          </KbButton>
-        </div>
+          </AppDialogButton>
+        </>
+      }
+    >
+      <div className="mb-5 flex items-center gap-2 rounded-[8px] border border-[var(--form-control-border)] bg-[#f7fafb] px-3 py-2.5">
+        <span className="text-[12px] text-kb-muted">目标知识库</span>
+        <span className="truncate text-[13px] font-medium text-kb-heading">{base.name}</span>
       </div>
-    </div>
+      <KbFormField label="权限组" icon={Users} required>
+        <PillSelect
+          value={group}
+          onChange={setGroup}
+          options={[
+            { value: "view", label: "浏览组" },
+            { value: "upload", label: "上传组" },
+          ]}
+        />
+      </KbFormField>
+      <KbFormField label="申请理由" icon={MessageSquareText} className="mb-0">
+        <AppFormTextarea
+          value={reason}
+          maxLength={200}
+          onChange={(e) => setReason(e.target.value)}
+          className="min-h-[96px] resize-none"
+          placeholder="请说明使用场景，便于管理员审批"
+        />
+      </KbFormField>
+    </KbFormDialog>
   );
 }

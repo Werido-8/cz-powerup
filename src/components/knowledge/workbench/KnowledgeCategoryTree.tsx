@@ -7,8 +7,11 @@ import {
   Layers,
   Library,
   LockKeyhole,
+  MoreHorizontal,
+  Pencil,
   Pin,
   PinOff,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
@@ -18,6 +21,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   canViewBaseFiles,
   getBasesForCategory,
@@ -274,6 +284,8 @@ export function KnowledgeCategoryTree({
   onCreateDirectory,
   onCreateKnowledgeBase,
   onMoveDirectory,
+  onRenameDirectory,
+  onDeleteDirectory,
 }: {
   selectedBaseId?: string;
   pinnedIds: string[];
@@ -286,6 +298,8 @@ export function KnowledgeCategoryTree({
   onCreateDirectory?: (category: KnowledgeCategory) => void;
   onCreateKnowledgeBase?: (category: KnowledgeCategory) => void;
   onMoveDirectory?: (category: KnowledgeCategory) => void;
+  onRenameDirectory?: (category: KnowledgeCategory) => void;
+  onDeleteDirectory?: (category: KnowledgeCategory) => void;
 }) {
   useKnowledgeStoreVersion();
   const categories = getStoreCategories();
@@ -350,6 +364,8 @@ export function KnowledgeCategoryTree({
           onCreateDirectory={onCreateDirectory}
           onCreateKnowledgeBase={onCreateKnowledgeBase}
           onMoveDirectory={onMoveDirectory}
+          onRenameDirectory={onRenameDirectory}
+          onDeleteDirectory={onDeleteDirectory}
         />
       ))}
     </div>
@@ -370,6 +386,8 @@ function CategoryNode({
   onCreateDirectory,
   onCreateKnowledgeBase,
   onMoveDirectory,
+  onRenameDirectory,
+  onDeleteDirectory,
 }: {
   category: KnowledgeCategory;
   depth: number;
@@ -384,13 +402,17 @@ function CategoryNode({
   onCreateDirectory?: (category: KnowledgeCategory) => void;
   onCreateKnowledgeBase?: (category: KnowledgeCategory) => void;
   onMoveDirectory?: (category: KnowledgeCategory) => void;
+  onRenameDirectory?: (category: KnowledgeCategory) => void;
+  onDeleteDirectory?: (category: KnowledgeCategory) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const open = expanded.has(category.id);
   const children = getCategoryChildren(category.id);
   const bases = getBasesForCategory(category.id);
   const FolderIcon = open ? FolderOpen : Folder;
   const highlighted = highlightedCategoryId === category.id;
-  const showActions = Boolean(onCreateDirectory || onCreateKnowledgeBase || onMoveDirectory);
+  const hasMoreMenu = Boolean(onRenameDirectory || onMoveDirectory || onDeleteDirectory);
+  const showActions = Boolean(onCreateDirectory || onCreateKnowledgeBase || hasMoreMenu);
 
   return (
     <div>
@@ -406,7 +428,7 @@ function CategoryNode({
           type="button"
           onClick={() => onToggle(category.id)}
           className={cn(
-            "flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-[8px] pr-12 text-left text-[12.5px] transition-colors",
+            "flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-[8px] pr-[4.75rem] text-left text-[12.5px] transition-colors",
             "text-kb-muted group-hover:text-kb-body",
             highlighted && "font-medium text-accent-foreground",
           )}
@@ -418,23 +440,16 @@ function CategoryNode({
         {showActions && (
           <div
             className={cn(
-              "pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-end gap-0.5",
-              onMoveDirectory ? "w-[4.5rem]" : "w-11",
-              "opacity-0 transition-opacity",
+              "absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-end gap-0.5",
+              "pointer-events-none opacity-0 transition-opacity",
               "group-hover:pointer-events-auto group-hover:opacity-100",
+              "focus-within:pointer-events-auto focus-within:opacity-100",
+              menuOpen && "pointer-events-auto opacity-100",
             )}
           >
-            {onMoveDirectory && (
-              <TreeNodeActionButton
-                label="移动目录"
-                onClick={() => onMoveDirectory(category)}
-              >
-                <FolderInput className="h-3 w-3 stroke-[1.8]" />
-              </TreeNodeActionButton>
-            )}
             {onCreateDirectory && (
               <TreeNodeActionButton
-                label="新建子目录"
+                label="新建目录"
                 onClick={() => onCreateDirectory(category)}
               >
                 <FolderPlus className="h-3 w-3 stroke-[1.8]" />
@@ -442,11 +457,77 @@ function CategoryNode({
             )}
             {onCreateKnowledgeBase && (
               <TreeNodeActionButton
-                label="新增知识库"
+                label="新建知识库"
                 onClick={() => onCreateKnowledgeBase(category)}
               >
                 <KnowledgeBasePlusIcon className="h-3 w-3" />
               </TreeNodeActionButton>
+            )}
+            {hasMoreMenu && (
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="更多操作"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onMouseDown={(event) => event.stopPropagation()}
+                          className={cn(
+                            "grid h-5 w-5 shrink-0 place-items-center rounded-[5px] text-kb-muted transition-colors",
+                            "hover:bg-kb-surface-hover hover:text-kb-body",
+                            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+                            menuOpen && "bg-kb-surface-hover text-kb-body",
+                          )}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5 stroke-[1.8]" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    {!menuOpen && (
+                      <TooltipContent side="bottom" className="text-[12px]">
+                        更多操作
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+                <DropdownMenuContent align="end" className="min-w-[9rem]">
+                  {onRenameDirectory && (
+                    <DropdownMenuItem
+                      className="gap-2 text-[13px]"
+                      onSelect={() => onRenameDirectory(category)}
+                    >
+                      <Pencil className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
+                      重命名
+                    </DropdownMenuItem>
+                  )}
+                  {onMoveDirectory && (
+                    <DropdownMenuItem
+                      className="gap-2 text-[13px]"
+                      onSelect={() => onMoveDirectory(category)}
+                    >
+                      <FolderInput className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
+                      移动
+                    </DropdownMenuItem>
+                  )}
+                  {onDeleteDirectory && (
+                    <>
+                      {(onRenameDirectory || onMoveDirectory) && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        className="gap-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
+                        onSelect={() => onDeleteDirectory(category)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+                        删除
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         )}
@@ -469,6 +550,8 @@ function CategoryNode({
               onCreateDirectory={onCreateDirectory}
               onCreateKnowledgeBase={onCreateKnowledgeBase}
               onMoveDirectory={onMoveDirectory}
+              onRenameDirectory={onRenameDirectory}
+              onDeleteDirectory={onDeleteDirectory}
             />
           ))}
           {bases.map((base) => (

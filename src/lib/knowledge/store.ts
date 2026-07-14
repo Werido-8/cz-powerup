@@ -69,6 +69,30 @@ export function removeStoreCategory(id: string) {
   emit();
 }
 
+/** 删除目录及其所有子目录，同时移除这些目录下的知识库与文件 */
+export function removeStoreCategoryCascade(id: string) {
+  const removedIds = new Set<string>([id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const item of categories) {
+      if (item.parentId && removedIds.has(item.parentId) && !removedIds.has(item.id)) {
+        removedIds.add(item.id);
+        changed = true;
+      }
+    }
+  }
+
+  const removedBaseIds = new Set(
+    bases.filter((base) => base.categoryId && removedIds.has(base.categoryId)).map((b) => b.id),
+  );
+
+  categories = categories.filter((item) => !removedIds.has(item.id));
+  bases = bases.filter((base) => !removedBaseIds.has(base.id));
+  files = files.filter((file) => !removedBaseIds.has(file.knowledgeBaseId));
+  emit();
+}
+
 export function addStoreBase(base: KnowledgeBase) {
   bases = [base, ...bases];
   emit();

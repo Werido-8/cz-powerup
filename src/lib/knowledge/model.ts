@@ -52,10 +52,12 @@ export function canViewBaseFiles(
   base: KnowledgeBase,
   user: KnowledgeUser = CURRENT_KNOWLEDGE_USER,
 ) {
+  if (base.restricted) return false;
   return base.permission.canView || canManageBase(base, user);
 }
 
 export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = CURRENT_KNOWLEDGE_USER) {
+  if (base.restricted) return false;
   if (base.scope === "personal") return true;
   if (isKnowledgeAdmin(user)) return true;
   if (isDepartmentAdmin(user) && base.scope !== "personal") return true;

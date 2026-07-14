@@ -20,7 +20,6 @@ import {
 } from "@/lib/knowledge/model";
 import {
   createInitialGrants,
-  hasManager,
   type PermissionGrants,
 } from "@/lib/knowledge/permission";
 import type { KnowledgeBase, KnowledgeBaseScope } from "@/lib/knowledge/types";
@@ -142,11 +141,6 @@ export function CreateKnowledgeBaseDialog({
       setStep(1);
       return;
     }
-    if (isProfessional && !hasManager(grants)) {
-      toast.error("至少保留一名管理者");
-      return;
-    }
-
     setSubmitting(true);
     const base = buildBase();
     onSubmit(base, isProfessional ? grants : undefined);
@@ -248,17 +242,14 @@ export function CreateKnowledgeBaseDialog({
             </div>
 
             {scope === "public" ? (
-              <div className="mt-3 rounded-[8px] border border-[#E1EBEE] bg-[#F8FAFB] px-3 py-2.5">
-                <div className="text-[12px] font-semibold text-kb-heading">公共库默认权限</div>
-                <p className="mt-1 text-[11.5px] leading-relaxed text-kb-muted">
-                  全体系统用户拥有浏览权限；上传及管理权限由系统知识库管理员承担。
-                  公共知识库无需进行成员权限配置。
-                </p>
+              <div className="mt-3 flex items-start gap-1.5 rounded-[8px] bg-primary-soft/20 px-2.5 py-2 text-[11.5px] leading-snug text-[#2C6E7B]">
+                <Globe className="mt-[1px] h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
+                <span>全体系统用户拥有浏览权限，无需进行成员权限配置。</span>
               </div>
             ) : (
               <div className="mt-3 flex items-start gap-1.5 rounded-[8px] bg-primary-soft/20 px-2.5 py-2 text-[11.5px] leading-snug text-[#2C6E7B]">
                 <KeyRound className="mt-[1px] h-3.5 w-3.5 shrink-0 stroke-[1.8]" />
-                <span>专业知识库需要配置角色或成员权限，至少需要设置一名管理者。</span>
+                <span>专业知识库需要配置角色或成员权限。</span>
               </div>
             )}
           </KbFormField>

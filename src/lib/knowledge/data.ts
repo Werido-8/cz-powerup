@@ -283,11 +283,11 @@ export const KNOWLEDGE_BASES: KnowledgeBase[] = [
     scope: "professional",
     categoryId: "cat-tech",
     categoryPath: ["设备技术"],
-    fileCount: 67,
+    fileCount: 0,
     status: "enabled",
     permission: {
-      canView: false,
-      canUpload: false,
+      canView: true,
+      canUpload: true,
       canManage: false,
       canConfigurePermission: false,
     },
@@ -328,6 +328,7 @@ export const KNOWLEDGE_BASES: KnowledgeBase[] = [
     categoryPath: ["调度协同"],
     fileCount: 54,
     status: "enabled",
+    restricted: true,
     permission: {
       canView: false,
       canUpload: false,
