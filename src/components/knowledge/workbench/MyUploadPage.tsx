@@ -170,7 +170,7 @@ export function UploadTrackingPanel({
     getKnowledgeStoreServerSnapshot,
   );
 
-  const currentView: UploadView = search.view ?? "all";
+  const currentView: UploadView = search.view ?? "review";
   const statusFilter = search.status ?? "all";
   const searchQuery = search.q ?? "";
 
@@ -288,8 +288,8 @@ export function UploadTrackingPanel({
                 <div role="tablist" aria-label="上传跟踪" className="mt-3 flex items-center gap-1">
                   {[
                     { view: "all" as const, label: "全部上传", icon: ListChecks, count: counts.all },
-                    { view: "review" as const, label: "审核进度", icon: CircleDashed, count: counts.needRejected },
                     { view: "parse" as const, label: "解析进度", icon: Loader2, count: counts.needParseError },
+                    { view: "review" as const, label: "审核进度", icon: CircleDashed, count: counts.reviewInProgress },
                   ].map(({ view, label, icon: Icon, count }) => {
                     const active = currentView === view;
                     const hasAlert = view !== "all" && count > 0;

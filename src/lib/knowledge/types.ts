@@ -205,6 +205,9 @@ export interface UploadApproval {
   riskHint?: string;
   status?: ApprovalStatus;
   parseStatus?: KnowledgeParseStatus;
+  reviewerName?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
   summary?: string;
   aiKeywords?: string[];
   aiQuestions?: string[];

@@ -47,10 +47,7 @@ export function KnowledgeBaseListToolbar({
   return (
     <div
       className={cn(
-        "relative box-border flex h-[52px] min-h-[52px] items-center justify-between gap-4 overflow-hidden border border-[#E8F0F2] bg-white px-3.5",
-        isBatchMode && "border-[rgba(52,155,172,0.18)] bg-[rgba(52,155,172,0.055)]",
-        isBatchMode &&
-          "before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-primary",
+        "relative  flex h-[42px] min-h-[42px] items-center justify-between gap-4 overflow-hidden bg-white ",
         className,
       )}
     >

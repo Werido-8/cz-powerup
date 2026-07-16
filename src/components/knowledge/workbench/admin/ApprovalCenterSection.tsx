@@ -52,7 +52,7 @@ const APPROVAL_TABS: {
 ];
 
 const UPLOAD_GRID =
-  "grid-cols-[36px_minmax(220px,1.3fr)_minmax(140px,1fr)_100px_96px_120px_minmax(200px,auto)] min-w-[980px]";
+  "grid-cols-[36px_minmax(220px,1.3fr)_minmax(140px,1fr)_100px_108px_108px_120px_minmax(200px,auto)] min-w-[1120px]";
 
 const PERMISSION_GRID =
   "grid-cols-[36px_120px_minmax(200px,1.2fr)_minmax(200px,1fr)_100px_minmax(180px,auto)] min-w-[860px]";
@@ -71,6 +71,10 @@ function approvalStatusTone(status?: ApprovalStatus) {
   return "warning" as const;
 }
 
+function parseApprovalStatusLabel() {
+  return "解析完成";
+}
+
 export function ApprovalCenterSection({
   manageableBases,
   embedded = false,
@@ -87,7 +91,7 @@ export function ApprovalCenterSection({
   const [batchLoading, setBatchLoading] = useState<"approve" | "reject" | null>(null);
   const [fileQuery, setFileQuery] = useState("");
   const [submitterFilter, setSubmitterFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("pendingApproval");
   const [permissionQuery, setPermissionQuery] = useState("");
   const [applicantFilter, setApplicantFilter] = useState("all");
   const [permissionBaseFilter, setPermissionBaseFilter] = useState("all");
@@ -113,17 +117,24 @@ export function ApprovalCenterSection({
 
   const filteredUploadItems = useMemo(() => {
     const q = fileQuery.trim().toLowerCase();
-    return uploadItems.filter((item) => {
-      if (submitterFilter !== "all" && item.submitterName !== submitterFilter) return false;
-      const status = item.status ?? "pendingApproval";
-      if (statusFilter !== "all" && status !== statusFilter) return false;
-      if (!q) return true;
-      return (
-        item.fileName.toLowerCase().includes(q) ||
-        item.knowledgeBaseName.toLowerCase().includes(q) ||
-        item.submitterName.toLowerCase().includes(q)
-      );
-    });
+    return uploadItems
+      .filter((item) => {
+        if (submitterFilter !== "all" && item.submitterName !== submitterFilter) return false;
+        const status = item.status ?? "pendingApproval";
+        if (statusFilter !== "all" && status !== statusFilter) return false;
+        if (!q) return true;
+        return (
+          item.fileName.toLowerCase().includes(q) ||
+          item.knowledgeBaseName.toLowerCase().includes(q) ||
+          item.submitterName.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => {
+        const aPending = (a.status ?? "pendingApproval") === "pendingApproval";
+        const bPending = (b.status ?? "pendingApproval") === "pendingApproval";
+        if (aPending !== bPending) return aPending ? -1 : 1;
+        return b.submittedAt.localeCompare(a.submittedAt);
+      });
   }, [fileQuery, statusFilter, submitterFilter, uploadItems]);
 
   const filteredPermissionItems = useMemo(() => {
@@ -444,7 +455,8 @@ function UploadApprovalTable({
             <span>文件名</span>
             <span>归属知识库</span>
             <span>提交人</span>
-            <span>状态</span>
+            <span>解析状态</span>
+            <span>审核状态</span>
             <span>提交时间</span>
             <span className="text-right">操作</span>
           </>
@@ -473,6 +485,11 @@ function UploadApprovalTable({
               />
               <KbTableCellBase name={item.knowledgeBaseName} />
               <KbTableCellUser name={item.submitterName} />
+              <span>
+                <KbStatusTag tone="success" variant="outline" dot>
+                  {parseApprovalStatusLabel()}
+                </KbStatusTag>
+              </span>
               <span>
                 <KbStatusTag tone={approvalStatusTone(status)} variant="outline" dot>
                   {approvalStatusLabel(status)}
