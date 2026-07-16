@@ -11,7 +11,11 @@ import {
   isSubmitToPublicMove,
 } from "@/lib/knowledge/model";
 import { loadRecentMoveIds, pushRecentMoveId } from "@/lib/knowledge/recentMove";
-import { getKnowledgeStoreVersion, subscribeKnowledgeStore } from "@/lib/knowledge/store";
+import {
+  getKnowledgeStoreServerSnapshot,
+  getKnowledgeStoreVersion,
+  subscribeKnowledgeStore,
+} from "@/lib/knowledge/store";
 import type { KnowledgeBase, KnowledgeCategory, KnowledgeFile } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import { useSyncExternalStore } from "react";
@@ -30,7 +34,11 @@ export function FileMoveDialog({
   onConfirm: (files: KnowledgeFile[], targetBaseId: string) => void;
 }) {
   const open = files.length > 0;
-  const storeVersion = useSyncExternalStore(subscribeKnowledgeStore, getKnowledgeStoreVersion);
+  const storeVersion = useSyncExternalStore(
+    subscribeKnowledgeStore,
+    getKnowledgeStoreVersion,
+    getKnowledgeStoreServerSnapshot,
+  );
   const [target, setTarget] = useState("");
   const [treeOpen, setTreeOpen] = useState(false);
 

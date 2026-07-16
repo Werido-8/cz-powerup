@@ -6,6 +6,7 @@ import {
   DEMO_ROLE_LABELS,
   DEMO_USERS,
   getDemoRoleKey,
+  getDemoRoleServerSnapshot,
   setDemoRole,
   subscribeDemoRole,
 } from "@/lib/knowledge/demoRole";
@@ -157,7 +158,11 @@ function NavLink({
 }
 
 function DemoRoleSwitcher() {
-  const currentRole = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  const currentRole = useSyncExternalStore(
+    subscribeDemoRole,
+    getDemoRoleKey,
+    getDemoRoleServerSnapshot,
+  );
   const currentUser = DEMO_USERS[currentRole];
 
   return (
@@ -200,7 +205,7 @@ function DemoRoleSwitcher() {
 
 export function Header() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const showKnowledgeAdmin = canViewKnowledgeAdmin();
 
   const menu = MENU.map((item) => {

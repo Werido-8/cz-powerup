@@ -34,6 +34,10 @@ export function getDemoRoleKey(): KnowledgeUserRole {
   return currentRole;
 }
 
+export function getDemoRoleServerSnapshot(): KnowledgeUserRole {
+  return "knowledgeAdmin";
+}
+
 export function getCurrentKnowledgeUser(): KnowledgeUser {
   return DEMO_USERS[currentRole] ?? DEMO_USERS.knowledgeAdmin;
 }

@@ -1,10 +1,11 @@
-import { KNOWLEDGE_BASES, KNOWLEDGE_CATEGORIES, KNOWLEDGE_FILES } from "./data";
-import type { KnowledgeBase, KnowledgeCategory, KnowledgeFile } from "./types";
+import { KNOWLEDGE_BASES, KNOWLEDGE_CATEGORIES, KNOWLEDGE_FILES, PERSONAL_DIRECTORIES } from "./data";
+import type { KnowledgeBase, KnowledgeCategory, KnowledgeFile, PersonalDirectory } from "./types";
 
 /** 公共知识库根目录（表单选择器用，写入时 parentId 为空） */
 export const PROFESSIONAL_CATEGORY_ROOT_ID = "__professional_category_root__";
 
 let categories: KnowledgeCategory[] = KNOWLEDGE_CATEGORIES.map((item) => ({ ...item }));
+let personalDirectories: PersonalDirectory[] = PERSONAL_DIRECTORIES.map((item) => ({ ...item }));
 let bases: KnowledgeBase[] = KNOWLEDGE_BASES.map((item) => ({ ...item }));
 let files: KnowledgeFile[] = KNOWLEDGE_FILES.map((item) => ({
   ...item,
@@ -30,8 +31,16 @@ export function getKnowledgeStoreVersion() {
   return version;
 }
 
+export function getKnowledgeStoreServerSnapshot() {
+  return 0;
+}
+
 export function getStoreCategories() {
   return categories;
+}
+
+export function getStorePersonalDirectories() {
+  return personalDirectories;
 }
 
 export function getStoreBases() {
@@ -103,4 +112,22 @@ export function updateStoreBase(base: KnowledgeBase) {
   bases = bases.map((item) => (item.id === base.id ? base : item));
   emit();
   return base;
+}
+
+export function removeStoreBase(id: string) {
+  bases = bases.filter((item) => item.id !== id);
+  files = files.filter((file) => file.knowledgeBaseId !== id);
+  emit();
+}
+
+export function updateStorePersonalDirectory(id: string, patch: Partial<PersonalDirectory>) {
+  personalDirectories = personalDirectories.map((item) =>
+    item.id === id ? { ...item, ...patch } : item,
+  );
+  emit();
+}
+
+export function removeStorePersonalDirectory(id: string) {
+  personalDirectories = personalDirectories.filter((item) => item.id !== id);
+  emit();
 }

@@ -1,15 +1,44 @@
-import { ChevronRight, Folder, FolderOpen, FolderInput, FolderPlus } from "lucide-react";
-import { useEffect, useState } from "react";
-import { PERSONAL_DIRECTORIES } from "@/lib/knowledge/data";
 import {
-  getPersonalBasesForDirectory,
+  ChevronRight,
+  CircleOff,
+  Folder,
+  FolderOpen,
+  FolderInput,
+  FolderPlus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  canDisablePersonalDirectory,
+  canManageBase,
+  getPersonalBasesForDirectoryTree,
   getPersonalDirectoryChildren,
   getPersonalDirectoryTreeDirectories,
   PERSONAL_DIRECTORY_ROOT_ID,
   PERSONAL_TREE_ALL_ID,
 } from "@/lib/knowledge/model";
 import { isPinnedId } from "@/lib/knowledge/pinned";
-import type { PersonalDirectory } from "@/lib/knowledge/types";
+import {
+  getKnowledgeStoreVersion,
+  getStorePersonalDirectories,
+  subscribeKnowledgeStore,
+} from "@/lib/knowledge/store";
+import type { KnowledgeBase, PersonalDirectory } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import {
   KnowledgeBaseTreeItem,
@@ -18,32 +47,55 @@ import {
 } from "./KnowledgeCategoryTree";
 import { KnowledgeBasePlusIcon } from "./KnowledgeBasePlusIcon";
 
+function useKnowledgeStoreVersion() {
+  const [version, setVersion] = useState(getKnowledgeStoreVersion);
+  useEffect(() => subscribeKnowledgeStore(() => setVersion(getKnowledgeStoreVersion())), []);
+  return version;
+}
+
 const defaultExpandedDirectoryIds = () =>
-  PERSONAL_DIRECTORIES.filter((item) => item.id !== PERSONAL_DIRECTORY_ROOT_ID).map(
-    (item) => item.id,
-  );
+  getStorePersonalDirectories()
+    .filter((item) => item.id !== PERSONAL_DIRECTORY_ROOT_ID)
+    .map((item) => item.id);
 
 export function PersonalDirectoryTree({
   selectedBaseId,
   pinnedIds = [],
   highlightedDirectoryId,
   highlightedBaseId,
+  showDirectoryManageActions = false,
   onSelectBase,
   onTogglePin,
   onCreateDirectory,
   onCreateKnowledgeBase,
   onMoveDirectory,
+  onRenameDirectory,
+  onDeleteDirectory,
+  onDisableDirectory,
+  onRenameBase,
+  onMoveBase,
+  onDeleteBase,
+  onToggleBaseStatus,
 }: {
   selectedBaseId?: string;
   pinnedIds?: string[];
   highlightedDirectoryId?: string;
   highlightedBaseId?: string;
+  showDirectoryManageActions?: boolean;
   onSelectBase: (baseId: string) => void;
   onTogglePin?: (baseId: string) => void;
   onCreateDirectory?: (directory: PersonalDirectory) => void;
   onCreateKnowledgeBase?: (directory: PersonalDirectory) => void;
   onMoveDirectory?: (directory: PersonalDirectory) => void;
+  onRenameDirectory?: (directory: PersonalDirectory) => void;
+  onDeleteDirectory?: (directory: PersonalDirectory) => void;
+  onDisableDirectory?: (directory: PersonalDirectory) => void;
+  onRenameBase?: (base: KnowledgeBase) => void;
+  onMoveBase?: (base: KnowledgeBase) => void;
+  onDeleteBase?: (base: KnowledgeBase) => void;
+  onToggleBaseStatus?: (base: KnowledgeBase) => void;
 }) {
+  useKnowledgeStoreVersion();
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     if (typeof window === "undefined") {
       return new Set(defaultExpandedDirectoryIds());
@@ -91,12 +143,20 @@ export function PersonalDirectoryTree({
           pinnedIds={pinnedIds}
           highlightedDirectoryId={highlightedDirectoryId}
           highlightedBaseId={highlightedBaseId}
+          showDirectoryManageActions={showDirectoryManageActions}
           onToggle={toggle}
           onSelectBase={onSelectBase}
           onTogglePin={onTogglePin}
           onCreateDirectory={onCreateDirectory}
           onCreateKnowledgeBase={onCreateKnowledgeBase}
           onMoveDirectory={onMoveDirectory}
+          onRenameDirectory={onRenameDirectory}
+          onDeleteDirectory={onDeleteDirectory}
+          onDisableDirectory={onDisableDirectory}
+          onRenameBase={onRenameBase}
+          onMoveBase={onMoveBase}
+          onDeleteBase={onDeleteBase}
+          onToggleBaseStatus={onToggleBaseStatus}
         />
       ))}
     </div>
@@ -111,12 +171,20 @@ function PersonalDirectoryNode({
   pinnedIds,
   highlightedDirectoryId,
   highlightedBaseId,
+  showDirectoryManageActions,
   onToggle,
   onSelectBase,
   onTogglePin,
   onCreateDirectory,
   onCreateKnowledgeBase,
   onMoveDirectory,
+  onRenameDirectory,
+  onDeleteDirectory,
+  onDisableDirectory,
+  onRenameBase,
+  onMoveBase,
+  onDeleteBase,
+  onToggleBaseStatus,
 }: {
   directory: PersonalDirectory;
   depth: number;
@@ -125,20 +193,42 @@ function PersonalDirectoryNode({
   pinnedIds: string[];
   highlightedDirectoryId?: string;
   highlightedBaseId?: string;
+  showDirectoryManageActions: boolean;
   onToggle: (id: string) => void;
   onSelectBase: (baseId: string) => void;
   onTogglePin?: (baseId: string) => void;
   onCreateDirectory?: (directory: PersonalDirectory) => void;
   onCreateKnowledgeBase?: (directory: PersonalDirectory) => void;
   onMoveDirectory?: (directory: PersonalDirectory) => void;
+  onRenameDirectory?: (directory: PersonalDirectory) => void;
+  onDeleteDirectory?: (directory: PersonalDirectory) => void;
+  onDisableDirectory?: (directory: PersonalDirectory) => void;
+  onRenameBase?: (base: KnowledgeBase) => void;
+  onMoveBase?: (base: KnowledgeBase) => void;
+  onDeleteBase?: (base: KnowledgeBase) => void;
+  onToggleBaseStatus?: (base: KnowledgeBase) => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const open = expanded.has(directory.id);
   const children = getPersonalDirectoryChildren(directory.id);
-  const bases = getPersonalBasesForDirectory(directory.id);
+  const bases = getPersonalBasesForDirectoryTree(directory.id);
   const FolderIcon = open ? FolderOpen : Folder;
   const hasChildren = children.length > 0 || bases.length > 0;
   const highlighted = highlightedDirectoryId === directory.id;
-  const showActions = Boolean(onCreateDirectory || onCreateKnowledgeBase || onMoveDirectory);
+  const canDisableDir = canDisablePersonalDirectory(directory.id);
+  const hasMoreMenu = Boolean(
+    showDirectoryManageActions && (onMoveDirectory || onDeleteDirectory || onDisableDirectory),
+  );
+  const showActions = Boolean(
+    showDirectoryManageActions &&
+      (onCreateDirectory || onCreateKnowledgeBase || onRenameDirectory || hasMoreMenu),
+  );
+  const actionWidth =
+    1 +
+    (onCreateDirectory ? 1 : 0) +
+    (onCreateKnowledgeBase ? 1 : 0) +
+    (onRenameDirectory ? 1 : 0) +
+    (hasMoreMenu ? 1 : 0);
 
   return (
     <div>
@@ -154,10 +244,12 @@ function PersonalDirectoryNode({
           type="button"
           onClick={() => onToggle(directory.id)}
           className={cn(
-            "flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-[8px] pr-12 text-left text-[12.5px] transition-colors",
+            "flex h-8 min-w-0 flex-1 items-center gap-1.5 rounded-[8px] text-left text-[12.5px] transition-colors",
             "text-kb-muted group-hover:text-kb-body",
             highlighted && "font-medium text-accent-foreground",
+            showActions && "pr-1",
           )}
+          style={showActions ? { paddingRight: `${actionWidth * 1.25 + 0.5}rem` } : undefined}
         >
           <ChevronRight
             className={cn(
@@ -173,17 +265,15 @@ function PersonalDirectoryNode({
           <div
             className={cn(
               "pointer-events-none absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-end gap-0.5",
-              onMoveDirectory ? "w-[4.5rem]" : "w-11",
               "opacity-0 transition-opacity",
               "group-hover:pointer-events-auto group-hover:opacity-100",
+              "focus-within:pointer-events-auto focus-within:opacity-100",
+              menuOpen && "pointer-events-auto opacity-100",
             )}
           >
-            {onMoveDirectory && (
-              <TreeNodeActionButton
-                label="移动目录"
-                onClick={() => onMoveDirectory(directory)}
-              >
-                <FolderInput className="h-3 w-3 stroke-[1.8]" />
+            {onRenameDirectory && (
+              <TreeNodeActionButton label="重命名" onClick={() => onRenameDirectory(directory)}>
+                <Pencil className="h-3 w-3 stroke-[1.8]" />
               </TreeNodeActionButton>
             )}
             {onCreateDirectory && (
@@ -202,6 +292,77 @@ function PersonalDirectoryNode({
                 <KnowledgeBasePlusIcon className="h-3 w-3" />
               </TreeNodeActionButton>
             )}
+            {hasMoreMenu && (
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                <TooltipProvider delayDuration={200}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="更多操作"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                          }}
+                          onMouseDown={(event) => event.stopPropagation()}
+                          className={cn(
+                            "grid h-5 w-5 shrink-0 place-items-center rounded-[5px] text-kb-muted transition-colors",
+                            "hover:bg-kb-surface-hover hover:text-kb-body",
+                            "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+                            menuOpen && "bg-kb-surface-hover text-kb-body",
+                          )}
+                        >
+                          <MoreHorizontal className="h-3.5 w-3.5 stroke-[1.8]" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    {!menuOpen && (
+                      <TooltipContent side="bottom" className="text-[12px]">
+                        更多操作
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+                <DropdownMenuContent align="end" className="min-w-[9rem]">
+                  {onMoveDirectory && (
+                    <DropdownMenuItem
+                      className="gap-2 text-[13px]"
+                      onSelect={() => onMoveDirectory(directory)}
+                    >
+                      <FolderInput className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
+                      移动
+                    </DropdownMenuItem>
+                  )}
+                  {onDeleteDirectory && (
+                    <DropdownMenuItem
+                      className="gap-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
+                      onSelect={() => onDeleteDirectory(directory)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+                      删除
+                    </DropdownMenuItem>
+                  )}
+                  {onDisableDirectory && (
+                    <>
+                      {(onMoveDirectory || onDeleteDirectory) && <DropdownMenuSeparator />}
+                      <DropdownMenuItem
+                        className="gap-2 text-[13px]"
+                        disabled={!canDisableDir}
+                        title={!canDisableDir ? "下属仍有知识库，无法停用" : undefined}
+                        onSelect={() => {
+                          if (!canDisableDir) return;
+                          onDisableDirectory(directory);
+                        }}
+                      >
+                        <CircleOff className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
+                        停用
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         )}
       </div>
@@ -217,12 +378,20 @@ function PersonalDirectoryNode({
               pinnedIds={pinnedIds}
               highlightedDirectoryId={highlightedDirectoryId}
               highlightedBaseId={highlightedBaseId}
+              showDirectoryManageActions={showDirectoryManageActions}
               onToggle={onToggle}
               onSelectBase={onSelectBase}
               onTogglePin={onTogglePin}
               onCreateDirectory={onCreateDirectory}
               onCreateKnowledgeBase={onCreateKnowledgeBase}
               onMoveDirectory={onMoveDirectory}
+              onRenameDirectory={onRenameDirectory}
+              onDeleteDirectory={onDeleteDirectory}
+              onDisableDirectory={onDisableDirectory}
+              onRenameBase={onRenameBase}
+              onMoveBase={onMoveBase}
+              onDeleteBase={onDeleteBase}
+              onToggleBaseStatus={onToggleBaseStatus}
             />
           ))}
           {bases.map((base) => (
@@ -234,8 +403,13 @@ function PersonalDirectoryNode({
               pinned={isPinnedId(pinnedIds, base.id)}
               highlighted={highlightedBaseId === base.id}
               showPin={Boolean(onTogglePin)}
+              showManageActions={canManageBase(base)}
               onSelect={() => onSelectBase(base.id)}
               onTogglePin={() => onTogglePin?.(base.id)}
+              onRename={onRenameBase ? () => onRenameBase(base) : undefined}
+              onMove={onMoveBase ? () => onMoveBase(base) : undefined}
+              onDelete={onDeleteBase ? () => onDeleteBase(base) : undefined}
+              onToggleStatus={onToggleBaseStatus ? () => onToggleBaseStatus(base) : undefined}
             />
           ))}
         </div>

@@ -9,7 +9,11 @@ import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 import { KbButton, KbEmptyState, KbSidebar, KbSidebarItem, KbSidebarSection } from "@/components/knowledge/ui";
 import { PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
-import { getDemoRoleKey, subscribeDemoRole } from "@/lib/knowledge/demoRole";
+import {
+  getDemoRoleKey,
+  getDemoRoleServerSnapshot,
+  subscribeDemoRole,
+} from "@/lib/knowledge/demoRole";
 import {
   canSeeCategoryManager,
   canSeeGlobalAudit,
@@ -32,7 +36,6 @@ import { EditKnowledgeBaseDialog } from "./admin/EditKnowledgeBaseDialog";
 import { PermissionConfigDialog } from "./permission/PermissionConfigDialog";
 import { PublicPermissionDialog } from "./permission/PublicPermissionDialog";
 import { KnowledgeAdminTitleBanner } from "./KnowledgeAdminTitleBanner";
-import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 
 type AdminSection = "categories" | "bases" | "approvals" | "exceptions" | "audit";
 
@@ -68,7 +71,7 @@ const SECTION_META: Record<
 };
 
 export function KnowledgeAdminPage() {
-  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const [section, setSection] = useState<AdminSection>(() =>
     canSeeCategoryManager() ? "categories" : "bases",
   );
@@ -115,12 +118,7 @@ export function KnowledgeAdminPage() {
       <KbSidebar
         width="browse"
         withDecor
-        header={
-          <>
-            <KnowledgeAdminTitleBanner subtitle={scopeSubtitle} />
-            <KnowledgeSidebarQuickLinks />
-          </>
-        }
+        header={<KnowledgeAdminTitleBanner subtitle={scopeSubtitle} />}
       >
         <KbSidebarSection title="管理功能">
           {canSeeCategoryManager() && (

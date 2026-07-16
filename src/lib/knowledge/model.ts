@@ -2,7 +2,6 @@ import {
   FAVORITE_FILE_IDS,
   PARSE_EXCEPTIONS,
   PERMISSION_REQUESTS,
-  PERSONAL_DIRECTORIES,
   RECENT_FILE_IDS,
 } from "./data";
 import { getCurrentKnowledgeUser } from "./demoRole";
@@ -11,7 +10,7 @@ import {
   getGrantsForBase,
   type PermissionLevel,
 } from "./permission";
-import { getStoreBases, getStoreCategories, getStoreFiles } from "./store";
+import { getStoreBases, getStoreCategories, getStoreFiles, getStorePersonalDirectories } from "./store";
 import { publishStatusLabel } from "./status";
 import type {
   FilePublishStatus,
@@ -188,20 +187,34 @@ export function getPersonalBasesForDirectory(directoryId: string) {
   return getPersonalBases().filter((base) => base.personalDirectoryId === directoryId);
 }
 
+export function getPersonalBasesForDirectoryTree(
+  directoryId: string,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
+) {
+  return getStoreBases().filter(
+    (base) =>
+      base.scope === "personal" &&
+      base.personalDirectoryId === directoryId &&
+      (canManageBase(base, user) || canViewBaseFiles(base, user)),
+  );
+}
+
 export function getPersonalDirectoryChildren(parentId?: string): PersonalDirectory[] {
-  return PERSONAL_DIRECTORIES.filter((directory) =>
+  return getStorePersonalDirectories().filter((directory) =>
     parentId ? directory.parentId === parentId : !directory.parentId,
   );
 }
 
+export function getPersonalDirectoryById(id: string) {
+  return getStorePersonalDirectories().find((directory) => directory.id === id);
+}
+
 export function getPersonalDirectoryPathLabel(directoryId: string): string {
   const chain: string[] = [];
-  let current = PERSONAL_DIRECTORIES.find((d) => d.id === directoryId);
+  let current = getPersonalDirectoryById(directoryId);
   while (current) {
     chain.unshift(current.name);
-    current = current.parentId
-      ? PERSONAL_DIRECTORIES.find((d) => d.id === current!.parentId)
-      : undefined;
+    current = current.parentId ? getPersonalDirectoryById(current.parentId) : undefined;
   }
   return chain.join(" / ");
 }
@@ -480,6 +493,58 @@ export function getCategoryChildren(parentId?: string): KnowledgeCategory[] {
 
 export function getBasesForCategory(categoryId: string) {
   return getBrowsableBases().filter((base) => base.categoryId === categoryId);
+}
+
+/** 管理端树：包含已停用但仍可管理的知识库 */
+export function getBasesForCategoryTree(
+  categoryId: string,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
+) {
+  return getStoreBases().filter(
+    (base) =>
+      base.scope !== "personal" &&
+      base.categoryId === categoryId &&
+      (canManageBase(base, user) || canViewBaseFiles(base, user)),
+  );
+}
+
+export function countAllBasesInCategorySubtree(categoryId: string): number {
+  let count = getStoreBases().filter(
+    (base) => base.scope !== "personal" && base.categoryId === categoryId,
+  ).length;
+  for (const child of getCategoryChildren(categoryId)) {
+    count += countAllBasesInCategorySubtree(child.id);
+  }
+  return count;
+}
+
+export function countAllBasesInPersonalDirectorySubtree(directoryId: string): number {
+  let count = getStoreBases().filter(
+    (base) => base.scope === "personal" && base.personalDirectoryId === directoryId,
+  ).length;
+  for (const child of getPersonalDirectoryChildren(directoryId)) {
+    count += countAllBasesInPersonalDirectorySubtree(child.id);
+  }
+  return count;
+}
+
+export function canDisableCategory(categoryId: string) {
+  return countAllBasesInCategorySubtree(categoryId) === 0;
+}
+
+export function canDisablePersonalDirectory(directoryId: string) {
+  return countAllBasesInPersonalDirectorySubtree(directoryId) === 0;
+}
+
+export function hasSiblingPersonalDirectoryName(
+  parentId: string | undefined,
+  name: string,
+  excludeId?: string,
+) {
+  const normalized = name.trim();
+  return getPersonalDirectoryChildren(parentId).some(
+    (directory) => directory.id !== excludeId && directory.name === normalized,
+  );
 }
 
 export function getCategoryChain(categoryId: string): KnowledgeCategory[] {

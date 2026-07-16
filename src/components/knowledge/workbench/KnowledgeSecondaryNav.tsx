@@ -1,7 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Database, FolderOpen, LayoutGrid, Network } from "lucide-react";
 import { useSyncExternalStore } from "react";
-import { getDemoRoleKey, subscribeDemoRole } from "@/lib/knowledge/demoRole";
+import {
+  getDemoRoleKey,
+  getDemoRoleServerSnapshot,
+  subscribeDemoRole,
+} from "@/lib/knowledge/demoRole";
 import { cn } from "@/lib/utils";
 import { canViewKnowledgeAdmin } from "@/lib/knowledge/model";
 
@@ -21,7 +25,7 @@ const items: SecondaryNavItem[] = [
 ];
 
 export function KnowledgeSecondaryNav({ className }: { className?: string }) {
-  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const showAdmin = canViewKnowledgeAdmin();
 

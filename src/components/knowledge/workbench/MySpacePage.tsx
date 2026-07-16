@@ -61,25 +61,40 @@ import {
   getMetadataFieldsForBase,
   getBaseById,
   getPersonalBases,
+  getPersonalDirectoryChildren,
   getPinnedFiles,
   getRecentFiles,
   listCategoryPathOptions,
+  PERSONAL_DIRECTORY_ROOT_ID,
   PERSONAL_TREE_ALL_ID,
   sortKnowledgeFiles,
 } from "@/lib/knowledge/model";
 import {
+  getDemoRoleKey,
+  getDemoRoleServerSnapshot,
+  subscribeDemoRole,
+} from "@/lib/knowledge/demoRole";
+import {
+  getKnowledgeStoreServerSnapshot,
   getKnowledgeStoreVersion,
+  getStoreBases,
+  removeStoreBase,
   removeStoreFiles,
+  removeStorePersonalDirectory,
   subscribeKnowledgeStore,
+  updateStoreBase,
   updateStoreFile,
+  updateStorePersonalDirectory,
 } from "@/lib/knowledge/store";
 import { isPinnedId, loadPinnedIds, savePinnedIds, togglePinnedId } from "@/lib/knowledge/pinned";
 import { kbFileTypeConfig, kbMainPanel } from "@/lib/knowledge/tokens";
 import type {
   KnowledgeBase,
+  KnowledgeBaseStatus,
   KnowledgeFile,
   KnowledgeSortBy,
   FileSearchMode,
+  PersonalDirectory,
 } from "@/lib/knowledge/types";
 import type { UploadView } from "@/lib/knowledge/uploadTracking";
 import { cn } from "@/lib/utils";
@@ -92,11 +107,14 @@ import {
 import { FileMoveDialog } from "./FileMoveDialog";
 import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
 import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDialog";
+import { KnowledgeBaseDeleteDialog } from "./KnowledgeBaseDeleteDialog";
+import { KnowledgeBaseMoveDialog } from "./KnowledgeBaseMoveDialog";
+import { KnowledgeBaseRenameDialog } from "./KnowledgeBaseRenameDialog";
+import { PersonalDirectoryRenameDialog } from "./PersonalDirectoryRenameDialog";
 import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { KnowledgeAggregateDetailHeader } from "./KnowledgeAggregateDetailHeader";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
 import { KnowledgeTreeNavItem } from "./KnowledgeCategoryTree";
-import { KnowledgeSidebarQuickLinks } from "./KnowledgeSidebarQuickLinks";
 import { KnowledgeTreeSectionActions } from "./KnowledgeTreeSectionActions";
 import { MySpaceTitleBanner } from "./MySpaceTitleBanner";
 import { PersonalDirectoryTree } from "./PersonalDirectoryTree";
@@ -132,7 +150,13 @@ const mySpaceSortOptions: Array<{ value: KnowledgeSortBy; label: string }> = [
 
 export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const navigate = useNavigate({ from: "/knowledge/mine" });
-  const storeVersion = useSyncExternalStore(subscribeKnowledgeStore, getKnowledgeStoreVersion);
+  const role = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
+  const showPersonalManageActions = role !== "employee";
+  const storeVersion = useSyncExternalStore(
+    subscribeKnowledgeStore,
+    getKnowledgeStoreVersion,
+    getKnowledgeStoreServerSnapshot,
+  );
   const personalBases = useMemo(() => getPersonalBases(), [storeVersion]);
   const [selection, setSelection] = useState<MySpaceSelection>({ kind: "recent" });
   const [query, setQuery] = useState("");
@@ -154,6 +178,16 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const [historyFile, setHistoryFile] = useState<KnowledgeFile | null>(null);
   const [directoryMoveTarget, setDirectoryMoveTarget] = useState<DirectoryMoveTarget | null>(null);
   const [directoryMoveLoading, setDirectoryMoveLoading] = useState(false);
+  const [renameBase, setRenameBase] = useState<KnowledgeBase | null>(null);
+  const [renameBaseLoading, setRenameBaseLoading] = useState(false);
+  const [moveBase, setMoveBase] = useState<KnowledgeBase | null>(null);
+  const [moveBaseLoading, setMoveBaseLoading] = useState(false);
+  const [deleteBase, setDeleteBase] = useState<KnowledgeBase | null>(null);
+  const [deleteBaseLoading, setDeleteBaseLoading] = useState(false);
+  const [renamePersonalDirectory, setRenamePersonalDirectory] = useState<PersonalDirectory | null>(
+    null,
+  );
+  const [renamePersonalDirectoryLoading, setRenamePersonalDirectoryLoading] = useState(false);
 
   const handleTogglePin = (baseId: string) => {
     setPinnedIds((prev) => {
@@ -162,6 +196,47 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
       toast.message(isPinnedId(prev, baseId) ? "已取消置顶" : "已置顶到快速访问");
       return next;
     });
+  };
+
+  const handleToggleBaseStatus = (base: KnowledgeBase) => {
+    const nextStatus: KnowledgeBaseStatus = base.status === "enabled" ? "disabled" : "enabled";
+    const message =
+      nextStatus === "disabled"
+        ? "停用后该知识库将不可访问。确认停用？"
+        : "确认重新启用该知识库？";
+    if (typeof window !== "undefined" && !window.confirm(message)) return;
+    updateStoreBase({ ...base, status: nextStatus });
+    toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
+    if (nextStatus === "disabled" && selection.kind === "personalBase" && selection.baseId === base.id) {
+      setSelection({ kind: "personalAll" });
+    }
+  };
+
+  const handleDisablePersonalDirectory = (directory: PersonalDirectory) => {
+    toast.success(`个人目录「${directory.name}」已停用`);
+  };
+
+  const handleDeletePersonalDirectory = (directory: PersonalDirectory) => {
+    const childCount = getPersonalDirectoryChildren(directory.id).length;
+    const baseCount = getStoreBases().filter(
+      (base) => base.scope === "personal" && base.personalDirectoryId === directory.id,
+    ).length;
+    if (childCount > 0) {
+      toast.error("该目录下仍有子目录，请先删除或移动子目录");
+      return;
+    }
+    if (baseCount > 0) {
+      toast.error("该目录下仍有知识库，无法删除");
+      return;
+    }
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`确认删除个人目录「${directory.name}」？该操作不可恢复。`)
+    ) {
+      return;
+    }
+    removeStorePersonalDirectory(directory.id);
+    toast.success("个人目录已删除");
   };
 
   useEffect(() => {
@@ -388,12 +463,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
       <KbSidebar
         width="browse"
         withDecor
-        header={
-          <>
-            <MySpaceTitleBanner />
-            <KnowledgeSidebarQuickLinks />
-          </>
-        }
+        header={<MySpaceTitleBanner />}
       >
         <PinnedQuickAccessSection
           pinnedBases={pinnedBases}
@@ -432,12 +502,14 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
           title="个人知识库"
           className="border-t border-[#E8F0F2] pt-2"
           action={
-            <KnowledgeTreeSectionActions
-              directoryLabel="新建个人目录"
-              knowledgeBaseLabel="新建个人知识库"
-              onAddDirectory={() => toast.success("已预留新建个人目录入口")}
-              onAddKnowledgeBase={() => toast.success("已预留新建个人知识库入口")}
-            />
+            showPersonalManageActions ? (
+              <KnowledgeTreeSectionActions
+                directoryLabel="新建个人目录"
+                knowledgeBaseLabel="新建个人知识库"
+                onAddDirectory={() => toast.success("已预留新建个人目录入口")}
+                onAddKnowledgeBase={() => toast.success("已预留新建个人知识库入口")}
+              />
+            ) : undefined
           }
         >
           <PersonalDirectoryTree
@@ -449,6 +521,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
                   : undefined
             }
             pinnedIds={pinnedIds}
+            showDirectoryManageActions={showPersonalManageActions}
             onSelectBase={(baseId) => {
               if (baseId === PERSONAL_TREE_ALL_ID) {
                 setSelection({ kind: "personalAll" });
@@ -457,15 +530,36 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
               }
             }}
             onTogglePin={handleTogglePin}
-            onCreateDirectory={(directory) =>
-              toast.success(`已预留：在「${directory.name}」下新建个人目录`)
+            onCreateDirectory={
+              showPersonalManageActions
+                ? (directory) => toast.success(`已预留：在「${directory.name}」下新建个人目录`)
+                : undefined
             }
-            onCreateKnowledgeBase={(directory) =>
-              toast.success(`已预留：在「${directory.name}」下新建个人知识库`)
+            onCreateKnowledgeBase={
+              showPersonalManageActions
+                ? (directory) => toast.success(`已预留：在「${directory.name}」下新建个人知识库`)
+                : undefined
             }
-            onMoveDirectory={(directory) =>
-              setDirectoryMoveTarget({ kind: "personal", item: directory })
+            onMoveDirectory={
+              showPersonalManageActions
+                ? (directory) => setDirectoryMoveTarget({ kind: "personal", item: directory })
+                : undefined
             }
+            onRenameDirectory={
+              showPersonalManageActions
+                ? (directory) => setRenamePersonalDirectory(directory)
+                : undefined
+            }
+            onDeleteDirectory={
+              showPersonalManageActions ? handleDeletePersonalDirectory : undefined
+            }
+            onDisableDirectory={
+              showPersonalManageActions ? handleDisablePersonalDirectory : undefined
+            }
+            onRenameBase={(base) => setRenameBase(base)}
+            onMoveBase={(base) => setMoveBase(base)}
+            onDeleteBase={(base) => setDeleteBase(base)}
+            onToggleBaseStatus={handleToggleBaseStatus}
           />
         </KbSidebarSection>
       </KbSidebar>
@@ -574,12 +668,97 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
         target={directoryMoveTarget}
         loading={directoryMoveLoading}
         onClose={() => setDirectoryMoveTarget(null)}
-        onConfirm={() => {
+        onConfirm={(targetParentId) => {
+          const moving = directoryMoveTarget;
           setDirectoryMoveLoading(true);
           window.setTimeout(() => {
-            toast.success(`目录「${directoryMoveTarget?.item.name}」已移动`);
+            if (moving?.kind === "personal") {
+              const resolvedParentId =
+                targetParentId === PERSONAL_DIRECTORY_ROOT_ID
+                  ? PERSONAL_DIRECTORY_ROOT_ID
+                  : targetParentId;
+              updateStorePersonalDirectory(moving.item.id, {
+                parentId:
+                  resolvedParentId === PERSONAL_DIRECTORY_ROOT_ID
+                    ? PERSONAL_DIRECTORY_ROOT_ID
+                    : resolvedParentId,
+              });
+            }
+            toast.success(`目录「${moving?.item.name}」已移动`);
             setDirectoryMoveLoading(false);
             setDirectoryMoveTarget(null);
+          }, 300);
+        }}
+      />
+
+      <KnowledgeBaseRenameDialog
+        base={renameBase}
+        loading={renameBaseLoading}
+        onClose={() => setRenameBase(null)}
+        onConfirm={(name) => {
+          const target = renameBase;
+          if (!target) return;
+          setRenameBaseLoading(true);
+          window.setTimeout(() => {
+            updateStoreBase({ ...target, name });
+            toast.success(`知识库已重命名为「${name}」`);
+            setRenameBaseLoading(false);
+            setRenameBase(null);
+          }, 300);
+        }}
+      />
+
+      <KnowledgeBaseMoveDialog
+        base={moveBase}
+        loading={moveBaseLoading}
+        onClose={() => setMoveBase(null)}
+        onConfirm={(targetId) => {
+          const target = moveBase;
+          if (!target) return;
+          setMoveBaseLoading(true);
+          window.setTimeout(() => {
+            const directoryId = targetId === PERSONAL_DIRECTORY_ROOT_ID ? undefined : targetId;
+            updateStoreBase({ ...target, personalDirectoryId: directoryId });
+            toast.success(`知识库「${target.name}」已移动`);
+            setMoveBaseLoading(false);
+            setMoveBase(null);
+          }, 300);
+        }}
+      />
+
+      <KnowledgeBaseDeleteDialog
+        base={deleteBase}
+        loading={deleteBaseLoading}
+        onClose={() => setDeleteBase(null)}
+        onConfirm={() => {
+          const target = deleteBase;
+          if (!target) return;
+          setDeleteBaseLoading(true);
+          window.setTimeout(() => {
+            removeStoreBase(target.id);
+            if (selection.kind === "personalBase" && selection.baseId === target.id) {
+              setSelection({ kind: "personalAll" });
+            }
+            toast.success(`知识库「${target.name}」已删除`);
+            setDeleteBaseLoading(false);
+            setDeleteBase(null);
+          }, 300);
+        }}
+      />
+
+      <PersonalDirectoryRenameDialog
+        directory={renamePersonalDirectory}
+        loading={renamePersonalDirectoryLoading}
+        onClose={() => setRenamePersonalDirectory(null)}
+        onConfirm={(name) => {
+          const target = renamePersonalDirectory;
+          if (!target) return;
+          setRenamePersonalDirectoryLoading(true);
+          window.setTimeout(() => {
+            updateStorePersonalDirectory(target.id, { name });
+            toast.success(`个人目录已重命名为「${name}」`);
+            setRenamePersonalDirectoryLoading(false);
+            setRenamePersonalDirectory(null);
           }, 300);
         }}
       />

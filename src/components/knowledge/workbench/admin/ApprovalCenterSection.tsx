@@ -1,7 +1,7 @@
 import { Check, FileUp, Info, ShieldCheck, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ModulePanel, ModuleTabs, SearchBar } from "@/components/learning/ui";
+import { SearchBar, TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
 import {
   KbDataTable,
   KbDataTableRow,
@@ -17,7 +17,7 @@ import {
   KbTableCellUser,
 } from "@/components/knowledge/ui";
 import { PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
-import { listCategoryPathOptions, permissionGroupLabel } from "@/lib/knowledge/model";
+import { listCategoryPathOptions } from "@/lib/knowledge/model";
 import type {
   ApprovalStatus,
   KnowledgeBase,
@@ -55,7 +55,7 @@ const UPLOAD_GRID =
   "grid-cols-[36px_minmax(220px,1.3fr)_minmax(140px,1fr)_100px_96px_120px_minmax(200px,auto)] min-w-[980px]";
 
 const PERMISSION_GRID =
-  "grid-cols-[36px_120px_minmax(200px,1.2fr)_100px_minmax(200px,1fr)_100px_minmax(180px,auto)] min-w-[960px]";
+  "grid-cols-[36px_120px_minmax(200px,1.2fr)_minmax(200px,1fr)_100px_minmax(180px,auto)] min-w-[860px]";
 
 function approvalStatusLabel(status?: ApprovalStatus) {
   if (status === "parsing") return "解析中";
@@ -88,6 +88,8 @@ export function ApprovalCenterSection({
   const [fileQuery, setFileQuery] = useState("");
   const [submitterFilter, setSubmitterFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
 
   const selection = useFileSelection();
 
@@ -112,13 +114,26 @@ export function ApprovalCenterSection({
   }, [fileQuery, statusFilter, submitterFilter, uploadItems]);
 
   const currentItems = tab === "uploads" ? filteredUploadItems : permissionItems;
-  const pageIds = useMemo(() => currentItems.map((item) => item.id), [currentItems]);
-  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selection.isSelected(id));
-  const somePageSelected = pageIds.some((id) => selection.isSelected(id));
+  const filteredIds = useMemo(() => currentItems.map((item) => item.id), [currentItems]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [tab, fileQuery, submitterFilter, statusFilter, pageSize]);
 
   useEffect(() => {
     selection.clear();
   }, [tab, fileQuery, submitterFilter, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(currentItems.length / pageSize) || 1);
+  const safePage = Math.min(page, totalPages);
+  const pagedItems = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return currentItems.slice(start, start + pageSize);
+  }, [currentItems, pageSize, safePage]);
+
+  const pageIds = useMemo(() => pagedItems.map((item) => item.id), [pagedItems]);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selection.isSelected(id));
+  const somePageSelected = pageIds.some((id) => selection.isSelected(id));
 
   const handleTabChange = (next: ApprovalTab) => {
     setTab(next);
@@ -209,19 +224,48 @@ export function ApprovalCenterSection({
     ) : null;
 
   const tabPanel = (
-    <ModulePanel className={cn("flex min-h-0 flex-1 flex-col", embedded && "rounded-none border-0 shadow-none")}>
-      <ModuleTabs
-        compact
-        className={embedded ? "!bg-transparent px-4" : undefined}
-        tabs={APPROVAL_TABS.map((item) => ({
-          key: item.key,
-          label: item.label,
-          desc: item.desc,
-          icon: <item.icon className="h-4 w-4" />,
-        }))}
-        value={tab}
-        onChange={handleTabChange}
-      />
+    <div
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] border border-[#DCEBED] bg-white shadow-[0_8px_24px_rgba(31,52,64,0.025)]",
+        embedded && "rounded-none border-0 shadow-none",
+      )}
+    >
+      <div className="px-5 pt-4">
+        <div role="tablist" aria-label="审批台" className="flex items-center gap-1">
+          {APPROVAL_TABS.map((item) => {
+            const active = tab === item.key;
+            const count = item.key === "uploads" ? uploadItems.length : permissionItems.length;
+            return (
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => handleTabChange(item.key)}
+                className={cn(
+                  "inline-flex h-9 items-center gap-1.5 border-b-2 px-3 text-[12.5px] font-medium transition-colors",
+                  active
+                    ? "border-primary text-primary"
+                    : "border-transparent text-kb-muted hover:text-kb-body",
+                )}
+              >
+                <item.icon className="h-3.5 w-3.5 stroke-[1.8]" />
+                {item.label}
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "min-w-4 rounded-full px-1.5 py-px text-center text-[10px] leading-4",
+                      active ? "bg-primary-soft text-primary" : "bg-muted text-kb-muted",
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {filterBar}
 
@@ -230,7 +274,7 @@ export function ApprovalCenterSection({
         totalCount={currentItems.length}
         pageItemCount={pageIds.length}
         isAllResultsSelected={selection.isAllResultsSelected}
-        onSelectAllResults={() => selection.selectAllResults(pageIds)}
+        onSelectAllResults={() => selection.selectAllResults(filteredIds)}
         onBatchApprove={handleBatchApprove}
         onBatchReject={handleBatchReject}
         onClearSelection={selection.clear}
@@ -248,7 +292,7 @@ export function ApprovalCenterSection({
       <div className="min-h-0 flex-1 overflow-x-auto">
         {tab === "uploads" ? (
           <UploadApprovalTable
-            items={filteredUploadItems}
+            items={pagedItems as UploadApproval[]}
             selection={selection}
             allPageSelected={allPageSelected}
             somePageSelected={somePageSelected}
@@ -257,7 +301,7 @@ export function ApprovalCenterSection({
           />
         ) : (
           <PermissionApprovalTable
-            items={permissionItems}
+            items={pagedItems as PermissionRequest[]}
             selection={selection}
             allPageSelected={allPageSelected}
             somePageSelected={somePageSelected}
@@ -266,7 +310,21 @@ export function ApprovalCenterSection({
           />
         )}
       </div>
-    </ModulePanel>
+
+      {currentItems.length > 0 && (
+        <TableListPager
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={currentItems.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
+    </div>
   );
 
   if (embedded) {
@@ -505,7 +563,6 @@ function PermissionApprovalTable({
           </span>
           <span>申请人</span>
           <span>目标知识库</span>
-          <span>权限组</span>
           <span>申请理由</span>
           <span>通知</span>
           <span className="text-right">操作</span>
@@ -525,9 +582,6 @@ function PermissionApprovalTable({
             </span>
             <KbTableCellUser name={item.applicantName} />
             <span className="truncate text-kb-body">{item.knowledgeBaseName}</span>
-            <span>
-              <KbStatusTag tone="accent">{permissionGroupLabel(item.group)}</KbStatusTag>
-            </span>
             <span className="truncate text-kb-muted">{item.reason}</span>
             <span className="text-kb-muted">{item.notifyStatus === "sent" ? "已通知" : "待通知"}</span>
             <span className="flex justify-end gap-2">

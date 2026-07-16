@@ -5,6 +5,7 @@ import {
   DEMO_ROLE_LABELS,
   getCurrentKnowledgeUser,
   getDemoRoleKey,
+  getDemoRoleServerSnapshot,
   subscribeDemoRole,
 } from "@/lib/knowledge/demoRole";
 import { canViewKnowledgeAdmin } from "@/lib/knowledge/model";
@@ -24,7 +25,7 @@ const navItems: NavItem[] = [
 ];
 
 export function KnowledgeModuleNav() {
-  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const currentUser = getCurrentKnowledgeUser();
   const visibleItems = navItems.filter((item) => !item.adminOnly || canViewKnowledgeAdmin());

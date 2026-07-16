@@ -20,9 +20,9 @@ import {
   UploadCloud,
   type LucideIcon,
 } from "lucide-react";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { SearchBar } from "@/components/learning/ui";
+import { SearchBar, TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import {
   DropdownMenu,
@@ -46,7 +46,11 @@ import {
   listCategoryPathOptions,
 } from "@/lib/knowledge/model";
 import { pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
-import { getKnowledgeStoreVersion, subscribeKnowledgeStore } from "@/lib/knowledge/store";
+import {
+  getKnowledgeStoreServerSnapshot,
+  getKnowledgeStoreVersion,
+  subscribeKnowledgeStore,
+} from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeBase, UploadRecord } from "@/lib/knowledge/types";
 import {
@@ -160,7 +164,11 @@ export function UploadTrackingPanel({
   onSearchChange: (next: UploadSearch) => void;
   embedded?: boolean;
 }) {
-  const storeVersion = useSyncExternalStore(subscribeKnowledgeStore, getKnowledgeStoreVersion);
+  const storeVersion = useSyncExternalStore(
+    subscribeKnowledgeStore,
+    getKnowledgeStoreVersion,
+    getKnowledgeStoreServerSnapshot,
+  );
 
   const currentView: UploadView = search.view ?? "all";
   const statusFilter = search.status ?? "all";
@@ -173,6 +181,8 @@ export function UploadTrackingPanel({
   const [uploadBase, setUploadBase] = useState<KnowledgeBase | null>(null);
   const [basePickerOpen, setBasePickerOpen] = useState(false);
   const [actionDialog, setActionDialog] = useState<ActionDialog>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
 
   const historyFile = historyFileId ? (getFileById(historyFileId) ?? null) : null;
   const meta = UPLOAD_VIEW_META[currentView];
@@ -197,6 +207,17 @@ export function UploadTrackingPanel({
       );
     }).sort((a, b) => (b.updatedAt ?? b.submittedAt).localeCompare(a.updatedAt ?? a.submittedAt));
   }, [currentView, statusFilter, categoryFilter, searchQuery]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [currentView, statusFilter, categoryFilter, searchQuery, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(records.length / pageSize) || 1);
+  const safePage = Math.min(page, totalPages);
+  const pagedRecords = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return records.slice(start, start + pageSize);
+  }, [records, pageSize, safePage]);
 
   const setView = (view: UploadView, status = "all") => {
     onSearchChange({ ...search, view, status: status === "all" ? undefined : status });
@@ -377,7 +398,7 @@ export function UploadTrackingPanel({
                     />
                   }
                 >
-                  {records.map((record) => (
+                  {pagedRecords.map((record) => (
                     <UploadTrackingRow
                       key={record.id}
                       view={currentView}
@@ -387,6 +408,20 @@ export function UploadTrackingPanel({
                   ))}
                 </KbDataTable>
               </div>
+
+              {records.length > 0 && (
+                <TableListPager
+                  page={safePage}
+                  totalPages={totalPages}
+                  totalItems={records.length}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size);
+                    setPage(1);
+                  }}
+                />
+              )}
             </section>
           </div>
         </div>

@@ -3,7 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { getMoveTargetBases } from "@/lib/knowledge/model";
 import { pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
-import { getKnowledgeStoreVersion, subscribeKnowledgeStore } from "@/lib/knowledge/store";
+import {
+  getKnowledgeStoreServerSnapshot,
+  getKnowledgeStoreVersion,
+  subscribeKnowledgeStore,
+} from "@/lib/knowledge/store";
 import type { KnowledgeBase } from "@/lib/knowledge/types";
 import { useSyncExternalStore } from "react";
 import { BaseTreeSelect } from "./FileMoveDialog";
@@ -19,7 +23,11 @@ export function UploadBasePickerDialog({
   onClose: () => void;
   onSelect: (base: KnowledgeBase) => void;
 }) {
-  const storeVersion = useSyncExternalStore(subscribeKnowledgeStore, getKnowledgeStoreVersion);
+  const storeVersion = useSyncExternalStore(
+    subscribeKnowledgeStore,
+    getKnowledgeStoreVersion,
+    getKnowledgeStoreServerSnapshot,
+  );
   const [target, setTarget] = useState("");
   const [treeOpen, setTreeOpen] = useState(false);
 

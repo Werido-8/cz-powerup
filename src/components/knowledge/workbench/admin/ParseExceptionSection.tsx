@@ -13,7 +13,7 @@ import {
   KbStatusTag,
   KbTableCellFile,
 } from "@/components/knowledge/ui";
-import { SearchInput } from "@/components/learning/ui";
+import { SearchInput, TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
 import type { ParseException } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import { FileListCheckbox } from "../FileListCheckbox";
@@ -35,6 +35,8 @@ export function ParseExceptionSection({
   const [submitterFilter, setSubmitterFilter] = useState("all");
   const [logItem, setLogItem] = useState<ParseException | null>(null);
   const [batchLoading, setBatchLoading] = useState<"retry" | "delete" | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
 
   const selection = useFileSelection();
 
@@ -72,7 +74,18 @@ export function ParseExceptionSection({
     });
   }, [baseFilter, query, rows, submitterFilter]);
 
-  const pageIds = useMemo(() => filtered.map((item) => item.id), [filtered]);
+  useEffect(() => {
+    setPage(1);
+  }, [baseFilter, query, submitterFilter, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize) || 1);
+  const safePage = Math.min(page, totalPages);
+  const pagedItems = useMemo(() => {
+    const start = (safePage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, pageSize, safePage]);
+
+  const pageIds = useMemo(() => pagedItems.map((item) => item.id), [pagedItems]);
   const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selection.isSelected(id));
   const somePageSelected = pageIds.some((id) => selection.isSelected(id));
 
@@ -232,7 +245,7 @@ export function ParseExceptionSection({
       }
       empty={<KbEmptyState title="暂无解析异常" description="解析失败文件会在这里集中处理。" />}
     >
-      {filtered.map((item) => {
+      {pagedItems.map((item) => {
         const selected = selection.isSelected(item.id);
         return (
           <KbDataTableRow key={item.id} variant="flat" className={GRID} selected={selected}>
@@ -285,6 +298,20 @@ export function ParseExceptionSection({
     <>
       {toolbar}
       <div className="min-h-0 flex-1 overflow-x-auto">{table}</div>
+
+      {filtered.length > 0 && (
+        <TableListPager
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={filtered.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
+      )}
 
       <KbDrawer
         open={Boolean(logItem)}
