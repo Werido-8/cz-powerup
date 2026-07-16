@@ -1,5 +1,17 @@
-import { KNOWLEDGE_BASES, KNOWLEDGE_CATEGORIES, KNOWLEDGE_FILES, PERSONAL_DIRECTORIES } from "./data";
-import type { KnowledgeBase, KnowledgeCategory, KnowledgeFile, PersonalDirectory } from "./types";
+import {
+  KNOWLEDGE_BASES,
+  KNOWLEDGE_CATEGORIES,
+  KNOWLEDGE_FILES,
+  PERSONAL_DIRECTORIES,
+  UPLOAD_APPROVALS,
+} from "./data";
+import type {
+  KnowledgeBase,
+  KnowledgeCategory,
+  KnowledgeFile,
+  PersonalDirectory,
+  UploadApproval,
+} from "./types";
 
 /** 公共知识库根目录（表单选择器用，写入时 parentId 为空） */
 export const PROFESSIONAL_CATEGORY_ROOT_ID = "__professional_category_root__";
@@ -10,6 +22,15 @@ let bases: KnowledgeBase[] = KNOWLEDGE_BASES.map((item) => ({ ...item }));
 let files: KnowledgeFile[] = KNOWLEDGE_FILES.map((item) => ({
   ...item,
   enabled: item.enabled ?? true,
+}));
+let uploadApprovals: UploadApproval[] = UPLOAD_APPROVALS.map((item) => ({
+  ...item,
+  aiMetadata: item.aiMetadata?.map((field) => ({ ...field })),
+  aiExercises: item.aiExercises?.map((exercise) => ({
+    ...exercise,
+    options: exercise.options.map((option) => ({ ...option })),
+    correctAnswers: [...exercise.correctAnswers],
+  })),
 }));
 let version = 0;
 
@@ -49,6 +70,15 @@ export function getStoreBases() {
 
 export function getStoreFiles() {
   return files;
+}
+
+export function getStoreUploadApprovals() {
+  return uploadApprovals;
+}
+
+export function updateStoreUploadApproval(id: string, patch: Partial<UploadApproval>) {
+  uploadApprovals = uploadApprovals.map((item) => (item.id === id ? { ...item, ...patch } : item));
+  emit();
 }
 
 export function updateStoreFile(fileId: string, patch: Partial<KnowledgeFile>) {

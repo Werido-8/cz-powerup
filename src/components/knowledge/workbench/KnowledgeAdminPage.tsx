@@ -8,7 +8,7 @@ import {
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { toast } from "sonner";
 import { KbButton, KbEmptyState, KbSidebar, KbSidebarItem, KbSidebarSection } from "@/components/knowledge/ui";
-import { PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
+import { PERMISSION_REQUESTS } from "@/lib/knowledge/data";
 import {
   getDemoRoleKey,
   getDemoRoleServerSnapshot,
@@ -22,7 +22,14 @@ import {
   getManageableBases,
   getParseExceptionsForScope,
 } from "@/lib/knowledge/model";
-import { addStoreBase, updateStoreBase } from "@/lib/knowledge/store";
+import {
+  addStoreBase,
+  getKnowledgeStoreServerSnapshot,
+  getKnowledgeStoreVersion,
+  getStoreUploadApprovals,
+  subscribeKnowledgeStore,
+  updateStoreBase,
+} from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeBase, KnowledgeBaseStatus } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -70,10 +77,15 @@ const SECTION_META: Record<
   },
 };
 
-export function KnowledgeAdminPage() {
+export function KnowledgeAdminPage({ initialSection }: { initialSection?: AdminSection }) {
   useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
+  useSyncExternalStore(
+    subscribeKnowledgeStore,
+    getKnowledgeStoreVersion,
+    getKnowledgeStoreServerSnapshot,
+  );
   const [section, setSection] = useState<AdminSection>(() =>
-    canSeeCategoryManager() ? "categories" : "bases",
+    initialSection ?? (canSeeCategoryManager() ? "categories" : "bases"),
   );
   const [bases, setBases] = useState(() => getManageableBases());
   const [formBase, setFormBase] = useState<KnowledgeBase | "new" | null>(null);
@@ -98,7 +110,10 @@ export function KnowledgeAdminPage() {
   const permissionRequestCount = PERMISSION_REQUESTS.filter((request) =>
     bases.some((base) => base.id === request.knowledgeBaseId),
   ).length;
-  const approvalBadge = UPLOAD_APPROVALS.length + permissionRequestCount;
+  const pendingUploadCount = getStoreUploadApprovals().filter(
+    (item) => (item.status ?? "pendingApproval") === "pendingApproval",
+  ).length;
+  const approvalBadge = pendingUploadCount + permissionRequestCount;
 
   const sectionMeta = SECTION_META[visibleSection];
 

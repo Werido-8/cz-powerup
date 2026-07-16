@@ -193,6 +193,23 @@ export interface PermissionRequest {
 
 export type ApprovalStatus = "pendingApproval" | "approved" | "rejected" | "parsing";
 
+export type KnowledgeExerciseType = "single" | "multiple" | "judge";
+
+export interface KnowledgeExerciseOption {
+  id: string;
+  label: string;
+  content: string;
+}
+
+export interface KnowledgeExercise {
+  id: string;
+  type: KnowledgeExerciseType;
+  stem: string;
+  options: KnowledgeExerciseOption[];
+  correctAnswers: string[];
+  analysis: string;
+}
+
 export interface UploadApproval {
   id: string;
   fileName: string;
@@ -210,7 +227,14 @@ export interface UploadApproval {
   reviewNote?: string;
   summary?: string;
   aiKeywords?: string[];
+  aiMetadata?: Array<{
+    id: string;
+    label: string;
+    value: string;
+  }>;
   aiQuestions?: string[];
+  aiAnswers?: string[];
+  aiExercises?: KnowledgeExercise[];
   categoryId?: string;
 }
 

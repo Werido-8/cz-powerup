@@ -48,6 +48,7 @@ import { Route as KnowledgeLibLibIdRouteImport } from './routes/knowledge.lib.$l
 import { Route as KnowledgeKbKbIdRouteImport } from './routes/knowledge.kb.$kbId'
 import { Route as KnowledgeFileFileIdRouteImport } from './routes/knowledge.file.$fileId'
 import { Route as KnowledgeDeptDeptIdRouteImport } from './routes/knowledge.dept.$deptId'
+import { Route as KnowledgeApprovalApprovalIdRouteImport } from './routes/knowledge.approval.$approvalId'
 import { Route as ExamAdminPaperNewRouteImport } from './routes/exam-admin.paper.new'
 import { Route as AssetsCollectionIdRouteImport } from './routes/assets.collection.$id'
 import { Route as ScenarioTypicalResultIdRouteImport } from './routes/scenario.typical.result.$id'
@@ -257,6 +258,12 @@ const KnowledgeDeptDeptIdRoute = KnowledgeDeptDeptIdRouteImport.update({
   path: '/dept/$deptId',
   getParentRoute: () => KnowledgeRoute,
 } as any)
+const KnowledgeApprovalApprovalIdRoute =
+  KnowledgeApprovalApprovalIdRouteImport.update({
+    id: '/approval/$approvalId',
+    path: '/approval/$approvalId',
+    getParentRoute: () => KnowledgeRoute,
+  } as any)
 const ExamAdminPaperNewRoute = ExamAdminPaperNewRouteImport.update({
   id: '/paper/new',
   path: '/paper/new',
@@ -360,6 +367,7 @@ export interface FileRoutesByFullPath {
   '/training/': typeof TrainingIndexRoute
   '/assets/collection/$id': typeof AssetsCollectionIdRoute
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
+  '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
   '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
@@ -410,6 +418,7 @@ export interface FileRoutesByTo {
   '/training': typeof TrainingIndexRoute
   '/assets/collection/$id': typeof AssetsCollectionIdRoute
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
+  '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
   '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
@@ -465,6 +474,7 @@ export interface FileRoutesById {
   '/training/': typeof TrainingIndexRoute
   '/assets/collection/$id': typeof AssetsCollectionIdRoute
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
+  '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
   '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
     | '/training/'
     | '/assets/collection/$id'
     | '/exam-admin/paper/new'
+    | '/knowledge/approval/$approvalId'
     | '/knowledge/dept/$deptId'
     | '/knowledge/file/$fileId'
     | '/knowledge/kb/$kbId'
@@ -571,6 +582,7 @@ export interface FileRouteTypes {
     | '/training'
     | '/assets/collection/$id'
     | '/exam-admin/paper/new'
+    | '/knowledge/approval/$approvalId'
     | '/knowledge/dept/$deptId'
     | '/knowledge/file/$fileId'
     | '/knowledge/kb/$kbId'
@@ -625,6 +637,7 @@ export interface FileRouteTypes {
     | '/training/'
     | '/assets/collection/$id'
     | '/exam-admin/paper/new'
+    | '/knowledge/approval/$approvalId'
     | '/knowledge/dept/$deptId'
     | '/knowledge/file/$fileId'
     | '/knowledge/kb/$kbId'
@@ -955,6 +968,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeDeptDeptIdRouteImport
       parentRoute: typeof KnowledgeRoute
     }
+    '/knowledge/approval/$approvalId': {
+      id: '/knowledge/approval/$approvalId'
+      path: '/approval/$approvalId'
+      fullPath: '/knowledge/approval/$approvalId'
+      preLoaderRoute: typeof KnowledgeApprovalApprovalIdRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
     '/exam-admin/paper/new': {
       id: '/exam-admin/paper/new'
       path: '/paper/new'
@@ -1101,6 +1121,7 @@ interface KnowledgeRouteChildren {
   KnowledgeMineRoute: typeof KnowledgeMineRoute
   KnowledgeUploadsRoute: typeof KnowledgeUploadsRoute
   KnowledgeIndexRoute: typeof KnowledgeIndexRoute
+  KnowledgeApprovalApprovalIdRoute: typeof KnowledgeApprovalApprovalIdRoute
   KnowledgeDeptDeptIdRoute: typeof KnowledgeDeptDeptIdRoute
   KnowledgeFileFileIdRoute: typeof KnowledgeFileFileIdRoute
   KnowledgeKbKbIdRoute: typeof KnowledgeKbKbIdRouteWithChildren
@@ -1115,6 +1136,7 @@ const KnowledgeRouteChildren: KnowledgeRouteChildren = {
   KnowledgeMineRoute: KnowledgeMineRoute,
   KnowledgeUploadsRoute: KnowledgeUploadsRoute,
   KnowledgeIndexRoute: KnowledgeIndexRoute,
+  KnowledgeApprovalApprovalIdRoute: KnowledgeApprovalApprovalIdRoute,
   KnowledgeDeptDeptIdRoute: KnowledgeDeptDeptIdRoute,
   KnowledgeFileFileIdRoute: KnowledgeFileFileIdRoute,
   KnowledgeKbKbIdRoute: KnowledgeKbKbIdRouteWithChildren,

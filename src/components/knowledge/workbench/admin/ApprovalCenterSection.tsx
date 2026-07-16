@@ -1,11 +1,11 @@
-import { Check, FileUp, Info, ShieldCheck, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Check, ClipboardCheck, FileText, FileUp, ShieldCheck, X } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { SearchBar, TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
 import {
   KbDataTable,
   KbDataTableRow,
-  KbDrawer,
   KbEmptyState,
   KbFilterPills,
   KbIconTextButton,
@@ -16,8 +16,13 @@ import {
   KbTableCellFile,
   KbTableCellUser,
 } from "@/components/knowledge/ui";
-import { PERMISSION_REQUESTS, UPLOAD_APPROVALS } from "@/lib/knowledge/data";
-import { listCategoryPathOptions } from "@/lib/knowledge/model";
+import { PERMISSION_REQUESTS } from "@/lib/knowledge/data";
+import {
+  getKnowledgeStoreServerSnapshot,
+  getKnowledgeStoreVersion,
+  getStoreUploadApprovals,
+  subscribeKnowledgeStore,
+} from "@/lib/knowledge/store";
 import type {
   ApprovalStatus,
   KnowledgeBase,
@@ -52,7 +57,7 @@ const APPROVAL_TABS: {
 ];
 
 const UPLOAD_GRID =
-  "grid-cols-[36px_minmax(220px,1.3fr)_minmax(140px,1fr)_100px_108px_108px_120px_minmax(200px,auto)] min-w-[1120px]";
+  "grid-cols-[minmax(240px,1.4fr)_minmax(150px,1fr)_100px_108px_108px_120px_96px] min-w-[980px]";
 
 const PERMISSION_GRID =
   "grid-cols-[36px_120px_minmax(200px,1.2fr)_minmax(200px,1fr)_100px_minmax(180px,auto)] min-w-[860px]";
@@ -82,9 +87,15 @@ export function ApprovalCenterSection({
   manageableBases: KnowledgeBase[];
   embedded?: boolean;
 }) {
+  const navigate = useNavigate();
+  useSyncExternalStore(
+    subscribeKnowledgeStore,
+    getKnowledgeStoreVersion,
+    getKnowledgeStoreServerSnapshot,
+  );
   const manageableIds = new Set(manageableBases.map((base) => base.id));
   const [tab, setTab] = useState<ApprovalTab>("uploads");
-  const [uploadItems, setUploadItems] = useState(UPLOAD_APPROVALS);
+  const uploadItems = getStoreUploadApprovals();
   const [permissionItems, setPermissionItems] = useState(() =>
     PERMISSION_REQUESTS.filter((request) => manageableIds.has(request.knowledgeBaseId)),
   );
@@ -181,14 +192,10 @@ export function ApprovalCenterSection({
   const removeSelected = useCallback(
     (ids: string[]) => {
       const idSet = new Set(ids);
-      if (tab === "uploads") {
-        setUploadItems((previous) => previous.filter((item) => !idSet.has(item.id)));
-      } else {
-        setPermissionItems((previous) => previous.filter((item) => !idSet.has(item.id)));
-      }
+      setPermissionItems((previous) => previous.filter((item) => !idSet.has(item.id)));
       selection.clear();
     },
-    [selection, tab],
+    [selection],
   );
 
   const handleBatchApprove = useCallback(async () => {
@@ -196,18 +203,16 @@ export function ApprovalCenterSection({
     if (ids.length === 0) return;
     const confirmed =
       typeof window === "undefined" ||
-      window.confirm(`确认通过选中的 ${ids.length} ${tab === "uploads" ? "个文件上传" : "条权限申请"}？`);
+      window.confirm(`确认通过选中的 ${ids.length} 条权限申请？`);
     if (!confirmed) return;
     setBatchLoading("approve");
     try {
       removeSelected(ids);
-      toast.success(
-        tab === "uploads" ? `已通过 ${ids.length} 个文件并发布` : `已通过 ${ids.length} 条权限申请`,
-      );
+      toast.success(`已通过 ${ids.length} 条权限申请`);
     } finally {
       setBatchLoading(null);
     }
-  }, [removeSelected, selection.selectedArray, tab]);
+  }, [removeSelected, selection.selectedArray]);
 
   const handleBatchReject = useCallback(async () => {
     const ids = selection.selectedArray;
@@ -220,15 +225,11 @@ export function ApprovalCenterSection({
     setBatchLoading("reject");
     try {
       removeSelected(ids);
-      toast.success(
-        tab === "uploads"
-          ? `已驳回 ${ids.length} 个文件并记录原因`
-          : `已驳回 ${ids.length} 条权限申请`,
-      );
+      toast.success(`已驳回 ${ids.length} 条权限申请`);
     } finally {
       setBatchLoading(null);
     }
-  }, [removeSelected, selection.selectedArray, tab]);
+  }, [removeSelected, selection.selectedArray]);
 
   const filterBar =
     tab === "uploads" ? (
@@ -252,7 +253,6 @@ export function ApprovalCenterSection({
           onChange={setStatusFilter}
           options={[
             { value: "all", label: "全部状态" },
-            { value: "parsing", label: "解析中" },
             { value: "pendingApproval", label: "待审批" },
             { value: "approved", label: "已通过" },
             { value: "rejected", label: "已驳回" },
@@ -335,35 +335,38 @@ export function ApprovalCenterSection({
       {filterBar}
 
 
-      <ApprovalListToolbar
-        selectedCount={selection.selectedCount}
-        totalCount={currentItems.length}
-        pageItemCount={pageIds.length}
-        isAllResultsSelected={selection.isAllResultsSelected}
-        onSelectAllResults={() => selection.selectAllResults(filteredIds)}
-        onBatchApprove={handleBatchApprove}
-        onBatchReject={handleBatchReject}
-        onClearSelection={selection.clear}
-        batchLoading={batchLoading}
-        entityLabel={tab === "uploads" ? "个文件" : "条申请"}
-        left={
+      {tab === "uploads" ? (
+        <div className="flex min-h-[52px] items-center border-b border-divider px-4 py-2.5">
           <p className="text-[13px] text-muted-foreground">
-            {tab === "uploads"
-              ? "公共库文件先解析后审批，可在详情中调整 AI 内容"
-              : "勾选申请后可批量通过或驳回"}
+            文件已完成解析。点击“审批”进入工作台，核对并修改 AI 生成内容后再提交结果。
           </p>
-        }
-      />
+        </div>
+      ) : (
+        <ApprovalListToolbar
+          selectedCount={selection.selectedCount}
+          totalCount={currentItems.length}
+          pageItemCount={pageIds.length}
+          isAllResultsSelected={selection.isAllResultsSelected}
+          onSelectAllResults={() => selection.selectAllResults(filteredIds)}
+          onBatchApprove={handleBatchApprove}
+          onBatchReject={handleBatchReject}
+          onClearSelection={selection.clear}
+          batchLoading={batchLoading}
+          entityLabel="条申请"
+          left={<p className="text-[13px] text-muted-foreground">勾选申请后可批量通过或驳回</p>}
+        />
+      )}
 
       <div className="min-h-0 flex-1 overflow-x-auto">
         {tab === "uploads" ? (
           <UploadApprovalTable
             items={pagedItems as UploadApproval[]}
-            selection={selection}
-            allPageSelected={allPageSelected}
-            somePageSelected={somePageSelected}
-            pageIds={pageIds}
-            onRemove={(id) => removeSelected([id])}
+            onReview={(approvalId) =>
+              navigate({
+                to: "/knowledge/approval/$approvalId",
+                params: { approvalId },
+              })
+            }
           />
         ) : (
           <PermissionApprovalTable
@@ -413,185 +416,62 @@ type SelectionApi = ReturnType<typeof useFileSelection>;
 
 function UploadApprovalTable({
   items,
-  selection,
-  allPageSelected,
-  somePageSelected,
-  pageIds,
-  onRemove,
+  onReview,
 }: {
   items: UploadApproval[];
-  selection: SelectionApi;
-  allPageSelected: boolean;
-  somePageSelected: boolean;
-  pageIds: string[];
-  onRemove: (id: string) => void;
+  onReview: (id: string) => void;
 }) {
-  const [detailItem, setDetailItem] = useState<UploadApproval | null>(null);
-  const [editSummary, setEditSummary] = useState("");
-  const [editKeywords, setEditKeywords] = useState("");
-  const categoryOptions = listCategoryPathOptions();
-
-  const openDetail = (item: UploadApproval) => {
-    setDetailItem(item);
-    setEditSummary(item.summary ?? "");
-    setEditKeywords((item.aiKeywords ?? []).join("、"));
-  };
-
   return (
-    <>
-      <KbDataTable
-        variant="flat"
-        minWidth={UPLOAD_GRID}
-        header={
-          <>
-            <span className="flex items-center justify-center">
-              <FileListCheckbox
-                checked={allPageSelected}
-                indeterminate={!allPageSelected && somePageSelected}
-                onCheckedChange={(checked) => selection.toggleAll(pageIds, checked)}
-                aria-label="全选当前列表"
+    <KbDataTable
+      variant="flat"
+      minWidth={UPLOAD_GRID}
+      header={
+        <>
+          <span>文件名</span>
+          <span>归属知识库</span>
+          <span>提交人</span>
+          <span>解析状态</span>
+          <span>审核状态</span>
+          <span>提交时间</span>
+          <span className="text-right">操作</span>
+        </>
+      }
+      empty={<KbEmptyState title="暂无审批记录" description="解析完成后的文件上传申请会出现在这里。" />}
+    >
+      {items.map((item) => {
+        const status = item.status ?? "pendingApproval";
+        return (
+          <KbDataTableRow key={item.id} variant="flat" className={UPLOAD_GRID}>
+            <KbTableCellFile
+              name={item.fileName}
+              subtitle={[item.uploadNote, item.fileSize].filter(Boolean).join(" / ")}
+              type={item.fileName.endsWith(".pdf") ? "pdf" : "docx"}
+            />
+            <KbTableCellBase name={item.knowledgeBaseName} />
+            <KbTableCellUser name={item.submitterName} />
+            <span>
+              <KbStatusTag tone="success" variant="outline" dot>
+                {parseApprovalStatusLabel()}
+              </KbStatusTag>
+            </span>
+            <span>
+              <KbStatusTag tone={approvalStatusTone(status)} variant="outline" dot>
+                {approvalStatusLabel(status)}
+              </KbStatusTag>
+            </span>
+            <span className="text-kb-muted">{item.submittedAt}</span>
+            <span className="flex items-center justify-end">
+              <KbIconTextButton
+                icon={status === "pendingApproval" ? ClipboardCheck : FileText}
+                label={status === "pendingApproval" ? "审批" : "查看"}
+                variant={status === "pendingApproval" ? "primary-text" : "default"}
+                onClick={() => onReview(item.id)}
               />
             </span>
-            <span>文件名</span>
-            <span>归属知识库</span>
-            <span>提交人</span>
-            <span>解析状态</span>
-            <span>审核状态</span>
-            <span>提交时间</span>
-            <span className="text-right">操作</span>
-          </>
-        }
-        empty={
-          <KbEmptyState title="暂无待审批上传" description="解析完成后的文件上传申请会出现在这里。" />
-        }
-      >
-        {items.map((item) => {
-          const selected = selection.isSelected(item.id);
-          const status = item.status ?? "pendingApproval";
-          const canApprove = status === "pendingApproval";
-          return (
-            <KbDataTableRow key={item.id} variant="flat" className={UPLOAD_GRID} selected={selected}>
-              <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                <FileListCheckbox
-                  checked={selected}
-                  onCheckedChange={() => selection.toggle(item.id)}
-                  aria-label={`选择 ${item.fileName}`}
-                />
-              </span>
-              <KbTableCellFile
-                name={item.fileName}
-                subtitle={[item.uploadNote, item.fileSize].filter(Boolean).join(" / ")}
-                type={item.fileName.endsWith(".pdf") ? "pdf" : "docx"}
-              />
-              <KbTableCellBase name={item.knowledgeBaseName} />
-              <KbTableCellUser name={item.submitterName} />
-              <span>
-                <KbStatusTag tone="success" variant="outline" dot>
-                  {parseApprovalStatusLabel()}
-                </KbStatusTag>
-              </span>
-              <span>
-                <KbStatusTag tone={approvalStatusTone(status)} variant="outline" dot>
-                  {approvalStatusLabel(status)}
-                </KbStatusTag>
-              </span>
-              <span className="text-kb-muted">{item.submittedAt}</span>
-              <span className="flex items-center justify-end gap-2">
-                <KbIconTextButton
-                  icon={Check}
-                  label="通过"
-                  variant="primary-text"
-                  disabled={!canApprove}
-                  onClick={() => {
-                    if (!canApprove) {
-                      toast.message("需等待解析完成后再审批");
-                      return;
-                    }
-                    onRemove(item.id);
-                    toast.success("已通过并发布");
-                  }}
-                />
-                <KbIconTextButton
-                  icon={X}
-                  label="驳回"
-                  variant="danger-text"
-                  disabled={!canApprove}
-                  onClick={() => {
-                    const reason =
-                      typeof window !== "undefined" ? window.prompt("请输入驳回原因") : "";
-                    if (!reason) return;
-                    onRemove(item.id);
-                    toast.success("已驳回并记录原因");
-                  }}
-                />
-                <KbIconTextButton icon={Info} label="详情" onClick={() => openDetail(item)} />
-              </span>
-            </KbDataTableRow>
-          );
-        })}
-      </KbDataTable>
-
-      <KbDrawer
-        open={Boolean(detailItem)}
-        title="审批详情"
-        subtitle={detailItem?.fileName}
-        onClose={() => setDetailItem(null)}
-      >
-        {detailItem && (
-          <div className="space-y-4 text-[13px]">
-            <DetailRow label="归属知识库" value={detailItem.knowledgeBaseName} />
-            <DetailRow label="提交人" value={detailItem.submitterName} />
-            <DetailRow label="提交时间" value={detailItem.submittedAt} />
-            <DetailRow label="状态" value={approvalStatusLabel(detailItem.status)} />
-            <div>
-              <div className="text-[12px] font-medium text-kb-muted">分类</div>
-              <select
-                className="mt-1 w-full rounded-[8px] border border-kb-border px-3 py-2 text-[13px]"
-                defaultValue={detailItem.categoryId ?? categoryOptions[0]?.value}
-              >
-                {categoryOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <div className="text-[12px] font-medium text-kb-muted">摘要（可编辑）</div>
-              <textarea
-                value={editSummary}
-                onChange={(e) => setEditSummary(e.target.value)}
-                rows={3}
-                className="mt-1 w-full resize-none rounded-[8px] border border-kb-border px-3 py-2 text-[13px]"
-              />
-            </div>
-            <div>
-              <div className="text-[12px] font-medium text-kb-muted">关键词（可编辑，顿号分隔）</div>
-              <input
-                value={editKeywords}
-                onChange={(e) => setEditKeywords(e.target.value)}
-                className="mt-1 w-full rounded-[8px] border border-kb-border px-3 py-2 text-[13px]"
-              />
-            </div>
-            {(detailItem.aiQuestions ?? []).length > 0 && (
-              <div>
-                <div className="text-[12px] font-medium text-kb-muted">训练题预览</div>
-                <ul className="mt-1 list-inside list-disc text-kb-body">
-                  {detailItem.aiQuestions!.map((q) => (
-                    <li key={q}>{q}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {detailItem.riskHint && (
-              <div className="rounded-[8px] border border-warning/30 bg-warning-soft p-3 text-warning-foreground">
-                {detailItem.riskHint}
-              </div>
-            )}
-          </div>
-        )}
-      </KbDrawer>
-    </>
+          </KbDataTableRow>
+        );
+      })}
+    </KbDataTable>
   );
 }
 
@@ -683,14 +563,5 @@ function PermissionApprovalTable({
         );
       })}
     </KbDataTable>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[12px] font-medium text-kb-muted">{label}</div>
-      <div className="mt-1 text-kb-body">{value}</div>
-    </div>
   );
 }
