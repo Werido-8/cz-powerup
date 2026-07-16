@@ -88,6 +88,9 @@ export function ApprovalCenterSection({
   const [fileQuery, setFileQuery] = useState("");
   const [submitterFilter, setSubmitterFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [permissionQuery, setPermissionQuery] = useState("");
+  const [applicantFilter, setApplicantFilter] = useState("all");
+  const [permissionBaseFilter, setPermissionBaseFilter] = useState("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
 
@@ -97,6 +100,16 @@ export function ApprovalCenterSection({
     const names = Array.from(new Set(uploadItems.map((item) => item.submitterName)));
     return [{ value: "all", label: "全部提交人" }, ...names.map((n) => ({ value: n, label: n }))];
   }, [uploadItems]);
+
+  const applicantOptions = useMemo(() => {
+    const names = Array.from(new Set(permissionItems.map((item) => item.applicantName)));
+    return [{ value: "all", label: "全部申请人" }, ...names.map((n) => ({ value: n, label: n }))];
+  }, [permissionItems]);
+
+  const permissionBaseOptions = useMemo(() => {
+    const bases = Array.from(new Set(permissionItems.map((item) => item.knowledgeBaseName)));
+    return [{ value: "all", label: "全部知识库" }, ...bases.map((n) => ({ value: n, label: n }))];
+  }, [permissionItems]);
 
   const filteredUploadItems = useMemo(() => {
     const q = fileQuery.trim().toLowerCase();
@@ -113,16 +126,30 @@ export function ApprovalCenterSection({
     });
   }, [fileQuery, statusFilter, submitterFilter, uploadItems]);
 
-  const currentItems = tab === "uploads" ? filteredUploadItems : permissionItems;
+  const filteredPermissionItems = useMemo(() => {
+    const q = permissionQuery.trim().toLowerCase();
+    return permissionItems.filter((item) => {
+      if (applicantFilter !== "all" && item.applicantName !== applicantFilter) return false;
+      if (permissionBaseFilter !== "all" && item.knowledgeBaseName !== permissionBaseFilter) return false;
+      if (!q) return true;
+      return (
+        item.applicantName.toLowerCase().includes(q) ||
+        item.knowledgeBaseName.toLowerCase().includes(q) ||
+        item.reason.toLowerCase().includes(q)
+      );
+    });
+  }, [applicantFilter, permissionBaseFilter, permissionItems, permissionQuery]);
+
+  const currentItems = tab === "uploads" ? filteredUploadItems : filteredPermissionItems;
   const filteredIds = useMemo(() => currentItems.map((item) => item.id), [currentItems]);
 
   useEffect(() => {
     setPage(1);
-  }, [tab, fileQuery, submitterFilter, statusFilter, pageSize]);
+  }, [tab, fileQuery, submitterFilter, statusFilter, permissionQuery, applicantFilter, permissionBaseFilter, pageSize]);
 
   useEffect(() => {
     selection.clear();
-  }, [tab, fileQuery, submitterFilter, statusFilter]);
+  }, [tab, fileQuery, submitterFilter, statusFilter, permissionQuery, applicantFilter, permissionBaseFilter]);
 
   const totalPages = Math.max(1, Math.ceil(currentItems.length / pageSize) || 1);
   const safePage = Math.min(page, totalPages);
@@ -221,7 +248,29 @@ export function ApprovalCenterSection({
           ]}
         />
       </div>
-    ) : null;
+    ) : (
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#E8F0F2] px-4 py-3">
+        <SearchBar
+          value={permissionQuery}
+          onChange={setPermissionQuery}
+          onSearch={() => undefined}
+          placeholder="搜索申请人 / 目标知识库"
+          className="min-w-[200px] max-w-[280px]"
+        />
+        <KbFilterPills
+          label="申请人"
+          value={applicantFilter}
+          onChange={setApplicantFilter}
+          options={applicantOptions}
+        />
+        <KbFilterPills
+          label="知识库"
+          value={permissionBaseFilter}
+          onChange={setPermissionBaseFilter}
+          options={permissionBaseOptions}
+        />
+      </div>
+    );
 
   const tabPanel = (
     <div
@@ -267,7 +316,13 @@ export function ApprovalCenterSection({
         </div>
       </div>
 
+      <div
+        className="border-y border-[#E8F0F2]"
+        style={{ borderTop: "none", paddingTop: "0px" }}
+      />
+
       {filterBar}
+
 
       <ApprovalListToolbar
         selectedCount={selection.selectedCount}

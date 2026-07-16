@@ -15,8 +15,8 @@ import { toast } from "sonner";
 import { FileListCheckbox } from "./FileListCheckbox";
 import { Tag } from "@/components/learning/ui";
 import { publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
-import { isEmployee, isFileEnabled } from "@/lib/knowledge/model";
-import { updateStoreFile } from "@/lib/knowledge/store";
+import { getBaseById, isEmployee, isFileEnabled } from "@/lib/knowledge/model";
+import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
 import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -162,7 +162,12 @@ export function KnowledgeOverviewFileCard({
         file={file}
         onEdit={() => toast.message("打开编辑")}
         onDownload={() => toast.message("开始下载文件")}
-        onDelete={() => toast.message("确认删除文件？")}
+        onDelete={() => {
+          if (window.confirm(`确认删除文件「${file.name}」？该操作不可恢复。`)) {
+            removeStoreFiles([file.id]);
+            toast.success("文件已删除");
+          }
+        }}
         onMove={onMove ? () => onMove(file) : undefined}
         onTogglePin={onTogglePin ? () => onTogglePin(file) : undefined}
         onViewHistory={onViewHistory ? () => onViewHistory(file) : undefined}
@@ -199,6 +204,7 @@ function FileCardGlassActions({
   const pinned = Boolean(file.pinned);
   const hasHistory = (file.versions?.length ?? 0) > 1;
   const employee = isEmployee();
+  const canManageFile = !employee || getBaseById(file.knowledgeBaseId)?.scope === "personal";
   const fillId = `kb-card-glass-fill-${file.id}`;
 
   return (
@@ -256,17 +262,17 @@ function FileCardGlassActions({
           />
         )}
         <CardAction
-          icon={Star}
+          icon={file.favorite ? StarOff : Star}
           label={file.favorite ? "取消收藏" : "收藏"}
           onClick={() => updateStoreFile(file.id, { favorite: !file.favorite })}
         />
-        {!employee && file.canEdit !== false && (
+        {canManageFile && file.canEdit !== false && (
           <CardAction icon={Pencil} label="编辑" onClick={onEdit} />
         )}
         {file.canDownload !== false && (
           <CardAction icon={Download} label="下载" onClick={onDownload} />
         )}
-        {!employee && <CardAction icon={Trash2} label="删除" onClick={onDelete} danger />}
+        {canManageFile && <CardAction icon={Trash2} label="删除" onClick={onDelete} danger />}
       </div>
     </div>
   );

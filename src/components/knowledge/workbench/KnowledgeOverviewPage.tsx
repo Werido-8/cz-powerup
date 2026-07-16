@@ -35,6 +35,7 @@ import {
   getMetadataFieldsForBase,
   getPersonalDirectoryChildren,
   getPinnedFiles,
+  isSubmitToPublicMove,
   isTreeAggregateId,
   PERSONAL_DIRECTORY_ROOT_ID,
   PERSONAL_TREE_ALL_ID,
@@ -194,6 +195,8 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   const showCategoryManageActions = canSeeCategoryManager();
   const showPersonalManageActions = !employee;
+  // 个人知识库由当前用户维护，普通员工同样需要节点快捷操作。
+  const showPersonalTreeNodeActions = true;
 
   useEffect(() => {
     if (initialBaseId) setSelectedBaseId(initialBaseId);
@@ -274,7 +277,10 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     return selectedFiles.slice(start, start + effectivePageSize);
   }, [effectivePageSize, safePage, selectedFiles]);
 
-  const showManageColumn = selectedBase ? canManageFileList(selectedBase) : canManageFileList();
+  const showManageColumn =
+    selectedBase?.scope === "personal" ||
+    selectedBaseId === PERSONAL_TREE_ALL_ID ||
+    (selectedBase ? canManageFileList(selectedBase) : canManageFileList());
   const metadataFields = selectedBase ? getMetadataFieldsForBase(selectedBase.id) : [];
   const pageFileIds = pagedFiles.map((file) => file.id);
   const listSelection = {
@@ -301,8 +307,15 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   const handleConfirmMove = (files: KnowledgeFile[], targetBaseId: string) => {
     const targetBase = getBaseById(targetBaseId);
+    const submittedForApproval = files.filter((file) =>
+      isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
+    );
     setMoveLoading(true);
     for (const file of files) {
+      if (isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId)) {
+        updateStoreFile(file.id, { status: "pendingApproval" });
+        continue;
+      }
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
         knowledgeBaseName: targetBase?.name,
@@ -310,7 +323,11 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     }
     window.setTimeout(() => {
       const label = files.length > 1 ? `${files.length} 个文件` : `「${files[0]?.name}」`;
-      toast.success(`已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`);
+      toast.success(
+        submittedForApproval.length > 0
+          ? `已提交 ${label} 至「${targetBase?.name ?? "公共知识库"}」审批`
+          : `已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`,
+      );
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();
@@ -612,34 +629,34 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             selectedBaseId={selectedBaseId}
             pinnedIds={pinnedIds}
             highlightedBaseId={highlightedBaseId}
-            showDirectoryManageActions={showPersonalManageActions}
+            showDirectoryManageActions={showPersonalTreeNodeActions}
             onSelectBase={handleSelectTreeId}
             onTogglePin={handleTogglePin}
             onCreateDirectory={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => toast.success(`已预留：在「${directory.name}」下新建个人目录`)
                 : undefined
             }
             onCreateKnowledgeBase={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => toast.success(`已预留：在「${directory.name}」下新建个人知识库`)
                 : undefined
             }
             onMoveDirectory={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => setDirectoryMoveTarget({ kind: "personal", item: directory })
                 : undefined
             }
             onRenameDirectory={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => setRenamePersonalDirectory(directory)
                 : undefined
             }
             onDeleteDirectory={
-              showPersonalManageActions ? handleDeletePersonalDirectory : undefined
+              showPersonalTreeNodeActions ? handleDeletePersonalDirectory : undefined
             }
             onDisableDirectory={
-              showPersonalManageActions ? handleDisablePersonalDirectory : undefined
+              showPersonalTreeNodeActions ? handleDisablePersonalDirectory : undefined
             }
             onRenameBase={(base) => setRenameBase(base)}
             onMoveBase={(base) => setMoveBase(base)}

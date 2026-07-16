@@ -59,6 +59,7 @@ function effectiveLevelForBase(
   base: KnowledgeBase,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ): PermissionLevel | null {
+  if (base.scope === "personal") return "manage";
   if (isEmployee(user)) return "view";
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return "manage";
   if (base.scope === "personal") {
@@ -74,6 +75,7 @@ function effectiveLevelForBase(
 }
 
 export function canManageBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (base.scope === "personal") return true;
   if (isEmployee(user)) return false;
   if (isSuperAdmin(user)) return true;
   if (isKnowledgeAdmin(user)) return true;
@@ -94,9 +96,9 @@ export function canViewBaseFiles(
 }
 
 export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (base.scope === "personal") return true;
   if (isEmployee(user)) return false;
   if (base.restricted) return false;
-  if (base.scope === "personal") return true;
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return true;
   const level = effectiveLevelForBase(base, user);
   return level === "upload" || level === "manage" || base.permission.canUpload;
@@ -116,16 +118,16 @@ export function canManageFileList(
   base?: KnowledgeBase,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
+  if (base?.scope === "personal") return true;
   if (isEmployee(user)) return false;
   if (isSuperAdmin(user)) return true;
-  if (base?.scope === "personal") return true;
   if (!base) return canViewKnowledgeAdmin(user);
   return canManageBase(base, user);
 }
 
 export function canDeleteFile(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
-  if (isEmployee(user)) return false;
   if (base.scope === "personal") return true;
+  if (isEmployee(user)) return false;
   return canManageBase(base, user);
 }
 
@@ -336,7 +338,11 @@ export function getMoveTargetBases(
 
     if (sourceBase) {
       if (isEmployee(user)) {
-        return sourceIsPersonal && base.scope === "public" && canViewBaseFiles(base, user);
+        return (
+          sourceIsPersonal &&
+          (base.scope === "personal" ||
+            (base.scope !== "personal" && canViewBaseFiles(base, user)))
+        );
       }
       if (sourceIsPersonal && base.scope === "personal") {
         return canManageFileList(base, user);

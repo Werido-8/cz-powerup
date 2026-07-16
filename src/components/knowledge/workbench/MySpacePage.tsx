@@ -64,6 +64,7 @@ import {
   getPersonalDirectoryChildren,
   getPinnedFiles,
   getRecentFiles,
+  isSubmitToPublicMove,
   listCategoryPathOptions,
   PERSONAL_DIRECTORY_ROOT_ID,
   PERSONAL_TREE_ALL_ID,
@@ -152,6 +153,8 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const navigate = useNavigate({ from: "/knowledge/mine" });
   const role = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const showPersonalManageActions = role !== "employee";
+  // 个人知识库由当前用户维护，普通员工同样需要节点快捷操作。
+  const showPersonalTreeNodeActions = true;
   const storeVersion = useSyncExternalStore(
     subscribeKnowledgeStore,
     getKnowledgeStoreVersion,
@@ -340,8 +343,15 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
 
   const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
     const targetBase = getBaseById(targetBaseId);
+    const submittedForApproval = movingFiles.filter((file) =>
+      isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
+    );
     setMoveLoading(true);
     for (const file of movingFiles) {
+      if (isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId)) {
+        updateStoreFile(file.id, { status: "pendingApproval" });
+        continue;
+      }
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
         knowledgeBaseName: targetBase?.name,
@@ -350,7 +360,11 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     window.setTimeout(() => {
       const label =
         movingFiles.length > 1 ? `${movingFiles.length} 个文件` : `「${movingFiles[0]?.name}」`;
-      toast.success(`已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`);
+      toast.success(
+        submittedForApproval.length > 0
+          ? `已提交 ${label} 至「${targetBase?.name ?? "公共知识库"}」审批`
+          : `已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`,
+      );
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();
@@ -365,7 +379,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     setMoveFiles(movingFiles);
   };
 
-  const showManageActions = canManageFileList(selectedBase);
+  const showManageActions = selectedBase ? canManageFileList(selectedBase) : true;
 
   const fileRowActions = {
     ...(showManageActions ? { onMove: (file: KnowledgeFile) => setMoveFiles([file]) } : {}),
@@ -521,7 +535,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
                   : undefined
             }
             pinnedIds={pinnedIds}
-            showDirectoryManageActions={showPersonalManageActions}
+            showDirectoryManageActions={showPersonalTreeNodeActions}
             onSelectBase={(baseId) => {
               if (baseId === PERSONAL_TREE_ALL_ID) {
                 setSelection({ kind: "personalAll" });
@@ -531,30 +545,30 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             }}
             onTogglePin={handleTogglePin}
             onCreateDirectory={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => toast.success(`已预留：在「${directory.name}」下新建个人目录`)
                 : undefined
             }
             onCreateKnowledgeBase={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => toast.success(`已预留：在「${directory.name}」下新建个人知识库`)
                 : undefined
             }
             onMoveDirectory={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => setDirectoryMoveTarget({ kind: "personal", item: directory })
                 : undefined
             }
             onRenameDirectory={
-              showPersonalManageActions
+              showPersonalTreeNodeActions
                 ? (directory) => setRenamePersonalDirectory(directory)
                 : undefined
             }
             onDeleteDirectory={
-              showPersonalManageActions ? handleDeletePersonalDirectory : undefined
+              showPersonalTreeNodeActions ? handleDeletePersonalDirectory : undefined
             }
             onDisableDirectory={
-              showPersonalManageActions ? handleDisablePersonalDirectory : undefined
+              showPersonalTreeNodeActions ? handleDisablePersonalDirectory : undefined
             }
             onRenameBase={(base) => setRenameBase(base)}
             onMoveBase={(base) => setMoveBase(base)}
@@ -601,7 +615,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             page={page}
             pageSize={pageSize}
             refreshSeed={refreshSeed}
-            showManageColumn={canManageFileList()}
+            showManageColumn={showManageActions}
             onNavigateRoot={() => setSelection({ kind: "recent" })}
             onQueryChange={setQuery}
             onSearchModeChange={setSearchMode}

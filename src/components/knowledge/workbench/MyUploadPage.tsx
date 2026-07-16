@@ -325,12 +325,10 @@ export function UploadTrackingPanel({
                 </div>
               </div>
 
-              <div className="border-y border-[#E8F0F2] px-5 py-3">
-                <p className="text-[12.5px] text-kb-muted">{meta.description}</p>
-                <p className="mt-1 text-[12px] text-kb-muted">
-                  共 <span className="font-medium text-kb-body">{records.length}</span> 条
-                  {meta.countUnit}
-                </p>
+              <div className="border-y border-[#E8F0F2] "
+              
+              style={{borderTop: 'none', paddingTop: '0px'}}>
+              
               </div>
 
               <div className="flex flex-wrap items-center gap-3 border-b border-[#E8F0F2] px-4 py-3">

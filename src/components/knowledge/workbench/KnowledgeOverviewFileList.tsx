@@ -13,6 +13,8 @@ import {
   History,
   Pin,
   PinOff,
+  Star,
+  StarOff,
   Info,
   Upload,
 } from "lucide-react";
@@ -46,8 +48,8 @@ import {
   fileListParseStatusTone,
   type KnowledgeStatusTone,
 } from "@/lib/knowledge/status";
-import { isEmployee, isFileEnabled } from "@/lib/knowledge/model";
-import { updateStoreFile } from "@/lib/knowledge/store";
+import { getBaseById, isEmployee, isFileEnabled } from "@/lib/knowledge/model";
+import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
 import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile, KnowledgeSortBy } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -462,6 +464,7 @@ function FileDataRow({
 }) {
   const type = kbFileTypeConfig[file.type ?? "other"];
   const employee = isEmployee();
+  const canManageFile = !employee || getBaseById(file.knowledgeBaseId)?.scope === "personal";
   const selected = selection?.isSelected(file.id) ?? false;
   const parseStatus = fileListParseStatus(file);
 
@@ -495,14 +498,14 @@ function FileDataRow({
       )}
       {showManageColumn && (
         <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
-          {employee ? (
-            <span className="text-[12px] text-kb-muted">{isFileEnabled(file) ? "已启用" : "已停用"}</span>
-          ) : (
+          {canManageFile ? (
             <Switch
               checked={isFileEnabled(file)}
               onCheckedChange={(checked) => onToggleEnabled?.(file, checked)}
               aria-label={`${file.name} 启用状态`}
             />
+          ) : (
+            <span className="text-[12px] text-kb-muted">{isFileEnabled(file) ? "已启用" : "已停用"}</span>
           )}
         </span>
       )}
@@ -618,6 +621,7 @@ function FileActions({
 }) {
   const enabled = isFileEnabled(file);
   const employee = isEmployee();
+  const canManageFile = !employee || getBaseById(file.knowledgeBaseId)?.scope === "personal";
   const pinned = Boolean(file.pinned);
   const hasHistory = (file.versions?.length ?? 0) > 1;
   const { open, setOpen, hoverProps } = useHoverMenu();
@@ -648,7 +652,7 @@ function FileActions({
           onCloseAutoFocus={(e) => e.preventDefault()}
           {...hoverProps}
         >
-          {!employee && file.canEdit !== false && (
+          {canManageFile && file.canEdit !== false && (
             <DropdownMenuItem
               className="text-[12.5px]"
               onClick={() => toast.message("打开编辑")}
@@ -686,9 +690,14 @@ function FileActions({
               toast.success(file.favorite ? "已取消收藏" : "已收藏");
             }}
           >
+            {file.favorite ? (
+              <StarOff className="h-3.5 w-3.5 stroke-[1.8]" />
+            ) : (
+              <Star className="h-3.5 w-3.5 stroke-[1.8]" />
+            )}
             {file.favorite ? "取消收藏" : "收藏"}
           </DropdownMenuItem>
-          {!employee && onToggleEnabled && (
+          {canManageFile && onToggleEnabled && (
             <DropdownMenuItem
               className="text-[12.5px]"
               onClick={() => onToggleEnabled(file, !enabled)}
@@ -697,12 +706,17 @@ function FileActions({
               {enabled ? "停用" : "启用"}
             </DropdownMenuItem>
           )}
-          {!employee && (
+          {canManageFile && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-[12.5px] text-destructive focus:text-destructive"
-                onClick={() => toast.message("确认删除文件？")}
+                onClick={() => {
+                  if (window.confirm(`确认删除文件「${file.name}」？该操作不可恢复。`)) {
+                    removeStoreFiles([file.id]);
+                    toast.success("文件已删除");
+                  }
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
                 删除

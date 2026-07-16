@@ -328,7 +328,8 @@ export const UPLOAD_VIEW_META: Record<UploadView, ViewMeta> = {
   all: {
     navLabel: "全部上传",
     title: "全部上传",
-    description: "查看本人上传文件当前所处的审核、解析与发布阶段",
+    // description: "查看本人上传文件当前所处的审核、解析与发布阶段",
+        description: "",
     emptyTitle: "暂无上传文件",
     emptyDesc: "上传文件后，可在这里跟踪审核、解析和发布进度",
     countUnit: "上传记录",
@@ -336,7 +337,8 @@ export const UPLOAD_VIEW_META: Record<UploadView, ViewMeta> = {
   review: {
     navLabel: "审核进度",
     title: "审核进度",
-    description: "查看文件审核状态、审批记录和驳回原因",
+    // description: "查看文件审核状态、审批记录和驳回原因",
+        description: "",
     emptyTitle: "暂无审核记录",
     emptyDesc: "提交到公共知识库的文件将在这里展示审核进度",
     countUnit: "审核记录",
@@ -344,7 +346,8 @@ export const UPLOAD_VIEW_META: Record<UploadView, ViewMeta> = {
   parse: {
     navLabel: "解析进度",
     title: "解析进度",
-    description: "跟踪文件解析过程，查看解析结果与异常原因",
+    // description: "跟踪文件解析过程，查看解析结果与异常原因",
+        description: "",
     emptyTitle: "暂无解析记录",
     emptyDesc: "文件上传后将先进入解析，解析完成后进入审批",
     countUnit: "解析记录",
@@ -352,7 +355,8 @@ export const UPLOAD_VIEW_META: Record<UploadView, ViewMeta> = {
   publish: {
     navLabel: "发布状态",
     title: "发布状态",
-    description: "查看文件进入目标知识库后的发布与使用情况",
+    // description: "查看文件进入目标知识库后的发布与使用情况",
+        description: "",
     emptyTitle: "暂无已发布文件",
     emptyDesc: "文件解析并发布后，将在这里展示使用状态",
     countUnit: "发布记录",

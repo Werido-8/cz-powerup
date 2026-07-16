@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/tooltip";
 import {
   canDisablePersonalDirectory,
-  canManageBase,
   getPersonalBasesForDirectoryTree,
   getPersonalDirectoryChildren,
   getPersonalDirectoryTreeDirectories,
@@ -403,7 +402,7 @@ function PersonalDirectoryNode({
               pinned={isPinnedId(pinnedIds, base.id)}
               highlighted={highlightedBaseId === base.id}
               showPin={Boolean(onTogglePin)}
-              showManageActions={canManageBase(base)}
+              showManageActions={showDirectoryManageActions}
               onSelect={() => onSelectBase(base.id)}
               onTogglePin={() => onTogglePin?.(base.id)}
               onRename={onRenameBase ? () => onRenameBase(base) : undefined}
