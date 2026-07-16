@@ -40,6 +40,10 @@ export function isDepartmentAdmin(user: KnowledgeUser = getCurrentKnowledgeUser(
   return user.role === "departmentAdmin";
 }
 
+export function isEmployee(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return user.role === "employee";
+}
+
 export function canViewKnowledgeAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return isKnowledgeAdmin(user) || isDepartmentAdmin(user) || isSuperAdmin(user);
 }
@@ -56,6 +60,7 @@ function effectiveLevelForBase(
   base: KnowledgeBase,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ): PermissionLevel | null {
+  if (isEmployee(user)) return "view";
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return "manage";
   if (base.scope === "personal") {
     if (base.ownerName === user.name || user.role === "employee") return "manage";
@@ -70,6 +75,7 @@ function effectiveLevelForBase(
 }
 
 export function canManageBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (isEmployee(user)) return false;
   if (isSuperAdmin(user)) return true;
   if (isKnowledgeAdmin(user)) return true;
   if (base.scope === "personal") return true;
@@ -89,6 +95,7 @@ export function canViewBaseFiles(
 }
 
 export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (isEmployee(user)) return false;
   if (base.restricted) return false;
   if (base.scope === "personal") return true;
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return true;
@@ -100,6 +107,7 @@ export function canConfigureBasePermission(
   base: KnowledgeBase,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
+  if (isEmployee(user)) return false;
   // 公共库对全员开放，不提供权限配置能力；仅专业库支持配置权限
   if (base.scope === "public") return false;
   return base.permission.canConfigurePermission || canManageBase(base, user);
@@ -109,14 +117,15 @@ export function canManageFileList(
   base?: KnowledgeBase,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
+  if (isEmployee(user)) return false;
   if (isSuperAdmin(user)) return true;
-  if (user.role === "employee" && base?.scope !== "personal") return false;
   if (base?.scope === "personal") return true;
   if (!base) return canViewKnowledgeAdmin(user);
   return canManageBase(base, user);
 }
 
 export function canDeleteFile(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  if (isEmployee(user)) return false;
   if (base.scope === "personal") return true;
   return canManageBase(base, user);
 }
@@ -126,6 +135,9 @@ export function canMoveCrossLibrary(
   target: KnowledgeBase,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
+  if (isEmployee(user)) {
+    return source.scope === "personal" && target.scope === "public" && canViewBaseFiles(target, user);
+  }
   if (source.scope === "personal" && target.scope !== "personal") {
     return canUploadToBase(target, user);
   }
@@ -310,6 +322,9 @@ export function getMoveTargetBases(
     if (base.status !== "enabled") return false;
 
     if (sourceBase) {
+      if (isEmployee(user)) {
+        return sourceIsPersonal && base.scope === "public" && canViewBaseFiles(base, user);
+      }
       if (sourceIsPersonal && base.scope === "personal") {
         return canManageFileList(base, user);
       }

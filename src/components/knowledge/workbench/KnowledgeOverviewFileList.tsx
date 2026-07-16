@@ -46,7 +46,8 @@ import {
   fileListParseStatusTone,
   type KnowledgeStatusTone,
 } from "@/lib/knowledge/status";
-import { isFileEnabled } from "@/lib/knowledge/model";
+import { isEmployee, isFileEnabled } from "@/lib/knowledge/model";
+import { updateStoreFile } from "@/lib/knowledge/store";
 import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile, KnowledgeSortBy } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -366,7 +367,9 @@ export function KnowledgeFileTable({
 }) {
   if (files.length === 0) return <>{empty}</>;
 
-  const grid = resolveGrid({ allLibraryMode, overviewMode, showLibrary, showManageColumn });
+  const employee = isEmployee();
+  const showEnabledStatus = showManageColumn || employee;
+  const grid = resolveGrid({ allLibraryMode, overviewMode, showLibrary, showManageColumn: showEnabledStatus });
   const showLibraryColumn = allLibraryMode || (!overviewMode && showLibrary);
   const pageIds = selection?.pageIds ?? files.map((file) => file.id);
   const allPageSelected =
@@ -384,7 +387,7 @@ export function KnowledgeFileTable({
       <span>类型</span>
       <span>大小</span>
       {showLibraryColumn && <span>所属知识库</span>}
-      {showManageColumn && <EnabledColumnHeader />}
+      {showEnabledStatus && <EnabledColumnHeader />}
       <span>解析状态</span>
       <span>更新时间</span>
       <span>上传人</span>
@@ -401,7 +404,7 @@ export function KnowledgeFileTable({
           grid={grid}
           onOpen={onOpen}
           showLibraryColumn={showLibraryColumn}
-          showManageColumn={showManageColumn}
+          showManageColumn={showEnabledStatus}
           selection={selection}
           onToggleEnabled={onToggleEnabled}
           onMove={onMove}
@@ -458,6 +461,7 @@ function FileDataRow({
   onViewHistory?: (file: KnowledgeFile) => void;
 }) {
   const type = kbFileTypeConfig[file.type ?? "other"];
+  const employee = isEmployee();
   const selected = selection?.isSelected(file.id) ?? false;
   const parseStatus = fileListParseStatus(file);
 
@@ -491,11 +495,15 @@ function FileDataRow({
       )}
       {showManageColumn && (
         <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
-          <Switch
-            checked={isFileEnabled(file)}
-            onCheckedChange={(checked) => onToggleEnabled?.(file, checked)}
-            aria-label={`${file.name} 启用状态`}
-          />
+          {employee ? (
+            <span className="text-[12px] text-kb-muted">{isFileEnabled(file) ? "已启用" : "已停用"}</span>
+          ) : (
+            <Switch
+              checked={isFileEnabled(file)}
+              onCheckedChange={(checked) => onToggleEnabled?.(file, checked)}
+              aria-label={`${file.name} 启用状态`}
+            />
+          )}
         </span>
       )}
       <FileParseStatusCell status={parseStatus} />
@@ -609,6 +617,7 @@ function FileActions({
   onViewHistory?: (file: KnowledgeFile) => void;
 }) {
   const enabled = isFileEnabled(file);
+  const employee = isEmployee();
   const pinned = Boolean(file.pinned);
   const hasHistory = (file.versions?.length ?? 0) > 1;
   const { open, setOpen, hoverProps } = useHoverMenu();
@@ -639,7 +648,7 @@ function FileActions({
           onCloseAutoFocus={(e) => e.preventDefault()}
           {...hoverProps}
         >
-          {file.canEdit !== false && (
+          {!employee && file.canEdit !== false && (
             <DropdownMenuItem
               className="text-[12.5px]"
               onClick={() => toast.message("打开编辑")}
@@ -670,7 +679,16 @@ function FileActions({
               {pinned ? "取消置顶" : "置顶"}
             </DropdownMenuItem>
           )}
-          {onToggleEnabled && (
+          <DropdownMenuItem
+            className="text-[12.5px]"
+            onClick={() => {
+              updateStoreFile(file.id, { favorite: !file.favorite });
+              toast.success(file.favorite ? "已取消收藏" : "已收藏");
+            }}
+          >
+            {file.favorite ? "取消收藏" : "收藏"}
+          </DropdownMenuItem>
+          {!employee && onToggleEnabled && (
             <DropdownMenuItem
               className="text-[12.5px]"
               onClick={() => onToggleEnabled(file, !enabled)}
@@ -679,14 +697,18 @@ function FileActions({
               {enabled ? "停用" : "启用"}
             </DropdownMenuItem>
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-[12.5px] text-destructive focus:text-destructive"
-            onClick={() => toast.message("确认删除文件？")}
-          >
-            <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
-            删除
-          </DropdownMenuItem>
+          {!employee && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-[12.5px] text-destructive focus:text-destructive"
+                onClick={() => toast.message("确认删除文件？")}
+              >
+                <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+                删除
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </span>

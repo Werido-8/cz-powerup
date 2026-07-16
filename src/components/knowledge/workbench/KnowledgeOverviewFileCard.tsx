@@ -7,6 +7,7 @@ import {
   Pencil,
   Pin,
   PinOff,
+  Star,
   Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -14,7 +15,8 @@ import { toast } from "sonner";
 import { FileListCheckbox } from "./FileListCheckbox";
 import { Tag } from "@/components/learning/ui";
 import { publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
-import { isFileEnabled } from "@/lib/knowledge/model";
+import { isEmployee, isFileEnabled } from "@/lib/knowledge/model";
+import { updateStoreFile } from "@/lib/knowledge/store";
 import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -196,6 +198,7 @@ function FileCardGlassActions({
 }) {
   const pinned = Boolean(file.pinned);
   const hasHistory = (file.versions?.length ?? 0) > 1;
+  const employee = isEmployee();
   const fillId = `kb-card-glass-fill-${file.id}`;
 
   return (
@@ -252,13 +255,18 @@ function FileCardGlassActions({
             onClick={onTogglePin}
           />
         )}
-        {file.canEdit !== false && (
+        <CardAction
+          icon={Star}
+          label={file.favorite ? "取消收藏" : "收藏"}
+          onClick={() => updateStoreFile(file.id, { favorite: !file.favorite })}
+        />
+        {!employee && file.canEdit !== false && (
           <CardAction icon={Pencil} label="编辑" onClick={onEdit} />
         )}
         {file.canDownload !== false && (
           <CardAction icon={Download} label="下载" onClick={onDownload} />
         )}
-        <CardAction icon={Trash2} label="删除" onClick={onDelete} danger />
+        {!employee && <CardAction icon={Trash2} label="删除" onClick={onDelete} danger />}
       </div>
     </div>
   );

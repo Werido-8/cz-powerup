@@ -1,6 +1,7 @@
 import { CheckCircle2, CircleOff, Download, FolderInput, Loader2, Trash2, X } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { isEmployee } from "@/lib/knowledge/model";
 import { cn } from "@/lib/utils";
 
 type BatchLoadingState = "download" | "disable" | "delete" | "move" | null;
@@ -41,6 +42,7 @@ export function FileListToolbar({
   className?: string;
 }) {
   const isBatchMode = selectedCount > 0;
+  const employee = isEmployee();
   const allPageSelected = pageFileCount > 0 && selectedCount >= pageFileCount;
   const canSelectAllResults =
     !isAllResultsSelected &&
@@ -86,7 +88,8 @@ export function FileListToolbar({
             onBatchDelete={onBatchDelete}
             onClearSelection={onClearSelection}
             showBatchMove={showBatchMove}
-            showBatchDisable={showBatchDisable}
+            showBatchDisable={showBatchDisable && !employee}
+            showBatchDelete={!employee}
             batchLoading={batchLoading}
           />
         ) : (
@@ -145,6 +148,7 @@ function BatchToolbarActions({
   onClearSelection,
   showBatchMove,
   showBatchDisable,
+  showBatchDelete,
   batchLoading,
 }: {
   onBatchDownload: () => void;
@@ -154,6 +158,7 @@ function BatchToolbarActions({
   onClearSelection: () => void;
   showBatchMove?: boolean;
   showBatchDisable?: boolean;
+  showBatchDelete: boolean;
   batchLoading?: BatchLoadingState;
 }) {
   const busy = Boolean(batchLoading);
@@ -185,14 +190,16 @@ function BatchToolbarActions({
           disabled={busy}
         />
       )}
-      <BatchIconButton
-        icon={Trash2}
-        label="删除"
-        onClick={onBatchDelete}
-        loading={batchLoading === "delete"}
-        disabled={busy}
-        danger
-      />
+      {showBatchDelete && (
+        <BatchIconButton
+          icon={Trash2}
+          label="删除"
+          onClick={onBatchDelete}
+          loading={batchLoading === "delete"}
+          disabled={busy}
+          danger
+        />
+      )}
       <span className="mx-1 h-5 w-px bg-[#d8e2e7]" aria-hidden />
       <button
         type="button"

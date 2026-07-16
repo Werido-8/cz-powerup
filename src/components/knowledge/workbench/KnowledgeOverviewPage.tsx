@@ -4,7 +4,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ComponentProps } from "react";
 import { toast } from "sonner";
 import knowledgeNoPermissionIllustration from "@/assets/knowledge-no-permission.png";
 import {
@@ -38,6 +38,7 @@ import {
   PROFESSIONAL_TREE_ALL_ID,
   sortKnowledgeFiles,
 } from "@/lib/knowledge/model";
+import { getDemoRoleKey, subscribeDemoRole } from "@/lib/knowledge/demoRole";
 import {
   isPinnedId,
   loadPinnedIds,
@@ -118,6 +119,8 @@ function collectExpandIds(categoryId?: string) {
 
 export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: string }) {
   const navigate = useNavigate();
+  const role = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey);
+  const employee = role === "employee";
   const router = useRouter();
   const storeVersion = useKnowledgeStoreVersion();
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedIds());
