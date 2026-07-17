@@ -1606,6 +1606,19 @@ export const UPLOAD_APPROVALS: UploadApproval[] = [
         analysis: "异常处置首先需要确认告警真实性和设备状态，再按分级要求上报。",
       },
       {
+        id: "exercise-grid-multiple",
+        type: "multiple",
+        stem: "并网运行异常处置中，需要同步完成哪些工作？",
+        options: [
+          { id: "A", label: "A", content: "确认告警与设备状态" },
+          { id: "B", label: "B", content: "按分级要求上报" },
+          { id: "C", label: "C", content: "保留现场记录" },
+          { id: "D", label: "D", content: "删除异常告警" },
+        ],
+        correctAnswers: ["A", "B", "C"],
+        analysis: "异常处置应完成状态确认、分级上报和现场留痕，不能删除告警记录。",
+      },
+      {
         id: "exercise-grid-judge",
         type: "judge",
         stem: "现场异常记录应保留至复盘完成。",
