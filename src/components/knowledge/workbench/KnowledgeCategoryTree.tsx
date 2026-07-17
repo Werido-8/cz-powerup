@@ -35,6 +35,7 @@ import {
   canViewBaseFiles,
   getBasesForCategoryTree,
   getCategoryChildren,
+  isKnowledgeAdmin,
   PROFESSIONAL_TREE_ALL_ID,
 } from "@/lib/knowledge/model";
 import { isPinnedId } from "@/lib/knowledge/pinned";
@@ -127,6 +128,7 @@ export function KnowledgeBaseTreeItem({
   onToggleStatus?: () => void;
 }) {
   const canView = canViewBaseFiles(base);
+  const showNoViewLock = showPin && !canView && !isKnowledgeAdmin();
   const [menuOpen, setMenuOpen] = useState(false);
   const hasMoreMenu = Boolean(showManageActions && (onMove || onDelete || onToggleStatus));
   const isDisabled = base.status === "disabled";
@@ -168,31 +170,31 @@ export function KnowledgeBaseTreeItem({
           </span>
         )}
       </button>
-      <div
-        className={cn(
-          "flex shrink-0 items-center gap-0.5",
-          hasMoreMenu && "opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100",
-          menuOpen && "opacity-100",
-        )}
-      >
-        {showManageActions && onRename && (
-          <TreeNodeActionButton label="重命名" onClick={onRename}>
-            <Pencil className="h-3 w-3 stroke-[1.8]" />
-          </TreeNodeActionButton>
-        )}
-        {showPin &&
-          (!canView ? (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="grid h-5 w-5 shrink-0 place-items-center text-warning-foreground/80">
-                    <LockKeyhole className="h-3 w-3 stroke-[1.8]" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent className="text-[12px]">无浏览权限</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          ) : (
+      {showNoViewLock ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="grid h-5 w-5 shrink-0 place-items-center text-warning-foreground/80">
+                <LockKeyhole className="h-3 w-3 stroke-[1.8]" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="text-[12px]">无浏览权限</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : (
+        <div
+          className={cn(
+            "flex shrink-0 items-center gap-0.5",
+            hasMoreMenu && "opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100",
+            menuOpen && "opacity-100",
+          )}
+        >
+          {showManageActions && onRename && (
+            <TreeNodeActionButton label="重命名" onClick={onRename}>
+              <Pencil className="h-3 w-3 stroke-[1.8]" />
+            </TreeNodeActionButton>
+          )}
+          {showPin && canView && (
             <button
               type="button"
               aria-label={pinned ? "取消置顶" : "置顶"}
@@ -213,68 +215,69 @@ export function KnowledgeBaseTreeItem({
                 <Pin className="h-3 w-3 stroke-[1.8]" />
               )}
             </button>
-          ))}
-        {hasMoreMenu && (
-          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="更多操作"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                      }}
-                      onMouseDown={(event) => event.stopPropagation()}
-                      className={cn(
-                        "grid h-5 w-5 shrink-0 place-items-center rounded-[5px] text-kb-muted transition-colors",
-                        "hover:bg-kb-surface-hover hover:text-kb-body",
-                        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
-                        menuOpen && "bg-kb-surface-hover text-kb-body",
-                      )}
-                    >
-                      <MoreHorizontal className="h-3.5 w-3.5 stroke-[1.8]" />
-                    </button>
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                {!menuOpen && (
-                  <TooltipContent side="bottom" className="text-[12px]">
-                    更多操作
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-            <DropdownMenuContent align="end" className="min-w-[9rem]">
-              {onMove && (
-                <DropdownMenuItem className="gap-2 text-[13px]" onSelect={onMove}>
-                  <FolderInput className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
-                  移动
-                </DropdownMenuItem>
-              )}
-              {onDelete && (
-                <DropdownMenuItem
-                  className="gap-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
-                  onSelect={onDelete}
-                >
-                  <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
-                  删除
-                </DropdownMenuItem>
-              )}
-              {onToggleStatus && (
-                <>
-                  {(onMove || onDelete) && <DropdownMenuSeparator />}
-                  <DropdownMenuItem className="gap-2 text-[13px]" onSelect={onToggleStatus}>
-                    <CircleOff className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
-                    {isDisabled ? "启用" : "停用"}
+          )}
+          {hasMoreMenu && (
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="更多操作"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                        }}
+                        onMouseDown={(event) => event.stopPropagation()}
+                        className={cn(
+                          "grid h-5 w-5 shrink-0 place-items-center rounded-[5px] text-kb-muted transition-colors",
+                          "hover:bg-kb-surface-hover hover:text-kb-body",
+                          "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/30",
+                          menuOpen && "bg-kb-surface-hover text-kb-body",
+                        )}
+                      >
+                        <MoreHorizontal className="h-3.5 w-3.5 stroke-[1.8]" />
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  {!menuOpen && (
+                    <TooltipContent side="bottom" className="text-[12px]">
+                      更多操作
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
+              <DropdownMenuContent align="end" className="min-w-[9rem]">
+                {onMove && (
+                  <DropdownMenuItem className="gap-2 text-[13px]" onSelect={onMove}>
+                    <FolderInput className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
+                    移动
                   </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
-      </div>
+                )}
+                {onDelete && (
+                  <DropdownMenuItem
+                    className="gap-2 text-[13px] text-destructive focus:bg-destructive/10 focus:text-destructive"
+                    onSelect={onDelete}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+                    删除
+                  </DropdownMenuItem>
+                )}
+                {onToggleStatus && (
+                  <>
+                    {(onMove || onDelete) && <DropdownMenuSeparator />}
+                    <DropdownMenuItem className="gap-2 text-[13px]" onSelect={onToggleStatus}>
+                      <CircleOff className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
+                      {isDisabled ? "启用" : "停用"}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
+      )}
     </div>
   );
 }

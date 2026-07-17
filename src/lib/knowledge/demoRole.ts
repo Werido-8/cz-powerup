@@ -2,14 +2,12 @@ import type { KnowledgeUser, KnowledgeUserRole } from "./types";
 
 export const DEMO_USERS: Record<KnowledgeUserRole, KnowledgeUser> = {
   employee: { id: "u-employee-demo", name: "李工", role: "employee" },
-  departmentAdmin: { id: "u-dept-admin-demo", name: "刘工", role: "departmentAdmin" },
   knowledgeAdmin: { id: "u-run-admin", name: "张工", role: "knowledgeAdmin" },
   superAdmin: { id: "u-super-admin-demo", name: "王管", role: "superAdmin" },
 };
 
 export const DEMO_ROLE_LABELS: Record<KnowledgeUserRole, string> = {
   employee: "普通员工",
-  departmentAdmin: "部门管理员",
   knowledgeAdmin: "知识库管理员",
   superAdmin: "超级管理员",
 };

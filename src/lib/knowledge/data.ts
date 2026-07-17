@@ -234,6 +234,43 @@ export const KNOWLEDGE_BASES: KnowledgeBase[] = [
     ],
   },
   {
+    id: "kb-trading-review",
+    name: "电力交易内部评审库",
+    description: "交易方案内部评审材料，仅授权岗位可浏览",
+    scope: "professional",
+    categoryId: "cat-run-market",
+    categoryPath: ["运行专业", "交易与考核"],
+    fileCount: 6,
+    status: "enabled",
+    permission: {
+      canView: false,
+      canUpload: false,
+      canManage: false,
+      canConfigurePermission: false,
+    },
+    updatedAt: "2026-07-05 09:40",
+    ownerName: "张工",
+    metadataFields: [
+      {
+        id: "docType",
+        label: "文档类型",
+        type: "select",
+        options: ["评审意见", "方案材料", "会议纪要", "批复文件"],
+      },
+      {
+        id: "tradeType",
+        label: "交易类型",
+        type: "select",
+        options: ["现货市场", "中长期", "辅助服务"],
+      },
+      {
+        id: "docNo",
+        label: "文号/编号",
+        type: "text",
+      },
+    ],
+  },
+  {
     id: "kb-public-regulation",
     name: "规章制度汇编库",
     description: "全厂共享的安全生产、运行管理与制度文件",

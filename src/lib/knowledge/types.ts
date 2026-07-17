@@ -1,4 +1,4 @@
-export type KnowledgeUserRole = "employee" | "departmentAdmin" | "knowledgeAdmin" | "superAdmin";
+export type KnowledgeUserRole = "employee" | "knowledgeAdmin" | "superAdmin";
 
 export type KnowledgeBaseStatus = "enabled" | "disabled";
 
@@ -69,7 +69,7 @@ export interface KnowledgeBase {
   updatedAt?: string;
   ownerName?: string;
   isPinned?: boolean;
-  /** 硬性锁定：即使是管理员也无法查看/上传，仅用于演示「无权访问」态 */
+  /** 演示用：对普通员工锁定浏览/上传，知识库管理员不受影响 */
   restricted?: boolean;
   /** 个人知识库所属目录（仅 scope=personal 时使用） */
   personalDirectoryId?: string;
@@ -205,6 +205,10 @@ export interface KnowledgeExercise {
   id: string;
   type: KnowledgeExerciseType;
   stem: string;
+  difficulty?: "easy" | "medium" | "hard";
+  knowledgePoint?: string;
+  source?: string;
+  enabled?: boolean;
   options: KnowledgeExerciseOption[];
   correctAnswers: string[];
   analysis: string;

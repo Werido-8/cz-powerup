@@ -35,16 +35,12 @@ export function isKnowledgeAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()
   return user.role === "knowledgeAdmin" || isSuperAdmin(user);
 }
 
-export function isDepartmentAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()) {
-  return user.role === "departmentAdmin";
-}
-
 export function isEmployee(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return user.role === "employee";
 }
 
 export function canViewKnowledgeAdmin(user: KnowledgeUser = getCurrentKnowledgeUser()) {
-  return isKnowledgeAdmin(user) || isDepartmentAdmin(user) || isSuperAdmin(user);
+  return isKnowledgeAdmin(user);
 }
 
 export function canSeeCategoryManager(user: KnowledgeUser = getCurrentKnowledgeUser()) {
@@ -80,7 +76,7 @@ export function canManageBase(base: KnowledgeBase, user: KnowledgeUser = getCurr
   if (isSuperAdmin(user)) return true;
   if (isKnowledgeAdmin(user)) return true;
   if (base.scope === "personal") return true;
-  return effectiveLevelForBase(base, user) === "manage" || isDepartmentAdmin(user);
+  return effectiveLevelForBase(base, user) === "manage";
 }
 
 export function canBrowseBase(base: KnowledgeBase) {
@@ -91,6 +87,7 @@ export function canViewBaseFiles(
   base: KnowledgeBase,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
+  if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return true;
   if (base.restricted) return false;
   return base.permission.canView || canManageBase(base, user);
 }
@@ -98,8 +95,8 @@ export function canViewBaseFiles(
 export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
   if (base.scope === "personal") return true;
   if (isEmployee(user)) return false;
-  if (base.restricted) return false;
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return true;
+  if (base.restricted) return false;
   const level = effectiveLevelForBase(base, user);
   return level === "upload" || level === "manage" || base.permission.canUpload;
 }
@@ -252,9 +249,6 @@ export function getReadableBases(user: KnowledgeUser = getCurrentKnowledgeUser()
 export function getManageableBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   const allBases = getStoreBases();
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return allBases;
-  if (isDepartmentAdmin(user)) {
-    return allBases.filter((base) => base.scope !== "personal");
-  }
   return allBases.filter((base) => canManageBase(base, user));
 }
 
@@ -501,17 +495,16 @@ export function getBasesForCategory(categoryId: string) {
   return getBrowsableBases().filter((base) => base.categoryId === categoryId);
 }
 
-/** 管理端树：包含已停用但仍可管理的知识库 */
+/** 侧栏树：启用库全员可见（无权限时展示锁）；已停用库仅管理者可见 */
 export function getBasesForCategoryTree(
   categoryId: string,
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
-  return getStoreBases().filter(
-    (base) =>
-      base.scope !== "personal" &&
-      base.categoryId === categoryId &&
-      (canManageBase(base, user) || canViewBaseFiles(base, user)),
-  );
+  return getStoreBases().filter((base) => {
+    if (base.scope === "personal" || base.categoryId !== categoryId) return false;
+    if (base.status === "disabled") return canManageBase(base, user);
+    return true;
+  });
 }
 
 export function countAllBasesInCategorySubtree(categoryId: string): number {

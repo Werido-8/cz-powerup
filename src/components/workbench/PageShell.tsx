@@ -18,8 +18,8 @@ export function PageShell({
       <main
         className={
           compact
-            ? "mx-auto min-h-0 w-full max-w-[1760px] flex-1 overflow-hidden px-4 py-3"
-            : "mx-auto w-full max-w-[1760px] px-6 py-7 lg:px-8"
+            ? "mx-auto min-h-0 w-full max-w-[1840px] flex-1 overflow-hidden px-4 py-3"
+            : "mx-auto w-full max-w-[1840px] px-6 py-7 lg:px-8"
         }
       >
         {children}
