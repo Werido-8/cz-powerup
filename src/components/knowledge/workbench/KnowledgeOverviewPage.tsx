@@ -1251,16 +1251,6 @@ function PermissionApplyModal({ base, onClose }: { base: KnowledgeBase; onClose:
         <span className="text-[12px] text-kb-muted">目标知识库</span>
         <span className="truncate text-[13px] font-medium text-kb-heading">{base.name}</span>
       </div>
-      <KbFormField label="权限组" icon={Users} required>
-        <PillSelect
-          value={group}
-          onChange={setGroup}
-          options={[
-            { value: "view", label: "浏览组" },
-            { value: "upload", label: "上传组" },
-          ]}
-        />
-      </KbFormField>
       <KbFormField label="申请理由" icon={MessageSquareText} className="mb-0">
         <AppFormTextarea
           value={reason}
