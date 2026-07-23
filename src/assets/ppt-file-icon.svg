@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="PPTX file">
+  <defs><linearGradient id="pptx" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff7016"/><stop offset="1" stop-color="#f24b05"/></linearGradient><clipPath id="page"><path d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/></clipPath></defs>
+  <path fill="#fff" stroke="#95a0aa" stroke-width="3" stroke-linejoin="round" d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/><path fill="url(#pptx)" d="M166 8v38a14 14 0 0 0 14 14h38Z"/><path fill="url(#pptx)" d="M16 240h202v50a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22Z" clip-path="url(#page)"/>
+  <g fill="none" stroke="url(#pptx)" stroke-linecap="round" stroke-linejoin="round"><path d="M62 92h110v61H62Z" stroke-width="7"/><path d="M117 153v27m0-9-21 18m21-18 21 18M57 92h120" stroke-width="7"/><path d="M90 112v20h20" stroke-width="7"/><path d="M90 132a20 20 0 1 0 20-20M129 113h26m-26 17h26" stroke-width="6"/></g>
+  <text x="117" y="286" fill="#fff" font-family="Arial, sans-serif" font-size="38" font-weight="800" text-anchor="middle">PPTX</text>
+</svg>

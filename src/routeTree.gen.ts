@@ -36,6 +36,7 @@ import { Route as KnowledgeUploadsRouteImport } from './routes/knowledge.uploads
 import { Route as KnowledgeMineRouteImport } from './routes/knowledge.mine'
 import { Route as KnowledgeAllRouteImport } from './routes/knowledge.all'
 import { Route as KnowledgeAdminRouteImport } from './routes/knowledge.admin'
+import { Route as KnowledgePracticeFileIdRouteImport } from './routes/knowledge-practice.$fileId'
 import { Route as ScenarioTypicalIndexRouteImport } from './routes/scenario.typical.index'
 import { Route as ScenarioFaultIndexRouteImport } from './routes/scenario.fault.index'
 import { Route as TrainingSessionIdRouteImport } from './routes/training.session.$id'
@@ -198,6 +199,11 @@ const KnowledgeAdminRoute = KnowledgeAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => KnowledgeRoute,
 } as any)
+const KnowledgePracticeFileIdRoute = KnowledgePracticeFileIdRouteImport.update({
+  id: '/knowledge-practice/$fileId',
+  path: '/knowledge-practice/$fileId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ScenarioTypicalIndexRoute = ScenarioTypicalIndexRouteImport.update({
   id: '/scenario/typical/',
   path: '/scenario/typical/',
@@ -348,6 +354,7 @@ export interface FileRoutesByFullPath {
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/knowledge-practice/$fileId': typeof KnowledgePracticeFileIdRoute
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
@@ -400,6 +407,7 @@ export interface FileRoutesByTo {
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/knowledge-practice/$fileId': typeof KnowledgePracticeFileIdRoute
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
@@ -455,6 +463,7 @@ export interface FileRoutesById {
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/knowledge-practice/$fileId': typeof KnowledgePracticeFileIdRoute
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
@@ -512,6 +521,7 @@ export interface FileRouteTypes {
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/knowledge-practice/$fileId'
     | '/knowledge/admin'
     | '/knowledge/all'
     | '/knowledge/mine'
@@ -564,6 +574,7 @@ export interface FileRouteTypes {
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/knowledge-practice/$fileId'
     | '/knowledge/admin'
     | '/knowledge/all'
     | '/knowledge/mine'
@@ -618,6 +629,7 @@ export interface FileRouteTypes {
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/knowledge-practice/$fileId'
     | '/knowledge/admin'
     | '/knowledge/all'
     | '/knowledge/mine'
@@ -674,6 +686,7 @@ export interface RootRouteChildren {
   QuestionBankRoute: typeof QuestionBankRoute
   SceneRoute: typeof SceneRoute
   SearchRoute: typeof SearchRoute
+  KnowledgePracticeFileIdRoute: typeof KnowledgePracticeFileIdRoute
   ScenarioFaultRoute: typeof ScenarioFaultRouteWithChildren
   ScenarioPeakRoute: typeof ScenarioPeakRouteWithChildren
   TrainingExamRoute: typeof TrainingExamRoute
@@ -883,6 +896,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/knowledge/admin'
       preLoaderRoute: typeof KnowledgeAdminRouteImport
       parentRoute: typeof KnowledgeRoute
+    }
+    '/knowledge-practice/$fileId': {
+      id: '/knowledge-practice/$fileId'
+      path: '/knowledge-practice/$fileId'
+      fullPath: '/knowledge-practice/$fileId'
+      preLoaderRoute: typeof KnowledgePracticeFileIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/scenario/typical/': {
       id: '/scenario/typical/'
@@ -1203,6 +1223,7 @@ const rootRouteChildren: RootRouteChildren = {
   QuestionBankRoute: QuestionBankRoute,
   SceneRoute: SceneRoute,
   SearchRoute: SearchRoute,
+  KnowledgePracticeFileIdRoute: KnowledgePracticeFileIdRoute,
   ScenarioFaultRoute: ScenarioFaultRouteWithChildren,
   ScenarioPeakRoute: ScenarioPeakRouteWithChildren,
   TrainingExamRoute: TrainingExamRoute,

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { BookOpen, FileText, MoreHorizontal, Plus } from "lucide-react";
+import { BookOpen, MoreHorizontal, Plus } from "lucide-react";
+import { KbFileTypeIcon } from "@/components/knowledge/ui";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { KbLibrary } from "@/lib/mock/knowledge-space";
@@ -83,7 +84,7 @@ export function KbLibraryCard({ library }: { library: KbLibrary }) {
             <ul className="space-y-1">
               {library.recentFiles.slice(0, 2).map((f) => (
                 <li key={f.id} className="flex items-center gap-1.5 text-[11px]">
-                  <FileText className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                  <KbFileTypeIcon type={f.fileType} fileName={f.name} size="xs" />
                   <span className="min-w-0 flex-1 truncate text-foreground/80">{f.name}</span>
                   <span className="shrink-0 tabular-nums text-muted-foreground/60">{f.updatedAt}</span>
                 </li>

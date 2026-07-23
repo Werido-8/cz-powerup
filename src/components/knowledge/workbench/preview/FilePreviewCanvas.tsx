@@ -30,8 +30,8 @@ export function FilePreviewCanvas({
     return (
       <div className="flex flex-1 items-center justify-center p-6">
         <KbEmptyState
-          title="仅作文件存储"
-          description="该格式不支持在线预览、全文检索与智能问答，可下载原文件。"
+          title="暂不支持在线预览"
+          description="当前格式无法直接展示内容，可下载原文件后查看。"
         />
       </div>
     );
@@ -52,8 +52,8 @@ export function FilePreviewCanvas({
   }
 
   return (
-    <section className="scrollbar-thin flex min-w-0 flex-1 flex-col overflow-hidden bg-kb-preview-bg">
-      <div className="flex h-11 shrink-0 items-center justify-center gap-2 border-b border-kb-border/60 bg-card/50 px-4">
+    <section className="scrollbar-thin flex min-w-0 flex-1 flex-col overflow-hidden bg-[rgb(246,247,249)]">
+      <div className="flex h-14 shrink-0 items-center justify-center gap-2 border-b border-[#E3ECEE] bg-[rgb(246,247,249)] px-4">
         <KbIconButton
           icon={ChevronLeft}
           label="上一页"
@@ -69,7 +69,7 @@ export function FilePreviewCanvas({
           disabled={page >= totalPages}
           onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
         />
-        <div className="mx-2 h-4 w-px bg-divider" />
+        <div className="mx-2 h-5 w-px bg-[#DCE7E9]" />
         <KbIconButton
           icon={ZoomOut}
           label="缩小"
@@ -86,11 +86,11 @@ export function FilePreviewCanvas({
         <KbIconButton icon={Maximize2} label="适合宽度" onClick={() => setZoom(100)} />
       </div>
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 py-5">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-6 py-5 lg:px-9 lg:py-6">
         {historyVersion && (
           <div
             className={cn(
-              "mx-auto mb-4 max-w-[840px] rounded-[8px] border border-warning/30 bg-warning-soft px-4 py-3 text-[12.5px] text-warning-foreground",
+              "mx-auto mb-4 max-w-[900px] rounded-[8px] border border-warning/30 bg-warning-soft px-4 py-3 text-[12.5px] text-warning-foreground",
             )}
           >
             当前为历史版本，只读预览，可下载，不参与默认 AI 问答召回。
@@ -98,21 +98,21 @@ export function FilePreviewCanvas({
         )}
         <article
           className={cn(
-            "mx-auto min-h-[800px] w-full max-w-[820px] bg-card px-14 py-11 shadow-card ring-1 ring-kb-border",
-            kbRadius.md,
+            "mx-auto min-h-[720px] w-full max-w-[900px] border border-[#E7EEF0] bg-white px-10 py-9 shadow-[0_10px_28px_rgba(31,52,64,0.09)] lg:px-14 lg:py-11",
+            kbRadius.lg,
           )}
           style={{ transform: `scale(${zoom / 100})`, transformOrigin: "top center" }}
         >
-          <div className="mb-6 flex items-center justify-between border-b border-divider pb-3 text-[11px] text-kb-muted">
+          <div className="mb-7 flex items-center justify-between border-b border-[#E8EFF1] pb-4 text-[11.5px] text-kb-muted">
             <span>
               第 {page} 页 / 共 {totalPages} 页
             </span>
             <span>{version?.version ?? file.version}</span>
           </div>
-          <h2 className="text-[24px] font-semibold leading-tight text-kb-heading">
+          <h2 className="text-[26px] font-semibold leading-tight tracking-[-0.02em] text-kb-heading">
             {file.name.replace(/\.(pdf|docx|xlsx|pptx)$/i, "")}
           </h2>
-          <div className="mt-3 flex flex-wrap gap-4 text-[12px] text-kb-muted">
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-kb-muted">
             <span>上传人：{file.uploaderName}</span>
             <span>更新时间：{file.updatedAt}</span>
             <span>文件大小：{file.size}</span>
@@ -126,7 +126,7 @@ export function FilePreviewCanvas({
             </KbStatusTag>
           </div>
           <p className="mt-8 text-[14px] leading-[1.9] text-kb-body">{file.summary}</p>
-          <div className="mt-6 rounded-[8px] border border-primary/20 border-l-[3px] border-l-primary bg-primary-soft/40 px-4 py-3 text-[13px] leading-relaxed text-kb-body">
+          <div className="mt-6 rounded-[8px] border border-[#BFE8ED] bg-[#F4FCFD] px-4 py-3 text-[13px] leading-relaxed text-kb-body">
             此处为在线预览画布。接入真实接口后，可替换为 PDF 阅读器、Office 预览服务或媒体播放器。
           </div>
           <h3 className="mt-8 text-[16px] font-semibold text-kb-heading">1. 适用范围</h3>

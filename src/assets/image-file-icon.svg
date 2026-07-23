@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="IMG image file">
+  <defs><linearGradient id="image" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6c2cf2"/><stop offset="1" stop-color="#4316d8"/></linearGradient><clipPath id="page"><path d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/></clipPath></defs>
+  <path fill="#fff" stroke="#95a0aa" stroke-width="3" stroke-linejoin="round" d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/><path fill="url(#image)" d="M166 8v38a14 14 0 0 0 14 14h38Z"/><path fill="url(#image)" d="M16 240h202v50a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22Z" clip-path="url(#page)"/>
+  <g fill="url(#image)"><circle cx="79" cy="107" r="16"/><path d="m48 194 34-39a7 7 0 0 1 11 0l19 23 32-42a7 7 0 0 1 11 0l42 53a8 8 0 0 1-6 13H54a8 8 0 0 1-6-8Z"/></g>
+  <text x="117" y="286" fill="#fff" font-family="Arial, sans-serif" font-size="46" font-weight="800" text-anchor="middle">IMG</text>
+</svg>

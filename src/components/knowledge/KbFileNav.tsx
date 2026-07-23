@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { BookOpen, ChevronDown, ChevronRight, FileText, Search } from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Search } from "lucide-react";
+import { KbFileTypeIcon } from "@/components/knowledge/ui";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { KbFile } from "@/lib/mock/knowledge-space";
@@ -181,12 +182,7 @@ function FileNavItem({
         dimmed && !active && "opacity-50",
       )}
     >
-      <FileText
-        className={cn(
-          "h-3.5 w-3.5 shrink-0",
-          active ? "text-primary" : "text-muted-foreground/60",
-        )}
-      />
+      <KbFileTypeIcon type={file.fileType} fileName={file.name} size="xs" />
       <span className="min-w-0 flex-1 truncate">{file.name}</span>
       {dimmed && (
         <span className="shrink-0 text-[9px] text-muted-foreground/70">

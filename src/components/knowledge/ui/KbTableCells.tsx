@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { KnowledgeFileType } from "@/lib/knowledge/types";
-import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import { cn } from "@/lib/utils";
+import { KbFileTypeIcon } from "./KbFileTypeIcon";
 
 export function KbTableCellFile({
   name,
@@ -21,10 +21,6 @@ export function KbTableCellFile({
   badge?: ReactNode;
   className?: string;
 }) {
-  const config = kbFileTypeConfig[type ?? "other"];
-  const Icon = config.icon;
-  const iconBox = size === "sm" ? "h-7 w-7 rounded-[7px]" : "h-9 w-9 rounded-[8px]";
-  const iconSize = size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";
   const weightClass =
     nameWeight === "normal"
       ? "font-normal"
@@ -33,16 +29,8 @@ export function KbTableCellFile({
         : "font-semibold";
 
   return (
-    <div className={cn("flex min-w-0 items-center gap-2.5 py-2", className)}>
-      <div
-        className={cn(
-          "grid shrink-0 place-items-center ring-1 ring-inset",
-          iconBox,
-          config.color,
-        )}
-      >
-        <Icon className={cn(iconSize, "stroke-[1.8]")} />
-      </div>
+    <div className={cn("flex min-w-0 items-center gap-2 py-2", className)}>
+      <KbFileTypeIcon type={type} fileName={name} size={size} />
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className={cn("truncate text-kb-heading", weightClass)}>{name}</span>

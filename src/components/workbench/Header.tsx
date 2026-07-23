@@ -203,7 +203,7 @@ function DemoRoleSwitcher() {
   );
 }
 
-export function Header() {
+export function Header({ wide = false }: { wide?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const showKnowledgeAdmin = canViewKnowledgeAdmin();
@@ -219,8 +219,16 @@ export function Header() {
   });
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-[1760px] items-center gap-8 px-8">
+    <header
+      className={`sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl${
+        wide ? " page-shell__header--wide" : ""
+      }`}
+    >
+      <div
+        className={`mx-auto flex h-16 max-w-[1760px] items-center gap-8 px-8${
+          wide ? " page-shell__header-content--wide" : ""
+        }`}
+      >
         <Link to="/" className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-white ring-1 ring-border">
             <img src={logo} alt="平台 Logo" className="h-8 w-8 object-contain" />

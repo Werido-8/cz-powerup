@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="XLSX file">
+  <defs><linearGradient id="xlsx" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0a9b72"/><stop offset="1" stop-color="#007e5d"/></linearGradient><clipPath id="page"><path d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/></clipPath></defs>
+  <path fill="#fff" stroke="#95a0aa" stroke-width="3" stroke-linejoin="round" d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/>
+  <path fill="url(#xlsx)" d="M166 8v38a14 14 0 0 0 14 14h38Z"/><path fill="url(#xlsx)" d="M16 240h202v50a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22Z" clip-path="url(#page)"/>
+  <rect x="65" y="91" width="126" height="104" rx="9" fill="url(#xlsx)"/><g fill="#fff"><path d="M72 105h32v22H72zm39 0h32v22h-32zm39 0h34v22h-34zM72 134h32v22H72zm39 0h32v22h-32zm39 0h34v22h-34zM72 163h32v22H72zm39 0h32v22h-32zm39 0h34v22h-34z"/></g>
+  <text x="117" y="286" fill="#fff" font-family="Arial, sans-serif" font-size="35" font-weight="800" letter-spacing="1" text-anchor="middle">XLSX</text>
+</svg>

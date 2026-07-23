@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="TXT file">
+  <defs><linearGradient id="text" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5a6d86"/><stop offset="1" stop-color="#3d4d5e"/></linearGradient><clipPath id="page"><path d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/></clipPath></defs>
+  <path fill="#fff" stroke="#95a0aa" stroke-width="3" stroke-linejoin="round" d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/><path fill="url(#text)" d="M166 8v38a14 14 0 0 0 14 14h38Z"/><path fill="url(#text)" d="M16 240h202v50a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22Z" clip-path="url(#page)"/>
+  <g stroke="url(#text)" stroke-linecap="round" stroke-width="9"><path d="M62 100h110M62 126h110M62 152h90M62 178h110M62 204h68"/></g>
+  <text x="117" y="286" fill="#fff" font-family="Arial, sans-serif" font-size="44" font-weight="800" text-anchor="middle">TXT</text>
+</svg>

@@ -695,7 +695,7 @@ function TrackingActionDialogs({ dialog, onClose, onConfirm }: { dialog: ActionD
   const file = getFileById(record.fileId);
 
   const confirm = (title: string, icon: LucideIcon, desc: ReactNode, label: string, msg: string, danger?: boolean) => (
-    <ConfirmDialog open title={title} titleIcon={icon} description={desc} confirmLabel={label} danger={danger} onClose={onClose} onConfirm={() => onConfirm(msg)} />
+    <ConfirmDialog open title={title} titleIcon={icon} fileName={record.fileName} description={desc} confirmLabel={label} danger={danger} onClose={onClose} onConfirm={() => onConfirm(msg)} />
   );
 
   switch (kind) {
@@ -727,7 +727,7 @@ function TrackingActionDialogs({ dialog, onClose, onConfirm }: { dialog: ActionD
       );
     }
     case "progress":
-      return <InfoDialog open title="解析进度" titleIcon={RefreshCw} onClose={onClose}><ProgressBody record={record} /></InfoDialog>;
+      return <InfoDialog open size="compact" className="upload-progress-dialog" title="解析进度" titleIcon={RefreshCw} onClose={onClose}><ProgressBody record={record} /></InfoDialog>;
     case "detail":
     case "submitDetail":
       return <InfoDialog open title={kind === "submitDetail" ? "查看提交详情" : "查看详情"} titleIcon={Info} onClose={onClose}><DetailBody record={record} file={file} /></InfoDialog>;
@@ -742,16 +742,22 @@ function TrackingActionDialogs({ dialog, onClose, onConfirm }: { dialog: ActionD
   }
 }
 
-function ConfirmDialog({ open, title, titleIcon, description, confirmLabel, danger, onClose, onConfirm }: { open: boolean; title: string; titleIcon: LucideIcon; description: ReactNode; confirmLabel: string; danger?: boolean; onClose: () => void; onConfirm: () => void }) {
+function ConfirmDialog({ open, title, titleIcon, fileName, description, confirmLabel, danger, onClose, onConfirm }: { open: boolean; title: string; titleIcon: LucideIcon; fileName: string; description: ReactNode; confirmLabel: string; danger?: boolean; onClose: () => void; onConfirm: () => void }) {
   return (
-    <AppFormDialog open={open} size="small" variant="confirm" title={title} titleIcon={titleIcon} onClose={onClose} footer={<><AppDialogButton variant="outline" onClick={onClose}>取消</AppDialogButton><AppDialogButton variant="primary" className={danger ? "border-destructive bg-destructive hover:border-destructive/90 hover:bg-destructive/90" : undefined} onClick={onConfirm}>{confirmLabel}</AppDialogButton></>}>
-      <p className="text-[13.5px] leading-relaxed text-kb-body">{description}</p>
+    <AppFormDialog open={open} size="small" variant="confirm" className="upload-confirm-dialog" title={title} titleIcon={titleIcon} onClose={onClose} footer={<><AppDialogButton variant="outline" className="h-10 min-w-[104px]" onClick={onClose}>取消</AppDialogButton><AppDialogButton variant="primary" className={cn("h-10 min-w-[112px]", danger && "border-destructive bg-destructive hover:border-destructive/90 hover:bg-destructive/90")} onClick={onConfirm}>{confirmLabel}</AppDialogButton></>}>
+      <div className="px-7 py-5">
+        <div className="rounded-[10px] border border-[#DDECEF] bg-[#F7FBFC] px-4 py-3.5">
+          <div className="text-[11.5px] font-medium text-kb-muted">操作文件</div>
+          <div className="mt-1 truncate text-[13px] font-medium text-kb-heading">{fileName}</div>
+        </div>
+        <p className="mt-3.5 text-[13.5px] leading-6 text-kb-body">{description}</p>
+      </div>
     </AppFormDialog>
   );
 }
 
-function InfoDialog({ open, title, titleIcon, onClose, children }: { open: boolean; title: string; titleIcon: LucideIcon; onClose: () => void; children: ReactNode }) {
-  return <AppFormDialog open={open} size="small" variant="detail" title={title} titleIcon={titleIcon} onClose={onClose}>{children}</AppFormDialog>;
+function InfoDialog({ open, title, titleIcon, onClose, children, size = "small", className }: { open: boolean; title: string; titleIcon: LucideIcon; onClose: () => void; children: ReactNode; size?: "small" | "compact"; className?: string }) {
+  return <AppFormDialog open={open} size={size} variant="detail" className={className} title={title} titleIcon={titleIcon} onClose={onClose}><div className="px-7 py-5">{children}</div></AppFormDialog>;
 }
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
@@ -809,21 +815,37 @@ function ReasonBody({ record, file }: { record: UploadRecord; file: ReturnType<t
 const PARSE_STEPS = ["文件读取", "内容提取", "OCR识别", "内容分块", "索引构建"] as const;
 
 function ProgressBody({ record }: { record: UploadRecord }) {
-  const active = 2;
+  const progress = record.parseProgress ?? 46;
+  const active = Math.min(PARSE_STEPS.length - 1, Math.max(0, Math.floor(progress / 20)));
   return (
-    <div className="space-y-4">
-      <p className="text-[13px] text-kb-muted">正在解析 <span className="font-medium text-kb-body">{record.fileName}</span></p>
-      {record.parseProgress != null && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${record.parseProgress}%` }} />
+    <div className="space-y-5">
+      <section className="rounded-[10px] border border-[#DCEBED] bg-[#F8FBFC] px-4 py-3.5">
+        <div className="flex items-start gap-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] bg-primary-soft text-primary">
+            <FileStack className="h-4 w-4 stroke-[1.8]" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11.5px] font-medium text-kb-muted">正在解析文件</div>
+            <div className="mt-1 truncate text-[13.5px] font-medium text-kb-heading">{record.fileName}</div>
+          </div>
+          <span className="shrink-0 rounded-full bg-primary-soft px-2 py-1 text-[11px] font-semibold tabular-nums text-primary">{progress}%</span>
+        </div>
+      </section>
+      <div className="flex items-center justify-between text-[12px]">
+        <span className="font-medium text-kb-body">{PARSE_STEPS[active]}</span>
+        <span className="text-kb-muted">第 {active + 1} / {PARSE_STEPS.length} 步</span>
+      </div>
+      {progress != null && (
+        <div className="h-1.5 overflow-hidden rounded-full bg-[#E9F1F3]">
+          <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${progress}%` }} />
         </div>
       )}
       {PARSE_STEPS.map((label, idx) => {
         const done = idx < active;
         const cur = idx === active;
         return (
-          <div key={label} className="flex items-center gap-3 py-1">
-            <span className={cn("grid h-6 w-6 place-items-center rounded-full", done && "bg-[#EEFBF3] text-[#159463]", cur && "bg-primary-soft text-primary", !done && !cur && "bg-muted text-kb-muted")}>
+          <div key={label} className="flex items-center gap-3 py-1.5">
+            <span className={cn("grid h-7 w-7 place-items-center rounded-full ring-4 ring-white", done && "bg-[#EAF9F1] text-[#159463]", cur && "bg-primary text-white shadow-[0_3px_8px_rgba(52,155,172,0.24)]", !done && !cur && "bg-[#F1F6F7] text-[#91A3AA]")}>
               {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : cur ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Circle className="h-3.5 w-3.5" />}
             </span>
             <span className={cn("text-[13px]", cur && "font-medium text-primary")}>{label}{cur && <span className="ml-1.5 text-[11.5px] font-normal text-kb-muted">进行中…</span>}</span>

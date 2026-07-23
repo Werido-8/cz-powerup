@@ -1,25 +1,6 @@
-import {
-  ArrowLeft,
-  Download,
-  History,
-  Library,
-  MoreHorizontal,
-  Pencil,
-  Star,
-} from "lucide-react";
+import { ArrowLeft, Download, Library, Star } from "lucide-react";
 import { toast } from "sonner";
-import {
-  KbIconButton,
-  KbStatusTag,
-  KbVersionSelect,
-} from "@/components/knowledge/ui";
-import {
-  parseStatusLabel,
-  parseStatusTone,
-  publishStatusLabel,
-  publishStatusTone,
-} from "@/lib/knowledge/status";
-import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
+import { KbFileTypeIcon, KbIconButton, KbVersionSelect } from "@/components/knowledge/ui";
 import type { KnowledgeBase, KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
 
 export function FilePreviewToolbar({
@@ -29,8 +10,6 @@ export function FilePreviewToolbar({
   currentVersionId,
   onBack,
   onVersionChange,
-  onOpenVersionHistory,
-  canEdit,
 }: {
   currentBase: KnowledgeBase;
   currentFile: KnowledgeFile;
@@ -38,49 +17,37 @@ export function FilePreviewToolbar({
   currentVersionId?: string;
   onBack: () => void;
   onVersionChange: (versionId: string) => void;
-  onOpenVersionHistory?: () => void;
-  canEdit: boolean;
 }) {
-  const typeConfig = kbFileTypeConfig[currentFile.type ?? "other"];
-
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-kb-border bg-card px-3">
+    <header className="flex h-[68px] shrink-0 items-center gap-2 border-b border-[#E0E9EB] bg-card px-4 lg:px-5">
       <button
         type="button"
         onClick={onBack}
-        className="inline-flex h-9 items-center gap-1.5 rounded-[8px] px-2.5 text-[12.5px] font-medium text-kb-muted transition-colors hover:bg-kb-surface-hover hover:text-kb-heading"
+        aria-label="返回文件列表"
+        title="返回文件列表"
+        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-kb-muted transition-colors hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
       >
         <ArrowLeft className="h-4 w-4 stroke-[1.8]" />
-        返回
       </button>
-      <div className="h-5 w-px bg-divider" />
-      <span className="inline-flex max-w-[220px] items-center gap-2 text-[12.5px] font-medium text-kb-heading">
-        <Library className="h-4 w-4 shrink-0 text-primary stroke-[1.8]" />
+      <div className="h-7 w-px bg-[#E1EAEC]" />
+      <span className="inline-flex max-w-[240px] items-center gap-2 text-[13px] font-semibold text-kb-heading">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[8px] bg-primary text-primary-foreground">
+          <Library className="h-4 w-4 stroke-[1.8]" />
+        </span>
         <span className="min-w-0 truncate">{currentBase.name}</span>
       </span>
-      <span className="text-kb-muted">/</span>
-      <h1 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-kb-heading">
-        {currentFile.name}
-      </h1>
-      <KbStatusTag tone={publishStatusTone(currentFile.status)}>
-        {publishStatusLabel(currentFile.status)}
-      </KbStatusTag>
-      <KbStatusTag tone="accent">{typeConfig.label}</KbStatusTag>
+      <span className="mx-1 text-kb-muted">/</span>
+      <div className="flex min-w-0 flex-1 items-center gap-2.5">
+        <KbFileTypeIcon type={currentFile.type} fileName={currentFile.name} size="xs" />
+        <h1 className="min-w-0 flex-1 truncate text-[14px] font-semibold text-kb-heading">
+          {currentFile.name}
+        </h1>
+      </div>
       <KbVersionSelect
         versions={versions}
         value={currentVersionId}
         onChange={onVersionChange}
       />
-      {versions.length > 1 && onOpenVersionHistory && (
-        <button
-          type="button"
-          onClick={onOpenVersionHistory}
-          className="inline-flex h-9 items-center gap-1 rounded-[8px] px-2.5 text-[12px] font-medium text-kb-muted transition-colors hover:bg-kb-surface-hover hover:text-primary"
-        >
-          <History className="h-3.5 w-3.5 stroke-[1.8]" />
-          版本历史
-        </button>
-      )}
       <KbIconButton icon={Download} label="下载" onClick={() => toast.message("开始下载文件")} />
       <KbIconButton
         icon={Star}
@@ -88,14 +55,6 @@ export function FilePreviewToolbar({
         active={currentFile.favorite}
         onClick={() => toast.success("收藏状态已更新")}
       />
-      {canEdit && (
-        <KbIconButton
-          icon={Pencil}
-          label="编辑元数据"
-          onClick={() => toast.message("打开元数据编辑面板")}
-        />
-      )}
-      <KbIconButton icon={MoreHorizontal} label="更多" onClick={() => toast.message("更多操作")} />
     </header>
   );
 }

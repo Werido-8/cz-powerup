@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="PDF file">
+  <defs><linearGradient id="pdf" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff2b2b"/><stop offset="1" stop-color="#ed1111"/></linearGradient><clipPath id="page"><path d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/></clipPath></defs>
+  <path fill="#fff" stroke="#b3bbc3" stroke-width="3" stroke-linejoin="round" d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/><path fill="url(#pdf)" opacity=".55" d="M166 8v38a14 14 0 0 0 14 14h38Z"/><path fill="url(#pdf)" d="M16 240h202v50a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22Z" clip-path="url(#page)"/>
+  <path fill="none" stroke="url(#pdf)" stroke-linecap="round" stroke-linejoin="round" stroke-width="8" d="M102 88c-5 8 0 22 13 42 12 19 25 29 37 26 10-2 1-14-27-9-20 4-40 18-45 27-4 8 6 8 13 2 16-14 26-39 22-61-2-11-11-15-13-7Z"/>
+  <text x="117" y="286" fill="#fff" font-family="Arial, sans-serif" font-size="44" font-weight="800" text-anchor="middle">PDF</text>
+</svg>

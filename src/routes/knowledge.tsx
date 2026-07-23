@@ -8,10 +8,12 @@ export const Route = createFileRoute("/knowledge")({
 
 function KnowledgeLayout() {
   return (
-    <PageShell compact>
-      <KnowledgeAppLayout>
-        <Outlet />
-      </KnowledgeAppLayout>
+    <PageShell compact wide>
+      <div className="knowledge-density-frame h-full">
+        <KnowledgeAppLayout>
+          <Outlet />
+        </KnowledgeAppLayout>
+      </div>
     </PageShell>
   );
 }

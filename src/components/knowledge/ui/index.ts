@@ -11,6 +11,7 @@ export { KbMetadataFilter } from "./KbMetadataFilter";
 export { KbDragUploadOverlay } from "./KbDragUploadOverlay";
 export { KbDataTable, KbDataTableRow } from "./KbDataTable";
 export { KbTableCellFile, KbTableCellUser, KbTableCellBase } from "./KbTableCells";
+export { KbFileTypeIcon, getKbFileTypeLabel } from "./KbFileTypeIcon";
 export { KbStatusTag } from "./KbStatusTag";
 export { KbButton, KbIconButton, KbIconTextButton } from "./KbButtons";
 export { KbSidebar, KbSidebarSection, KbSidebarItem } from "./KbSidebar";

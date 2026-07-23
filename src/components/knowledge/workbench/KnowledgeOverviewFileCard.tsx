@@ -8,16 +8,17 @@ import {
   Pin,
   PinOff,
   Star,
+  StarOff,
   Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { FileListCheckbox } from "./FileListCheckbox";
 import { Tag } from "@/components/learning/ui";
+import { KbFileTypeIcon } from "@/components/knowledge/ui";
 import { publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
 import { getBaseById, isEmployee, isFileEnabled } from "@/lib/knowledge/model";
 import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
-import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 
@@ -38,8 +39,6 @@ export function KnowledgeOverviewFileCard({
   onTogglePin?: (file: KnowledgeFile) => void;
   onViewHistory?: (file: KnowledgeFile) => void;
 }) {
-  const type = kbFileTypeConfig[file.type ?? "other"];
-  const TypeIcon = type.icon;
   const statusTone = publishStatusTone(file.status);
   const disabled = !isFileEnabled(file);
   const pinned = Boolean(file.pinned);
@@ -85,15 +84,12 @@ export function KnowledgeOverviewFileCard({
         )}
       >
         <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "grid h-11 w-11 shrink-0 place-items-center rounded-[10px] ring-1 ring-inset",
-              type.color,
-              disabled && "opacity-60",
-            )}
-          >
-            <TypeIcon className="h-5 w-5 stroke-[1.8]" />
-          </div>
+          <KbFileTypeIcon
+            type={file.type}
+            fileName={file.name}
+            size="lg"
+            className={disabled ? "opacity-60" : undefined}
+          />
           <h3
             className={cn(
               "line-clamp-2 min-w-0 flex-1 text-[13.5px] font-medium leading-snug",

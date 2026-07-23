@@ -1,8 +1,7 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { KbButton, KbEmptyState } from "@/components/knowledge/ui";
 import {
-  canManageBase,
   getBaseById,
   getFileById,
   getFilesForBase,
@@ -10,7 +9,6 @@ import {
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
-import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
 import { FileAIAssistantPanel } from "./preview/FileAIAssistantPanel";
 import { FilePreviewCanvas } from "./preview/FilePreviewCanvas";
 import { FilePreviewToolbar } from "./preview/FilePreviewToolbar";
@@ -27,7 +25,6 @@ export function FileDetailPage({
 }) {
   const navigate = useNavigate({ from: "/knowledge/file/$fileId" });
   const router = useRouter();
-  const [historyOpen, setHistoryOpen] = useState(false);
   const routeFile = getFileById(fileId);
   const routeBase = initialKnowledgeBaseId ? getBaseById(initialKnowledgeBaseId) : undefined;
   const fileBase = routeFile ? getBaseById(routeFile.knowledgeBaseId) : undefined;
@@ -84,7 +81,7 @@ export function FileDetailPage({
   }
 
   return (
-    <main className={cn(kbMainPanel, "overflow-hidden")}>
+    <main className={cn(kbMainPanel, "overflow-hidden bg-[#F5F8FA]")}>
       <FilePreviewToolbar
         currentBase={currentBase}
         currentFile={currentFile}
@@ -94,11 +91,9 @@ export function FileDetailPage({
         onVersionChange={(vid) =>
           navigate({ search: (prev) => ({ ...prev, version: vid }) })
         }
-        onOpenVersionHistory={() => setHistoryOpen(true)}
-        canEdit={canManageBase(currentBase)}
       />
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-[#F5F8FA]">
         <FileTreeSidebar
           files={files}
           currentFileId={currentFile.id}
@@ -117,15 +112,6 @@ export function FileDetailPage({
         />
         <FileAIAssistantPanel file={currentFile} base={currentBase} />
       </div>
-
-      <FileVersionHistoryDialog
-        file={historyOpen ? currentFile : null}
-        onClose={() => setHistoryOpen(false)}
-        onPreviewVersion={(versionId) => {
-          setHistoryOpen(false);
-          navigate({ search: (prev) => ({ ...prev, version: versionId }) });
-        }}
-      />
     </main>
   );
 }

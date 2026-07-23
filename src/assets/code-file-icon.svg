@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 320" role="img" aria-label="CODE file">
+  <defs><linearGradient id="code" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#10a9a5"/><stop offset="1" stop-color="#008a88"/></linearGradient><clipPath id="page"><path d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/></clipPath></defs>
+  <path fill="#fff" stroke="#95a0aa" stroke-width="3" stroke-linejoin="round" d="M38 8h128l52 52v230a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22V30A22 22 0 0 1 38 8Z"/><path fill="url(#code)" d="M166 8v38a14 14 0 0 0 14 14h38Z"/><path fill="url(#code)" d="M16 240h202v50a22 22 0 0 1-22 22H38a22 22 0 0 1-22-22Z" clip-path="url(#page)"/>
+  <g fill="none" stroke="url(#code)" stroke-linecap="round" stroke-linejoin="round"><path d="m80 105-25 20 25 20m56-40 25 20-25 20M119 99l-16 52" stroke-width="8"/><path d="M55 174h112M55 192h90M55 210h57" stroke-width="7"/></g>
+  <text x="117" y="286" fill="#fff" font-family="Arial, sans-serif" font-size="38" font-weight="800" text-anchor="middle">CODE</text>
+</svg>

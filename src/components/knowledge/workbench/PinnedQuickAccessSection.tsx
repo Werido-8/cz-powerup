@@ -1,7 +1,6 @@
-import { PinOff, Star } from "lucide-react";
+import { Library, PinOff } from "lucide-react";
 import type { ReactNode } from "react";
-import { KbSidebarSection } from "@/components/knowledge/ui";
-import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
+import { KbFileTypeIcon, KbSidebarSection } from "@/components/knowledge/ui";
 import type { KnowledgeBase, KnowledgeFile } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 
@@ -37,19 +36,17 @@ export function PinnedQuickAccessSection({
               key={`base-${base.id}`}
               label={base.name}
               selected={selectedBaseId === base.id}
-              icon={<Star className="h-3.5 w-3.5 fill-primary-soft text-primary stroke-[1.8]" />}
+              icon={<Library className="h-3.5 w-3.5 text-primary stroke-[1.8]" />}
               onClick={() => onSelectBase(base.id)}
               onUnpin={() => onUnpinBase(base.id)}
             />
           ))}
           {pinnedFiles.map((file) => {
-            const type = kbFileTypeConfig[file.type ?? "other"];
-            const TypeIcon = type.icon;
             return (
               <QuickAccessRow
                 key={`file-${file.id}`}
                 label={file.name}
-                icon={<TypeIcon className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />}
+                icon={<KbFileTypeIcon type={file.type} fileName={file.name} size="xs" />}
                 onClick={() => onOpenFile(file)}
                 onUnpin={() => onUnpinFile(file)}
               />

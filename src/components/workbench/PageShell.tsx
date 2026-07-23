@@ -4,21 +4,26 @@ import { Header } from "./Header";
 export function PageShell({
   children,
   compact,
+  wide,
 }: {
   children: ReactNode;
   compact?: boolean;
+  /** Enables the 2K desktop density treatment used by the knowledge workspace. */
+  wide?: boolean;
 }) {
   return (
     <div
       className={
-        compact ? "flex h-screen flex-col overflow-hidden bg-background" : "min-h-screen bg-background"
+        compact
+          ? `flex h-screen flex-col overflow-hidden bg-background${wide ? " page-shell--wide" : ""}`
+          : `min-h-screen bg-background${wide ? " page-shell--wide" : ""}`
       }
     >
-      <Header />
+      <Header wide={wide} />
       <main
         className={
           compact
-            ? "mx-auto min-h-0 w-full max-w-[1840px] flex-1 overflow-hidden px-4 py-3"
+            ? `page-shell__main mx-auto min-h-0 w-full max-w-[1840px] flex-1 overflow-hidden px-4 py-3${wide ? " page-shell__main--wide" : ""}`
             : "mx-auto w-full max-w-[1840px] px-6 py-7 lg:px-8"
         }
       >

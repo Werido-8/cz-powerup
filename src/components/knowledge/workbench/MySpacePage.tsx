@@ -44,6 +44,7 @@ import {
   KbDragUploadOverlay,
   KbEmptyState,
   KbFileSearchInput,
+  KbFileTypeIcon,
   KbFilterSelect,
   KbMetadataFilter,
   KbSidebar,
@@ -998,8 +999,6 @@ function RecentAccessListItem({
   tags: string[];
   onOpen: () => void;
 }) {
-  const type = kbFileTypeConfig[file.type ?? "other"];
-  const TypeIcon = type.icon;
   const sourceName = file.knowledgeBaseName ?? "个人知识库";
   const displayName = stripFileExtension(file.name);
 
@@ -1010,14 +1009,7 @@ function RecentAccessListItem({
         onClick={onOpen}
         className="grid min-h-[50px] w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 px-3 py-1.5 text-left"
       >
-        <div
-          className={cn(
-            "grid h-7 w-7 place-items-center rounded-[7px] ring-1 ring-inset",
-            type.color,
-          )}
-        >
-          <TypeIcon className="h-[15px] w-[15px] stroke-[1.8]" />
-        </div>
+        <KbFileTypeIcon type={file.type} fileName={file.name} size="sm" />
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
             <h3 className="truncate text-[13px] font-normal text-[#102A33]">{displayName}</h3>

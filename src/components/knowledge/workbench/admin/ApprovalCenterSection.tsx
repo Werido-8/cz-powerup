@@ -446,6 +446,8 @@ function UploadApprovalTable({
               name={item.fileName}
               subtitle={[item.uploadNote, item.fileSize].filter(Boolean).join(" / ")}
               type={item.fileName.endsWith(".pdf") ? "pdf" : "docx"}
+              size="sm"
+              nameWeight="normal"
             />
             <KbTableCellBase name={item.knowledgeBaseName} />
             <KbTableCellUser name={item.submitterName} />

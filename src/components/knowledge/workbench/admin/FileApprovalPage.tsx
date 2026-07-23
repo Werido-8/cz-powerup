@@ -2,12 +2,10 @@ import { useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Check, ChevronDown, Download, Maximize2, Minus, Pencil, Plus, Printer, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import docIcon from "@/assets/doc.png";
 import knowledgeIcon from "@/assets/b69a8633-c81d-42e2-80f5-aae7e7edc146.png";
-import pdfIcon from "@/assets/pdf.png";
-import xlsxIcon from "@/assets/xlsx.png";
 import { ExerciseEditorDialog } from "@/components/knowledge/workbench/admin/ExerciseEditorDialog";
 import { KbEmptyState } from "@/components/knowledge/ui/KbEmptyState";
+import { KbFileTypeIcon } from "@/components/knowledge/ui/KbFileTypeIcon";
 import { KbFormDialog } from "@/components/knowledge/ui/KbFormDialog";
 import { AppDialogButton } from "@/components/ui/app-dialog";
 import { AppFormTextarea } from "@/components/ui/app-form";
@@ -16,16 +14,13 @@ import type { KnowledgeExercise, UploadApproval } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 
 const CARD = "flex min-h-0 flex-col overflow-hidden rounded-[8px] border border-[#E6EDF3] bg-white";
-const icons: Record<string, string> = { pdf: pdfIcon, xlsx: xlsxIcon, xls: xlsxIcon, doc: docIcon, docx: docIcon };
 const stamp = (value?: string) => value ? value.replace("T", " ").slice(0, 16) : "-";
-const ext = (name: string) => name.split(".").pop()?.toLowerCase() ?? "";
-const iconFor = (name: string) => icons[ext(name)] ?? docIcon;
 const normalizeKeywords = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string").join("，") : typeof value === "string" ? value : "";
 const tags = (text: unknown) => normalizeKeywords(text).split(/[，,]/).map((x) => x.trim()).filter(Boolean);
 const copyExercises = (items?: KnowledgeExercise[]) => (items ?? []).map((item) => ({ ...item, options: (item.options ?? []).map((option) => ({ ...option })), correctAnswers: [...(item.correctAnswers ?? [])] }));
 
 function FileIcon({ name, className }: { name: string; className?: string }) {
-  return <img src={iconFor(name)} alt="" className={cn("size-8 shrink-0 object-contain", className)} />;
+  return <KbFileTypeIcon fileName={name} size="sm" className={className} />;
 }
 
 function Header({ item, readOnly, back, reject, approve }: { item: UploadApproval; readOnly: boolean; back: () => void; reject: () => void; approve: () => void }) {
@@ -52,10 +47,67 @@ function EditAction({ children, completed, disabled, onClick }: { children: Reac
 }
 
 function Queue({ items, active, visible, choose, more }: { items: UploadApproval[]; active: string; visible: number; choose: (id: string) => void; more: () => void }) {
-  return <aside className={CARD}><CardHeader title="待审批文件" action={<span className="flex size-6 items-center justify-center rounded-full bg-[#EEF6F9] text-[13px] font-semibold text-[#315068]">{items.length}</span>} />
-    <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2">{items.slice(0, visible).map((entry) => <button key={entry.id} type="button" onClick={() => choose(entry.id)} className={cn("flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors", active === entry.id ? "border-[#1496B4] bg-[#F0FAFC]" : "border-transparent border-b-[#EEF3F6] hover:bg-[#F8FBFC]")}><FileIcon name={entry.fileName} className="mt-0.5" /><span className="min-w-0 flex-1"><span className={cn("block truncate text-[13px] font-medium leading-5", active === entry.id ? "text-[#107F99]" : "text-[#263B50]")}>{entry.fileName}</span><span className="mt-1 block truncate text-[11px] text-[#7C8A9A]">{entry.submitterName}<b className="px-1 font-normal text-[#B2BEC9]">|</b>{stamp(entry.submittedAt)}</span></span></button>)}
-      {visible < items.length && <button type="button" onClick={more} className="mx-auto mt-3 flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-[#52677B] hover:text-[#1496B4]">加载更多<ChevronDown className="size-4" /></button>}</div>
-  </aside>;
+  return (
+    <aside className={CARD}>
+      <CardHeader
+        title="待审批文件"
+        action={
+          <span className="flex size-6 items-center justify-center rounded-full bg-[#EEF6F9] text-[13px] font-semibold text-[#315068]">
+            {items.length}
+          </span>
+        }
+      />
+      <div className="scrollbar-neutral min-h-0 flex-1 overflow-y-auto px-3 py-2">
+        {items.slice(0, visible).map((entry) => {
+          const selected = active === entry.id;
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => choose(entry.id)}
+              className={cn(
+                "relative mb-2 flex w-full items-center gap-3 rounded-[9px] border px-3 py-3 text-left transition-colors last:mb-0",
+                selected
+                  ? "border-[#D7E6E9] bg-[#F5FAFB]"
+                  : "border-[#E7EEF0] bg-white hover:border-primary/20 hover:bg-[#FCFEFE]",
+              )}
+            >
+              {selected ? (
+                <span className="absolute bottom-3.5 left-0 top-3.5 w-[2px] rounded-r-full bg-primary/55" />
+              ) : null}
+              <FileIcon name={entry.fileName} />
+              <span className="min-w-0 flex-1">
+                <span
+                  className={cn(
+                    "block truncate text-[13px] leading-5",
+                    selected ? "font-medium text-[#1F2D3D]" : "font-semibold text-[#263B50]",
+                  )}
+                  title={entry.fileName}
+                >
+                  {entry.fileName}
+                </span>
+                <span className="mt-1.5 block truncate text-[11px] text-[#7C8A9A]">
+                  {entry.submitterName}
+                  <b className="px-1 font-normal text-[#B2BEC9]">|</b>
+                  {stamp(entry.submittedAt)}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+        {visible < items.length ? (
+          <button
+            type="button"
+            onClick={more}
+            className="mx-auto mt-3 flex items-center gap-1.5 px-4 py-2 text-[13px] font-medium text-[#52677B] hover:text-[#1496B4]"
+          >
+            加载更多
+            <ChevronDown className="size-4" />
+          </button>
+        ) : null}
+      </div>
+    </aside>
+  );
 }
 
 function Metadata({ values, editing, readOnly, change, toggle }: { values: { id: string; label: string; value: string }[]; editing: boolean; readOnly: boolean; change: (id: string, value: string) => void; toggle: () => void }) {
@@ -64,11 +116,11 @@ function Metadata({ values, editing, readOnly, change, toggle }: { values: { id:
   </section>;
 }
 
-function Keywords({ keywordText, summary, editing, expanded, readOnly, setKeywordText, setSummary, toggle, expand }: { keywordText: string; summary: string; editing: boolean; expanded: boolean; readOnly: boolean; setKeywordText: (value: string) => void; setSummary: (value: string) => void; toggle: () => void; expand: () => void }) {
+function Keywords({ keywordText, summary, editing, readOnly, setKeywordText, setSummary, toggle }: { keywordText: string; summary: string; editing: boolean; readOnly: boolean; setKeywordText: (value: string) => void; setSummary: (value: string) => void; toggle: () => void }) {
   const items = tags(keywordText);
   return <section className={CARD}><CardHeader title="关键词与摘要" desc="确认主题标签与内容概述" action={<EditAction completed={editing} disabled={readOnly} onClick={toggle}>{editing ? "完成" : "编辑"}</EditAction>} />
     <div className="min-h-0 flex-1 overflow-y-auto p-5"><p className="text-[12px] text-[#7C8A9A]">关键词</p>{editing ? <input value={keywordText} onChange={(event) => setKeywordText(event.target.value)} className="mt-2 h-9 w-full rounded-[6px] border border-[#DCE7EF] px-3 text-[13px] outline-none focus:border-[#1496B4]" placeholder="多个关键词使用逗号分隔" /> : <div className="mt-2 flex flex-wrap gap-2">{items.length ? items.map((tag) => <span key={tag} className="rounded-md bg-[#EEF8FA] px-2.5 py-1 text-[12px] text-[#137E98]">{tag}</span>) : <span className="text-[13px] text-[#9AA8B6]">暂无关键词</span>}</div>}
-      <div className="mt-5 border-t border-[#EEF3F6] pt-4"><div className="flex items-center justify-between"><p className="text-[12px] text-[#7C8A9A]">摘要</p>{!editing && <button type="button" onClick={expand} className="inline-flex items-center gap-1 text-[12px] font-medium text-[#1496B4]">{expanded ? "收起" : "展开全文"}<ChevronDown className={cn("size-3.5", expanded && "rotate-180")} /></button>}</div>{editing ? <AppFormTextarea value={summary} onChange={(event) => setSummary(event.target.value)} rows={4} className="mt-2 min-h-[96px] !rounded-[6px] resize-none text-[13px] leading-6" /> : <p className={cn("mt-2 text-[13px] leading-6 text-[#4D6175]", !expanded && "line-clamp-3")}>{summary || "暂无摘要"}</p>}</div>
+      <div className="mt-5 border-t border-[#EEF3F6] pt-4"><p className="text-[12px] text-[#7C8A9A]">摘要</p>{editing ? <AppFormTextarea value={summary} onChange={(event) => setSummary(event.target.value)} rows={4} className="mt-2 min-h-[96px] !rounded-[6px] resize-none text-[13px] leading-6" /> : <p className="mt-2 text-[13px] leading-6 text-[#4D6175]">{summary || "暂无摘要"}</p>}</div>
     </div>
   </section>;
 }
@@ -97,15 +149,15 @@ function Reader({ item, keywordText, summary }: { item: UploadApproval; keywordT
 
 export function FileApprovalPage({ approvalId }: { approvalId: string }) {
   const navigate = useNavigate(); const approvals = useSyncExternalStore(subscribeKnowledgeStore, getStoreUploadApprovals, getStoreUploadApprovals); const current = approvals.find((item) => item.id === approvalId) ?? approvals[0]; const pending = useMemo(() => approvals.filter((item) => item.status === "pendingApproval" || !item.status), [approvals]); const queue = pending.length ? pending : approvals;
-  const [visible, setVisible] = useState(6), [metadataEditing, setMetadataEditing] = useState(false), [keywordsEditing, setKeywordsEditing] = useState(false), [expanded, setExpanded] = useState(false), [selected, setSelected] = useState<string[]>([]), [editing, setEditing] = useState<KnowledgeExercise | null>(null), [keywordText, setKeywordText] = useState(""), [summary, setSummary] = useState(""), [metadata, setMetadata] = useState<{ id: string; label: string; value: string }[]>([]), [exercises, setExercises] = useState<KnowledgeExercise[]>([]);
-  useEffect(() => { if (!current) return; setKeywordText(normalizeKeywords(current.aiKeywords)); setSummary(current.summary ?? ""); setMetadata(current.aiMetadata ?? []); setExercises(copyExercises(current.aiExercises)); setSelected([]); setMetadataEditing(false); setKeywordsEditing(false); setExpanded(false); }, [current?.id]);
+  const [visible, setVisible] = useState(6), [metadataEditing, setMetadataEditing] = useState(false), [keywordsEditing, setKeywordsEditing] = useState(false), [selected, setSelected] = useState<string[]>([]), [editing, setEditing] = useState<KnowledgeExercise | null>(null), [keywordText, setKeywordText] = useState(""), [summary, setSummary] = useState(""), [metadata, setMetadata] = useState<{ id: string; label: string; value: string }[]>([]), [exercises, setExercises] = useState<KnowledgeExercise[]>([]);
+  useEffect(() => { if (!current) return; setKeywordText(normalizeKeywords(current.aiKeywords)); setSummary(current.summary ?? ""); setMetadata(current.aiMetadata ?? []); setExercises(copyExercises(current.aiExercises)); setSelected([]); setMetadataEditing(false); setKeywordsEditing(false); }, [current?.id]);
   if (!current) return <KbEmptyState title="未找到待审批文件" description="请返回审批台重新选择文件。" />;
   const readOnly = current.status === "approved" || current.status === "rejected";
   const persist = () => { updateStoreUploadApproval(current.id, { aiKeywords: keywordText, summary, aiMetadata: metadata, aiExercises: exercises }); toast.success("审批内容已保存"); };
   const finish = (status: "approved" | "rejected") => { persist(); updateStoreUploadApproval(current.id, { status, reviewerName: "当前审批人", reviewedAt: new Date().toISOString() }); toast.success(status === "approved" ? "文件已通过审批" : "文件已驳回"); const next = queue.find((item) => item.id !== current.id); if (next) navigate({ to: "/knowledge/approval/$approvalId", params: { approvalId: next.id } }); else navigate({ to: "/knowledge/admin", search: { section: "approvals" } }); };
   return <main className="flex min-h-0 flex-1 flex-col bg-[#F6F9FC] text-[#1F2D3D] 2xl:-mx-4 2xl:w-[calc(100%+32px)]"><Header item={current} readOnly={readOnly} back={() => navigate({ to: "/knowledge/admin", search: { section: "approvals" } })} reject={() => finish("rejected")} approve={() => finish("approved")} />
     <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden p-3 2xl:grid-cols-[276px_minmax(0,1fr)_510px] 2xl:p-4"><Queue items={queue} active={current.id} visible={visible} choose={(id) => navigate({ to: "/knowledge/approval/$approvalId", params: { approvalId: id } })} more={() => setVisible((n) => Math.min(n + 4, queue.length))} />
-      <section className="grid min-h-0 grid-cols-1 gap-3 2xl:grid-cols-2 2xl:grid-rows-2"><Metadata values={metadata} editing={metadataEditing} readOnly={readOnly} change={(id, value) => setMetadata((items) => items.map((item) => item.id === id ? { ...item, value } : item))} toggle={() => setMetadataEditing((value) => !value)} /><Keywords keywordText={keywordText} summary={summary} editing={keywordsEditing} expanded={expanded} readOnly={readOnly} setKeywordText={setKeywordText} setSummary={setSummary} toggle={() => setKeywordsEditing((value) => !value)} expand={() => setExpanded((value) => !value)} /><Exercises items={exercises} selected={selected} readOnly={readOnly} toggleSelected={(id) => setSelected((items) => items.includes(id) ? items.filter((item) => item !== id) : [...items, id])} edit={setEditing} remove={(id) => { setExercises((items) => items.filter((item) => item.id !== id)); setSelected((items) => items.filter((item) => item !== id)); }} upload={() => { toast.success(`已将 ${selected.length} 道题加入题库`); setSelected([]); }} /><MindMap item={current} keywordText={keywordText} /></section>
+      <section className="grid min-h-0 grid-cols-1 gap-3 2xl:grid-cols-2 2xl:grid-rows-2"><Metadata values={metadata} editing={metadataEditing} readOnly={readOnly} change={(id, value) => setMetadata((items) => items.map((item) => item.id === id ? { ...item, value } : item))} toggle={() => setMetadataEditing((value) => !value)} /><Keywords keywordText={keywordText} summary={summary} editing={keywordsEditing} readOnly={readOnly} setKeywordText={setKeywordText} setSummary={setSummary} toggle={() => setKeywordsEditing((value) => !value)} /><Exercises items={exercises} selected={selected} readOnly={readOnly} toggleSelected={(id) => setSelected((items) => items.includes(id) ? items.filter((item) => item !== id) : [...items, id])} edit={setEditing} remove={(id) => { setExercises((items) => items.filter((item) => item.id !== id)); setSelected((items) => items.filter((item) => item !== id)); }} upload={() => { toast.success(`已将 ${selected.length} 道题加入题库`); setSelected([]); }} /><MindMap item={current} keywordText={keywordText} /></section>
       <Reader item={current} keywordText={keywordText} summary={summary} />
     </div><ExerciseEditorDialog item={editing} open={Boolean(editing)} sourceName={current.fileName} close={() => setEditing(null)} save={(item) => { setExercises((items) => items.map((entry) => entry.id === item.id ? item : entry)); setEditing(null); }} />
   </main>;
