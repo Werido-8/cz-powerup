@@ -262,7 +262,6 @@ export function ParseExceptionSection({
             <KbTableCellFile
               name={item.fileName}
               nameWeight="normal"
-              subtitle={item.reason}
               type={item.fileName.endsWith(".pdf") ? "pdf" : "xlsx"}
             />
             <span className="truncate text-kb-muted">{item.knowledgeBaseName}</span>

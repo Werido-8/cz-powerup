@@ -225,7 +225,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
       }`}
     >
       <div
-        className={`mx-auto flex h-16 max-w-[1760px] items-center gap-8 px-8${
+        className={`flex h-16 w-full items-center gap-8 px-8${
           wide ? " page-shell__header-content--wide" : ""
         }`}
       >

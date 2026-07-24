@@ -43,6 +43,10 @@ import { EditKnowledgeBaseDialog } from "./admin/EditKnowledgeBaseDialog";
 import { PermissionConfigDialog } from "./permission/PermissionConfigDialog";
 import { PublicPermissionDialog } from "./permission/PublicPermissionDialog";
 import { KnowledgeAdminTitleBanner } from "./KnowledgeAdminTitleBanner";
+import {
+  KnowledgeBaseStatusConfirmDialog,
+  type KnowledgeBaseStatusConfirmState,
+} from "./KnowledgeBaseStatusConfirmDialog";
 
 type AdminSection = "categories" | "bases" | "approvals" | "exceptions" | "audit";
 
@@ -90,6 +94,7 @@ export function KnowledgeAdminPage({ initialSection }: { initialSection?: AdminS
   const [bases, setBases] = useState(() => getManageableBases());
   const [formBase, setFormBase] = useState<KnowledgeBase | "new" | null>(null);
   const [permissionBase, setPermissionBase] = useState<KnowledgeBase | null>(null);
+  const [statusConfirm, setStatusConfirm] = useState<KnowledgeBaseStatusConfirmState | null>(null);
 
   const scopeSubtitle = (
     <>
@@ -208,17 +213,7 @@ export function KnowledgeAdminPage({ initialSection }: { initialSection?: AdminS
                     onToggleStatus={(base) => {
                       const nextStatus: KnowledgeBaseStatus =
                         base.status === "enabled" ? "disabled" : "enabled";
-                      const confirmMessage =
-                        nextStatus === "disabled"
-                          ? "停用后普通员工不可见，且不参与检索。确认停用？"
-                          : "确认重新启用该知识库？";
-                      if (typeof window !== "undefined" && !window.confirm(confirmMessage)) return;
-                      setBases((previous) =>
-                        previous.map((item) =>
-                          item.id === base.id ? { ...item, status: nextStatus } : item,
-                        ),
-                      );
-                      toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
+                      setStatusConfirm({ base, nextStatus });
                     }}
                     onBatchToggleStatus={(ids, nextStatus) => {
                       const idSet = new Set(ids);
@@ -245,6 +240,23 @@ export function KnowledgeAdminPage({ initialSection }: { initialSection?: AdminS
           </div>
         </div>
       </main>
+
+      <KnowledgeBaseStatusConfirmDialog
+        state={statusConfirm}
+        onClose={() => setStatusConfirm(null)}
+        onConfirm={() => {
+          if (!statusConfirm) return;
+          const { base, nextStatus } = statusConfirm;
+          updateStoreBase({ ...base, status: nextStatus });
+          setBases((previous) =>
+            previous.map((item) =>
+              item.id === base.id ? { ...item, status: nextStatus } : item,
+            ),
+          );
+          toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
+          setStatusConfirm(null);
+        }}
+      />
 
       {formBase === "new" && (
         <CreateKnowledgeBaseDialog

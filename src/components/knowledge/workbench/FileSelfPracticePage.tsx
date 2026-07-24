@@ -5,7 +5,7 @@ import {
   Check,
   CheckCircle2,
   CircleHelp,
-  FileText,
+  ExternalLink,
   Library,
   Save,
   Send,
@@ -258,12 +258,21 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
     );
   };
 
-  const openFile = () =>
+  const returnToFile = () =>
     navigate({
       to: "/knowledge/file/$fileId",
       params: { fileId: file.id },
       search: { kbId: file.knowledgeBaseId },
     });
+
+  const openFileInNewWindow = () => {
+    const params = new URLSearchParams({ kbId: file.knowledgeBaseId });
+    window.open(
+      `/knowledge/file/${encodeURIComponent(file.id)}?${params.toString()}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
   return (
     <PageShell compact wide>
@@ -272,7 +281,7 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
-              onClick={openFile}
+              onClick={returnToFile}
               className="inline-flex h-9 items-center gap-1.5 rounded-[8px] px-2.5 text-[12.5px] font-medium text-kb-muted transition-colors hover:text-primary"
             >
               <ArrowLeft className="h-4 w-4 stroke-[1.8]" />
@@ -426,11 +435,11 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
                 </div>
                 <button
                   type="button"
-                  onClick={openFile}
+                  onClick={openFileInNewWindow}
                   className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
                 >
-                  <FileText className="h-3.5 w-3.5" />
-                  打开资料
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  新窗口打开
                 </button>
               </div>
 

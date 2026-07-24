@@ -189,10 +189,16 @@ export function FileAIAssistantPanel({ file, base }: { file: KnowledgeFile; base
     setDetailEditing(editing);
   };
 
-  const saveQuestion = (next: FilePracticeQuestion) => {
+  const saveQuestion = (next: FilePracticeQuestion, submitToBank = false) => {
     setDisplayedQuestions((current) =>
       current.map((question) => (question.id === next.id ? next : question)),
     );
+    if (submitToBank) {
+      setViewingQuestion(null);
+      setDetailEditing(false);
+      toast.success("已保存并提交至题库");
+      return;
+    }
     setViewingQuestion(next);
     setDetailEditing(false);
     toast.success("练习题已更新");
@@ -390,7 +396,8 @@ export function FileAIAssistantPanel({ file, base }: { file: KnowledgeFile; base
           setDetailEditing(false);
         }}
         onEditingChange={setDetailEditing}
-        onSave={saveQuestion}
+        onSave={(question) => saveQuestion(question)}
+        onSaveAndSubmit={(question) => saveQuestion(question, true)}
       />
       <KbFormDialog
         open={Boolean(deletingQuestion)}
@@ -451,6 +458,7 @@ function QuestionDetailDialog({
   onClose,
   onEditingChange,
   onSave,
+  onSaveAndSubmit,
 }: {
   question: FilePracticeQuestion | null;
   isAdmin: boolean;
@@ -458,6 +466,7 @@ function QuestionDetailDialog({
   onClose: () => void;
   onEditingChange: (editing: boolean) => void;
   onSave: (question: FilePracticeQuestion) => void;
+  onSaveAndSubmit: (question: FilePracticeQuestion) => void;
 }) {
   const [stem, setStem] = useState("");
   const [options, setOptions] = useState<FilePracticeQuestion["options"]>([]);
@@ -499,15 +508,22 @@ function QuestionDetailDialog({
     onEditingChange(false);
   };
 
+  const buildNext = (): FilePracticeQuestion => ({
+    ...question,
+    stem: stem.trim(),
+    options: options.map((option) => ({ ...option, label: option.label.trim() })),
+    answer: multiple ? answers : answers[0] ?? "",
+    analysis: analysis.trim(),
+  });
+
   const submit = () => {
     if (!canSave) return;
-    onSave({
-      ...question,
-      stem: stem.trim(),
-      options: options.map((option) => ({ ...option, label: option.label.trim() })),
-      answer: multiple ? answers : answers[0] ?? "",
-      analysis: analysis.trim(),
-    });
+    onSave(buildNext());
+  };
+
+  const submitAndUpload = () => {
+    if (!canSave) return;
+    onSaveAndSubmit(buildNext());
   };
 
   return (
@@ -523,8 +539,11 @@ function QuestionDetailDialog({
             <AppDialogButton variant="outline" onClick={cancelEditing}>
               取消
             </AppDialogButton>
-            <AppDialogButton variant="primary" disabled={!canSave} onClick={submit}>
+            <AppDialogButton variant="outline" disabled={!canSave} onClick={submit}>
               保存
+            </AppDialogButton>
+            <AppDialogButton variant="primary" disabled={!canSave} onClick={submitAndUpload}>
+              保存并提交至题库
             </AppDialogButton>
           </>
         ) : (
@@ -626,17 +645,36 @@ function QuestionDetailDialog({
                     </div>
                   );
                 })
-              : question.options.map((option) => (
-                  <div
-                    key={option.key}
-                    className="flex items-start gap-2 rounded-[7px] border border-divider bg-kb-surface px-3 py-2.5 text-[13px] leading-5 text-kb-body"
-                  >
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-card px-1 text-[10.5px] font-semibold text-kb-muted">
-                      {option.key}
-                    </span>
-                    <span>{option.label}</span>
-                  </div>
-                ))}
+              : question.options.map((option) => {
+                  const answerKeys = Array.isArray(question.answer)
+                    ? question.answer
+                    : [question.answer];
+                  const checked = answerKeys.includes(option.key);
+                  return (
+                    <div
+                      key={option.key}
+                      className={cn(
+                        "flex items-start gap-2 rounded-[7px] border px-3 py-2.5 text-[13px] leading-5",
+                        checked
+                          ? "border-primary/55 bg-primary-soft/55 text-kb-heading shadow-[inset_3px_0_0_0_var(--primary)]"
+                          : "border-[#EEF2F4] bg-white text-kb-body",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] px-1 text-[10.5px] font-semibold",
+                          checked ? "bg-primary text-primary-foreground" : "bg-[#F3F6F7] text-[#8A9BA3]",
+                        )}
+                      >
+                        {option.key}
+                      </span>
+                      <span className="min-w-0 flex-1">{option.label}</span>
+                      {checked ? (
+                        <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                      ) : null}
+                    </div>
+                  );
+                })}
           </div>
         </KbFormField>
 

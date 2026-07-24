@@ -224,35 +224,6 @@
   }
 }
 
-/*
- * 2K displays at 100% browser zoom expose substantially more CSS pixels than
- * the 125% reference layout.  Keep the knowledge workspace at the same visual
- * density only on those extra-wide viewports.  The 80% frame counterbalances
- * the zoom, so it still occupies the normal available height and does not
- * introduce a nested scrollbar.
- */
-@media (min-width: 2200px) {
-  .page-shell--wide .page-shell__main--wide {
-    max-width: 2300px;
-  }
-
-  .page-shell__header--wide {
-    height: 80px;
-  }
-
-  .page-shell__header-content--wide {
-    width: 80%;
-    zoom: 1.25;
-  }
-
-  .knowledge-density-frame {
-    width: 80%;
-    height: 80%;
-    margin-inline: auto;
-    zoom: 1.25;
-  }
-}
-
 @layer components {
   .app-dialog-overlay {
     background: var(--dialog-overlay);

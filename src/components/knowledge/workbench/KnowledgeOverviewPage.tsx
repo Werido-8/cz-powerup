@@ -104,7 +104,12 @@ import { DirectoryDeleteDialog } from "./DirectoryDeleteDialog";
 import { KnowledgeBaseDeleteDialog } from "./KnowledgeBaseDeleteDialog";
 import { KnowledgeBaseMoveDialog } from "./KnowledgeBaseMoveDialog";
 import { KnowledgeBaseRenameDialog } from "./KnowledgeBaseRenameDialog";
+import {
+  KnowledgeBaseStatusConfirmDialog,
+  type KnowledgeBaseStatusConfirmState,
+} from "./KnowledgeBaseStatusConfirmDialog";
 import { PersonalDirectoryRenameDialog } from "./PersonalDirectoryRenameDialog";
+import { KnowledgeDisabledState } from "./KnowledgeDisabledState";
 import { KnowledgeEmptyFilesState } from "./KnowledgeEmptyFilesState";
 import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { useFileSelection } from "./useFileSelection";
@@ -188,6 +193,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const [moveBaseLoading, setMoveBaseLoading] = useState(false);
   const [deleteBase, setDeleteBase] = useState<KnowledgeBase | null>(null);
   const [deleteBaseLoading, setDeleteBaseLoading] = useState(false);
+  const [statusConfirm, setStatusConfirm] = useState<KnowledgeBaseStatusConfirmState | null>(null);
   const [renamePersonalDirectory, setRenamePersonalDirectory] = useState<PersonalDirectory | null>(
     null,
   );
@@ -410,16 +416,20 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   const handleToggleBaseStatus = (base: KnowledgeBase) => {
     const nextStatus: KnowledgeBaseStatus = base.status === "enabled" ? "disabled" : "enabled";
-    const message =
-      nextStatus === "disabled"
-        ? "停用后普通员工不可见，且不参与检索。确认停用？"
-        : "确认重新启用该知识库？";
-    if (typeof window !== "undefined" && !window.confirm(message)) return;
+    setStatusConfirm({ base, nextStatus });
+  };
+
+  const handleConfirmBaseStatus = () => {
+    if (!statusConfirm) return;
+    const { base, nextStatus } = statusConfirm;
     updateStoreBase({ ...base, status: nextStatus });
     toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
     if (nextStatus === "disabled" && selectedBaseId === base.id) {
-      handleSelectTreeId(PROFESSIONAL_TREE_ALL_ID);
+      handleSelectTreeId(
+        base.scope === "personal" ? PERSONAL_TREE_ALL_ID : PROFESSIONAL_TREE_ALL_ID,
+      );
     }
+    setStatusConfirm(null);
   };
 
   const handleDisableDirectory = (category: KnowledgeCategory) => {
@@ -544,14 +554,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
           pinnedBases={pinnedBases}
           pinnedFiles={pinnedFiles}
           selectedBaseId={selectedBaseId}
-          onSelectBase={(baseId) => {
-            const base = getBaseById(baseId);
-            if (base?.scope === "personal") {
-              navigate({ to: "/knowledge/mine", hash: "personal" });
-              return;
-            }
-            handleSelectTreeId(baseId);
-          }}
+          onSelectBase={handleSelectTreeId}
           onOpenFile={handleOpenFile}
           onUnpinBase={handleTogglePin}
           onUnpinFile={(file) => handleToggleFilePin(file)}
@@ -711,6 +714,17 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             <KbEmptyState
               title="知识库不存在"
               description="该知识库可能已被删除或你暂无访问权限，请从左侧重新选择。"
+            />
+          </div>
+        ) : selectedBase.status === "disabled" ? (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <KnowledgeBaseDetailHeader
+              base={selectedBase}
+              fileCount={selectedBase.fileCount ?? 0}
+              onSelectBase={handleSelectTreeId}
+            />
+            <KnowledgeDisabledState
+              onEnable={() => handleToggleBaseStatus(selectedBase)}
             />
           </div>
         ) : !canViewBaseFiles(selectedBase) ? (
@@ -978,6 +992,12 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             setMoveBase(null);
           }, 300);
         }}
+      />
+
+      <KnowledgeBaseStatusConfirmDialog
+        state={statusConfirm}
+        onClose={() => setStatusConfirm(null)}
+        onConfirm={handleConfirmBaseStatus}
       />
 
       <KnowledgeBaseDeleteDialog

@@ -1080,11 +1080,11 @@ export function ModuleTabs<T extends string>({
             type="button"
             onClick={() => onChange(t.key)}
             className={cn(
-              "relative flex items-center gap-2.5 rounded-t-[12px] text-left transition-colors",
+              "relative flex items-center gap-2.5 text-left transition-colors",
               compact ? "px-4 py-2.5" : "px-5 py-3",
               active
-                ? "z-[1] -mb-px border border-[#DCE8EA] border-b-white bg-white text-primary"
-                : "border border-transparent text-[#607681] hover:bg-white/50 hover:text-[#1F3440]",
+                ? "z-[1] -mb-px rounded-t-[10px] bg-white text-primary"
+                : "rounded-t-[10px] text-[#607681] hover:bg-white/60 hover:text-[#1F3440]",
             )}
           >
             {active && (

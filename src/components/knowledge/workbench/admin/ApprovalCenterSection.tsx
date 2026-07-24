@@ -441,7 +441,12 @@ function UploadApprovalTable({
       {items.map((item) => {
         const status = item.status ?? "pendingApproval";
         return (
-          <KbDataTableRow key={item.id} variant="flat" className={UPLOAD_GRID}>
+          <KbDataTableRow
+            key={item.id}
+            variant="flat"
+            className={UPLOAD_GRID}
+            onClick={() => onReview(item.id)}
+          >
             <KbTableCellFile
               name={item.fileName}
               subtitle={[item.uploadNote, item.fileSize].filter(Boolean).join(" / ")}
@@ -462,7 +467,7 @@ function UploadApprovalTable({
               </KbStatusTag>
             </span>
             <span className="text-kb-muted">{item.submittedAt}</span>
-            <span className="flex items-center justify-end">
+            <span className="flex items-center justify-end" onClick={(event) => event.stopPropagation()}>
               <KbIconTextButton
                 icon={status === "pendingApproval" ? ClipboardCheck : FileText}
                 label={status === "pendingApproval" ? "审批" : "查看"}

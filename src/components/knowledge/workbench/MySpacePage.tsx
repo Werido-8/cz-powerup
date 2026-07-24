@@ -112,10 +112,15 @@ import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDi
 import { KnowledgeBaseDeleteDialog } from "./KnowledgeBaseDeleteDialog";
 import { KnowledgeBaseMoveDialog } from "./KnowledgeBaseMoveDialog";
 import { KnowledgeBaseRenameDialog } from "./KnowledgeBaseRenameDialog";
+import {
+  KnowledgeBaseStatusConfirmDialog,
+  type KnowledgeBaseStatusConfirmState,
+} from "./KnowledgeBaseStatusConfirmDialog";
 import { PersonalDirectoryRenameDialog } from "./PersonalDirectoryRenameDialog";
 import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { KnowledgeAggregateDetailHeader } from "./KnowledgeAggregateDetailHeader";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
+import { KnowledgeDisabledState } from "./KnowledgeDisabledState";
 import { KnowledgeTreeNavItem } from "./KnowledgeCategoryTree";
 import { KnowledgeTreeSectionActions } from "./KnowledgeTreeSectionActions";
 import { MySpaceTitleBanner } from "./MySpaceTitleBanner";
@@ -188,6 +193,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const [moveBaseLoading, setMoveBaseLoading] = useState(false);
   const [deleteBase, setDeleteBase] = useState<KnowledgeBase | null>(null);
   const [deleteBaseLoading, setDeleteBaseLoading] = useState(false);
+  const [statusConfirm, setStatusConfirm] = useState<KnowledgeBaseStatusConfirmState | null>(null);
   const [renamePersonalDirectory, setRenamePersonalDirectory] = useState<PersonalDirectory | null>(
     null,
   );
@@ -204,16 +210,25 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
 
   const handleToggleBaseStatus = (base: KnowledgeBase) => {
     const nextStatus: KnowledgeBaseStatus = base.status === "enabled" ? "disabled" : "enabled";
-    const message =
-      nextStatus === "disabled"
-        ? "停用后该知识库将不可访问。确认停用？"
-        : "确认重新启用该知识库？";
-    if (typeof window !== "undefined" && !window.confirm(message)) return;
+    setStatusConfirm({
+      base,
+      nextStatus,
+      description:
+        nextStatus === "disabled"
+          ? "停用后该知识库将不可访问。确认停用？"
+          : "确认重新启用该知识库？",
+    });
+  };
+
+  const handleConfirmBaseStatus = () => {
+    if (!statusConfirm) return;
+    const { base, nextStatus } = statusConfirm;
     updateStoreBase({ ...base, status: nextStatus });
     toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
     if (nextStatus === "disabled" && selection.kind === "personalBase" && selection.baseId === base.id) {
       setSelection({ kind: "personalAll" });
     }
+    setStatusConfirm(null);
   };
 
   const handleDisablePersonalDirectory = (directory: PersonalDirectory) => {
@@ -657,6 +672,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             onUploadFiles={handleUploadFiles}
             onSelectBase={(baseId) => setSelection({ kind: "personalBase", baseId })}
             onToggleEnabled={handleToggleEnabled}
+            onEnableBase={() => handleToggleBaseStatus(selectedBase)}
             selection={fileSelection}
             batchToolbarProps={batchToolbarProps}
             fileRowActions={fileRowActions}
@@ -759,6 +775,12 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             setDeleteBase(null);
           }, 300);
         }}
+      />
+
+      <KnowledgeBaseStatusConfirmDialog
+        state={statusConfirm}
+        onClose={() => setStatusConfirm(null)}
+        onConfirm={handleConfirmBaseStatus}
       />
 
       <PersonalDirectoryRenameDialog
@@ -955,7 +977,6 @@ function RecentAccessListGroup({
               key={item.file.id}
               file={item.file}
               accessTime={item.accessTime}
-              tags={item.tags}
               onOpen={() => onOpen(item.file)}
             />
           ))}
@@ -991,12 +1012,10 @@ function RecentAccessLoadState({
 function RecentAccessListItem({
   file,
   accessTime,
-  tags,
   onOpen,
 }: {
   file: KnowledgeFile;
   accessTime: string;
-  tags: string[];
   onOpen: () => void;
 }) {
   const sourceName = file.knowledgeBaseName ?? "个人知识库";
@@ -1011,12 +1030,7 @@ function RecentAccessListItem({
       >
         <KbFileTypeIcon type={file.type} fileName={file.name} size="sm" />
         <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-            <h3 className="truncate text-[13px] font-normal text-[#102A33]">{displayName}</h3>
-            {tags.map((tag) => (
-              <RecentAccessTag key={tag}>{tag}</RecentAccessTag>
-            ))}
-          </div>
+          <h3 className="truncate text-[12px] font-normal text-[#102A33]">{displayName}</h3>
           <div className="mt-0.5 truncate text-[12px] text-[#6B7F88]">来源知识库：{sourceName}</div>
         </div>
         <div className="flex shrink-0 items-center gap-3">
@@ -1038,18 +1052,10 @@ function stripFileExtension(name: string) {
   return name.replace(/\.[^.]+$/, "");
 }
 
-function RecentAccessTag({ children }: { children: string }) {
-  return (
-    <span className="inline-flex h-[18px] shrink-0 items-center rounded-[4px] border border-[#DCEBED] bg-[#F7FAFB] px-1.5 text-[10px] font-normal text-[#6B7F88]">
-      {children}
-    </span>
-  );
-}
-
 function groupRecentAccessFiles(files: KnowledgeFile[]) {
   const groups: Array<{
     label: string;
-    items: Array<{ file: KnowledgeFile; accessTime: string; tags: string[] }>;
+    items: Array<{ file: KnowledgeFile; accessTime: string }>;
   }> = [
     { label: "今天", items: [] },
     { label: "本周", items: [] },
@@ -1061,7 +1067,6 @@ function groupRecentAccessFiles(files: KnowledgeFile[]) {
     group.items.push({
       file,
       accessTime: formatAccessTime(file.updatedAt, index),
-      tags: (file.tags ?? []).slice(0, 2),
     });
   });
 
@@ -1633,6 +1638,7 @@ function PersonalBasePanel({
   onUploadFiles,
   onSelectBase,
   onToggleEnabled,
+  onEnableBase,
   selection,
   batchToolbarProps,
   fileRowActions,
@@ -1659,6 +1665,7 @@ function PersonalBasePanel({
   onUploadFiles: (files: FileList) => void;
   onSelectBase: (baseId: string) => void;
   onToggleEnabled: (file: KnowledgeFile, enabled: boolean) => void;
+  onEnableBase: () => void;
   selection: ReturnType<typeof useFileSelection>;
   batchToolbarProps: (
     pageIds: string[],
@@ -1697,6 +1704,19 @@ function PersonalBasePanel({
   const empty = (
     <KbEmptyState title="个人库暂无文件" description="可拖拽上传，上传后直接进入解析流程。" />
   );
+
+  if (base.status === "disabled") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <KnowledgeBaseDetailHeader
+          base={base}
+          fileCount={allFiles.length}
+          onSelectBase={onSelectBase}
+        />
+        <KnowledgeDisabledState onEnable={onEnableBase} />
+      </div>
+    );
+  }
 
   return (
     <KbDragUploadOverlay onFiles={onUploadFiles} className="flex min-h-0 flex-1 flex-col">
