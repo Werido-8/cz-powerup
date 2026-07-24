@@ -439,7 +439,7 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
                   className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                  新窗口打开
+                    打开
                 </button>
               </div>
 

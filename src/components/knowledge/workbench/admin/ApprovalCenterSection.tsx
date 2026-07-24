@@ -2,7 +2,7 @@ import { Check, ClipboardCheck, FileText, FileUp, ShieldCheck, X } from "lucide-
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { SearchBar, TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
+import { SearchInput, TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
 import {
   KbDataTable,
   KbDataTableRow,
@@ -234,12 +234,11 @@ export function ApprovalCenterSection({
   const filterBar =
     tab === "uploads" ? (
       <div className="flex flex-wrap items-center gap-2 border-b border-[#E8F0F2] px-4 py-3">
-        <SearchBar
+        <SearchInput
           value={fileQuery}
           onChange={setFileQuery}
-          onSearch={() => undefined}
           placeholder="搜索文件名 / 提交人"
-          className="min-w-[200px] max-w-[280px]"
+          className="h-9 min-w-[200px] max-w-[280px] flex-1 !rounded-[8px] py-0"
         />
         <KbFilterPills
           label="提交人"
@@ -261,12 +260,11 @@ export function ApprovalCenterSection({
       </div>
     ) : (
       <div className="flex flex-wrap items-center gap-2 border-b border-[#E8F0F2] px-4 py-3">
-        <SearchBar
+        <SearchInput
           value={permissionQuery}
           onChange={setPermissionQuery}
-          onSearch={() => undefined}
           placeholder="搜索申请人 / 目标知识库"
-          className="min-w-[200px] max-w-[280px]"
+          className="h-9 min-w-[200px] max-w-[280px] flex-1 !rounded-[8px] py-0"
         />
         <KbFilterPills
           label="申请人"
