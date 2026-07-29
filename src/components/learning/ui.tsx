@@ -1067,7 +1067,7 @@ export function ModuleTabs<T extends string>({
   return (
     <div
       className={cn(
-        "flex flex-wrap gap-1 border-b border-[#EDF3F5] bg-[#F5FAFB] px-3 pb-0",
+        "flex flex-wrap gap-1 border-b border-[#EDF3F5] bg-white px-3 pb-0",
         compact ? "pt-1.5" : "pt-2",
         className,
       )}

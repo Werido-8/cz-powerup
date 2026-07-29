@@ -16,6 +16,7 @@ import {
   Star,
   StarOff,
   Info,
+  Loader2,
   TriangleAlert,
   Upload,
 } from "lucide-react";
@@ -38,7 +39,7 @@ import { fileListParseStatus, fileListParseStatusLabel } from "@/lib/knowledge/s
 import { getBaseById, isEmployee, isFileEnabled } from "@/lib/knowledge/model";
 import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
 import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
-import type { KnowledgeFile, KnowledgeSortBy } from "@/lib/knowledge/types";
+import type { KnowledgeFile, KnowledgeParseStatus, KnowledgeSortBy } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import { FileListCheckbox } from "./FileListCheckbox";
 
@@ -262,6 +263,7 @@ export function FileListToolbarActions({
   onRefresh,
   onUpload,
   uploadDisabled,
+  showViewModeToggle = true,
 }: {
   viewMode: FileViewMode;
   onViewModeChange: (mode: FileViewMode) => void;
@@ -270,10 +272,14 @@ export function FileListToolbarActions({
   onRefresh: () => void;
   onUpload?: () => void;
   uploadDisabled?: boolean;
+  /** 全文检索等固定布局场景下隐藏卡片/列表切换 */
+  showViewModeToggle?: boolean;
 }) {
   return (
     <>
-      <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />
+      {showViewModeToggle && (
+        <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />
+      )}
       {onUpload && <FileListUploadButton onClick={onUpload} disabled={uploadDisabled} />}
       <FileListSortButton value={sortBy} onChange={onSortChange} />
       <FileListRefreshButton onClick={onRefresh} />
@@ -458,7 +464,6 @@ function FileDataRow({
   const employee = isEmployee();
   const canManageFile = !employee || getBaseById(file.knowledgeBaseId)?.scope === "personal";
   const selected = selection?.isSelected(file.id) ?? false;
-  const parseStatus = fileListParseStatus(file);
 
   return (
     <KbDataTableRow className={grid} selected={selected} onClick={() => onOpen(file)}>
@@ -476,8 +481,8 @@ function FileDataRow({
         nameWeight="normal"
         badge={
           <>
-            <FileParseExceptionIcon status={parseStatus} />
-            {(file.versions?.length ?? 0) > 1 ? (
+            <FileParseInlineIcon parseStatus={file.parseStatus} parseError={file.parseError} />
+            {(file.versions?.length ?? 0) > 1 && fileListParseStatus(file) === "success" ? (
               <FileHistoryBadge
                 count={file.versions?.length ?? 0}
                 onClick={onViewHistory ? () => onViewHistory(file) : undefined}
@@ -548,9 +553,36 @@ export function FileHistoryBadge({ count, onClick }: { count: number; onClick?: 
   );
 }
 
-function FileParseExceptionIcon({ status }: { status: ReturnType<typeof fileListParseStatus> }) {
-  if (status !== "failed") return null;
-  const label = fileListParseStatusLabel(status);
+export function FileParseInlineIcon({
+  parseStatus,
+  parseError,
+}: {
+  parseStatus?: KnowledgeParseStatus;
+  parseError?: string;
+}) {
+  if (parseStatus === "parsing") {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              role="status"
+              aria-label="文件解析中"
+              onClick={(event) => event.stopPropagation()}
+              className="grid h-5 w-5 shrink-0 place-items-center rounded-[5px] text-warning-foreground"
+            >
+              <Loader2 className="h-3.5 w-3.5 animate-spin stroke-[2]" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="bg-[#2f424d] text-[12px] leading-relaxed">
+            文件解析中，请稍候
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  if (parseStatus !== "failed") return null;
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -558,18 +590,15 @@ function FileParseExceptionIcon({ status }: { status: ReturnType<typeof fileList
         <TooltipTrigger asChild>
           <button
             type="button"
-            aria-label={`${label}，查看异常说明`}
+            aria-label={`${fileListParseStatusLabel("failed")}，查看异常说明`}
             onClick={(event) => event.stopPropagation()}
             className="grid h-5 w-5 shrink-0 place-items-center rounded-[5px] text-destructive transition-colors hover:bg-destructive/8"
           >
             <TriangleAlert className="h-3.5 w-3.5 stroke-[2]" />
           </button>
         </TooltipTrigger>
-        <TooltipContent
-          side="top"
-          className="bg-[#2f424d] text-[12px] leading-relaxed"
-        >
-          解析失败，请重试
+        <TooltipContent side="top" className="bg-[#2f424d] text-[12px] leading-relaxed">
+          {parseError?.trim() || "解析失败，请重试"}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

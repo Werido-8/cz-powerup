@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Bell, ChevronDown, UserCog } from "lucide-react";
+import { Bell, ChevronDown, Menu, UserCog } from "lucide-react";
 import logo from "@/assets/logo.png";
 import {
   DEMO_ROLE_LABELS,
@@ -21,6 +21,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface MenuItem {
   label: string;
@@ -41,8 +49,7 @@ const MENU: MenuItem[] = [
       { label: "知识管理", to: "/knowledge/admin" },
     ],
   },
-  // 本期暂不开放：智能问答
-  // { label: "智能问答", to: "/chat" },
+  { label: "智能对话", to: "/chat" },
   {
     label: "能力提升",
     to: "/learn",
@@ -66,13 +73,7 @@ function isItemActive(pathname: string, to: string) {
   return pathname === to || pathname.startsWith(to + "/");
 }
 
-function NavLink({
-  m,
-  pathname,
-}: {
-  m: MenuItem;
-  pathname: string;
-}) {
+function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
   const [open, setOpen] = useState(false);
   const active = isItemActive(pathname, m.to);
   const hasChildren = m.children && m.children.length > 0;
@@ -83,9 +84,7 @@ function NavLink({
         key={m.to}
         to={m.to}
         className={`relative whitespace-nowrap rounded-lg px-3.5 py-2 text-[13.5px] font-medium transition-all duration-200 ${
-          active
-            ? "text-foreground"
-            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          active ? "text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
         }`}
       >
         {m.label}
@@ -105,6 +104,11 @@ function NavLink({
       onMouseLeave={() => setOpen(false)}
     >
       <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((value) => !value)}
+        onFocus={() => setOpen(true)}
         className={`relative flex items-center gap-0.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13.5px] font-medium transition-all duration-200 ${
           childActive || active
             ? "text-foreground"
@@ -168,17 +172,23 @@ function DemoRoleSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <div className="flex cursor-pointer items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-primary/40">
+        <button
+          type="button"
+          aria-label={`切换演示角色，当前为${DEMO_ROLE_LABELS[currentRole]}`}
+          className="flex h-10 cursor-pointer items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 pr-2 transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
           <div className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[12px] font-semibold text-primary-foreground">
             {currentUser.name[0]}
           </div>
-          <span className="text-[13px] font-medium text-foreground">{currentUser.name}</span>
-          <div className="flex items-center gap-0.5 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">
+          <span className="hidden text-[13px] font-medium text-foreground sm:inline">
+            {currentUser.name}
+          </span>
+          <span className="hidden items-center gap-0.5 rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary 2xl:flex">
             <UserCog className="h-3 w-3" />
             <span className="ml-0.5">{DEMO_ROLE_LABELS[currentRole]}</span>
             <ChevronDown className="ml-0.5 h-2.5 w-2.5" />
-          </div>
-        </div>
+          </span>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-44 rounded-[10px] border-[#DCEBED]">
         <DropdownMenuLabel className="text-[11px] text-muted-foreground">
@@ -220,37 +230,102 @@ export function Header({ wide = false }: { wide?: boolean }) {
 
   return (
     <header
-      className={`sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-xl${
+      className={`sticky top-0 z-40 border-b border-border/70 bg-white${
         wide ? " page-shell__header--wide" : ""
       }`}
     >
       <div
-        className={`flex h-16 w-full items-center gap-8 px-8${
+        className={`flex h-16 w-full items-center gap-3 px-3 sm:px-5 xl:gap-6 xl:px-6${
           wide ? " page-shell__header-content--wide" : ""
         }`}
       >
-        <Link to="/" className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-white ring-1 ring-border">
+        <Sheet>
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              aria-label="打开主导航"
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring xl:hidden"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[min(88vw,360px)] p-0 sm:max-w-[360px]">
+            <SheetHeader className="border-b border-border px-5 py-5 text-left">
+              <SheetTitle className="flex items-center gap-3 text-[15px]">
+                <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-full bg-white ring-1 ring-border">
+                  <img src={logo} alt="" className="h-8 w-8 object-contain" />
+                </span>
+                涉网运行能力智能提升平台
+              </SheetTitle>
+            </SheetHeader>
+            <nav
+              aria-label="主导航"
+              className="scrollbar-thin h-[calc(100dvh-81px)] overflow-y-auto p-3"
+            >
+              {menu.map((item) => {
+                const active = isItemActive(pathname, item.to);
+                return (
+                  <div key={item.to} className="mb-1">
+                    <SheetClose asChild>
+                      <Link
+                        to={item.to}
+                        className={`flex min-h-11 items-center rounded-xl px-3 text-[14px] font-medium ${
+                          active ? "bg-primary-soft text-primary" : "text-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {item.label}
+                      </Link>
+                    </SheetClose>
+                    {item.children && (
+                      <div className="ml-4 border-l border-border pl-2">
+                        {item.children.map((child) => (
+                          <SheetClose asChild key={child.to}>
+                            <Link
+                              to={child.to}
+                              className="flex min-h-10 items-center rounded-lg px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                            >
+                              {child.label}
+                            </Link>
+                          </SheetClose>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </nav>
+          </SheetContent>
+        </Sheet>
+
+        <Link to="/" className="flex min-w-0 items-center gap-3">
+          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-full bg-white ring-1 ring-border">
             <img src={logo} alt="平台 Logo" className="h-8 w-8 object-contain" />
           </div>
-          <div className="leading-tight">
-            <div className="text-[15px] font-semibold tracking-tight text-foreground">
+          <div className="hidden min-w-0 leading-tight md:block">
+            <div className="truncate text-[15px] font-semibold tracking-tight text-foreground">
               涉网运行能力智能提升平台
             </div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="hidden text-[11px] text-muted-foreground 2xl:block">
               面向电厂人员的知识学习、场景练习与能力成长平台
             </div>
           </div>
         </Link>
 
-        <nav className="ml-4 flex flex-1 items-center gap-1">
+        <nav
+          aria-label="主导航"
+          className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 xl:flex"
+        >
           {menu.map((m) => (
             <NavLink key={m.to} m={m} pathname={pathname} />
           ))}
         </nav>
 
-        <div className="flex items-center gap-2.5">
-          <button className="relative grid h-9 w-9 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5 xl:ml-0">
+          <button
+            type="button"
+            aria-label="通知，有一条未读"
+            className="relative grid h-11 w-11 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <Bell className="h-[18px] w-[18px]" />
             <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-remind" />
           </button>

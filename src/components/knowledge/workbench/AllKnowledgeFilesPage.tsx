@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useRouter } from "@tanstack/react-router";
 import { CheckCircle2, Database } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -24,8 +24,10 @@ import {
 } from "@/lib/knowledge/model";
 import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
+import { openFileDetailInNewTab } from "@/lib/knowledge/searchNav";
 import type { FileSearchMode, KnowledgeFile, KnowledgeSortBy } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
+import { FullTextSearchResultPanel } from "./FullTextSearchResultPanel";
 import { FileListToolbar } from "./FileListToolbar";
 import { FileBatchDeleteDialog } from "./FileBatchDeleteDialog";
 import { FileMoveDialog } from "./FileMoveDialog";
@@ -41,9 +43,9 @@ import { useFileViewMode } from "./useFileViewMode";
 const CARD_PAGE_SIZE = 16;
 
 export function AllKnowledgeFilesPage() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [query, setQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<FileSearchMode>("fulltext");
+  const [searchMode, setSearchMode] = useState<FileSearchMode>("filename");
   const [categoryId, setCategoryId] = useState("all");
   const [baseId, setBaseId] = useState("all");
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>("updated");
@@ -60,6 +62,7 @@ export function AllKnowledgeFilesPage() {
   const [historyFile, setHistoryFile] = useState<KnowledgeFile | null>(null);
   const fileSelection = useFileSelection();
   const showManageColumn = canManageFileList();
+  const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
   const allFiles = useMemo(() => getAllPublishedFiles(), [refreshSeed]);
   const files = useMemo(
@@ -105,11 +108,7 @@ export function AllKnowledgeFilesPage() {
   };
 
   const handleOpen = (file: KnowledgeFile) => {
-    navigate({
-      to: "/knowledge/file/$fileId",
-      params: { fileId: file.id },
-      search: { kbId: file.knowledgeBaseId },
-    });
+    openFileDetailInNewTab(router, file, { query, searchMode, resultFiles: files });
   };
 
   const handleRefresh = () => {
@@ -282,38 +281,49 @@ export function AllKnowledgeFilesPage() {
               sortBy={sortBy}
               onSortChange={setSortBy}
               onRefresh={handleRefresh}
+              showViewModeToggle={!isFullTextSearchActive}
             />
           </>
         }
       />
 
-      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
-        {viewMode === "list" ? (
-          <KnowledgeFileTable
-            files={pagedFiles}
-            allLibraryMode
-            showManageColumn={showManageColumn}
-            selection={listSelection}
-            onToggleEnabled={handleToggleEnabled}
-            onOpen={handleOpen}
-            className="rounded-none border-0 shadow-none"
-            empty={<div className="px-4 py-8">{emptyState}</div>}
-            {...fileRowActions}
-          />
-        ) : (
-          <KnowledgeFileCardGrid
-            files={pagedFiles}
-            selection={cardSelection}
-            onOpen={handleOpen}
-            columns={4}
-            compact
-            empty={<div className="px-4 py-8">{emptyState}</div>}
-            {...fileRowActions}
-          />
-        )}
-      </div>
+      {isFullTextSearchActive ? (
+        <FullTextSearchResultPanel
+          files={files}
+          query={query}
+          showLibrary
+          onToggleEnabled={handleToggleEnabled}
+        />
+      ) : (
+        <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
+          {viewMode === "list" ? (
+            <KnowledgeFileTable
+              files={pagedFiles}
+              allLibraryMode
+              showManageColumn={showManageColumn}
+              selection={listSelection}
+              onToggleEnabled={handleToggleEnabled}
+              onOpen={handleOpen}
+              className="rounded-none border-0 shadow-none"
+              empty={<div className="px-4 py-8">{emptyState}</div>}
+              {...fileRowActions}
+            />
+          ) : (
+            <KnowledgeFileCardGrid
+              files={pagedFiles}
+              selection={cardSelection}
+              onOpen={handleOpen}
+              columns={4}
+              compact
+              empty={<div className="px-4 py-8">{emptyState}</div>}
+              {...fileRowActions}
+            />
+          )}
+        </div>
+      )}
 
-      {files.length > 0 &&
+      {!isFullTextSearchActive &&
+        files.length > 0 &&
         (viewMode === "list" ? (
           <TableListPager
             page={safePage}

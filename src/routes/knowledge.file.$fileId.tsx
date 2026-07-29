@@ -6,6 +6,11 @@ import { getFileById } from "@/lib/knowledge/model";
 const fileSearchSchema = z.object({
   kbId: z.string().optional().catch(undefined),
   version: z.string().optional().catch(undefined),
+  q: z.string().optional().catch(undefined),
+  mode: z.enum(["fulltext", "filename"]).optional().catch(undefined),
+  resultIds: z.array(z.string()).optional().catch(undefined),
+  scope: z.enum(["personal-all", "professional-all"]).optional().catch(undefined),
+  from: z.string().optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/knowledge/file/$fileId")({
@@ -33,6 +38,11 @@ function KnowledgeFileRoute() {
       fileId={params.fileId}
       initialKnowledgeBaseId={search.kbId}
       versionId={search.version}
+      searchQuery={search.q}
+      searchMode={search.mode}
+      searchResultIds={search.resultIds}
+      searchScope={search.scope}
+      returnFrom={search.from}
     />
   );
 }

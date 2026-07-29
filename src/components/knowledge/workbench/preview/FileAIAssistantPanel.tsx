@@ -2,6 +2,8 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   BookOpenCheck,
   Check,
+  ChevronDown,
+  ChevronUp,
   CircleCheck,
   FileText,
   GitFork,
@@ -12,6 +14,7 @@ import {
   Minus,
   Pencil,
   Plus,
+  SearchCheck,
   Send,
   Trash2,
 } from "lucide-react";
@@ -21,6 +24,7 @@ import { AppDialogButton } from "@/components/ui/app-dialog";
 import { AppFormTextarea } from "@/components/ui/app-form";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { KbFormDialog, KbFormField } from "@/components/knowledge/ui/KbFormDialog";
+import { KbHighlightText } from "@/components/knowledge/ui";
 import {
   getDemoRoleKey,
   getDemoRoleServerSnapshot,
@@ -31,6 +35,7 @@ import {
   getFilePracticeQuestions,
   type FilePracticeQuestion,
 } from "@/lib/knowledge/filePractice";
+import { getFileMatchChunks } from "@/lib/knowledge/fulltextSearch";
 import type { KnowledgeBase, KnowledgeFile } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 
@@ -144,7 +149,20 @@ function MindMapBoard({
   );
 }
 
-export function FileAIAssistantPanel({ file, base }: { file: KnowledgeFile; base: KnowledgeBase }) {
+export function FileAIAssistantPanel({
+  file,
+  base,
+  showHitTabs = false,
+  searchQuery = "",
+  onJumpToPage,
+}: {
+  file: KnowledgeFile;
+  base: KnowledgeBase;
+  /** When true, render tab switcher: "搜索命中" | "智能解读" */
+  showHitTabs?: boolean;
+  searchQuery?: string;
+  onJumpToPage?: (page: number) => void;
+}) {
   const navigate = useNavigate();
   const questions = useMemo(() => getFilePracticeQuestions(file), [file]);
   const keywords = file.aiKeywords ?? file.tags ?? [];
@@ -159,6 +177,14 @@ export function FileAIAssistantPanel({ file, base }: { file: KnowledgeFile; base
   const [mindMapZoom, setMindMapZoom] = useState(100);
   const [mindMapOpen, setMindMapOpen] = useState(false);
 
+  // Search-hit tab state
+  const [activeTab, setActiveTab] = useState<"hits" | "interpret">("hits");
+  const [activeHitIndex, setActiveHitIndex] = useState(0);
+  const chunks = useMemo(
+    () => (showHitTabs && searchQuery ? getFileMatchChunks(file, searchQuery) : []),
+    [file, searchQuery, showHitTabs],
+  );
+
   useEffect(() => {
     setDisplayedQuestions(questions);
     setSelectedIds([]);
@@ -168,6 +194,22 @@ export function FileAIAssistantPanel({ file, base }: { file: KnowledgeFile; base
     setMindMapZoom(100);
     setMindMapOpen(false);
   }, [file.id, questions]);
+
+  // Jump to first hit when file or chunks change
+  useEffect(() => {
+    setActiveHitIndex(0);
+    if (showHitTabs && chunks.length > 0 && onJumpToPage) {
+      onJumpToPage(chunks[0].page);
+    }
+  }, [file.id, chunks, showHitTabs, onJumpToPage]);
+
+  const jumpToHit = (index: number) => {
+    const safeIndex = Math.max(0, Math.min(index, chunks.length - 1));
+    setActiveHitIndex(safeIndex);
+    if (onJumpToPage && chunks[safeIndex]) {
+      onJumpToPage(chunks[safeIndex].page);
+    }
+  };
 
   const toggleQuestion = (id: string) => {
     setSelectedIds((current) =>
@@ -215,8 +257,102 @@ export function FileAIAssistantPanel({ file, base }: { file: KnowledgeFile; base
   };
 
   return (
-    <aside className="flex w-[390px] shrink-0 flex-col border-l border-[#E0E9EB] bg-white p-3 2xl:w-[420px]">
-      <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto pr-0.5">
+    <aside className="flex w-[390px] shrink-0 flex-col border-l border-[#E0E9EB] bg-white 2xl:w-[420px]">
+      {/* Tab bar — only shown when full-text search context is active */}
+      {showHitTabs && (
+        <div className="flex shrink-0 gap-1 border-b border-[#E8EFF1] px-3 pt-3">
+          <button
+            type="button"
+            onClick={() => setActiveTab("hits")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-t-[7px] px-3 py-2 text-[12.5px] font-medium transition-colors",
+              activeTab === "hits"
+                ? "bg-primary-soft/60 text-primary"
+                : "text-kb-muted hover:bg-kb-surface hover:text-kb-heading",
+            )}
+          >
+            <SearchCheck className="h-3.5 w-3.5 stroke-[1.8]" />
+            搜索命中
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("interpret")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-t-[7px] px-3 py-2 text-[12.5px] font-medium transition-colors",
+              activeTab === "interpret"
+                ? "bg-primary-soft/60 text-primary"
+                : "text-kb-muted hover:bg-kb-surface hover:text-kb-heading",
+            )}
+          >
+            <BookOpenCheck className="h-3.5 w-3.5 stroke-[1.8]" />
+            智能解读
+          </button>
+        </div>
+      )}
+
+      {/* ── 搜索命中 tab ──────────────────────────────────────── */}
+      {showHitTabs && activeTab === "hits" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* Header: hit count + prev/next navigation */}
+          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[#E8EFF1] px-4 py-2.5">
+            <span className="text-[12.5px] font-medium text-kb-heading">
+              本文件命中{" "}
+              <span className="font-semibold text-primary">{chunks.length}</span> 处
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="上一处命中"
+                disabled={chunks.length === 0 || activeHitIndex === 0}
+                onClick={() => jumpToHit(activeHitIndex - 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[#DCE8EA] text-kb-muted transition-colors hover:border-primary/30 hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronUp className="h-4 w-4 stroke-[2]" />
+              </button>
+              <button
+                type="button"
+                aria-label="下一处命中"
+                disabled={chunks.length === 0 || activeHitIndex >= chunks.length - 1}
+                onClick={() => jumpToHit(activeHitIndex + 1)}
+                className="flex h-7 w-7 items-center justify-center rounded-[6px] border border-[#DCE8EA] text-kb-muted transition-colors hover:border-primary/30 hover:bg-primary-soft hover:text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronDown className="h-4 w-4 stroke-[2]" />
+              </button>
+            </div>
+          </div>
+
+          {/* Hit list */}
+          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-3">
+            {chunks.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center py-12 text-center text-[12px] text-kb-muted">
+                当前文件无命中内容
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {chunks.map((chunk, index) => (
+                  <article
+                    key={chunk.id}
+                    className={cn(
+                      "rounded-[8px] border px-3.5 py-3",
+                      index === activeHitIndex
+                        ? "border-primary/30 bg-primary-soft/40"
+                        : "border-[#EEF2F4] bg-white",
+                    )}
+                  >
+                    <p className="line-clamp-3 text-[12.5px] leading-relaxed text-kb-body">
+                      <KbHighlightText text={chunk.text} keyword={chunk.keyword} />
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── 智能解读 tab (or full content when no tabs) ─────────── */}
+      {(!showHitTabs || activeTab === "interpret") && (
+      <div className={cn("scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto p-3 pr-2.5")}>
         <section className="rounded-[8px] border border-[#EEF2F4] bg-card px-4 py-4 shadow-[0_1px_3px_rgba(31,52,64,0.03)]">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -386,6 +522,7 @@ export function FileAIAssistantPanel({ file, base }: { file: KnowledgeFile; base
           )}
         </PanelSection>
       </div>
+      )}
 
       <QuestionDetailDialog
         question={viewingQuestion}

@@ -23,8 +23,8 @@ export function FilePreviewToolbar({
       <button
         type="button"
         onClick={onBack}
-        aria-label="返回文件列表"
-        title="返回文件列表"
+        aria-label="返回上一层"
+        title="返回上一层"
         className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] text-kb-muted transition-colors hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
       >
         <ArrowLeft className="h-4 w-4 stroke-[1.8]" />

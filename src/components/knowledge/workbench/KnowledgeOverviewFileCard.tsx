@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { FileListCheckbox } from "./FileListCheckbox";
 import { Tag } from "@/components/learning/ui";
 import { KbFileTypeIcon } from "@/components/knowledge/ui";
-import { publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
+import { fileListParseStatus, publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
 import { getBaseById, isEmployee, isFileEnabled } from "@/lib/knowledge/model";
 import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
 import type { KnowledgeFile } from "@/lib/knowledge/types";
@@ -43,7 +43,7 @@ export function KnowledgeOverviewFileCard({
   const disabled = !isFileEnabled(file);
   const pinned = Boolean(file.pinned);
   const versionCount = file.versions?.length ?? 0;
-  const hasHistory = versionCount > 1;
+  const hasHistory = versionCount > 1 && fileListParseStatus(file) === "success";
 
   return (
     <article

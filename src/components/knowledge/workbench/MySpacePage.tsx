@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import {
   ArrowUpDown,
   ChevronDown,
@@ -90,6 +90,10 @@ import {
 } from "@/lib/knowledge/store";
 import { isPinnedId, loadPinnedIds, savePinnedIds, togglePinnedId } from "@/lib/knowledge/pinned";
 import { kbFileTypeConfig, kbMainPanel } from "@/lib/knowledge/tokens";
+import {
+  openFileDetailInNewTab,
+  type FileDetailSearchScope,
+} from "@/lib/knowledge/searchNav";
 import type {
   KnowledgeBase,
   KnowledgeBaseStatus,
@@ -108,6 +112,7 @@ import {
 } from "./KnowledgeFileTable";
 import { FileMoveDialog } from "./FileMoveDialog";
 import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
+import { FullTextSearchResultPanel } from "./FullTextSearchResultPanel";
 import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDialog";
 import { KnowledgeBaseDeleteDialog } from "./KnowledgeBaseDeleteDialog";
 import { KnowledgeBaseMoveDialog } from "./KnowledgeBaseMoveDialog";
@@ -157,6 +162,7 @@ const mySpaceSortOptions: Array<{ value: KnowledgeSortBy; label: string }> = [
 
 export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const navigate = useNavigate({ from: "/knowledge/mine" });
+  const router = useRouter();
   const role = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const showPersonalManageActions = role !== "employee";
   // 个人知识库由当前用户维护，普通员工同样需要节点快捷操作。
@@ -169,7 +175,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const personalBases = useMemo(() => getPersonalBases(), [storeVersion]);
   const [selection, setSelection] = useState<MySpaceSelection>({ kind: "recent" });
   const [query, setQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<FileSearchMode>("fulltext");
+  const [searchMode, setSearchMode] = useState<FileSearchMode>("filename");
   const [metadataFilters, setMetadataFilters] = useState<Record<string, string>>({});
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>("updated");
   const fileSelection = useFileSelection();
@@ -284,7 +290,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   useEffect(() => {
     setPage(1);
     setQuery("");
-    setSearchMode("fulltext");
+    setSearchMode("filename");
     setMetadataFilters({});
     fileSelection.clear();
   }, [selection]);
@@ -301,11 +307,20 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     toast.success(`已选择 ${files.length} 个文件，上传面板即将打开`);
   };
 
-  const openFile = (file: KnowledgeFile) => {
-    navigate({
-      to: "/knowledge/file/$fileId",
-      params: { fileId: file.id },
-      search: { kbId: file.knowledgeBaseId },
+  const openFile = (
+    file: KnowledgeFile,
+    context?: {
+      query?: string;
+      searchMode?: FileSearchMode;
+      resultFiles?: KnowledgeFile[];
+      scope?: FileDetailSearchScope;
+    },
+  ) => {
+    openFileDetailInNewTab(router, file, {
+      query: context?.query ?? query,
+      searchMode: context?.searchMode ?? searchMode,
+      resultFiles: context?.resultFiles,
+      scope: context?.scope,
     });
   };
 
@@ -640,7 +655,14 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onRefresh={handleRefresh}
-            onOpen={openFile}
+            onOpen={(file) =>
+              openFile(file, {
+                query,
+                searchMode,
+                resultFiles: personalAllFiles,
+                scope: "personal-all",
+              })
+            }
             onToggleEnabled={handleToggleEnabled}
             selection={fileSelection}
             batchToolbarProps={batchToolbarProps}
@@ -668,7 +690,9 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onRefresh={handleRefresh}
-            onOpen={openFile}
+            onOpen={(file) =>
+              openFile(file, { query, searchMode, resultFiles: personalFiles })
+            }
             onUploadFiles={handleUploadFiles}
             onSelectBase={(baseId) => setSelection({ kind: "personalBase", baseId })}
             onToggleEnabled={handleToggleEnabled}
@@ -1082,7 +1106,10 @@ function FavoriteKnowledgePanel({
   files: KnowledgeFile[];
   refreshSeed: number;
   onRefresh: () => void;
-  onOpen: (file: KnowledgeFile) => void;
+  onOpen: (
+    file: KnowledgeFile,
+    ctx?: { query?: string; searchMode?: FileSearchMode; resultFiles?: KnowledgeFile[] },
+  ) => void;
 }) {
   const [query, setQuery] = useState("");
   const [searchMode, setSearchMode] = useState<FileSearchMode>("filename");
@@ -1120,12 +1147,16 @@ function FavoriteKnowledgePanel({
     setPage(1);
   }, [query, searchMode, categoryId, sortBy, viewMode]);
 
+  const handleOpen = (file: KnowledgeFile) =>
+    onOpen(file, { query, searchMode, resultFiles: filteredFiles });
+
   const empty = (
     <KbEmptyState
       title="暂无收藏文件"
       description="在文件详情页收藏后，文件会显示在这里。"
     />
   );
+  const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-white">
@@ -1167,21 +1198,32 @@ function FavoriteKnowledgePanel({
                   setPage(1);
                   onRefresh();
                 }}
+                showViewModeToggle={!isFullTextSearchActive}
               />
             </div>
           </div>
 
-          <div key={refreshSeed} className="min-h-0 overflow-x-auto">
-            {viewMode === "list" ? (
-              <FavoriteFilesTable files={pagedFiles} onOpen={onOpen} empty={empty} />
-            ) : (
-              <KnowledgeFileCardGrid files={pagedFiles} onOpen={onOpen} empty={empty} />
-            )}
-          </div>
+          {isFullTextSearchActive ? (
+            <FullTextSearchResultPanel
+              files={filteredFiles}
+              query={query}
+              showLibrary
+              className="h-[560px]"
+            />
+          ) : (
+            <div key={refreshSeed} className="min-h-0 overflow-x-auto">
+              {viewMode === "list" ? (
+                <FavoriteFilesTable files={pagedFiles} onOpen={handleOpen} empty={empty} />
+              ) : (
+                <KnowledgeFileCardGrid files={pagedFiles} onOpen={handleOpen} empty={empty} />
+              )}
+            </div>
+          )}
         </section>
       </div>
 
-      {filteredFiles.length > 0 &&
+      {!isFullTextSearchActive &&
+        filteredFiles.length > 0 &&
         (viewMode === "list" ? (
           <TableListPager
             page={safePage}
@@ -1528,6 +1570,7 @@ function PersonalAllPanel({
   const empty = (
     <KbEmptyState title="个人库暂无文件" description="当前个人知识库下还没有可查看的文件。" />
   );
+  const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1560,57 +1603,70 @@ function PersonalAllPanel({
             sortBy={sortBy}
             onSortChange={onSortChange}
             onRefresh={onRefresh}
+            showViewModeToggle={!isFullTextSearchActive}
           />
         }
       />
 
-      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
-        {viewMode === "list" ? (
-          <KnowledgeFileTable
-            files={pagedFiles}
-            onOpen={onOpen}
-            showLibrary
-            overviewMode
-            showManageColumn={showManageColumn}
-            selection={listSelection}
-            onToggleEnabled={onToggleEnabled}
-            empty={empty}
-            {...fileRowActions}
-          />
-        ) : (
-          <KnowledgeFileCardGrid
-            files={pagedFiles}
-            selection={cardSelection}
-            onOpen={onOpen}
-            empty={empty}
-            {...fileRowActions}
-          />
-        )}
-      </div>
-
-      {files.length > 0 &&
-        (viewMode === "list" ? (
-          <TableListPager
-            page={safePage}
-            totalPages={totalPages}
-            totalItems={files.length}
-            pageSize={pageSize}
-            onPageChange={onPageChange}
-            onPageSizeChange={onPageSizeChange}
-          />
-        ) : (
-          <div className="border-t border-divider px-4 py-2">
-            <CardBatchPager
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={files.length}
-              pageSize={CARD_PAGE_SIZE}
-              unitLabel="个文件"
-              onPageChange={onPageChange}
-              compact
-            />
+      {isFullTextSearchActive ? (
+        <FullTextSearchResultPanel
+          files={files}
+          query={query}
+          showLibrary
+          scope="personal-all"
+          onToggleEnabled={onToggleEnabled}
+        />
+      ) : (
+        <>
+          <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
+            {viewMode === "list" ? (
+              <KnowledgeFileTable
+                files={pagedFiles}
+                onOpen={onOpen}
+                showLibrary
+                overviewMode
+                showManageColumn={showManageColumn}
+                selection={listSelection}
+                onToggleEnabled={onToggleEnabled}
+                empty={empty}
+                {...fileRowActions}
+              />
+            ) : (
+              <KnowledgeFileCardGrid
+                files={pagedFiles}
+                selection={cardSelection}
+                onOpen={onOpen}
+                empty={empty}
+                {...fileRowActions}
+              />
+            )}
           </div>
-        ))}
+
+          {files.length > 0 &&
+            (viewMode === "list" ? (
+              <TableListPager
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={files.length}
+                pageSize={pageSize}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+              />
+            ) : (
+              <div className="border-t border-divider px-4 py-2">
+                <CardBatchPager
+                  page={safePage}
+                  totalPages={totalPages}
+                  totalItems={files.length}
+                  pageSize={CARD_PAGE_SIZE}
+                  unitLabel="个文件"
+                  onPageChange={onPageChange}
+                  compact
+                />
+              </div>
+            ))}
+        </>
+      )}
     </div>
   );
 }
@@ -1704,6 +1760,7 @@ function PersonalBasePanel({
   const empty = (
     <KbEmptyState title="个人库暂无文件" description="可拖拽上传，上传后直接进入解析流程。" />
   );
+  const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
   if (base.status === "disabled") {
     return (
@@ -1751,58 +1808,70 @@ function PersonalBasePanel({
             sortBy={sortBy}
             onSortChange={onSortChange}
             onRefresh={onRefresh}
+            showViewModeToggle={!isFullTextSearchActive}
             onUpload={() => toast.message("打开上传面板")}
           />
         }
       />
 
-      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
-        {viewMode === "list" ? (
-          <KnowledgeFileTable
-            files={pagedFiles}
-            onOpen={onOpen}
-            showLibrary={false}
-            overviewMode
-            showManageColumn={canManageFileList(base)}
-            selection={listSelection}
-            onToggleEnabled={onToggleEnabled}
-            empty={empty}
-            {...fileRowActions}
-          />
-        ) : (
-          <KnowledgeFileCardGrid
-            files={pagedFiles}
-            selection={cardSelection}
-            onOpen={onOpen}
-            empty={empty}
-            {...fileRowActions}
-          />
-        )}
-      </div>
-
-      {files.length > 0 &&
-        (viewMode === "list" ? (
-          <TableListPager
-            page={safePage}
-            totalPages={totalPages}
-            totalItems={files.length}
-            pageSize={pageSize}
-            onPageChange={onPageChange}
-            onPageSizeChange={onPageSizeChange}
-          />
-        ) : (
-          <div className="border-t border-divider px-4 py-2">
-            <CardBatchPager
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={files.length}
-              pageSize={CARD_PAGE_SIZE}
-              unitLabel="个文件"
-              onPageChange={onPageChange}
-              compact
-            />
+      {isFullTextSearchActive ? (
+        <FullTextSearchResultPanel
+          files={files}
+          query={query}
+          showLibrary={false}
+          onToggleEnabled={onToggleEnabled}
+        />
+      ) : (
+        <>
+          <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
+            {viewMode === "list" ? (
+              <KnowledgeFileTable
+                files={pagedFiles}
+                onOpen={onOpen}
+                showLibrary={false}
+                overviewMode
+                showManageColumn={canManageFileList(base)}
+                selection={listSelection}
+                onToggleEnabled={onToggleEnabled}
+                empty={empty}
+                {...fileRowActions}
+              />
+            ) : (
+              <KnowledgeFileCardGrid
+                files={pagedFiles}
+                selection={cardSelection}
+                onOpen={onOpen}
+                empty={empty}
+                {...fileRowActions}
+              />
+            )}
           </div>
-        ))}
+
+          {files.length > 0 &&
+            (viewMode === "list" ? (
+              <TableListPager
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={files.length}
+                pageSize={pageSize}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+              />
+            ) : (
+              <div className="border-t border-divider px-4 py-2">
+                <CardBatchPager
+                  page={safePage}
+                  totalPages={totalPages}
+                  totalItems={files.length}
+                  pageSize={CARD_PAGE_SIZE}
+                  unitLabel="个文件"
+                  onPageChange={onPageChange}
+                  compact
+                />
+              </div>
+            ))}
+        </>
+      )}
     </KbDragUploadOverlay>
   );
 }

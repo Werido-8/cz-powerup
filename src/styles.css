@@ -50,7 +50,8 @@
   --color-kb-preview-bg: var(--kb-preview-bg);
   --color-danger-soft: var(--danger-soft);
   --shadow-card: 0 1px 2px 0 oklch(0.5 0.05 230 / 0.03);
-  --shadow-card-hover: 0 1px 3px 0 oklch(0.5 0.05 230 / 0.05), 0 4px 12px -2px oklch(0.5 0.05 230 / 0.06);
+  --shadow-card-hover:
+    0 1px 3px 0 oklch(0.5 0.05 230 / 0.05), 0 4px 12px -2px oklch(0.5 0.05 230 / 0.06);
   --shadow-glow: 0 0 0 1px oklch(0.58 0.12 188 / 0.2), 0 8px 24px -6px oklch(0.58 0.12 188 / 0.25);
   --gradient-primary: linear-gradient(135deg, oklch(0.62 0.12 188), oklch(0.52 0.13 195));
   --gradient-surface: linear-gradient(180deg, oklch(0.99 0.005 230), oklch(0.97 0.01 230));
@@ -58,7 +59,7 @@
 
 :root {
   --radius: 0.875rem;
-  --background: #f5fafb;
+  --background: #ffffff;
   --foreground: #1f3440;
   --card: #ffffff;
   --card-foreground: #1f3440;
@@ -97,11 +98,10 @@
   --kb-preview-bg: #eef5f6;
   --danger-soft: #fff3f3;
 
-  /* App Dialog — 系统级表单弹窗 */
+  /* App Dialog: 系统级表单弹窗 */
   --dialog-overlay: rgba(19, 29, 39, 0.56);
   --dialog-border: rgba(218, 227, 232, 0.9);
-  --dialog-shadow:
-    0 24px 64px rgba(15, 35, 45, 0.22), 0 4px 16px rgba(15, 35, 45, 0.08);
+  --dialog-shadow: 0 24px 64px rgba(15, 35, 45, 0.22), 0 4px 16px rgba(15, 35, 45, 0.08);
   --dialog-header-border: #e8eef1;
   --dialog-footer-bg: #fbfcfc;
   --dialog-title-color: #162b36;
@@ -165,6 +165,15 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family:
+      "Microsoft YaHei UI",
+      "PingFang SC",
+      "Noto Sans CJK SC",
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
   }
@@ -305,5 +314,272 @@
   .app-form-textarea.app-form-control--error {
     border-color: var(--form-required);
     box-shadow: var(--form-control-error-ring);
+  }
+}
+
+/* Chat dialog loading animation */
+.dialog-loading-state {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+}
+
+.dialog-loading-state__text {
+  margin: 0;
+  color: #718186;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.dialog-loading {
+  --loader-size: 14px;
+  --loader-step: 24px;
+  --loader-duration: 1.55s;
+  --loader-primary: #349bac;
+  --loader-accent: #1e8497;
+
+  position: relative;
+  width: 110px;
+  height: var(--loader-size);
+}
+
+.dialog-loading__runner,
+.dialog-loading__tile {
+  width: var(--loader-size);
+  height: var(--loader-size);
+  border-radius: 4px;
+}
+
+.dialog-loading__runner {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 2;
+  background: linear-gradient(145deg, #5ec5d6 0%, var(--loader-accent) 100%);
+  box-shadow: 0 4px 10px rgb(52 155 172 / 22%);
+  animation: dialog-loading-run var(--loader-duration) cubic-bezier(0.45, 0, 0.25, 1) infinite
+    alternate;
+}
+
+.dialog-loading__tiles {
+  position: absolute;
+  top: 0;
+  left: var(--loader-step);
+  display: flex;
+  gap: calc(var(--loader-step) - var(--loader-size));
+}
+
+.dialog-loading__tile {
+  position: relative;
+  flex: 0 0 auto;
+  transform-origin: -5px center;
+  animation-duration: var(--loader-duration);
+  animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.dialog-loading__tile::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  border-radius: inherit;
+  background: linear-gradient(
+    145deg,
+    hsl(188deg 58% var(--tile-light)),
+    hsl(188deg 54% var(--tile-dark))
+  );
+  box-shadow: 0 4px 10px rgb(52 155 172 / 14%);
+  animation-duration: var(--loader-duration);
+  animation-timing-function: cubic-bezier(0.45, 0, 0.25, 1);
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.dialog-loading__tile:nth-child(1) {
+  --tile-light: 58%;
+  --tile-dark: 43%;
+  animation-name: dialog-loading-fold-1;
+}
+
+.dialog-loading__tile:nth-child(1)::before {
+  animation-name: dialog-loading-shape-1;
+}
+
+.dialog-loading__tile:nth-child(2) {
+  --tile-light: 60%;
+  --tile-dark: 45%;
+  animation-name: dialog-loading-fold-2;
+}
+
+.dialog-loading__tile:nth-child(2)::before {
+  animation-name: dialog-loading-shape-2;
+}
+
+.dialog-loading__tile:nth-child(3) {
+  --tile-light: 62%;
+  --tile-dark: 47%;
+  animation-name: dialog-loading-fold-3;
+}
+
+.dialog-loading__tile:nth-child(3)::before {
+  animation-name: dialog-loading-shape-3;
+}
+
+.dialog-loading__tile:nth-child(4) {
+  --tile-light: 64%;
+  --tile-dark: 49%;
+  animation-name: dialog-loading-fold-4;
+}
+
+.dialog-loading__tile:nth-child(4)::before {
+  animation-name: dialog-loading-shape-4;
+}
+
+@keyframes dialog-loading-run {
+  0%,
+  5% {
+    transform: translateX(0) rotate(0deg) scale(1);
+  }
+
+  22% {
+    transform: translateX(calc(var(--loader-step) * 1)) rotate(5deg) scale(1.12, 0.88);
+  }
+
+  46% {
+    transform: translateX(calc(var(--loader-step) * 2)) rotate(-4deg) scale(0.9, 1.1);
+  }
+
+  70% {
+    transform: translateX(calc(var(--loader-step) * 3)) rotate(4deg) scale(1.1, 0.9);
+  }
+
+  95%,
+  100% {
+    transform: translateX(calc(var(--loader-step) * 4)) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes dialog-loading-fold-1 {
+  0%,
+  8% {
+    transform: rotate(0deg);
+  }
+
+  29%,
+  100% {
+    transform: rotate(-180deg);
+  }
+}
+
+@keyframes dialog-loading-fold-2 {
+  0%,
+  27% {
+    transform: rotate(0deg);
+  }
+
+  49%,
+  100% {
+    transform: rotate(-180deg);
+  }
+}
+
+@keyframes dialog-loading-fold-3 {
+  0%,
+  47% {
+    transform: rotate(0deg);
+  }
+
+  69%,
+  100% {
+    transform: rotate(-180deg);
+  }
+}
+
+@keyframes dialog-loading-fold-4 {
+  0%,
+  67% {
+    transform: rotate(0deg);
+  }
+
+  89%,
+  100% {
+    transform: rotate(-180deg);
+  }
+}
+
+@keyframes dialog-loading-shape-1 {
+  0%,
+  8%,
+  36%,
+  100% {
+    transform: scale(1);
+  }
+
+  18% {
+    transform: scale(0.76, 1.22);
+  }
+
+  29% {
+    transform: scale(1.18, 0.82);
+  }
+}
+
+@keyframes dialog-loading-shape-2 {
+  0%,
+  27%,
+  56%,
+  100% {
+    transform: scale(1);
+  }
+
+  38% {
+    transform: scale(0.76, 1.22);
+  }
+
+  49% {
+    transform: scale(1.18, 0.82);
+  }
+}
+
+@keyframes dialog-loading-shape-3 {
+  0%,
+  47%,
+  76%,
+  100% {
+    transform: scale(1);
+  }
+
+  58% {
+    transform: scale(0.76, 1.22);
+  }
+
+  69% {
+    transform: scale(1.18, 0.82);
+  }
+}
+
+@keyframes dialog-loading-shape-4 {
+  0%,
+  67%,
+  96%,
+  100% {
+    transform: scale(1);
+  }
+
+  78% {
+    transform: scale(0.76, 1.22);
+  }
+
+  89% {
+    transform: scale(1.18, 0.82);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog-loading__runner,
+  .dialog-loading__tile,
+  .dialog-loading__tile::before {
+    animation: none;
   }
 }

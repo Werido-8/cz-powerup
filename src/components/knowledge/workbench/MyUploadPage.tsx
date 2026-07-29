@@ -20,7 +20,8 @@ import {
   UploadCloud,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { SearchBar, TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
@@ -46,6 +47,7 @@ import {
   listCategoryPathOptions,
 } from "@/lib/knowledge/model";
 import { pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
+import { openFileDetailInNewTab } from "@/lib/knowledge/searchNav";
 import {
   getKnowledgeStoreServerSnapshot,
   getKnowledgeStoreVersion,
@@ -80,7 +82,6 @@ import {
   type UploadView,
 } from "@/lib/knowledge/uploadTracking";
 import { cn } from "@/lib/utils";
-import { useSyncExternalStore } from "react";
 import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
 import { UploadBasePickerDialog } from "./UploadBasePickerDialog";
 
@@ -164,6 +165,7 @@ export function UploadTrackingPanel({
   onSearchChange: (next: UploadSearch) => void;
   embedded?: boolean;
 }) {
+  const router = useRouter();
   const storeVersion = useSyncExternalStore(
     subscribeKnowledgeStore,
     getKnowledgeStoreVersion,
@@ -228,9 +230,18 @@ export function UploadTrackingPanel({
     onSearchChange({ ...search, q: searchInput || undefined });
   };
 
+  const openRecordFile = (record: UploadRecord) => {
+    const file = getFileById(record.fileId);
+    if (file) {
+      openFileDetailInNewTab(router, file);
+      return;
+    }
+    toast.message(`预览 ${record.fileName}`);
+  };
+
   const handleUploadAction = (kind: UploadActionKind, record: UploadRecord) => {
     const instant: Partial<Record<UploadActionKind, () => void>> = {
-      preview: () => toast.message(`预览 ${record.fileName}`),
+      preview: () => openRecordFile(record),
       history: () => setHistoryFileId(record.fileId),
       download: () => toast.message(`下载 ${record.fileName}`),
       gotoBase: () => toast.message(`进入 ${record.targetKnowledgeBaseName}`),
@@ -402,6 +413,7 @@ export function UploadTrackingPanel({
                       view={currentView}
                       record={record}
                       onAction={handleUploadAction}
+                      onOpenFile={openRecordFile}
                     />
                   ))}
                 </KbDataTable>
@@ -452,16 +464,22 @@ function UploadTrackingRow({
   view,
   record,
   onAction,
+  onOpenFile,
 }: {
   view: UploadView;
   record: UploadRecord;
   onAction: (kind: UploadActionKind, record: UploadRecord) => void;
+  onOpenFile: (record: UploadRecord) => void;
 }) {
   const file = getFileById(record.fileId);
   const actions = getTrackingActions(view, record);
 
   return (
-    <KbDataTableRow variant="flat" className={VIEW_GRIDS[view]}>
+    <KbDataTableRow
+      variant="flat"
+      className={VIEW_GRIDS[view]}
+      onClick={() => onOpenFile(record)}
+    >
       <KbTableCellFile name={record.fileName} type={file?.type ?? "pdf"} size="sm" nameWeight="normal" />
       <span className="truncate text-kb-muted">{record.targetKnowledgeBaseName}</span>
 

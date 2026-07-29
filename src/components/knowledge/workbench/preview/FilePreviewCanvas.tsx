@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Maximize2, ZoomIn, ZoomOut } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KbEmptyState, KbIconButton, KbStatusTag } from "@/components/knowledge/ui";
 import { isStorageOnlyFile } from "@/lib/knowledge/parseMerge";
 import {
@@ -16,12 +16,31 @@ export function FilePreviewCanvas({
   file,
   version,
   historyVersion,
+  page: pageProp,
+  onPageChange,
 }: {
   file: KnowledgeFile;
   version?: KnowledgeFileVersion;
   historyVersion?: boolean;
+  /** Controlled page number; when provided the component acts as controlled */
+  page?: number;
+  onPageChange?: (page: number) => void;
 }) {
-  const [page, setPage] = useState(1);
+  const [internalPage, setInternalPage] = useState(1);
+  const page = pageProp ?? internalPage;
+  const setPage = (value: number | ((prev: number) => number)) => {
+    const next = typeof value === "function" ? value(page) : value;
+    if (onPageChange) {
+      onPageChange(next);
+    } else {
+      setInternalPage(next);
+    }
+  };
+
+  useEffect(() => {
+    if (pageProp == null) setInternalPage(1);
+  }, [file.id, pageProp]);
+
   const [zoom, setZoom] = useState(100);
   const totalPages = 12;
   const storageOnly = isStorageOnlyFile(file);

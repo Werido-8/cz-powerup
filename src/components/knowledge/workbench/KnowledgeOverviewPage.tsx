@@ -78,6 +78,7 @@ import type {
   PersonalDirectory,
 } from "@/lib/knowledge/types";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
+import { openFileDetailInNewTab, type FileDetailSearchScope } from "@/lib/knowledge/searchNav";
 import { TableListPager, CardBatchPager, PillSelect, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 import {
@@ -87,6 +88,7 @@ import {
   type FileViewMode,
 } from "./KnowledgeFileTable";
 import { DirectoryForm } from "./DirectoryForm";
+import { FullTextSearchResultPanel } from "./FullTextSearchResultPanel";
 import { KnowledgeAggregateDetailHeader } from "./KnowledgeAggregateDetailHeader";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
 import { KnowledgeCategoryTree } from "./KnowledgeCategoryTree";
@@ -141,13 +143,13 @@ function collectExpandIds(categoryId?: string) {
 
 export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: string }) {
   const navigate = useNavigate();
+  const router = useRouter();
   const role = useSyncExternalStore(
     subscribeDemoRole,
     getDemoRoleKey,
     getDemoRoleServerSnapshot,
   );
   const employee = role === "employee";
-  const router = useRouter();
   const storeVersion = useKnowledgeStoreVersion();
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedIds());
   const [selectedBaseId, setSelectedBaseId] = useState(() => {
@@ -158,7 +160,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     return getDefaultOverviewBaseId();
   });
   const [query, setQuery] = useState("");
-  const [searchMode, setSearchMode] = useState<FileSearchMode>("fulltext");
+  const [searchMode, setSearchMode] = useState<FileSearchMode>("filename");
   const [metadataFilters, setMetadataFilters] = useState<Record<string, string>>({});
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>("updated");
   const fileSelection = useFileSelection();
@@ -261,6 +263,8 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
       sortBy,
     );
   }, [allCurrentBaseFiles, isAggregate, metadataFilters, query, searchMode, selectedBase, sortBy]);
+
+  const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
   useEffect(() => {
     setPage(1);
@@ -498,22 +502,13 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     setKnowledgeBaseForm({ open: false });
   };
 
-  const handleOpenFile = (file: KnowledgeFile) => {
-    navigate({
-      to: "/knowledge/file/$fileId",
-      params: { fileId: file.id },
-      search: { kbId: file.knowledgeBaseId },
+  const handleOpenFile = (file: KnowledgeFile, opts?: { scope?: FileDetailSearchScope }) => {
+    openFileDetailInNewTab(router, file, {
+      query,
+      searchMode,
+      resultFiles: selectedFiles,
+      scope: opts?.scope,
     });
-  };
-
-  // 仅用于「知识总览 · 全部」汇总列表：在新浏览器 tab 中打开文件详情
-  const handleOpenFileNewTab = (file: KnowledgeFile) => {
-    const href = router.buildLocation({
-      to: "/knowledge/file/$fileId",
-      params: { fileId: file.id },
-      search: { kbId: file.knowledgeBaseId },
-    }).href;
-    window.open(href, "_blank", "noopener,noreferrer");
   };
 
   const handleUploadFiles = (files: FileList) => {
@@ -688,6 +683,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             files={selectedFiles}
             query={query}
             searchMode={searchMode}
+            scope={isPersonalAll ? "personal-all" : "professional-all"}
             sortBy={sortBy}
             viewMode={viewMode}
             page={page}
@@ -702,7 +698,11 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onRefresh={handleRefresh}
-            onOpen={handleOpenFileNewTab}
+            onOpen={(file) =>
+              handleOpenFile(file, {
+                scope: isPersonalAll ? "personal-all" : "professional-all",
+              })
+            }
             onToggleEnabled={handleToggleEnabled}
             selection={listSelection}
             cardSelection={cardSelection}
@@ -774,6 +774,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                     sortBy={sortBy}
                     onSortChange={setSortBy}
                     onRefresh={handleRefresh}
+                    showViewModeToggle={!isFullTextSearchActive}
                     onUpload={
                       canUploadToBase(selectedBase)
                         ? () => toast.message("打开上传面板")
@@ -783,56 +784,67 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                 }
               />
 
-              <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
-                {viewMode === "list" ? (
-                  <KnowledgeFileTable
-                    files={pagedFiles}
-                    showLibrary={false}
-                    overviewMode
-                    showManageColumn={showManageColumn}
-                    selection={listSelection}
-                    onToggleEnabled={handleToggleEnabled}
-                    onOpen={handleOpenFile}
-                    empty={emptyFiles}
-                    {...fileRowActions}
-                  />
-                ) : (
-                  <KnowledgeFileCardGrid
-                    files={pagedFiles}
-                    selection={cardSelection}
-                    onOpen={handleOpenFile}
-                    empty={emptyFiles}
-                    {...fileRowActions}
-                  />
-                )}
-              </div>
-
-              {selectedFiles.length > 0 &&
-                (viewMode === "list" ? (
-                  <TableListPager
-                    page={safePage}
-                    totalPages={totalPages}
-                    totalItems={selectedFiles.length}
-                    pageSize={pageSize}
-                    onPageChange={setPage}
-                    onPageSizeChange={(size) => {
-                      setPageSize(size);
-                      setPage(1);
-                    }}
-                  />
-                ) : (
-                  <div className="border-t border-divider px-4 py-2">
-                    <CardBatchPager
-                      page={safePage}
-                      totalPages={totalPages}
-                      totalItems={selectedFiles.length}
-                      pageSize={CARD_PAGE_SIZE}
-                      unitLabel="个文件"
-                      onPageChange={setPage}
-                      compact
-                    />
+              {isFullTextSearchActive ? (
+                <FullTextSearchResultPanel
+                  files={selectedFiles}
+                  query={query}
+                  showLibrary={false}
+                  onToggleEnabled={handleToggleEnabled}
+                />
+              ) : (
+                <>
+                  <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
+                    {viewMode === "list" ? (
+                      <KnowledgeFileTable
+                        files={pagedFiles}
+                        showLibrary={false}
+                        overviewMode
+                        showManageColumn={showManageColumn}
+                        selection={listSelection}
+                        onToggleEnabled={handleToggleEnabled}
+                        onOpen={handleOpenFile}
+                        empty={emptyFiles}
+                        {...fileRowActions}
+                      />
+                    ) : (
+                      <KnowledgeFileCardGrid
+                        files={pagedFiles}
+                        selection={cardSelection}
+                        onOpen={handleOpenFile}
+                        empty={emptyFiles}
+                        {...fileRowActions}
+                      />
+                    )}
                   </div>
-                ))}
+
+                  {selectedFiles.length > 0 &&
+                    (viewMode === "list" ? (
+                      <TableListPager
+                        page={safePage}
+                        totalPages={totalPages}
+                        totalItems={selectedFiles.length}
+                        pageSize={pageSize}
+                        onPageChange={setPage}
+                        onPageSizeChange={(size) => {
+                          setPageSize(size);
+                          setPage(1);
+                        }}
+                      />
+                    ) : (
+                      <div className="border-t border-divider px-4 py-2">
+                        <CardBatchPager
+                          page={safePage}
+                          totalPages={totalPages}
+                          totalItems={selectedFiles.length}
+                          pageSize={CARD_PAGE_SIZE}
+                          unitLabel="个文件"
+                          onPageChange={setPage}
+                          compact
+                        />
+                      </div>
+                    ))}
+                </>
+              )}
             </KbDragUploadOverlay>
           </div>
         )}
@@ -1048,6 +1060,7 @@ function TreeAggregatePanel({
   files,
   query,
   searchMode,
+  scope,
   sortBy,
   viewMode,
   page,
@@ -1074,6 +1087,7 @@ function TreeAggregatePanel({
   files: KnowledgeFile[];
   query: string;
   searchMode: FileSearchMode;
+  scope: FileDetailSearchScope;
   sortBy: KnowledgeSortBy;
   viewMode: FileViewMode;
   page: number;
@@ -1115,6 +1129,7 @@ function TreeAggregatePanel({
     return files.slice(start, start + effectivePageSize);
   }, [effectivePageSize, files, safePage]);
   const aggregatePageIds = pagedFiles.map((file) => file.id);
+  const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
   const empty = (
     <KbEmptyState
@@ -1149,60 +1164,73 @@ function TreeAggregatePanel({
             sortBy={sortBy}
             onSortChange={onSortChange}
             onRefresh={onRefresh}
+            showViewModeToggle={!isFullTextSearchActive}
           />
         }
       />
 
-      <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
-        {viewMode === "list" ? (
-          <KnowledgeFileTable
-            files={pagedFiles}
-            showLibrary
-            overviewMode
-            showManageColumn={showManageColumn}
-            selection={selection}
-            onToggleEnabled={onToggleEnabled}
-            onOpen={onOpen}
-            empty={empty}
-            {...fileRowActions}
-          />
-        ) : (
-          <KnowledgeFileCardGrid
-            files={pagedFiles}
-            selection={cardSelection}
-            onOpen={onOpen}
-            empty={empty}
-            {...fileRowActions}
-          />
-        )}
-      </div>
-
-      {files.length > 0 &&
-        (viewMode === "list" ? (
-          <TableListPager
-            page={safePage}
-            totalPages={totalPages}
-            totalItems={files.length}
-            pageSize={pageSize}
-            onPageChange={onPageChange}
-            onPageSizeChange={(size) => {
-              onPageSizeChange(size);
-              onPageChange(1);
-            }}
-          />
-        ) : (
-          <div className="border-t border-divider px-4 py-2">
-            <CardBatchPager
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={files.length}
-              pageSize={CARD_PAGE_SIZE}
-              unitLabel="个文件"
-              onPageChange={onPageChange}
-              compact
-            />
+      {isFullTextSearchActive ? (
+        <FullTextSearchResultPanel
+          files={files}
+          query={query}
+          showLibrary
+          scope={scope}
+          onToggleEnabled={onToggleEnabled}
+        />
+      ) : (
+        <>
+          <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
+            {viewMode === "list" ? (
+              <KnowledgeFileTable
+                files={pagedFiles}
+                showLibrary
+                overviewMode
+                showManageColumn={showManageColumn}
+                selection={selection}
+                onToggleEnabled={onToggleEnabled}
+                onOpen={onOpen}
+                empty={empty}
+                {...fileRowActions}
+              />
+            ) : (
+              <KnowledgeFileCardGrid
+                files={pagedFiles}
+                selection={cardSelection}
+                onOpen={onOpen}
+                empty={empty}
+                {...fileRowActions}
+              />
+            )}
           </div>
-        ))}
+
+          {files.length > 0 &&
+            (viewMode === "list" ? (
+              <TableListPager
+                page={safePage}
+                totalPages={totalPages}
+                totalItems={files.length}
+                pageSize={pageSize}
+                onPageChange={onPageChange}
+                onPageSizeChange={(size) => {
+                  onPageSizeChange(size);
+                  onPageChange(1);
+                }}
+              />
+            ) : (
+              <div className="border-t border-divider px-4 py-2">
+                <CardBatchPager
+                  page={safePage}
+                  totalPages={totalPages}
+                  totalItems={files.length}
+                  pageSize={CARD_PAGE_SIZE}
+                  unitLabel="个文件"
+                  onPageChange={onPageChange}
+                  compact
+                />
+              </div>
+            ))}
+        </>
+      )}
     </div>
   );
 }

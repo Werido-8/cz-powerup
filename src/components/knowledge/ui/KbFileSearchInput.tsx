@@ -3,8 +3,8 @@ import type { FileSearchMode } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 
 const SEARCH_MODES: { value: FileSearchMode; label: string }[] = [
-  { value: "fulltext", label: "全文" },
   { value: "filename", label: "文件名" },
+  { value: "fulltext", label: "全文" },
 ];
 
 export function KbFileSearchInput({

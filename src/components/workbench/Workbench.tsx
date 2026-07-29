@@ -302,7 +302,7 @@ export function Workbench() {
           <div className="w-full max-w-[300px] shrink-0 rounded-xl border border-remind/20 bg-remind-soft/60 p-4">
             <div className="mb-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-remind-foreground">
               <Bot className="h-3.5 w-3.5 text-remind" />
-              AI 学习助手提示
+              运行智库提示
             </div>
             <p className="text-[12px] leading-relaxed text-remind-foreground/90">
               本平台提供知识学习、场景练习和能力成长辅助，关键操作仍需以现场规程、票卡和岗位要求为准。

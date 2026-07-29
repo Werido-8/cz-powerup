@@ -14,6 +14,7 @@ export { KbTableCellFile, KbTableCellUser, KbTableCellBase } from "./KbTableCell
 export { KbFileTypeIcon, getKbFileTypeLabel } from "./KbFileTypeIcon";
 export { KbStatusTag } from "./KbStatusTag";
 export { KbButton, KbIconButton, KbIconTextButton } from "./KbButtons";
+export { KnowledgeBaseIcon } from "./KnowledgeBaseIcon";
 export { KbSidebar, KbSidebarSection, KbSidebarItem } from "./KbSidebar";
 export { KbSidebarDecor } from "./KbSidebarDecor";
 export { KbUploadCard } from "./KbUploadCard";
@@ -23,3 +24,4 @@ export { KbFormDialog, KbFormField } from "./KbFormDialog";
 export { KbBaseSwitcher } from "./KbBaseSwitcher";
 export type { KbBaseSwitcherGroup } from "./KbBaseSwitcher";
 export { KbVersionSelect } from "./KbVersionSelect";
+export { KbHighlightText } from "./KbHighlightText";

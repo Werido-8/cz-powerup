@@ -380,7 +380,7 @@ export function filterFiles(
   },
 ) {
   const query = filters.query?.trim().toLowerCase();
-  const searchMode = filters.searchMode ?? "fulltext";
+  const searchMode = filters.searchMode ?? "filename";
   return files.filter((file) => {
     const base = getBaseById(file.knowledgeBaseId);
     if (filters.categoryId && base?.categoryId !== filters.categoryId) return false;

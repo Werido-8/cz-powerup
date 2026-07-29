@@ -1,3 +1,4 @@
+import { useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   KbDataTable,
@@ -7,6 +8,7 @@ import {
   KbTableCellUser,
 } from "@/components/knowledge/ui";
 import { TABLE_PAGE_SIZE_DEFAULT, TableListPager } from "@/components/learning/ui";
+import { openFileDetailInNewTab } from "@/lib/knowledge/searchNav";
 import type { KnowledgeFile } from "@/lib/knowledge/types";
 
 const GRID = "grid-cols-[minmax(240px,1.4fr)_minmax(140px,1fr)_100px_120px] min-w-[720px]";
@@ -18,6 +20,7 @@ export function GlobalAuditSection({
   files: KnowledgeFile[];
   embedded?: boolean;
 }) {
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
 
@@ -55,7 +58,12 @@ export function GlobalAuditSection({
           }
         >
           {pagedFiles.map((file) => (
-            <KbDataTableRow key={file.id} variant="flat" className={GRID}>
+            <KbDataTableRow
+              key={file.id}
+              variant="flat"
+              className={GRID}
+              onClick={() => openFileDetailInNewTab(router, file)}
+            >
               <KbTableCellFile name={file.name} type={file.type ?? "pdf"} size="sm" nameWeight="normal" />
               <span className="truncate text-kb-muted">{file.knowledgeBaseName ?? "—"}</span>
               <KbTableCellUser name={file.uploaderName ?? "—"} />
