@@ -330,19 +330,21 @@ export function FileAIAssistantPanel({
             ) : (
               <div className="space-y-2">
                 {chunks.map((chunk, index) => (
-                  <article
+                  <button
                     key={chunk.id}
+                    type="button"
+                    onClick={() => jumpToHit(index)}
                     className={cn(
-                      "rounded-[8px] border px-3.5 py-3",
+                      "w-full rounded-[8px] border px-3.5 py-3 text-left transition-colors",
                       index === activeHitIndex
                         ? "border-primary/30 bg-primary-soft/40"
-                        : "border-[#EEF2F4] bg-white",
+                        : "border-[#EEF2F4] bg-white hover:border-primary/20 hover:bg-primary-soft/20",
                     )}
                   >
                     <p className="line-clamp-3 text-[12.5px] leading-relaxed text-kb-body">
                       <KbHighlightText text={chunk.text} keyword={chunk.keyword} />
                     </p>
-                  </article>
+                  </button>
                 ))}
               </div>
             )}
