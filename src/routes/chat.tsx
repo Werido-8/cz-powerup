@@ -49,6 +49,7 @@ import { ELLIPSIS_TOOLTIP_CLASS, useTextOverflow } from "@/components/common/ell
 import { cn } from "@/lib/utils";
 import {
   CONVERSATIONS,
+  DEFAULT_CONVERSATION_ID,
   DOCS,
   type AnswerCard,
   type AnswerCitation,
@@ -134,7 +135,9 @@ function readConversations(): Conversation[] {
     if (!parsed.every(isValidConversation)) return CONVERSATIONS;
 
     const storedById = new Map(parsed.map((conversation) => [conversation.id, conversation]));
-    const mergedMocks = CONVERSATIONS.map((mock) => storedById.get(mock.id) ?? mock);
+    const mergedMocks = CONVERSATIONS.map((mock) =>
+      mock.id === DEFAULT_CONVERSATION_ID ? mock : (storedById.get(mock.id) ?? mock),
+    );
     const userConversations = parsed.filter(
       (conversation) => !MOCK_CONVERSATION_IDS.has(conversation.id),
     );
@@ -146,11 +149,11 @@ function readConversations(): Conversation[] {
 }
 
 function readActiveConversationId(conversations: Conversation[]) {
-  if (typeof window === "undefined") return conversations[0]?.id ?? "";
-  const saved = localStorage.getItem(CHAT_ACTIVE_ID_KEY);
-  return conversations.some((conversation) => conversation.id === saved)
-    ? (saved as string)
-    : (conversations[0]?.id ?? "");
+  // 每次进入对话页默认打开 mock「新对话」
+  if (conversations.some((conversation) => conversation.id === DEFAULT_CONVERSATION_ID)) {
+    return DEFAULT_CONVERSATION_ID;
+  }
+  return conversations[0]?.id ?? "";
 }
 
 const COLLAPSE_MAX = 420;
@@ -2436,7 +2439,7 @@ function ChatPage() {
     useMockStore();
 
   const [conversations, setConversations] = useState<Conversation[]>(CONVERSATIONS);
-  const [activeId, setActiveId] = useState(() => CONVERSATIONS[0]?.id ?? "");
+  const [activeId, setActiveId] = useState(DEFAULT_CONVERSATION_ID);
   const [input, setInput] = useState(prefill ?? "");
   const [loading, setLoading] = useState(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);

@@ -1296,7 +1296,16 @@ export type Conversation = {
   pinned?: boolean;
 };
 
+/** 进入对话页时默认打开的空会话 */
+export const DEFAULT_CONVERSATION_ID = "c-new";
+
 export const CONVERSATIONS: Conversation[] = [
+  {
+    id: DEFAULT_CONVERSATION_ID,
+    title: "新对话",
+    updatedAt: "刚刚",
+    messages: [],
+  },
   {
     id: "c-agc",
     title: "AGC 考核依据哪些规程?",
