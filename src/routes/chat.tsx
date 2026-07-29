@@ -33,12 +33,15 @@ import {
   BrainCircuit,
   User,
   ExternalLink,
+  Share2,
+  Download,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -78,6 +81,8 @@ import { getCurrentKnowledgeUser } from "@/lib/knowledge/demoRole";
 import { getFileById } from "@/lib/knowledge/model";
 import { openFileDetailInNewTab } from "@/lib/knowledge/searchNav";
 import type { KnowledgeFile } from "@/lib/knowledge/types";
+import { ChatConversationShareDialog } from "@/components/chat/chat-conversation-share-dialog";
+import { downloadConversationMarkdown } from "@/lib/chat/conversation-export";
 
 function resolveKnowledgeFileForChatDoc(doc: Doc): KnowledgeFile | undefined {
   if (doc.knowledgeFileId) {
@@ -111,8 +116,15 @@ const COMMON_QUESTIONS = [
 // 附件/引用资料/常用问题快捷入口暂不开放，后续视需要再启用
 const SHOW_COMPOSER_ADD_MENU = false;
 
-const CHAT_CONVERSATIONS_KEY = "chat-conversations-v1";
-const CHAT_ACTIVE_ID_KEY = "chat-active-conversation-v1";
+/** 侧栏快捷键文案；发起新对话用 Ctrl+/，避开浏览器 Ctrl+N 新开窗口 */
+const CHAT_SHORTCUT = {
+  search: "Ctrl + K",
+  fold: "Ctrl + B",
+  newChat: "Ctrl + /",
+} as const;
+
+const CHAT_CONVERSATIONS_KEY = "chat-conversations-v2";
+const CHAT_ACTIVE_ID_KEY = "chat-active-conversation-v2";
 const MOCK_CONVERSATION_IDS = new Set(CONVERSATIONS.map((conversation) => conversation.id));
 
 function isValidConversation(item: unknown): item is Conversation {
@@ -135,6 +147,7 @@ function readConversations(): Conversation[] {
     if (!parsed.every(isValidConversation)) return CONVERSATIONS;
 
     const storedById = new Map(parsed.map((conversation) => [conversation.id, conversation]));
+    // 默认 mock 会话始终以代码数据为准，其余用户新建会话保留
     const mergedMocks = CONVERSATIONS.map((mock) =>
       mock.id === DEFAULT_CONVERSATION_ID ? mock : (storedById.get(mock.id) ?? mock),
     );
@@ -149,7 +162,7 @@ function readConversations(): Conversation[] {
 }
 
 function readActiveConversationId(conversations: Conversation[]) {
-  // 每次进入对话页默认打开 mock「新对话」
+  // 每次进入对话页默认打开唯一 mock 会话
   if (conversations.some((conversation) => conversation.id === DEFAULT_CONVERSATION_ID)) {
     return DEFAULT_CONVERSATION_ID;
   }
@@ -200,7 +213,10 @@ function findQuoteRange(source: string, quote: string): [number, number] | null 
   const candidates = [
     quote,
     quote.replace(/[…⋯.]+$/u, "").trim(),
-    quote.replace(/……$/, "").replace(/\.\.\.$/, "").trim(),
+    quote
+      .replace(/……$/, "")
+      .replace(/\.\.\.$/, "")
+      .trim(),
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -209,7 +225,10 @@ function findQuoteRange(source: string, quote: string): [number, number] | null 
   }
 
   const needle = normalizeCiteMatch(
-    quote.replace(/[…⋯.]+$/u, "").replace(/\.\.\.$/, "").trim(),
+    quote
+      .replace(/[…⋯.]+$/u, "")
+      .replace(/\.\.\.$/, "")
+      .trim(),
   );
   if (!needle) return null;
 
@@ -567,6 +586,8 @@ function ConvListItem({
   onRename,
   onDelete,
   onTogglePin,
+  onShare,
+  onExport,
 }: {
   conv: Conversation;
   active: boolean;
@@ -574,6 +595,8 @@ function ConvListItem({
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onShare: (id: string) => void;
+  onExport: (id: string) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(conv.title);
@@ -683,11 +706,20 @@ function ConvListItem({
                 <MoreHorizontal className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" sideOffset={4} className="min-w-[132px] text-[12px]">
+            <DropdownMenuContent align="end" sideOffset={4} className="min-w-[164px] text-[12px]">
               <DropdownMenuItem className="gap-2" onSelect={startEditing}>
                 <Pencil className="h-3.5 w-3.5" />
                 重命名
               </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => onShare(conv.id)}>
+                <Share2 className="h-3.5 w-3.5" />
+                分享对话
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onSelect={() => onExport(conv.id)}>
+                <Download className="h-3.5 w-3.5" />
+                导出 Markdown
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="gap-2 text-destructive focus:text-destructive"
                 onClick={(event) => {
@@ -822,7 +854,7 @@ function LegacyChatSidebar({
           className="flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-medium text-[#30302e] transition-colors hover:bg-[#e9e9e6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <SquarePen className="h-4 w-4" />
-          <span>新对话</span>
+          <span>发起新对话</span>
           <kbd className="ml-auto rounded-md border border-[#dededb] bg-white/70 px-1.5 py-0.5 text-[10px] font-normal text-[#777773]">
             Ctrl K
           </kbd>
@@ -1155,7 +1187,10 @@ function ChatSidebar({
   onDelete,
   onRename,
   onTogglePin,
+  onShare,
+  onExport,
   onCollapse,
+  onOpenSearch,
   className = "",
 }: {
   conversations: Conversation[];
@@ -1165,10 +1200,12 @@ function ChatSidebar({
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onTogglePin: (id: string) => void;
+  onShare: (id: string) => void;
+  onExport: (id: string) => void;
   onCollapse?: () => void;
+  onOpenSearch: () => void;
   className?: string;
 }) {
-  const [searchOpen, setSearchOpen] = useState(false);
   const [pinnedExpanded, setPinnedExpanded] = useState(true);
   const [recentExpanded, setRecentExpanded] = useState(true);
   const pinnedList = useMemo(
@@ -1180,7 +1217,8 @@ function ChatSidebar({
     [conversations],
   );
 
-  const openSearch = () => setSearchOpen(true);
+  const headerIconBtn =
+    "grid h-8 w-8 shrink-0 place-items-center rounded-[6px] text-kb-muted transition-colors hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35";
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -1195,35 +1233,51 @@ function ChatSidebar({
             <div className="min-w-0 flex-1">
               <h2 className="text-[14px] font-semibold text-kb-heading">智能问答</h2>
             </div>
-            <button
-              type="button"
-              onClick={openSearch}
-              aria-label="搜索会话"
-              title="搜索会话"
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-[6px] text-kb-muted transition-colors hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-            {onCollapse ? (
+            <ActionTooltip label="搜索" shortcut={CHAT_SHORTCUT.search}>
               <button
                 type="button"
-                onClick={onCollapse}
-                aria-label="收起智能问答侧栏"
-                title="收起侧栏"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-[6px] text-kb-muted transition-colors hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                onClick={onOpenSearch}
+                aria-label="搜索会话"
+                className={headerIconBtn}
               >
-                <PanelLeftClose className="h-4 w-4" />
+                <Search className="h-4 w-4" />
               </button>
+            </ActionTooltip>
+            {onCollapse ? (
+              <ActionTooltip label="折叠" shortcut={CHAT_SHORTCUT.fold}>
+                <button
+                  type="button"
+                  onClick={onCollapse}
+                  aria-label="折叠智能问答侧栏"
+                  className={headerIconBtn}
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                </button>
+              </ActionTooltip>
             ) : null}
           </div>
 
           <button
             type="button"
             onClick={onNew}
-            className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-[7px] border border-primary/25 bg-primary-soft/45 px-3 text-[13px] font-medium text-primary transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            aria-label={`发起新对话，快捷键 ${CHAT_SHORTCUT.newChat}`}
+            className={
+              activeId === "__pending__"
+                ? "mt-2 flex h-10 w-full items-center gap-2 rounded-[7px] border border-primary/25 bg-primary-soft/45 px-3 text-[13px] font-medium text-primary transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                : "mt-2 flex h-10 w-full items-center gap-2 rounded-[7px] border border-border bg-[#f7fafb] px-3 text-[13px] font-medium text-kb-heading transition-colors hover:border-primary/25 hover:bg-primary-soft/30 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            }
           >
-            <SquarePen className="h-4 w-4" />
-            新对话
+            <SquarePen className="h-4 w-4 shrink-0" />
+            <span className="flex-1 text-left">发起新对话</span>
+            <kbd
+              className={
+                activeId === "__pending__"
+                  ? "rounded-md border border-primary/20 bg-white/70 px-1.5 py-0.5 text-[10px] font-normal text-primary/70"
+                  : "rounded-md border border-border bg-white px-1.5 py-0.5 text-[10px] font-normal text-kb-muted"
+              }
+            >
+              {CHAT_SHORTCUT.newChat}
+            </kbd>
           </button>
         </div>
 
@@ -1260,6 +1314,8 @@ function ChatSidebar({
                         onRename={onRename}
                         onDelete={onDelete}
                         onTogglePin={onTogglePin}
+                        onShare={onShare}
+                        onExport={onExport}
                       />
                     ))}
                   </ul>
@@ -1297,6 +1353,8 @@ function ChatSidebar({
                         onRename={onRename}
                         onDelete={onDelete}
                         onTogglePin={onTogglePin}
+                        onShare={onShare}
+                        onExport={onExport}
                       />
                     ))}
                   </ul>
@@ -1311,38 +1369,32 @@ function ChatSidebar({
             )}
           </div>
         </div>
-
-        <ChatConversationSearchDialog
-          open={searchOpen}
-          onOpenChange={setSearchOpen}
-          conversations={conversations}
-          activeId={activeId}
-          onSelect={onSelect}
-        />
       </aside>
     </TooltipProvider>
   );
 }
 
-function RailTooltip({
+function ActionTooltip({
   label,
   shortcut,
+  side = "bottom",
   children,
 }: {
   label: string;
   shortcut?: string;
+  side?: "top" | "right" | "bottom" | "left";
   children: React.ReactNode;
 }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent
-        side="right"
-        sideOffset={10}
-        className="bg-[#252525] px-2.5 py-1.5 text-[12px] text-white shadow-none"
+        side={side}
+        sideOffset={8}
+        className="flex items-center gap-2 border-0 bg-[#252525] px-2.5 py-1.5 text-[12px] text-white shadow-none"
       >
         <span>{label}</span>
-        {shortcut && <kbd className="ml-2 text-[10px] text-white/65">{shortcut}</kbd>}
+        {shortcut ? <kbd className="text-[10px] text-white/65">{shortcut}</kbd> : null}
       </TooltipContent>
     </Tooltip>
   );
@@ -1356,6 +1408,8 @@ function ConversationPopover({
   onDelete,
   onRename,
   onTogglePin,
+  onShare,
+  onExport,
 }: {
   title: string;
   conversations: Conversation[];
@@ -1364,6 +1418,8 @@ function ConversationPopover({
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onTogglePin: (id: string) => void;
+  onShare: (id: string) => void;
+  onExport: (id: string) => void;
 }) {
   return (
     <div className="max-h-[min(28rem,calc(100dvh-7rem))] overflow-y-auto p-2">
@@ -1379,6 +1435,8 @@ function ConversationPopover({
               onRename={onRename}
               onDelete={onDelete}
               onTogglePin={onTogglePin}
+              onShare={onShare}
+              onExport={onExport}
             />
           ))}
         </ul>
@@ -1397,7 +1455,10 @@ function ChatRail({
   onDelete,
   onRename,
   onTogglePin,
+  onShare,
+  onExport,
   onExpand,
+  onOpenSearch,
 }: {
   conversations: Conversation[];
   activeId: string;
@@ -1406,9 +1467,11 @@ function ChatRail({
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onTogglePin: (id: string) => void;
+  onShare: (id: string) => void;
+  onExport: (id: string) => void;
   onExpand: () => void;
+  onOpenSearch: () => void;
 }) {
-  const [searchOpen, setSearchOpen] = useState(false);
   const [activePopover, setActivePopover] = useState<"pinned" | "recent" | null>(null);
   const pinned = useMemo(
     () => conversations.filter((conversation) => conversation.pinned),
@@ -1423,6 +1486,14 @@ function ChatRail({
     onSelect(id);
     setActivePopover(null);
   };
+  const shareFromPopover = (id: string) => {
+    setActivePopover(null);
+    onShare(id);
+  };
+  const exportFromPopover = (id: string) => {
+    setActivePopover(null);
+    onExport(id);
+  };
 
   const railButton =
     "grid h-11 w-11 place-items-center rounded-xl text-kb-body transition-colors duration-200 hover:bg-primary-soft hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35";
@@ -1433,7 +1504,7 @@ function ChatRail({
         aria-label="对话工具栏"
         className="flex h-full w-16 shrink-0 flex-col items-center border-r border-border bg-white py-2"
       >
-        <RailTooltip label="展开智能问答侧栏">
+        <ActionTooltip label="展开" shortcut={CHAT_SHORTCUT.fold} side="right">
           <button
             type="button"
             aria-label="展开智能问答侧栏"
@@ -1443,40 +1514,40 @@ function ChatRail({
             <Sparkles className="h-5 w-5 transition-opacity group-hover:opacity-0 group-focus-visible:opacity-0" />
             <PanelLeftOpen className="absolute h-5 w-5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />
           </button>
-        </RailTooltip>
+        </ActionTooltip>
 
         <div className="mt-2 flex flex-col items-center gap-1">
-          <RailTooltip label="新聊天" shortcut="Ctrl + K">
-            <button type="button" aria-label="新对话" onClick={onNew} className={railButton}>
+          <ActionTooltip label="发起新对话" shortcut={CHAT_SHORTCUT.newChat} side="right">
+            <button type="button" aria-label="发起新对话" onClick={onNew} className={railButton}>
               <SquarePen className="h-5 w-5" />
             </button>
-          </RailTooltip>
+          </ActionTooltip>
 
-          <RailTooltip label="搜索聊天">
+          <ActionTooltip label="搜索" shortcut={CHAT_SHORTCUT.search} side="right">
             <button
               type="button"
               aria-label="搜索会话"
               onClick={() => {
                 setActivePopover(null);
-                setSearchOpen(true);
+                onOpenSearch();
               }}
               className={railButton}
             >
               <Search className="h-5 w-5" />
             </button>
-          </RailTooltip>
+          </ActionTooltip>
 
           <Popover
-            open={activePopover === "pinned" && !searchOpen}
+            open={activePopover === "pinned"}
             onOpenChange={(open) => setActivePopover(open ? "pinned" : null)}
           >
-            <RailTooltip label="已置顶">
+            <ActionTooltip label="已置顶" side="right">
               <PopoverTrigger asChild>
                 <button type="button" aria-label="查看已置顶会话" className={railButton}>
                   <Pin className="h-5 w-5" />
                 </button>
               </PopoverTrigger>
-            </RailTooltip>
+            </ActionTooltip>
             <PopoverContent
               side="right"
               align="start"
@@ -1491,21 +1562,23 @@ function ChatRail({
                 onRename={onRename}
                 onDelete={onDelete}
                 onTogglePin={onTogglePin}
+                onShare={shareFromPopover}
+                onExport={exportFromPopover}
               />
             </PopoverContent>
           </Popover>
 
           <Popover
-            open={activePopover === "recent" && !searchOpen}
+            open={activePopover === "recent"}
             onOpenChange={(open) => setActivePopover(open ? "recent" : null)}
           >
-            <RailTooltip label="最近聊天">
+            <ActionTooltip label="最近聊天" side="right">
               <PopoverTrigger asChild>
                 <button type="button" aria-label="查看最近会话" className={railButton}>
                   <MessageCircle className="h-5 w-5" />
                 </button>
               </PopoverTrigger>
-            </RailTooltip>
+            </ActionTooltip>
             <PopoverContent
               side="right"
               align="start"
@@ -1520,19 +1593,13 @@ function ChatRail({
                 onRename={onRename}
                 onDelete={onDelete}
                 onTogglePin={onTogglePin}
+                onShare={shareFromPopover}
+                onExport={exportFromPopover}
               />
             </PopoverContent>
           </Popover>
         </div>
       </aside>
-
-      <ChatConversationSearchDialog
-        open={searchOpen}
-        onOpenChange={setSearchOpen}
-        conversations={conversations}
-        activeId={activeId}
-        onSelect={onSelect}
-      />
     </TooltipProvider>
   );
 }
@@ -1575,8 +1642,8 @@ function CompactChatRail({ onExpand, onNew }: { onExpand: () => void; onNew: () 
         </SidebarRailTooltip>
 
         <div className="mt-2 flex flex-col items-center gap-1">
-          <SidebarRailTooltip label="新对话">
-            <button type="button" onClick={onNew} aria-label="新对话" className={railButton}>
+          <SidebarRailTooltip label="发起新对话">
+            <button type="button" onClick={onNew} aria-label="发起新对话" className={railButton}>
               <SquarePen className="h-5 w-5" />
             </button>
           </SidebarRailTooltip>
@@ -1825,6 +1892,9 @@ function StructuredAnswer({
   );
 }
 
+const DISLIKE_REASONS = ["数据陈旧", "格式错误", "代码报错", "理解偏差", "引用不规范"] as const;
+const DISLIKE_FEEDBACK_MAX = 500;
+
 function AnswerBubble({
   card,
   msgId,
@@ -1851,7 +1921,25 @@ function AnswerBubble({
   const [expanded, setExpanded] = useState(false);
   const [needsCollapse, setNeedsCollapse] = useState(false);
   const [liked, setLiked] = useState<"up" | "down" | null>(null);
+  const [dislikeFeedbackOpen, setDislikeFeedbackOpen] = useState(false);
+  const [dislikeReason, setDislikeReason] = useState<string | null>(null);
+  const [dislikeComment, setDislikeComment] = useState("");
+  const [dislikeSubmitted, setDislikeSubmitted] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  const resetDislikeForm = () => {
+    setDislikeReason(null);
+    setDislikeComment("");
+  };
+
+  const closeDislikeFeedback = (clearSelection: boolean) => {
+    setDislikeFeedbackOpen(false);
+    if (clearSelection) {
+      setLiked(null);
+      setDislikeSubmitted(false);
+      resetDislikeForm();
+    }
+  };
 
   const openCite = (index: number) => onOpenCitation(card.citations, index);
   const answerForClipboard = [
@@ -1962,7 +2050,14 @@ function AnswerBubble({
             </div>
           )}
 
-          <div className="mt-2 flex min-h-10 flex-wrap items-center gap-0.5 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+          <div
+            className={cn(
+              "mt-2 flex min-h-10 flex-wrap items-center gap-0.5 transition-opacity",
+              dislikeFeedbackOpen
+                ? "opacity-100"
+                : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100",
+            )}
+          >
             {/* 后续开放：加入笔记
             <button
               type="button"
@@ -2003,9 +2098,15 @@ function AnswerBubble({
                 title="回答有帮助"
                 onClick={() => {
                   setLiked("up");
+                  setDislikeFeedbackOpen(false);
+                  setDislikeSubmitted(false);
+                  resetDislikeForm();
                   toast.success("感谢反馈");
                 }}
-                className={`grid h-10 w-10 place-items-center rounded-lg hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${liked === "up" ? "text-primary" : "text-muted-foreground"}`}
+                className={cn(
+                  "grid h-10 w-10 place-items-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  liked === "up" ? "bg-primary-soft text-primary" : "text-muted-foreground",
+                )}
               >
                 <ThumbsUp className="h-3.5 w-3.5" />
               </button>
@@ -2013,11 +2114,23 @@ function AnswerBubble({
                 type="button"
                 aria-label="回答需改进"
                 title="回答需改进"
+                aria-expanded={dislikeFeedbackOpen}
                 onClick={() => {
+                  if (dislikeFeedbackOpen) {
+                    closeDislikeFeedback(!dislikeSubmitted);
+                    return;
+                  }
+                  if (liked === "down" && dislikeSubmitted) {
+                    closeDislikeFeedback(true);
+                    return;
+                  }
                   setLiked("down");
-                  toast.message("已记录，将用于优化回答");
+                  setDislikeFeedbackOpen(true);
                 }}
-                className={`grid h-10 w-10 place-items-center rounded-lg hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${liked === "down" ? "text-remind" : "text-muted-foreground"}`}
+                className={cn(
+                  "grid h-10 w-10 place-items-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  liked === "down" ? "bg-primary-soft text-primary" : "text-muted-foreground",
+                )}
               >
                 <ThumbsDown className="h-3.5 w-3.5" />
               </button>
@@ -2035,6 +2148,67 @@ function AnswerBubble({
               </button>
             </div>
           </div>
+
+          {dislikeFeedbackOpen && (
+            <div className="mt-2 rounded-xl border border-[#e8e8e5] bg-[#f7f7f5] p-3.5 sm:p-4">
+              <p className="mb-3 text-[13px] font-medium text-kb-heading">请选择或输入不满意原因</p>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {DISLIKE_REASONS.map((reason) => {
+                  const selected = dislikeReason === reason;
+                  return (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() => setDislikeReason(selected ? null : reason)}
+                      className={cn(
+                        "inline-flex h-8 items-center rounded-lg border px-3 text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+                        selected
+                          ? "border-primary bg-white text-primary"
+                          : "border-[#e0e0dc] bg-white text-kb-body hover:border-primary/35 hover:text-primary",
+                      )}
+                    >
+                      {reason}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="relative mb-3">
+                <textarea
+                  value={dislikeComment}
+                  onChange={(e) =>
+                    setDislikeComment(e.target.value.slice(0, DISLIKE_FEEDBACK_MAX))
+                  }
+                  placeholder="请输入其他反馈"
+                  rows={3}
+                  maxLength={DISLIKE_FEEDBACK_MAX}
+                  className="w-full resize-none rounded-lg border border-[#e0e0dc] bg-white px-3 py-2.5 pb-7 text-[13px] leading-5 text-kb-body placeholder:text-[#b0b0aa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                />
+                <span className="pointer-events-none absolute bottom-2.5 right-3 tabular-nums text-[11px] text-[#b0b0aa]">
+                  {dislikeComment.length} / {DISLIKE_FEEDBACK_MAX}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => closeDislikeFeedback(!dislikeSubmitted)}
+                  className="inline-flex h-8 min-w-[4.5rem] items-center justify-center rounded-lg border border-[#e0e0dc] bg-white px-3 text-[12px] font-medium text-kb-heading transition-colors hover:bg-[#f0f0ed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                >
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDislikeSubmitted(true);
+                    setDislikeFeedbackOpen(false);
+                    toast.success("感谢反馈，将用于优化回答");
+                  }}
+                  className="inline-flex h-8 min-w-[4.5rem] items-center justify-center rounded-lg bg-primary px-3 text-[12px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                >
+                  提交
+                </button>
+              </div>
+            </div>
+          )}
         </article>
       </div>
     </div>
@@ -2052,6 +2226,7 @@ function ChatComposer({
   knowledgeBaseEnabled,
   deepThinkingEnabled,
   commonQuestions,
+  inputRef,
   onChange,
   onSend,
   onStop,
@@ -2071,6 +2246,7 @@ function ChatComposer({
   knowledgeBaseEnabled: boolean;
   deepThinkingEnabled: boolean;
   commonQuestions: string[];
+  inputRef?: React.Ref<HTMLTextAreaElement>;
   onChange: (v: string) => void;
   onSend: () => void;
   onStop: () => void;
@@ -2155,7 +2331,7 @@ function ChatComposer({
       >
         <div
           className={cn(
-            "scrollbar-hide flex min-h-10 items-center gap-1.5 overflow-x-auto rounded-t-2xl border-b border-divider bg-[#fbfcfc] px-3 py-2 transition-opacity sm:px-4",
+            "flex min-h-10 flex-wrap items-center gap-1.5 rounded-t-2xl border-b border-divider bg-[#fbfcfc] px-3 py-2 transition-opacity sm:px-4",
             !knowledgeBaseEnabled && "opacity-55",
           )}
           aria-label="已选知识库"
@@ -2185,6 +2361,7 @@ function ChatComposer({
         </div>
 
         <textarea
+          ref={inputRef}
           aria-label="输入对话问题"
           value={input}
           onChange={(e) => onChange(e.target.value)}
@@ -2439,16 +2616,19 @@ function ChatPage() {
     useMockStore();
 
   const [conversations, setConversations] = useState<Conversation[]>(CONVERSATIONS);
+  const [shareDialogConversationId, setShareDialogConversationId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState(DEFAULT_CONVERSATION_ID);
+  const [pendingNewConv, setPendingNewConv] = useState(true);
   const [input, setInput] = useState(prefill ?? "");
   const [loading, setLoading] = useState(false);
   const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [conversationSearchOpen, setConversationSearchOpen] = useState(false);
   const [citationPanelOpen, setCitationPanelOpen] = useState(false);
   const [attachedFile, setAttachedFile] = useState<string | null>(null);
   const [kbScope, setKbScope] = useState<string[]>(() => {
     if (libId && CHAT_KNOWLEDGE_BASES.some((base) => base.id === libId)) return [libId];
-    return ["kb-grid-operation"];
+    return [];
   });
   const [kbDialogOpen, setKbDialogOpen] = useState(false);
   const [knowledgeBaseEnabled, setKnowledgeBaseEnabled] = useState(true);
@@ -2477,6 +2657,7 @@ function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const nearBottomRef = useRef(true);
+  const composerInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const loadedConversations = readConversations();
@@ -2497,7 +2678,15 @@ function ChatPage() {
     };
   }, []);
 
-  const conv = conversations.find((c) => c.id === activeId) ?? conversations[0];
+  const PENDING_CONV: Conversation = {
+    id: "__pending__",
+    title: "新对话",
+    updatedAt: "",
+    messages: [],
+  };
+  const conv = pendingNewConv
+    ? PENDING_CONV
+    : (conversations.find((c) => c.id === activeId) ?? conversations[0] ?? PENDING_CONV);
 
   const openCitation = useCallback((citations: AnswerCitation[], index: number) => {
     setCitationView({ citations, index });
@@ -2528,6 +2717,11 @@ function ChatPage() {
     if (activeId) localStorage.setItem(CHAT_ACTIVE_ID_KEY, activeId);
   }, [activeId, storageReady]);
 
+  // 切换会话时默认收起右侧依据栏；用户点击引用后再展开
+  useEffect(() => {
+    setCitationPanelOpen(false);
+  }, [activeId, pendingNewConv]);
+
   // 仅在切换会话或最新回答引用变化时同步右侧 tabs；点击某条回答的引用时由 openCitation 绑定该回合引用
   const lastAssistantCitations = (() => {
     const last = [...conv.messages].reverse().find((m) => m.role === "assistant");
@@ -2539,7 +2733,6 @@ function ChatPage() {
       setCitationView({ citations: lastAssistantCitations, index: 0 });
     } else if (conv.messages.length === 0) {
       setCitationView({ citations: [], index: 0 });
-      setCitationPanelOpen(false);
     }
   }, [activeId, lastAssistantCitations, conv.messages.length]);
 
@@ -2602,25 +2795,44 @@ function ChatPage() {
   const send = (val?: string) => {
     const text = (val ?? input).trim();
     if (!text || loading) return;
-    const targetConversationId = activeId;
     const t = nowTime();
     setInput("");
     setPausedUserMessage(null);
     setLoading(true);
     nearBottomRef.current = true;
     requestAnimationFrame(() => scrollToBottom());
-    setConversations((cs) =>
-      cs.map((c) => {
-        if (c.id !== targetConversationId) return c;
-        const title = c.title === "新对话" ? text.slice(0, 28) : c.title;
-        return {
-          ...c,
-          title,
+
+    let targetConversationId: string;
+    if (pendingNewConv) {
+      const id = `c${Date.now()}`;
+      targetConversationId = id;
+      setPendingNewConv(false);
+      setActiveId(id);
+      setConversations((cs) => [
+        {
+          id,
+          title: text.slice(0, 28),
           updatedAt: "刚刚",
-          messages: [...c.messages, { role: "user", text, time: t }],
-        };
-      }),
-    );
+          messages: [{ role: "user", text, time: t }],
+        },
+        ...cs,
+      ]);
+    } else {
+      targetConversationId = activeId;
+      setConversations((cs) =>
+        cs.map((c) => {
+          if (c.id !== targetConversationId) return c;
+          const title = c.title === "新对话" ? text.slice(0, 28) : c.title;
+          return {
+            ...c,
+            title,
+            updatedAt: "刚刚",
+            messages: [...c.messages, { role: "user", text, time: t }],
+          };
+        }),
+      );
+    }
+
     responseTimerRef.current = setTimeout(() => {
       responseTimerRef.current = null;
       setConversations((cs) =>
@@ -2688,14 +2900,17 @@ function ChatPage() {
       responseTimerRef.current = null;
       setLoading(false);
     }
-    const id = `c${Date.now()}`;
-    setConversations((cs) => [{ id, title: "新对话", updatedAt: "刚刚", messages: [] }, ...cs]);
-    setActiveId(id);
+    setPendingNewConv(true);
     setHistoryDrawerOpen(false);
     setCitationPanelOpen(false);
     setCitationView({ citations: [], index: 0 });
     setPausedUserMessage(null);
     setInput("");
+    // 可能从有消息布局切到空会话布局导致输入框重挂载，连续两帧再聚焦更稳
+    requestAnimationFrame(() => {
+      composerInputRef.current?.focus();
+      requestAnimationFrame(() => composerInputRef.current?.focus());
+    });
   }, []);
 
   const deleteConv = (id: string) => {
@@ -2704,14 +2919,17 @@ function ChatPage() {
     if (!removed) return;
 
     const remaining = conversations.filter((conversation) => conversation.id !== id);
-    const replacement: Conversation | null =
-      remaining.length === 0
-        ? { id: `c${Date.now()}`, title: "新对话", updatedAt: "刚刚", messages: [] }
-        : null;
-    const next = replacement ? [replacement] : remaining;
 
-    setConversations(next);
-    if (activeId === id) setActiveId(next[Math.min(removedIndex, next.length - 1)].id);
+    setConversations(remaining);
+    if (activeId === id) {
+      const next = remaining.find((c) => c.messages.length > 0);
+      if (next) {
+        setActiveId(next.id);
+        setPendingNewConv(false);
+      } else {
+        setPendingNewConv(true);
+      }
+    }
 
     toast.success("会话已删除", {
       duration: 6000,
@@ -2719,14 +2937,12 @@ function ChatPage() {
         label: "撤销",
         onClick: () => {
           setConversations((current) => {
-            const base = replacement
-              ? current.filter((conversation) => conversation.id !== replacement.id)
-              : current;
-            const restored = [...base];
+            const restored = [...current];
             restored.splice(Math.min(removedIndex, restored.length), 0, removed);
             return restored;
           });
           setActiveId(id);
+          setPendingNewConv(false);
           toast.success("已恢复会话");
         },
       },
@@ -2751,7 +2967,19 @@ function ChatPage() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+      if (e.isComposing || !(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      if (key === "k" && !e.shiftKey) {
+        e.preventDefault();
+        setConversationSearchOpen(true);
+        return;
+      }
+      if (key === "b" && !e.shiftKey) {
+        e.preventDefault();
+        setSidebarCollapsed((collapsed) => !collapsed);
+        return;
+      }
+      if (key === "/" && !e.shiftKey) {
         e.preventDefault();
         newConv();
       }
@@ -2864,25 +3092,59 @@ function ChatPage() {
 
   const selectConversation = (id: string) => {
     setActiveId(id);
+    setPendingNewConv(false);
     setHistoryDrawerOpen(false);
+    setCitationPanelOpen(false);
     const selected = conversations.find((c) => c.id === id);
     if (!selected || selected.messages.length === 0) {
-      setCitationPanelOpen(false);
       setCitationView({ citations: [], index: 0 });
     }
   };
 
+  const openShareConversation = (id: string) => {
+    if (!conversations.some((conversation) => conversation.id === id)) return;
+    setHistoryDrawerOpen(false);
+    setShareDialogConversationId(id);
+  };
+
+  const exportConversation = (id: string) => {
+    const conversation = conversations.find((item) => item.id === id);
+    if (!conversation) return;
+    setHistoryDrawerOpen(false);
+    try {
+      downloadConversationMarkdown(conversation);
+      toast.success("会话已导出为 Markdown");
+    } catch {
+      toast.error("导出失败，请稍后重试");
+    }
+  };
+
+  const shareDialogConversation =
+    conversations.find((conversation) => conversation.id === shareDialogConversationId) ?? null;
+
+  const shareConversation = (memberIds: string[]) => {
+    if (!shareDialogConversation || memberIds.length === 0) return;
+    setShareDialogConversationId(null);
+    toast.success("对话已分享");
+  };
+
+  const historyConversations = conversations.filter((c) => c.messages.length > 0);
+  const sidebarActiveId = pendingNewConv ? "__pending__" : activeId;
+
   const renderSidebar = (className = "", onCollapse?: () => void) => (
     <ChatSidebar
       className={className}
-      conversations={conversations}
-      activeId={activeId}
+      conversations={historyConversations}
+      activeId={sidebarActiveId}
       onSelect={selectConversation}
       onNew={newConv}
       onDelete={deleteConv}
       onRename={renameConv}
       onTogglePin={togglePinConv}
+      onShare={openShareConversation}
+      onExport={exportConversation}
       onCollapse={onCollapse}
+      onOpenSearch={() => setConversationSearchOpen(true)}
     />
   );
 
@@ -2897,6 +3159,7 @@ function ChatPage() {
       kbDialogOpen={kbDialogOpen}
       knowledgeBaseEnabled={knowledgeBaseEnabled}
       deepThinkingEnabled={deepThinkingEnabled}
+      inputRef={composerInputRef}
       onChange={setInput}
       onSend={() => send()}
       onStop={stopGeneration}
@@ -2919,14 +3182,17 @@ function ChatPage() {
         <div className="hidden h-full min-h-0 xl:block">
           {sidebarCollapsed ? (
             <ChatRail
-              conversations={conversations}
-              activeId={activeId}
+              conversations={historyConversations}
+              activeId={sidebarActiveId}
               onSelect={selectConversation}
               onNew={newConv}
               onDelete={deleteConv}
               onRename={renameConv}
               onTogglePin={togglePinConv}
+              onShare={openShareConversation}
+              onExport={exportConversation}
               onExpand={() => setSidebarCollapsed(false)}
+              onOpenSearch={() => setConversationSearchOpen(true)}
             />
           ) : (
             renderSidebar("", () => setSidebarCollapsed(true))
@@ -2957,8 +3223,7 @@ function ChatPage() {
                       backgroundImage:
                         "radial-gradient(#d9d9d4 1px, transparent 1px), radial-gradient(ellipse 55% 60% at 50% 15%, rgba(52,155,172,0.09), transparent 70%)",
                       backgroundSize: "20px 20px, 100% 100%",
-                      maskImage:
-                        "radial-gradient(ellipse 65% 60% at 50% 22%, black, transparent)",
+                      maskImage: "radial-gradient(ellipse 65% 60% at 50% 22%, black, transparent)",
                       WebkitMaskImage:
                         "radial-gradient(ellipse 65% 60% at 50% 22%, black, transparent)",
                     }}
@@ -3145,11 +3410,27 @@ function ChatPage() {
         ) : null}
       </div>
 
+      <ChatConversationSearchDialog
+        open={conversationSearchOpen}
+        onOpenChange={setConversationSearchOpen}
+        conversations={historyConversations}
+        activeId={sidebarActiveId}
+        onSelect={selectConversation}
+      />
       <QuizSetDialog
         open={quizDialog.open}
         onOpenChange={(open) => setQuizDialog((prev) => ({ ...prev, open }))}
         loading={quizDialogLoading}
         quizSet={activeQuizSet}
+      />
+      <ChatConversationShareDialog
+        open={!!shareDialogConversation}
+        conversationTitle={shareDialogConversation?.title ?? ""}
+        currentUserId={getCurrentKnowledgeUser().id}
+        onOpenChange={(open) => {
+          if (!open) setShareDialogConversationId(null);
+        }}
+        onConfirm={shareConversation}
       />
     </PageShell>
   );

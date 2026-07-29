@@ -130,7 +130,7 @@ export function FileTreeSidebar({
   currentFileId: string;
   onSelect: (file: KnowledgeFile) => void;
   title?: string;
-  /** Search keyword hint shown below the title row when in search mode */
+  /** Search keyword hint; shares a row with the exit link when in results mode */
   subtitle?: ReactNode;
   /** When provided, shows a hit-count badge per file using getFileMatchChunks */
   hitQuery?: string;
@@ -168,16 +168,7 @@ export function FileTreeSidebar({
             <h2 className="text-[14px] font-semibold text-kb-heading">{title}</h2>
             <span className="text-[11.5px] text-kb-muted">{files.length} 个文件</span>
           </div>
-          {isResultsMode ? (
-            <button
-              type="button"
-              onClick={onExitResults}
-              className="inline-flex shrink-0 items-center gap-0.5 text-[11.5px] font-medium text-primary/80 transition-colors hover:text-primary"
-            >
-              <Library className="h-3.5 w-3.5 stroke-[2]" />
-              {exitResultsLabel}
-            </button>
-          ) : (
+          {!isResultsMode ? (
             <button
               type="button"
               aria-label="刷新文件列表"
@@ -187,12 +178,28 @@ export function FileTreeSidebar({
             >
               <RefreshCw className="h-4 w-4 stroke-[1.8]" />
             </button>
-          )}
+          ) : null}
         </div>
 
-        {subtitle && (
-          <div className="mt-2">
-            <span className="text-[11.5px] leading-relaxed text-kb-muted">{subtitle}</span>
+        {(subtitle || isResultsMode) && (
+          <div className="mt-2 flex items-center justify-between gap-2">
+            {subtitle ? (
+              <span className="min-w-0 truncate text-[11.5px] leading-relaxed text-kb-muted">
+                {subtitle}
+              </span>
+            ) : (
+              <span />
+            )}
+            {isResultsMode ? (
+              <button
+                type="button"
+                onClick={onExitResults}
+                className="inline-flex shrink-0 items-center gap-0.5 text-[11.5px] font-medium text-primary/80 transition-colors hover:text-primary"
+              >
+                <Library className="h-3.5 w-3.5 stroke-[2]" />
+                {exitResultsLabel}
+              </button>
+            ) : null}
           </div>
         )}
 

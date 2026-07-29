@@ -12,7 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useRouter } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -29,7 +29,7 @@ import type { KnowledgeFile } from "@/lib/knowledge/types";
 import { openFileDetailInNewTab, type FileDetailSearchScope } from "@/lib/knowledge/searchNav";
 import { cn } from "@/lib/utils";
 
-const LEFT_PAGE_SIZE = 8;
+const LEFT_PAGE_SIZE = 10;
 
 function formatFileDate(value?: string) {
   if (!value) return "-";
@@ -53,28 +53,6 @@ function FileMetaLine({ file, showLibrary }: { file: KnowledgeFile; showLibrary:
   }
 
   return <span className="tabular-nums">{date}</span>;
-}
-
-function useHoverMenu(closeDelay = 160) {
-  const [open, setOpen] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const clearTimer = () => {
-    if (timer.current) {
-      clearTimeout(timer.current);
-      timer.current = null;
-    }
-  };
-  const openNow = () => {
-    clearTimer();
-    setOpen(true);
-  };
-  const closeSoon = () => {
-    clearTimer();
-    timer.current = setTimeout(() => setOpen(false), closeDelay);
-  };
-
-  return { open, setOpen, hoverProps: { onMouseEnter: openNow, onMouseLeave: closeSoon } };
 }
 
 /**
@@ -324,18 +302,16 @@ function FullTextFileRowActions({
   onOpen: (file: KnowledgeFile) => void;
   onToggleEnabled?: (file: KnowledgeFile, enabled: boolean) => void;
 }) {
-  const { open, setOpen, hoverProps } = useHoverMenu();
   const employee = isEmployee();
   const canManageFile = !employee || getBaseById(file.knowledgeBaseId)?.scope === "personal";
   const enabled = isFileEnabled(file);
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
           aria-label="更多操作"
-          {...hoverProps}
           className={cn(
             "grid h-6 w-6 place-items-center rounded-[6px] text-muted-foreground transition-colors",
             "hover:bg-muted hover:text-foreground data-[state=open]:bg-muted data-[state=open]:text-primary",
@@ -348,7 +324,6 @@ function FullTextFileRowActions({
         align="end"
         className="min-w-[140px]"
         onCloseAutoFocus={(e) => e.preventDefault()}
-        {...hoverProps}
       >
         <DropdownMenuItem className="text-[12.5px]" onClick={() => onOpen(file)}>
           <Eye className="h-3.5 w-3.5 stroke-[1.8]" />
