@@ -1,11 +1,10 @@
 export type KnowledgeUserRole = "employee" | "knowledgeAdmin" | "superAdmin";
 
-export type KnowledgeBaseStatus = "enabled" | "disabled";
-
 export type KnowledgeBaseScope = "public" | "professional" | "personal";
 
 export type FilePublishStatus =
   | "pendingApproval"
+  | "pendingConfirm"
   | "rejected"
   | "parsing"
   | "parseFailed"
@@ -64,7 +63,6 @@ export interface KnowledgeBase {
   categoryId?: string;
   categoryPath?: string[];
   fileCount?: number;
-  status: KnowledgeBaseStatus;
   permission: KnowledgeBasePermission;
   updatedAt?: string;
   ownerName?: string;

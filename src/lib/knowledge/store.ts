@@ -1,9 +1,11 @@
 import {
+  FILE_CONFIRMS,
   KNOWLEDGE_BASES,
   KNOWLEDGE_CATEGORIES,
   KNOWLEDGE_FILES,
   PERSONAL_DIRECTORIES,
   UPLOAD_APPROVALS,
+  UPLOAD_RECORDS,
 } from "./data";
 import type {
   KnowledgeBase,
@@ -11,6 +13,7 @@ import type {
   KnowledgeFile,
   PersonalDirectory,
   UploadApproval,
+  UploadRecord,
 } from "./types";
 
 /** 公共知识库根目录（表单选择器用，写入时 parentId 为空） */
@@ -23,7 +26,17 @@ let files: KnowledgeFile[] = KNOWLEDGE_FILES.map((item) => ({
   ...item,
   enabled: item.enabled ?? true,
 }));
+let uploadRecords: UploadRecord[] = UPLOAD_RECORDS.map((item) => ({ ...item }));
 let uploadApprovals: UploadApproval[] = UPLOAD_APPROVALS.map((item) => ({
+  ...item,
+  aiMetadata: item.aiMetadata?.map((field) => ({ ...field })),
+  aiExercises: item.aiExercises?.map((exercise) => ({
+    ...exercise,
+    options: exercise.options.map((option) => ({ ...option })),
+    correctAnswers: [...exercise.correctAnswers],
+  })),
+}));
+let fileConfirms: UploadApproval[] = FILE_CONFIRMS.map((item) => ({
   ...item,
   aiMetadata: item.aiMetadata?.map((field) => ({ ...field })),
   aiExercises: item.aiExercises?.map((exercise) => ({
@@ -76,8 +89,84 @@ export function getStoreUploadApprovals() {
   return uploadApprovals;
 }
 
+export function getStoreUploadRecords() {
+  return uploadRecords;
+}
+
+export function getStoreFileConfirms() {
+  return fileConfirms;
+}
+
 export function updateStoreUploadApproval(id: string, patch: Partial<UploadApproval>) {
   uploadApprovals = uploadApprovals.map((item) => (item.id === id ? { ...item, ...patch } : item));
+  emit();
+}
+
+export function updateStoreUploadRecord(id: string, patch: Partial<UploadRecord>) {
+  uploadRecords = uploadRecords.map((item) => (item.id === id ? { ...item, ...patch } : item));
+  emit();
+}
+
+export function updateStoreFileConfirm(id: string, patch: Partial<UploadApproval>) {
+  fileConfirms = fileConfirms.map((item) => (item.id === id ? { ...item, ...patch } : item));
+  emit();
+}
+
+function publishPersonalConfirm(confirm: UploadApproval) {
+  const stamp = new Date().toISOString().replace("T", " ").slice(0, 16);
+  fileConfirms = fileConfirms.map((item) =>
+    item.id === confirm.id
+      ? {
+          ...confirm,
+          status: "approved" as const,
+          reviewerName: "本人确认",
+          reviewedAt: stamp,
+        }
+      : item,
+  );
+  uploadRecords = uploadRecords.map((item) =>
+    item.fileName === confirm.fileName && item.targetKnowledgeBaseId === confirm.knowledgeBaseId
+      ? {
+          ...item,
+          status: "published",
+          parseStatus: "success",
+          updatedAt: stamp,
+          publishedAt: stamp,
+          publisherName: "本人确认",
+          reviewNote: "本人已确认 AI 解析内容并发布",
+        }
+      : item,
+  );
+  files = files.map((item) =>
+    item.name === confirm.fileName &&
+    item.knowledgeBaseId === (confirm.knowledgeBaseId ?? item.knowledgeBaseId)
+      ? {
+          ...item,
+          status: "published",
+          parseStatus: "success",
+          summary: confirm.summary ?? item.summary,
+          aiKeywords: confirm.aiKeywords ?? item.aiKeywords,
+          updatedAt: stamp,
+          canPreview: true,
+        }
+      : item,
+  );
+}
+
+/** 确认单条个人库文件（编辑内容后发布） */
+export function confirmStoreFile(id: string, patch?: Partial<UploadApproval>) {
+  const current = fileConfirms.find((item) => item.id === id);
+  if (!current) return;
+  publishPersonalConfirm({ ...current, ...patch });
+  emit();
+}
+
+/** 批量确认个人库文件 */
+export function batchConfirmStoreFiles(ids: string[]) {
+  const idSet = new Set(ids);
+  for (const item of fileConfirms) {
+    if (idSet.has(item.id)) publishPersonalConfirm(item);
+  }
   emit();
 }
 

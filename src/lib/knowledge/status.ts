@@ -1,10 +1,11 @@
-import type { FilePublishStatus, KnowledgeBaseStatus, KnowledgeParseStatus } from "./types";
+import type { FilePublishStatus, KnowledgeParseStatus } from "./types";
 
 export type KnowledgeStatusTone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 export function publishStatusLabel(status: FilePublishStatus) {
   const labels: Record<FilePublishStatus, string> = {
     pendingApproval: "待审批",
+    pendingConfirm: "待确认",
     rejected: "审批驳回",
     parsing: "解析中",
     parseFailed: "解析失败",
@@ -17,7 +18,9 @@ export function publishStatusLabel(status: FilePublishStatus) {
 
 export function publishStatusTone(status: FilePublishStatus): KnowledgeStatusTone {
   if (status === "published") return "success";
-  if (status === "pendingApproval" || status === "parsing") return "warning";
+  if (status === "pendingApproval" || status === "pendingConfirm" || status === "parsing") {
+    return "warning";
+  }
   if (status === "rejected" || status === "parseFailed" || status === "disabled") {
     return "danger";
   }
@@ -31,6 +34,7 @@ export function publishStatusTone(status: FilePublishStatus): KnowledgeStatusTon
 export function approvalStatusLabel(status: FilePublishStatus) {
   const labels: Record<FilePublishStatus, string> = {
     pendingApproval: "待审批",
+    pendingConfirm: "待确认",
     rejected: "已驳回",
     parsing: "已通过",
     parseFailed: "已通过",
@@ -42,7 +46,7 @@ export function approvalStatusLabel(status: FilePublishStatus) {
 }
 
 export function approvalStatusTone(status: FilePublishStatus): KnowledgeStatusTone {
-  if (status === "pendingApproval") return "warning";
+  if (status === "pendingApproval" || status === "pendingConfirm") return "warning";
   if (status === "rejected") return "danger";
   if (status === "published") return "success";
   if (status === "parsing" || status === "parseFailed") return "accent";
@@ -91,12 +95,4 @@ export function fileListParseStatusTone(status: FileListParseStatus): KnowledgeS
   if (status === "success") return "success";
   if (status === "failed") return "danger";
   return "warning";
-}
-
-export function baseStatusLabel(status: KnowledgeBaseStatus) {
-  return status === "enabled" ? "启用" : "停用";
-}
-
-export function baseStatusTone(status: KnowledgeBaseStatus): KnowledgeStatusTone {
-  return status === "enabled" ? "success" : "neutral";
 }

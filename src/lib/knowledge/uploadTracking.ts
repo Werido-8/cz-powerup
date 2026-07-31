@@ -22,19 +22,21 @@ import { getBaseById } from "./model";
  * 视图与三维状态模型
  * ───────────────────────────────────────────── */
 
-export type UploadView = "all" | "review" | "parse" | "publish";
+export type UploadView = "all" | "review" | "parse" | "publish" | "confirm";
 
-export const UPLOAD_VIEWS: UploadView[] = ["all", "review", "parse", "publish"];
+export const UPLOAD_VIEWS: UploadView[] = ["all", "review", "parse", "publish", "confirm"];
 
 export type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type ConfirmStatus = "PENDING" | "CONFIRMED";
 export type ParseStage = "PENDING" | "PROCESSING" | "COMPLETED" | "ERROR";
 export type PublishStage = "PENDING" | "PUBLISHED" | "DISABLED";
-export type CurrentStage = "REVIEW" | "PARSE" | "PUBLISH";
+export type CurrentStage = "REVIEW" | "CONFIRM" | "PARSE" | "PUBLISH";
 
 /** 记录当前所处的具体处境，用于生成动态操作 */
 export type UploadSituation =
   | "reviewPending"
   | "reviewRejected"
+  | "confirmPending"
   | "parseWaiting"
   | "parseProcessing"
   | "parseCompleted"
@@ -44,10 +46,24 @@ export type UploadSituation =
 
 /* ─── 维度派生（基于既有 status + parseStatus） ─── */
 
+export function isPersonalUploadTarget(record: UploadRecord) {
+  return getBaseById(record.targetKnowledgeBaseId)?.scope === "personal";
+}
+
 export function getReviewStatus(record: UploadRecord): ReviewStatus {
+  if (isPersonalUploadTarget(record)) return "APPROVED";
   if (record.status === "pendingApproval") return "PENDING";
   if (record.status === "rejected") return "REJECTED";
   return "APPROVED";
+}
+
+export function getConfirmStatus(record: UploadRecord): ConfirmStatus {
+  if (!isPersonalUploadTarget(record)) return "CONFIRMED";
+  if (record.status === "pendingConfirm") return "PENDING";
+  if (record.status === "published" || record.status === "disabled") return "CONFIRMED";
+  // 解析完成后进入待确认；解析未完成时不算确认维度待办
+  if (getParseStage(record) === "COMPLETED") return "PENDING";
+  return "CONFIRMED";
 }
 
 export function getParseStage(record: UploadRecord): ParseStage {
@@ -75,17 +91,23 @@ export function getCurrentStage(record: UploadRecord): CurrentStage {
   const parse = getParseStage(record);
   const review = getReviewStatus(record);
 
+  if (parse === "PENDING" || parse === "PROCESSING" || parse === "ERROR") return "PARSE";
+
   if (base?.scope === "personal") {
-    if (parse === "PENDING" || parse === "PROCESSING" || parse === "ERROR") return "PARSE";
+    if (record.status === "pendingConfirm" || getConfirmStatus(record) === "PENDING") {
+      return "CONFIRM";
+    }
     return "PUBLISH";
   }
 
-  if (parse === "PENDING" || parse === "PROCESSING" || parse === "ERROR") return "PARSE";
   if (review === "PENDING" || review === "REJECTED") return "REVIEW";
   return "PUBLISH";
 }
 
 export function getSituation(record: UploadRecord): UploadSituation {
+  if (isPersonalUploadTarget(record) && getConfirmStatus(record) === "PENDING") {
+    return "confirmPending";
+  }
   const review = getReviewStatus(record);
   if (review === "PENDING") return "reviewPending";
   if (review === "REJECTED") return "reviewRejected";
@@ -113,6 +135,13 @@ export function reviewStatusTone(s: ReviewStatus): KnowledgeStatusTone {
   return { PENDING: "warning", APPROVED: "success", REJECTED: "danger" }[s] as KnowledgeStatusTone;
 }
 
+export function confirmStatusLabel(s: ConfirmStatus) {
+  return { PENDING: "待确认", CONFIRMED: "已确认" }[s];
+}
+export function confirmStatusTone(s: ConfirmStatus): KnowledgeStatusTone {
+  return { PENDING: "warning", CONFIRMED: "success" }[s] as KnowledgeStatusTone;
+}
+
 export function parseStageLabel(s: ParseStage) {
   return { PENDING: "待解析", PROCESSING: "解析中", COMPLETED: "解析完成", ERROR: "解析异常" }[s];
 }
@@ -132,14 +161,18 @@ export function publishStageTone(s: PublishStage): KnowledgeStatusTone {
 }
 
 export function stageLabel(s: CurrentStage) {
-  return { REVIEW: "审核阶段", PARSE: "解析阶段", PUBLISH: "发布阶段" }[s];
+  return { REVIEW: "审核阶段", CONFIRM: "确认阶段", PARSE: "解析阶段", PUBLISH: "发布阶段" }[s];
 }
 
-/** 「全部上传」文件状态：反映审核结果（待审核 / 已通过 / 已驳回），发布启停归入启用状态列 */
+/** 「全部上传」文件状态：反映审核/确认结果，发布启停归入启用状态列 */
 export function fileStatusOf(record: UploadRecord): {
   label: string;
   tone: KnowledgeStatusTone;
 } {
+  if (isPersonalUploadTarget(record)) {
+    if (getConfirmStatus(record) === "PENDING") return { label: "待确认", tone: "warning" };
+    return { label: "已确认", tone: "success" };
+  }
   const review = getReviewStatus(record);
   if (review === "PENDING") return { label: "待审核", tone: "warning" };
   if (review === "REJECTED") return { label: "已驳回", tone: "danger" };
@@ -167,6 +200,10 @@ export function currentStatusOf(record: UploadRecord): {
     const s = getReviewStatus(record);
     return { label: reviewStatusLabel(s), tone: reviewStatusTone(s) };
   }
+  if (stage === "CONFIRM") {
+    const s = getConfirmStatus(record);
+    return { label: confirmStatusLabel(s), tone: confirmStatusTone(s) };
+  }
   if (stage === "PARSE") {
     const s = getParseStage(record);
     return { label: parseStageLabel(s), tone: parseStageTone(s) };
@@ -181,14 +218,17 @@ export function currentStatusOf(record: UploadRecord): {
 
 export interface UploadCounts {
   all: number;
-  /** 审核进度徽标：待审核 + 审核驳回 */
+  /** 审核进度徽标：待审核 + 审核驳回（仅专业/公共库） */
   reviewPending: number;
-  /** 解析进度徽标：待解析 + 解析中 + 解析异常（仅已通过审核） */
+  /** 文件确认徽标：个人库待确认 */
+  confirmPending: number;
+  /** 解析进度徽标：待解析 + 解析中 + 解析异常 */
   parsePending: number;
   /** 发布状态徽标：待发布 + 已停用 */
   publishPending: number;
   /** 概览卡片 */
   reviewInProgress: number; // 审核进行中（待审核）
+  confirmInProgress: number; // 确认进行中（待确认）
   parseInProgress: number; // 解析进行中（解析中）
   published: number; // 已发布
   /** 待我处理 */
@@ -201,9 +241,11 @@ export function getUploadCounts(records: UploadRecord[]): UploadCounts {
   const counts: UploadCounts = {
     all: records.length,
     reviewPending: 0,
+    confirmPending: 0,
     parsePending: 0,
     publishPending: 0,
     reviewInProgress: 0,
+    confirmInProgress: 0,
     parseInProgress: 0,
     published: 0,
     needRejected: 0,
@@ -214,18 +256,22 @@ export function getUploadCounts(records: UploadRecord[]): UploadCounts {
     const review = getReviewStatus(r);
     const parse = getParseStage(r);
     const publish = getPublishStage(r);
+    const personal = isPersonalUploadTarget(r);
 
-    if (review === "PENDING" || review === "REJECTED") counts.reviewPending += 1;
-    if (review === "APPROVED" && (parse === "PENDING" || parse === "PROCESSING" || parse === "ERROR"))
-      counts.parsePending += 1;
+    if (!personal && (review === "PENDING" || review === "REJECTED")) counts.reviewPending += 1;
+    if (personal && getConfirmStatus(r) === "PENDING") {
+      counts.confirmPending += 1;
+      counts.confirmInProgress += 1;
+    }
+    if (parse === "PENDING" || parse === "PROCESSING" || parse === "ERROR") counts.parsePending += 1;
     if (publish === "PENDING" && getCurrentStage(r) === "PUBLISH") counts.publishPending += 1;
     if (publish === "DISABLED") counts.publishPending += 1;
 
-    if (review === "PENDING") counts.reviewInProgress += 1;
-    if (review === "APPROVED" && parse === "PROCESSING") counts.parseInProgress += 1;
+    if (!personal && review === "PENDING") counts.reviewInProgress += 1;
+    if (parse === "PROCESSING") counts.parseInProgress += 1;
     if (publish === "PUBLISHED") counts.published += 1;
 
-    if (review === "REJECTED") counts.needRejected += 1;
+    if (!personal && review === "REJECTED") counts.needRejected += 1;
     if (parse === "ERROR") counts.needParseError += 1;
     if (publish === "DISABLED") counts.needDisabled += 1;
   }
@@ -247,9 +293,15 @@ export function getViewStatusOptions(view: UploadView): FilterOption[] {
     case "all":
       return [
         { value: "all", label: "全部阶段" },
+        { value: "CONFIRM", label: "确认阶段" },
         { value: "REVIEW", label: "审核阶段" },
         { value: "PARSE", label: "解析阶段" },
         { value: "PUBLISH", label: "发布阶段" },
+      ];
+    case "confirm":
+      return [
+        { value: "all", label: "全部待确认" },
+        { value: "PENDING", label: "待确认" },
       ];
     case "review":
       return [
@@ -276,7 +328,13 @@ export function getViewStatusOptions(view: UploadView): FilterOption[] {
 }
 
 export function getViewStatusFilterLabel(view: UploadView) {
-  return { all: "阶段", review: "审核", parse: "解析", publish: "发布" }[view];
+  return {
+    all: "阶段",
+    confirm: "确认",
+    review: "审核",
+    parse: "解析",
+    publish: "发布",
+  }[view];
 }
 
 /** 判断记录是否命中当前视图的「状态/阶段」筛选值 */
@@ -285,6 +343,8 @@ export function matchViewStatus(view: UploadView, record: UploadRecord, value: s
   switch (view) {
     case "all":
       return getCurrentStage(record) === value;
+    case "confirm":
+      return getConfirmStatus(record) === value;
     case "review":
       return getReviewStatus(record) === value;
     case "parse":
@@ -299,14 +359,19 @@ export function belongsToView(view: UploadView, record: UploadRecord) {
   switch (view) {
     case "all":
       return true;
+    case "confirm":
+      // 仅个人库、解析完成且待本人确认；与审批台解耦
+      return (
+        isPersonalUploadTarget(record) &&
+        getParseStage(record) === "COMPLETED" &&
+        getConfirmStatus(record) === "PENDING"
+      );
     case "review":
-      // 审核维度有意义（所有记录都经历过审核）
-      return true;
+      // 仅专业/公共库审批进度，不混入个人库确认
+      return !isPersonalUploadTarget(record);
     case "parse":
-      // 先解析后审批：非驳回记录均可展示解析进度
       return getReviewStatus(record) !== "REJECTED";
     case "publish":
-      // 已发布 / 已停用 / 待发布
       return getCurrentStage(record) === "PUBLISH";
   }
 }
@@ -328,37 +393,41 @@ export const UPLOAD_VIEW_META: Record<UploadView, ViewMeta> = {
   all: {
     navLabel: "全部上传",
     title: "全部上传",
-    // description: "查看本人上传文件当前所处的审核、解析与发布阶段",
-        description: "",
+    description: "",
     emptyTitle: "暂无上传文件",
-    emptyDesc: "上传文件后，可在这里跟踪审核、解析和发布进度",
+    emptyDesc: "上传文件后，可在这里跟踪解析、确认、审核和发布进度",
     countUnit: "上传记录",
+  },
+  confirm: {
+    navLabel: "文件确认",
+    title: "文件确认",
+    description: "",
+    emptyTitle: "暂无待确认文件",
+    emptyDesc: "上传至个人库的文件解析完成后，将在这里核对 AI 内容并确认发布",
+    countUnit: "确认记录",
   },
   review: {
     navLabel: "审核进度",
     title: "审核进度",
-    // description: "查看文件审核状态、审批记录和驳回原因",
-        description: "",
+    description: "",
     emptyTitle: "暂无审核记录",
-    emptyDesc: "提交到公共知识库的文件将在这里展示审核进度",
+    emptyDesc: "提交到专业/公共知识库的文件将在这里展示审批进度",
     countUnit: "审核记录",
   },
   parse: {
     navLabel: "解析进度",
     title: "解析进度",
-    // description: "跟踪文件解析过程，查看解析结果与异常原因",
-        description: "",
+    description: "",
     emptyTitle: "暂无解析记录",
-    emptyDesc: "文件上传后将先进入解析，解析完成后进入审批",
+    emptyDesc: "文件上传后将先进入解析，完成后按目标库分流确认或审批",
     countUnit: "解析记录",
   },
   publish: {
     navLabel: "发布状态",
     title: "发布状态",
-    // description: "查看文件进入目标知识库后的发布与使用情况",
-        description: "",
+    description: "",
     emptyTitle: "暂无已发布文件",
-    emptyDesc: "文件解析并发布后，将在这里展示使用状态",
+    emptyDesc: "文件确认或审批通过后，将在这里展示使用状态",
     countUnit: "发布记录",
   },
 };
@@ -384,6 +453,8 @@ export type UploadActionKind =
   | "parseResult"
   | "chunks"
   | "approveRecord"
+  | "confirmContent"
+  | "batchConfirm"
   | "gotoBase"
   | "history"
   | "newVersion"
@@ -416,6 +487,11 @@ const A = {
   parseResult: { kind: "parseResult", label: "解析结果", icon: FileStack } as UploadActionItem,
   chunks: { kind: "chunks", label: "分块内容", icon: ListTree } as UploadActionItem,
   approveRecord: { kind: "approveRecord", label: "审批记录", icon: ShieldCheck } as UploadActionItem,
+  confirmContent: {
+    kind: "confirmContent",
+    label: "确认内容",
+    icon: ShieldCheck,
+  } as UploadActionItem,
   gotoBase: { kind: "gotoBase", label: "进入知识库", icon: ArrowRight } as UploadActionItem,
   history: { kind: "history", label: "版本记录", icon: History } as UploadActionItem,
   newVersion: { kind: "newVersion", label: "上传新版", icon: ArrowUpFromLine } as UploadActionItem,
@@ -434,6 +510,15 @@ function mark(items: UploadActionItem[]): UploadActionItem[] {
 
 export function getTrackingActions(view: UploadView, record: UploadRecord): UploadActionItem[] {
   const situation = getSituation(record);
+
+  if (view === "confirm") {
+    switch (getConfirmStatus(record)) {
+      case "PENDING":
+        return mark([A.confirmContent]);
+      default:
+        return mark([A.viewFile]);
+    }
+  }
 
   if (view === "review") {
     switch (getReviewStatus(record)) {
@@ -462,10 +547,8 @@ export function getTrackingActions(view: UploadView, record: UploadRecord): Uplo
   if (view === "publish") {
     switch (getPublishStage(record)) {
       case "PUBLISHED":
-        // 暂时仅保留「查看文件」；新版本 / 版本记录先隐藏，进入知识库、申请下架无此功能
-        return mark([A.viewFile /*, A.history, A.newVersion */]);
+        return mark([A.viewFile]);
       case "DISABLED":
-        // 停用文件仅可查看，暂无申请恢复 / 上传新版 / 版本记录
         return mark([A.viewFile]);
       default:
         return mark([A.parseResult, A.detail]);
@@ -474,6 +557,8 @@ export function getTrackingActions(view: UploadView, record: UploadRecord): Uplo
 
   // view === "all"：按处境给出当前阶段最重要操作
   switch (situation) {
+    case "confirmPending":
+      return mark([A.confirmContent, A.preview]);
     case "reviewPending":
       return mark([A.withdraw, A.preview]);
     case "reviewRejected":
@@ -487,10 +572,8 @@ export function getTrackingActions(view: UploadView, record: UploadRecord): Uplo
     case "parseError":
       return mark([A.errorReason, A.reparse]);
     case "published":
-      // 暂时仅保留「查看文件」；新版本 / 版本记录先隐藏，进入知识库、申请下架无此功能
-      return mark([A.viewFile /*, A.history, A.newVersion */]);
+      return mark([A.viewFile]);
     case "disabled":
-      // 停用文件仅可查看，暂无申请恢复 / 上传新版 / 版本记录
       return mark([A.viewFile]);
   }
 }

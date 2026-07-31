@@ -1,16 +1,12 @@
-import {
-  FAVORITE_FILE_IDS,
-  PARSE_EXCEPTIONS,
-  PERMISSION_REQUESTS,
-  RECENT_FILE_IDS,
-} from "./data";
+import { FAVORITE_FILE_IDS, PARSE_EXCEPTIONS, PERMISSION_REQUESTS, RECENT_FILE_IDS } from "./data";
 import { getCurrentKnowledgeUser } from "./demoRole";
+import { getEffectiveLevelForUser, getGrantsForBase, type PermissionLevel } from "./permission";
 import {
-  getEffectiveLevelForUser,
-  getGrantsForBase,
-  type PermissionLevel,
-} from "./permission";
-import { getStoreBases, getStoreCategories, getStoreFiles, getStorePersonalDirectories } from "./store";
+  getStoreBases,
+  getStoreCategories,
+  getStoreFiles,
+  getStorePersonalDirectories,
+} from "./store";
 import { publishStatusLabel } from "./status";
 import type {
   FilePublishStatus,
@@ -47,8 +43,18 @@ export function canSeeCategoryManager(user: KnowledgeUser = getCurrentKnowledgeU
   return isKnowledgeAdmin(user) || isSuperAdmin(user);
 }
 
+/** 超级管理员可见：个人库（原全局审计入口已并入库清单 Tab） */
 export function canSeeGlobalAudit(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return isSuperAdmin(user);
+}
+
+export function canSeePersonalLibraryAudit(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return canSeeGlobalAudit(user);
+}
+
+/** 管理端「专业库」清单：排除个人库 */
+export function getManageableProfessionalBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
+  return getManageableBases(user).filter((base) => base.scope !== "personal");
 }
 
 function effectiveLevelForBase(
@@ -70,17 +76,16 @@ function effectiveLevelForBase(
   return null;
 }
 
-export function canManageBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+export function canManageBase(
+  base: KnowledgeBase,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
+) {
   if (base.scope === "personal") return true;
   if (isEmployee(user)) return false;
   if (isSuperAdmin(user)) return true;
   if (isKnowledgeAdmin(user)) return true;
   if (base.scope === "personal") return true;
   return effectiveLevelForBase(base, user) === "manage";
-}
-
-export function canBrowseBase(base: KnowledgeBase) {
-  return base.status === "enabled";
 }
 
 export function canViewBaseFiles(
@@ -92,7 +97,10 @@ export function canViewBaseFiles(
   return base.permission.canView || canManageBase(base, user);
 }
 
-export function canUploadToBase(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+export function canUploadToBase(
+  base: KnowledgeBase,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
+) {
   if (base.scope === "personal") return true;
   if (isEmployee(user)) return false;
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return true;
@@ -122,7 +130,10 @@ export function canManageFileList(
   return canManageBase(base, user);
 }
 
-export function canDeleteFile(base: KnowledgeBase, user: KnowledgeUser = getCurrentKnowledgeUser()) {
+export function canDeleteFile(
+  base: KnowledgeBase,
+  user: KnowledgeUser = getCurrentKnowledgeUser(),
+) {
   if (base.scope === "personal") return true;
   if (isEmployee(user)) return false;
   return canManageBase(base, user);
@@ -134,7 +145,9 @@ export function canMoveCrossLibrary(
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
   if (isEmployee(user)) {
-    return source.scope === "personal" && target.scope === "public" && canViewBaseFiles(target, user);
+    return (
+      source.scope === "personal" && target.scope === "public" && canViewBaseFiles(target, user)
+    );
   }
   if (source.scope === "personal" && target.scope !== "personal") {
     return canUploadToBase(target, user);
@@ -163,15 +176,15 @@ export function getCategoryById(id: string) {
 }
 
 export function getBrowsableBases() {
-  return getStoreBases().filter((base) => base.scope !== "personal" && canBrowseBase(base));
+  return getStoreBases().filter((base) => base.scope !== "personal");
 }
 
 export function getPinnedBases() {
-  return getStoreBases().filter((base) => base.isPinned && base.status === "enabled");
+  return getStoreBases().filter((base) => base.isPinned);
 }
 
 export function getPersonalBases() {
-  return getStoreBases().filter((base) => base.scope === "personal" && base.status === "enabled");
+  return getStoreBases().filter((base) => base.scope === "personal");
 }
 
 export const PERSONAL_DIRECTORY_ROOT_ID = "personal-root";
@@ -228,7 +241,7 @@ export function getPersonalTreeBases(user: KnowledgeUser = getCurrentKnowledgeUs
 
 export function getProfessionalTreeBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getStoreBases().filter(
-    (base) => base.scope !== "personal" && base.status === "enabled" && canViewBaseFiles(base, user),
+    (base) => base.scope !== "personal" && canViewBaseFiles(base, user),
   );
 }
 
@@ -241,9 +254,7 @@ export function getFilesForProfessionalTree(user: KnowledgeUser = getCurrentKnow
 }
 
 export function getReadableBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
-  return getStoreBases().filter(
-    (base) => base.status === "enabled" && canViewBaseFiles(base, user),
-  );
+  return getStoreBases().filter((base) => canViewBaseFiles(base, user));
 }
 
 export function getManageableBases(user: KnowledgeUser = getCurrentKnowledgeUser()) {
@@ -252,7 +263,7 @@ export function getManageableBases(user: KnowledgeUser = getCurrentKnowledgeUser
   return allBases.filter((base) => canManageBase(base, user));
 }
 
-/** 超级管理员：全部个人库文件集合（审计） */
+/** 超级管理员：全部个人库文件集合（兼容旧调用；新页面请用 personalLibraryAudit） */
 export function getGlobalAuditFiles(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   if (!canSeeGlobalAudit(user)) return [];
   return getStoreFiles().filter((file) => {
@@ -266,7 +277,7 @@ export function isFileVisibleToUser(
   user: KnowledgeUser = getCurrentKnowledgeUser(),
 ) {
   const base = getBaseById(file.knowledgeBaseId);
-  if (!base || base.status !== "enabled") return false;
+  if (!base) return false;
   if (!isFileEnabled(file) && !canManageBase(base, user)) return false;
   if (file.status === "published") return canViewBaseFiles(base, user);
   return file.uploaderId === user.id || canManageBase(base, user);
@@ -282,10 +293,10 @@ export function getAllPublishedFiles(user: KnowledgeUser = getCurrentKnowledgeUs
   return getStoreFiles().filter((file) => {
     const base = getBaseById(file.knowledgeBaseId);
     return (
-      base?.status === "enabled" &&
+      Boolean(base) &&
       file.status === "published" &&
       file.isCurrentVersion !== false &&
-      canViewBaseFiles(base, user)
+      canViewBaseFiles(base!, user)
     );
   });
 }
@@ -328,14 +339,12 @@ export function getMoveTargetBases(
 
   return getStoreBases().filter((base) => {
     if (base.id === currentBaseId) return false;
-    if (base.status !== "enabled") return false;
 
     if (sourceBase) {
       if (isEmployee(user)) {
         return (
           sourceIsPersonal &&
-          (base.scope === "personal" ||
-            (base.scope !== "personal" && canViewBaseFiles(base, user)))
+          (base.scope === "personal" || (base.scope !== "personal" && canViewBaseFiles(base, user)))
         );
       }
       if (sourceIsPersonal && base.scope === "personal") {
@@ -495,16 +504,11 @@ export function getBasesForCategory(categoryId: string) {
   return getBrowsableBases().filter((base) => base.categoryId === categoryId);
 }
 
-/** 侧栏树：启用库全员可见（无权限时展示锁）；已停用库仅管理者可见 */
-export function getBasesForCategoryTree(
-  categoryId: string,
-  user: KnowledgeUser = getCurrentKnowledgeUser(),
-) {
-  return getStoreBases().filter((base) => {
-    if (base.scope === "personal" || base.categoryId !== categoryId) return false;
-    if (base.status === "disabled") return canManageBase(base, user);
-    return true;
-  });
+/** 侧栏树：知识库全员可见（无权限时展示锁） */
+export function getBasesForCategoryTree(categoryId: string) {
+  return getStoreBases().filter(
+    (base) => base.scope !== "personal" && base.categoryId === categoryId,
+  );
 }
 
 export function countAllBasesInCategorySubtree(categoryId: string): number {
