@@ -3,10 +3,7 @@ import { z } from "zod";
 import { KnowledgeAdminPage } from "@/components/knowledge/workbench/KnowledgeAdminPage";
 
 const adminSearchSchema = z.object({
-  section: z
-    .enum(["categories", "bases", "approvals", "exceptions", "audit"])
-    .optional()
-    .catch(undefined),
+  section: z.enum(["categories", "bases", "approvals", "exceptions"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/knowledge/admin")({
