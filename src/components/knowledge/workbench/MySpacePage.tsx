@@ -96,7 +96,6 @@ import {
 } from "@/lib/knowledge/searchNav";
 import type {
   KnowledgeBase,
-  KnowledgeBaseStatus,
   KnowledgeFile,
   KnowledgeSortBy,
   FileSearchMode,
@@ -117,15 +116,10 @@ import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDi
 import { KnowledgeBaseDeleteDialog } from "./KnowledgeBaseDeleteDialog";
 import { KnowledgeBaseMoveDialog } from "./KnowledgeBaseMoveDialog";
 import { KnowledgeBaseRenameDialog } from "./KnowledgeBaseRenameDialog";
-import {
-  KnowledgeBaseStatusConfirmDialog,
-  type KnowledgeBaseStatusConfirmState,
-} from "./KnowledgeBaseStatusConfirmDialog";
 import { PersonalDirectoryRenameDialog } from "./PersonalDirectoryRenameDialog";
 import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { KnowledgeAggregateDetailHeader } from "./KnowledgeAggregateDetailHeader";
 import { KnowledgeBaseDetailHeader } from "./KnowledgeBaseDetailHeader";
-import { KnowledgeDisabledState } from "./KnowledgeDisabledState";
 import { KnowledgeTreeNavItem } from "./KnowledgeCategoryTree";
 import { KnowledgeTreeSectionActions } from "./KnowledgeTreeSectionActions";
 import { MySpaceTitleBanner } from "./MySpaceTitleBanner";
@@ -199,7 +193,6 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const [moveBaseLoading, setMoveBaseLoading] = useState(false);
   const [deleteBase, setDeleteBase] = useState<KnowledgeBase | null>(null);
   const [deleteBaseLoading, setDeleteBaseLoading] = useState(false);
-  const [statusConfirm, setStatusConfirm] = useState<KnowledgeBaseStatusConfirmState | null>(null);
   const [renamePersonalDirectory, setRenamePersonalDirectory] = useState<PersonalDirectory | null>(
     null,
   );
@@ -212,29 +205,6 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
       toast.message(isPinnedId(prev, baseId) ? "已取消置顶" : "已置顶到快速访问");
       return next;
     });
-  };
-
-  const handleToggleBaseStatus = (base: KnowledgeBase) => {
-    const nextStatus: KnowledgeBaseStatus = base.status === "enabled" ? "disabled" : "enabled";
-    setStatusConfirm({
-      base,
-      nextStatus,
-      description:
-        nextStatus === "disabled"
-          ? "停用后该知识库将不可访问。确认停用？"
-          : "确认重新启用该知识库？",
-    });
-  };
-
-  const handleConfirmBaseStatus = () => {
-    if (!statusConfirm) return;
-    const { base, nextStatus } = statusConfirm;
-    updateStoreBase({ ...base, status: nextStatus });
-    toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
-    if (nextStatus === "disabled" && selection.kind === "personalBase" && selection.baseId === base.id) {
-      setSelection({ kind: "personalAll" });
-    }
-    setStatusConfirm(null);
   };
 
   const handleDisablePersonalDirectory = (directory: PersonalDirectory) => {
@@ -374,28 +344,26 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
 
   const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
     const targetBase = getBaseById(targetBaseId);
-    const submittedForApproval = movingFiles.filter((file) =>
+    const deferred = movingFiles.filter((file) =>
       isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
     );
+    const movable = movingFiles.filter(
+      (file) => !isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
+    );
+    if (deferred.length > 0 && movable.length === 0) {
+      toast.message("跨库移动入库（重解析 + 审批）需求已保留，一期暂不开放");
+      setMoveFiles([]);
+      return;
+    }
     setMoveLoading(true);
-    for (const file of movingFiles) {
-      if (isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId)) {
-        updateStoreFile(file.id, { status: "pendingApproval" });
-        continue;
-      }
+    for (const file of movable) {
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
         knowledgeBaseName: targetBase?.name,
       });
     }
     window.setTimeout(() => {
-      const label =
-        movingFiles.length > 1 ? `${movingFiles.length} 个文件` : `「${movingFiles[0]?.name}」`;
-      toast.success(
-        submittedForApproval.length > 0
-          ? `已提交 ${label} 至「${targetBase?.name ?? "公共知识库"}」审批`
-          : `已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`,
-      );
+      toast.success(`已将「${movable[0]?.name}」移动到「${targetBase?.name ?? "目标知识库"}」`);
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();
@@ -463,11 +431,10 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     onSelectAllResults: () =>
       fileSelection.selectAllResults(activePersonalFiles.map((file) => file.id)),
     onBatchDownload: handleBatchDownload,
-    onBatchMove: showDisable ? handleBatchMove : undefined,
     onBatchDisable: showDisable ? handleBatchDisable : undefined,
     onBatchDelete: () => setDeleteDialogOpen(true),
     onClearSelection: fileSelection.clear,
-    showBatchMove: showDisable,
+    showBatchMove: false,
     showBatchDisable: showDisable,
     batchLoading,
   });
@@ -604,7 +571,6 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             onRenameBase={(base) => setRenameBase(base)}
             onMoveBase={(base) => setMoveBase(base)}
             onDeleteBase={(base) => setDeleteBase(base)}
-            onToggleBaseStatus={handleToggleBaseStatus}
           />
         </KbSidebarSection>
       </KbSidebar>
@@ -696,7 +662,6 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             onUploadFiles={handleUploadFiles}
             onSelectBase={(baseId) => setSelection({ kind: "personalBase", baseId })}
             onToggleEnabled={handleToggleEnabled}
-            onEnableBase={() => handleToggleBaseStatus(selectedBase)}
             selection={fileSelection}
             batchToolbarProps={batchToolbarProps}
             fileRowActions={fileRowActions}
@@ -799,12 +764,6 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             setDeleteBase(null);
           }, 300);
         }}
-      />
-
-      <KnowledgeBaseStatusConfirmDialog
-        state={statusConfirm}
-        onClose={() => setStatusConfirm(null)}
-        onConfirm={handleConfirmBaseStatus}
       />
 
       <PersonalDirectoryRenameDialog
@@ -1694,7 +1653,6 @@ function PersonalBasePanel({
   onUploadFiles,
   onSelectBase,
   onToggleEnabled,
-  onEnableBase,
   selection,
   batchToolbarProps,
   fileRowActions,
@@ -1721,7 +1679,6 @@ function PersonalBasePanel({
   onUploadFiles: (files: FileList) => void;
   onSelectBase: (baseId: string) => void;
   onToggleEnabled: (file: KnowledgeFile, enabled: boolean) => void;
-  onEnableBase: () => void;
   selection: ReturnType<typeof useFileSelection>;
   batchToolbarProps: (
     pageIds: string[],
@@ -1761,19 +1718,6 @@ function PersonalBasePanel({
     <KbEmptyState title="个人库暂无文件" description="可拖拽上传，上传后直接进入解析流程。" />
   );
   const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
-
-  if (base.status === "disabled") {
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <KnowledgeBaseDetailHeader
-          base={base}
-          fileCount={allFiles.length}
-          onSelectBase={onSelectBase}
-        />
-        <KnowledgeDisabledState onEnable={onEnableBase} />
-      </div>
-    );
-  }
 
   return (
     <KbDragUploadOverlay onFiles={onUploadFiles} className="flex min-h-0 flex-1 flex-col">

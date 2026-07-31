@@ -44,8 +44,8 @@ const APPROVAL_TABS: {
 }[] = [
   {
     key: "uploads",
-    label: "文件上传",
-    desc: "解析完成后审核文件与 AI 生成内容",
+    label: "文件入库",
+    desc: "专业/公共库解析完成后审核文件与 AI 内容（不含个人库确认）",
     icon: FileUp,
   },
   {

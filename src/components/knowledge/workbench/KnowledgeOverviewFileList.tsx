@@ -71,10 +71,9 @@ export type FileListSelection = {
 };
 
 export const FILE_LIST_SORT_OPTIONS: { value: KnowledgeSortBy; label: string }[] = [
-  { value: "updated", label: "最近更新" },
+  { value: "updated", label: "上传时间" },
   { value: "size", label: "文件大小" },
   { value: "name", label: "文件名称" },
-  { value: "status", label: "解析状态" },
 ];
 
 /** 悬浮即展开的菜单：进入触发/内容区保持打开，移出短暂延时后关闭 */

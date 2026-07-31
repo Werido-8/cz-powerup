@@ -32,15 +32,15 @@ export function KnowledgeUploadPanel({
       title="拖入文件或选择上传"
       hint={
         personal || base?.scope === "personal"
-          ? "个人库上传免审批，提交后直接进入解析。"
-          : "同库同名文件会建议上传为新版本，非免审场景进入审批。"
+          ? "个人库上传解析完成后，在「我的上传 · 文件确认」核对 AI 内容后发布。"
+          : "提交后将先解析，解析完成后进入审批台审核。"
       }
       onUpload={() => {
         onUploaded?.();
         toast.success(
           personal || base?.scope === "personal"
-            ? "文件已进入解析队列"
-            : "文件已提交上传流程",
+            ? "文件已进入解析队列，完成后请在文件确认中核对"
+            : "文件已提交，解析完成后将进入审批台",
         );
       }}
     />

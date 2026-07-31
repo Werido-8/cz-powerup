@@ -5,12 +5,14 @@ import { cn } from "@/lib/utils";
 export function FileListCheckbox({
   checked,
   indeterminate,
+  disabled,
   onCheckedChange,
   className,
   "aria-label": ariaLabel,
 }: {
   checked?: boolean;
   indeterminate?: boolean;
+  disabled?: boolean;
   onCheckedChange?: (checked: boolean) => void;
   className?: string;
   "aria-label"?: string;
@@ -20,6 +22,7 @@ export function FileListCheckbox({
   return (
     <CheckboxPrimitive.Root
       checked={state}
+      disabled={disabled}
       onCheckedChange={(value) => onCheckedChange?.(value === true)}
       aria-label={ariaLabel}
       className={cn(

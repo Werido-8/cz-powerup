@@ -70,7 +70,6 @@ import {
 } from "@/lib/knowledge/store";
 import type {
   KnowledgeBase,
-  KnowledgeBaseStatus,
   KnowledgeCategory,
   KnowledgeFile,
   KnowledgeSortBy,
@@ -106,12 +105,7 @@ import { DirectoryDeleteDialog } from "./DirectoryDeleteDialog";
 import { KnowledgeBaseDeleteDialog } from "./KnowledgeBaseDeleteDialog";
 import { KnowledgeBaseMoveDialog } from "./KnowledgeBaseMoveDialog";
 import { KnowledgeBaseRenameDialog } from "./KnowledgeBaseRenameDialog";
-import {
-  KnowledgeBaseStatusConfirmDialog,
-  type KnowledgeBaseStatusConfirmState,
-} from "./KnowledgeBaseStatusConfirmDialog";
 import { PersonalDirectoryRenameDialog } from "./PersonalDirectoryRenameDialog";
-import { KnowledgeDisabledState } from "./KnowledgeDisabledState";
 import { KnowledgeEmptyFilesState } from "./KnowledgeEmptyFilesState";
 import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { useFileSelection } from "./useFileSelection";
@@ -195,7 +189,6 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const [moveBaseLoading, setMoveBaseLoading] = useState(false);
   const [deleteBase, setDeleteBase] = useState<KnowledgeBase | null>(null);
   const [deleteBaseLoading, setDeleteBaseLoading] = useState(false);
-  const [statusConfirm, setStatusConfirm] = useState<KnowledgeBaseStatusConfirmState | null>(null);
   const [renamePersonalDirectory, setRenamePersonalDirectory] = useState<PersonalDirectory | null>(
     null,
   );
@@ -226,7 +219,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   }, [highlightedCategoryId, highlightedBaseId, storeVersion]);
 
   const pinnedBases = useMemo(
-    () => getStoreBases().filter((b) => isPinnedId(pinnedIds, b.id) && b.status === "enabled"),
+    () => getStoreBases().filter((b) => isPinnedId(pinnedIds, b.id)),
     [pinnedIds, storeVersion],
   );
 
@@ -317,27 +310,26 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   const handleConfirmMove = (files: KnowledgeFile[], targetBaseId: string) => {
     const targetBase = getBaseById(targetBaseId);
-    const submittedForApproval = files.filter((file) =>
+    const deferred = files.filter((file) =>
       isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
     );
+    const movable = files.filter(
+      (file) => !isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
+    );
+    if (deferred.length > 0 && movable.length === 0) {
+      toast.message("跨库移动入库（重解析 + 审批）需求已保留，一期暂不开放");
+      setMoveFiles([]);
+      return;
+    }
     setMoveLoading(true);
-    for (const file of files) {
-      if (isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId)) {
-        updateStoreFile(file.id, { status: "pendingApproval" });
-        continue;
-      }
+    for (const file of movable) {
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
         knowledgeBaseName: targetBase?.name,
       });
     }
     window.setTimeout(() => {
-      const label = files.length > 1 ? `${files.length} 个文件` : `「${files[0]?.name}」`;
-      toast.success(
-        submittedForApproval.length > 0
-          ? `已提交 ${label} 至「${targetBase?.name ?? "公共知识库"}」审批`
-          : `已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`,
-      );
+      toast.success(`已将「${movable[0]?.name}」移动到「${targetBase?.name ?? "目标知识库"}」`);
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();
@@ -400,11 +392,10 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     isAllResultsSelected: fileSelection.isAllResultsSelected,
     onSelectAllResults: () => fileSelection.selectAllResults(selectedFiles.map((file) => file.id)),
     onBatchDownload: handleBatchDownload,
-    onBatchMove: showManageColumn ? handleBatchMove : undefined,
     onBatchDisable: showManageColumn ? handleBatchDisable : undefined,
     onBatchDelete: () => setDeleteDialogOpen(true),
     onClearSelection: fileSelection.clear,
-    showBatchMove: showManageColumn,
+    showBatchMove: false,
     showBatchDisable: showManageColumn,
     batchLoading,
   });
@@ -416,24 +407,6 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
       toast.message(isPinnedId(prev, baseId) ? "已取消置顶" : "已置顶到快速访问");
       return next;
     });
-  };
-
-  const handleToggleBaseStatus = (base: KnowledgeBase) => {
-    const nextStatus: KnowledgeBaseStatus = base.status === "enabled" ? "disabled" : "enabled";
-    setStatusConfirm({ base, nextStatus });
-  };
-
-  const handleConfirmBaseStatus = () => {
-    if (!statusConfirm) return;
-    const { base, nextStatus } = statusConfirm;
-    updateStoreBase({ ...base, status: nextStatus });
-    toast.success(nextStatus === "disabled" ? "知识库已停用" : "知识库已重新启用");
-    if (nextStatus === "disabled" && selectedBaseId === base.id) {
-      handleSelectTreeId(
-        base.scope === "personal" ? PERSONAL_TREE_ALL_ID : PROFESSIONAL_TREE_ALL_ID,
-      );
-    }
-    setStatusConfirm(null);
   };
 
   const handleDisableDirectory = (category: KnowledgeCategory) => {
@@ -605,7 +578,6 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             onRenameBase={(base) => setRenameBase(base)}
             onMoveBase={(base) => setMoveBase(base)}
             onDeleteBase={(base) => setDeleteBase(base)}
-            onToggleBaseStatus={handleToggleBaseStatus}
           />
         </KbSidebarSection>
 
@@ -659,7 +631,6 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             onRenameBase={(base) => setRenameBase(base)}
             onMoveBase={(base) => setMoveBase(base)}
             onDeleteBase={(base) => setDeleteBase(base)}
-            onToggleBaseStatus={handleToggleBaseStatus}
           />
         </KbSidebarSection>
       </KbSidebar>
@@ -714,17 +685,6 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             <KbEmptyState
               title="知识库不存在"
               description="该知识库可能已被删除或你暂无访问权限，请从左侧重新选择。"
-            />
-          </div>
-        ) : selectedBase.status === "disabled" ? (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <KnowledgeBaseDetailHeader
-              base={selectedBase}
-              fileCount={selectedBase.fileCount ?? 0}
-              onSelectBase={handleSelectTreeId}
-            />
-            <KnowledgeDisabledState
-              onEnable={() => handleToggleBaseStatus(selectedBase)}
             />
           </div>
         ) : !canViewBaseFiles(selectedBase) ? (
@@ -1004,12 +964,6 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             setMoveBase(null);
           }, 300);
         }}
-      />
-
-      <KnowledgeBaseStatusConfirmDialog
-        state={statusConfirm}
-        onClose={() => setStatusConfirm(null)}
-        onConfirm={handleConfirmBaseStatus}
       />
 
       <KnowledgeBaseDeleteDialog

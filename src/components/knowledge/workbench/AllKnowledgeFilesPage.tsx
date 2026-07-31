@@ -138,9 +138,7 @@ export function AllKnowledgeFilesPage() {
       });
     }
     window.setTimeout(() => {
-      const label =
-        movingFiles.length > 1 ? `${movingFiles.length} 个文件` : `「${movingFiles[0]?.name}」`;
-      toast.success(`已将 ${label} 移动到「${targetBase?.name ?? "目标知识库"}」`);
+      toast.success(`已将「${movingFiles[0]?.name}」移动到「${targetBase?.name ?? "目标知识库"}」`);
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();
@@ -210,7 +208,7 @@ export function AllKnowledgeFilesPage() {
           <div className="min-w-0">
             <h1 className="text-[20px] font-semibold tracking-tight text-foreground">全库资料</h1>
             <p className="mt-1 text-[12.5px] text-muted-foreground">
-              当前展示有权限访问且已发布的文档，已停用知识库不参与汇总。
+              当前展示有权限访问且已发布的文档。
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <Tag variant="primary" className="h-6 gap-1 rounded-[6px] px-2.5 text-[11px]">
@@ -232,11 +230,10 @@ export function AllKnowledgeFilesPage() {
         isAllResultsSelected={fileSelection.isAllResultsSelected}
         onSelectAllResults={() => fileSelection.selectAllResults(files.map((file) => file.id))}
         onBatchDownload={handleBatchDownload}
-        onBatchMove={showManageColumn ? handleBatchMove : undefined}
         onBatchDisable={showManageColumn ? handleBatchDisable : undefined}
         onBatchDelete={() => setDeleteDialogOpen(true)}
         onClearSelection={fileSelection.clear}
-        showBatchMove={showManageColumn}
+        showBatchMove={false}
         showBatchDisable={showManageColumn}
         batchLoading={batchLoading}
         left={
@@ -266,7 +263,7 @@ export function AllKnowledgeFilesPage() {
               options={[
                 { value: "all", label: "全部知识库" },
                 ...KNOWLEDGE_BASES.filter(
-                  (base) => base.status === "enabled" && base.permission.canView,
+                  (base) => base.permission.canView,
                 ).map((base) => ({ value: base.id, label: base.name })),
               ]}
             />

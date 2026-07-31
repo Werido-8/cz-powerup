@@ -33,6 +33,8 @@ import { AppDialogButton } from "@/components/ui/app-dialog";
 import { AppFormTextarea } from "@/components/ui/app-form";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
+  confirmStoreFile,
+  getStoreFileConfirms,
   getStoreUploadApprovals,
   subscribeKnowledgeStore,
   updateStoreUploadApproval,
@@ -126,16 +128,19 @@ function PanelSection({
 function Header({
   item,
   readOnly,
+  mode,
   back,
   reject,
   approve,
 }: {
   item: UploadApproval;
   readOnly: boolean;
+  mode: "approval" | "confirm";
   back: () => void;
   reject: () => void;
   approve: () => void;
 }) {
+  const isConfirm = mode === "confirm";
   return (
     <header className="flex min-h-[56px] shrink-0 items-center justify-between gap-5 border-b border-[#E0E9EB] bg-white px-5 py-3 2xl:px-7">
       <div className="flex min-w-0 items-center gap-5">
@@ -145,7 +150,7 @@ function Header({
           className="inline-flex shrink-0 items-center gap-2 text-[14px] font-medium text-[#44576A] hover:text-[#1496B4]"
         >
           <ArrowLeft className="size-4" />
-          返回审批台
+          {isConfirm ? "返回文件确认" : "返回审批台"}
         </button>
         <span className="hidden h-8 w-px bg-[#DCE7EF] sm:block" />
         <div className="flex min-w-0 items-center gap-3">
@@ -159,22 +164,24 @@ function Header({
             <div className="mt-0.5 flex items-center gap-2">
               <h1 className="truncate text-[18px] font-semibold text-[#1F2D3D]">{item.fileName}</h1>
               <span className="shrink-0 rounded-full bg-[#FFF3E7] px-2 py-0.5 text-[12px] font-medium text-[#E87B1B]">
-                待审批
+                {isConfirm ? "待确认" : "待审批"}
               </span>
             </div>
           </div>
         </div>
       </div>
       <div className="hidden shrink-0 items-center gap-2 xl:flex">
-        <button
-          type="button"
-          onClick={reject}
-          disabled={readOnly}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#FFB5B2] px-3 text-[13px] font-medium text-[#F15454] hover:bg-[#FFF7F7] disabled:opacity-45"
-        >
-          <X className="size-3.5" />
-          驳回
-        </button>
+        {!isConfirm && (
+          <button
+            type="button"
+            onClick={reject}
+            disabled={readOnly}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#FFB5B2] px-3 text-[13px] font-medium text-[#F15454] hover:bg-[#FFF7F7] disabled:opacity-45"
+          >
+            <X className="size-3.5" />
+            驳回
+          </button>
+        )}
         <button
           type="button"
           onClick={approve}
@@ -182,7 +189,7 @@ function Header({
           className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#1496B4] px-3 text-[13px] font-medium text-white hover:bg-[#0C819D] disabled:opacity-45"
         >
           <Check className="size-3.5" />
-          通过审批
+          {isConfirm ? "确认发布" : "通过审批"}
         </button>
       </div>
     </header>
@@ -884,12 +891,19 @@ function Reader({
   );
 }
 
-export function FileApprovalPage({ approvalId }: { approvalId: string }) {
+export function FileApprovalPage({
+  approvalId,
+  mode = "approval",
+}: {
+  approvalId: string;
+  mode?: "approval" | "confirm";
+}) {
   const navigate = useNavigate();
+  const isConfirm = mode === "confirm";
   const approvals = useSyncExternalStore(
     subscribeKnowledgeStore,
-    getStoreUploadApprovals,
-    getStoreUploadApprovals,
+    isConfirm ? getStoreFileConfirms : getStoreUploadApprovals,
+    isConfirm ? getStoreFileConfirms : getStoreUploadApprovals,
   );
   const current = approvals.find((item) => item.id === approvalId) ?? approvals[0];
   const pending = useMemo(
@@ -922,28 +936,43 @@ export function FileApprovalPage({ approvalId }: { approvalId: string }) {
     setDetailEditing(false);
   }, [current]);
   if (!current)
-    return <KbEmptyState title="未找到待审批文件" description="请返回审批台重新选择文件。" />;
+    return (
+      <KbEmptyState
+        title={isConfirm ? "未找到待确认文件" : "未找到待审批文件"}
+        description={isConfirm ? "请返回文件确认重新选择文件。" : "请返回审批台重新选择文件。"}
+      />
+    );
   const readOnly = current.status === "approved" || current.status === "rejected";
-  const persist = () => {
-    updateStoreUploadApproval(current.id, {
-      aiKeywords: tags(keywordText),
-      summary,
-      aiMetadata: metadata,
-      aiExercises: exercises,
-    });
-    toast.success("审批内容已保存");
-  };
+  const contentPatch = () => ({
+    aiKeywords: tags(keywordText),
+    summary,
+    aiMetadata: metadata,
+    aiExercises: exercises,
+  });
   const finish = (status: "approved" | "rejected") => {
-    persist();
-    updateStoreUploadApproval(current.id, {
-      status,
-      reviewerName: "当前审批人",
-      reviewedAt: new Date().toISOString(),
-    });
-    toast.success(status === "approved" ? "文件已通过审批" : "文件已驳回");
+    if (isConfirm) {
+      confirmStoreFile(current.id, contentPatch());
+      toast.success("文件已确认并发布到个人库");
+    } else {
+      updateStoreUploadApproval(current.id, {
+        ...contentPatch(),
+        status,
+        reviewerName: "当前审批人",
+        reviewedAt: new Date().toISOString(),
+      });
+      toast.success(status === "approved" ? "文件已通过审批" : "文件已驳回");
+    }
     const next = queue.find((item) => item.id !== current.id);
-    if (next) navigate({ to: "/knowledge/approval/$approvalId", params: { approvalId: next.id } });
-    else navigate({ to: "/knowledge/admin", search: { section: "approvals" } });
+    if (next) {
+      navigate({
+        to: isConfirm ? "/knowledge/confirm/$confirmId" : "/knowledge/approval/$approvalId",
+        params: isConfirm ? { confirmId: next.id } : { approvalId: next.id },
+      });
+    } else if (isConfirm) {
+      navigate({ to: "/knowledge/mine", search: { panel: "uploads", view: "confirm" } });
+    } else {
+      navigate({ to: "/knowledge/admin", search: { section: "approvals" } });
+    }
   };
   const queueFiles = useMemo(
     () => queue.slice(0, visible).map(approvalToFile),
@@ -974,17 +1003,25 @@ export function FileApprovalPage({ approvalId }: { approvalId: string }) {
       <Header
         item={current}
         readOnly={readOnly}
-        back={() => navigate({ to: "/knowledge/admin", search: { section: "approvals" } })}
+        mode={mode}
+        back={() =>
+          isConfirm
+            ? navigate({ to: "/knowledge/mine", search: { panel: "uploads", view: "confirm" } })
+            : navigate({ to: "/knowledge/admin", search: { section: "approvals" } })
+        }
         reject={() => finish("rejected")}
         approve={() => finish("approved")}
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <FileTreeSidebar
-          title="待审批文件"
+          title={isConfirm ? "待确认文件" : "待审批文件"}
           files={queueFiles}
           currentFileId={current.id}
           onSelect={(file) =>
-            navigate({ to: "/knowledge/approval/$approvalId", params: { approvalId: file.id } })
+            navigate({
+              to: isConfirm ? "/knowledge/confirm/$confirmId" : "/knowledge/approval/$approvalId",
+              params: isConfirm ? { confirmId: file.id } : { approvalId: file.id },
+            })
           }
           footer={
             visible < queue.length ? (
@@ -1050,7 +1087,7 @@ export function FileApprovalPage({ approvalId }: { approvalId: string }) {
           </ModulePanel>
         </section>
         <aside className="flex w-[390px] shrink-0 flex-col border-l border-[#E0E9EB] bg-white 2xl:w-[420px]">
-          <SidebarHeader title="审核信息" />
+          <SidebarHeader title={isConfirm ? "确认信息" : "审核信息"} />
           <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
             <PanelSection title="文件基本信息" icon={FileText}>
               <BasicInfo item={current} />

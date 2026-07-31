@@ -74,7 +74,6 @@ export function PersonalDirectoryTree({
   onRenameBase,
   onMoveBase,
   onDeleteBase,
-  onToggleBaseStatus,
 }: {
   selectedBaseId?: string;
   pinnedIds?: string[];
@@ -92,7 +91,6 @@ export function PersonalDirectoryTree({
   onRenameBase?: (base: KnowledgeBase) => void;
   onMoveBase?: (base: KnowledgeBase) => void;
   onDeleteBase?: (base: KnowledgeBase) => void;
-  onToggleBaseStatus?: (base: KnowledgeBase) => void;
 }) {
   useKnowledgeStoreVersion();
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -155,7 +153,6 @@ export function PersonalDirectoryTree({
           onRenameBase={onRenameBase}
           onMoveBase={onMoveBase}
           onDeleteBase={onDeleteBase}
-          onToggleBaseStatus={onToggleBaseStatus}
         />
       ))}
     </div>
@@ -183,7 +180,6 @@ function PersonalDirectoryNode({
   onRenameBase,
   onMoveBase,
   onDeleteBase,
-  onToggleBaseStatus,
 }: {
   directory: PersonalDirectory;
   depth: number;
@@ -205,7 +201,6 @@ function PersonalDirectoryNode({
   onRenameBase?: (base: KnowledgeBase) => void;
   onMoveBase?: (base: KnowledgeBase) => void;
   onDeleteBase?: (base: KnowledgeBase) => void;
-  onToggleBaseStatus?: (base: KnowledgeBase) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const open = expanded.has(directory.id);
@@ -390,7 +385,6 @@ function PersonalDirectoryNode({
               onRenameBase={onRenameBase}
               onMoveBase={onMoveBase}
               onDeleteBase={onDeleteBase}
-              onToggleBaseStatus={onToggleBaseStatus}
             />
           ))}
           {bases.map((base) => (
@@ -408,7 +402,6 @@ function PersonalDirectoryNode({
               onRename={onRenameBase ? () => onRenameBase(base) : undefined}
               onMove={onMoveBase ? () => onMoveBase(base) : undefined}
               onDelete={onDeleteBase ? () => onDeleteBase(base) : undefined}
-              onToggleStatus={onToggleBaseStatus ? () => onToggleBaseStatus(base) : undefined}
             />
           ))}
         </div>

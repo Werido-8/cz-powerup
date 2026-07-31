@@ -33,7 +33,16 @@ export function FileMoveDialog({
   onClose: () => void;
   onConfirm: (files: KnowledgeFile[], targetBaseId: string) => void;
 }) {
-  const open = files.length > 0;
+  const open = files.length === 1;
+  const rejectedBatch = files.length > 1;
+
+  useEffect(() => {
+    if (!rejectedBatch) return;
+    toast.error("移动仅支持单个文件，不做批量移动");
+    onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在误传批量时关闭一次
+  }, [rejectedBatch]);
+
   const storeVersion = useSyncExternalStore(
     subscribeKnowledgeStore,
     getKnowledgeStoreVersion,
@@ -62,16 +71,13 @@ export function FileMoveDialog({
       .slice(0, 4);
   }, [open, targetById]);
 
-  const isBatch = files.length > 1;
   const selectedBase = target ? targetById.get(target) : undefined;
   const isSubmitApproval = isSubmitToPublicMove(effectiveBaseId, target);
 
   const handleConfirm = () => {
-    if (!target) return;
+    if (!target || files.length !== 1) return;
     if (isSubmitApproval) {
-      pushRecentMoveId(target);
-      toast.success("已提交到公共知识库，等待审批");
-      onConfirm(files, target);
+      toast.message("跨库移动入库（重解析 + 审批）需求已保留，一期暂不开放（依赖 RAG）");
       return;
     }
     pushRecentMoveId(target);
@@ -82,7 +88,7 @@ export function FileMoveDialog({
     <AppFormDialog
       open={open}
       size="small"
-      title={isSubmitApproval ? "提交到公共知识库" : isBatch ? "批量移动文件" : "移动文件"}
+      title={isSubmitApproval ? "提交到专业/公共知识库" : "移动文件"}
       titleIcon={FolderInput}
       onClose={onClose}
       footer={
@@ -93,10 +99,10 @@ export function FileMoveDialog({
           <AppDialogButton
             variant="primary"
             loading={loading}
-            disabled={!target}
+            disabled={!target || isSubmitApproval}
             onClick={handleConfirm}
           >
-            {isSubmitApproval ? "提交审批" : "确认移动"}
+            {isSubmitApproval ? "暂未开放" : "确认移动"}
           </AppDialogButton>
         </>
       }
@@ -105,15 +111,7 @@ export function FileMoveDialog({
         <p className="text-[13px] leading-relaxed text-[#526670]">
           {isSubmitApproval ? (
             <>
-              将个人库文件提交到公共知识库
-              <strong className="mx-1 font-semibold text-foreground">{selectedBase?.name}</strong>
-              ，提交后需经管理员审批。
-            </>
-          ) : isBatch ? (
-            <>
-              已选择
-              <strong className="mx-1 font-semibold text-foreground">{files.length}</strong>
-              个文件，选择目标知识库后移动。
+              移入专业/公共知识库并触发重解析与审批的能力已写入需求（SR-48），一期暂不实现，依赖 RAG 入库链路后续开放。
             </>
           ) : (
             <>

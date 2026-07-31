@@ -123,7 +123,6 @@ export function KnowledgeBaseFormDrawer({
       categoryId,
       categoryPath: pathLabel ? pathLabel.split(" / ") : undefined,
       fileCount: base?.fileCount ?? 0,
-      status: base?.status ?? "enabled",
       permission: isPublic
         ? {
             // 公共库对全员开放，且不提供权限配置能力

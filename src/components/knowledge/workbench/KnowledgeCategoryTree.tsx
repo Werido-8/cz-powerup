@@ -111,7 +111,6 @@ export function KnowledgeBaseTreeItem({
   onRename,
   onMove,
   onDelete,
-  onToggleStatus,
 }: {
   base: KnowledgeBase;
   depth: number;
@@ -125,13 +124,11 @@ export function KnowledgeBaseTreeItem({
   onRename?: () => void;
   onMove?: () => void;
   onDelete?: () => void;
-  onToggleStatus?: () => void;
 }) {
   const canView = canViewBaseFiles(base);
   const showNoViewLock = showPin && !canView && !isKnowledgeAdmin();
   const [menuOpen, setMenuOpen] = useState(false);
-  const hasMoreMenu = Boolean(showManageActions && (onMove || onDelete || onToggleStatus));
-  const isDisabled = base.status === "disabled";
+  const hasMoreMenu = Boolean(showManageActions && (onMove || onDelete));
 
   return (
     <div
@@ -139,7 +136,6 @@ export function KnowledgeBaseTreeItem({
         "group relative flex h-8 w-full items-center gap-1 rounded-[8px] pr-1.5 transition-colors",
         selected ? "bg-primary-soft" : "hover:bg-[#F4FAFB]",
         highlighted && "bg-primary-soft/80 ring-1 ring-primary/30",
-        isDisabled && !selected && "opacity-60",
       )}
       style={{ paddingLeft: 30 + depth * 14 }}
     >
@@ -154,7 +150,6 @@ export function KnowledgeBaseTreeItem({
           selected
             ? "font-medium text-accent-foreground"
             : "text-kb-body group-hover:text-kb-heading",
-          isDisabled && "text-kb-muted",
         )}
       >
         <Library
@@ -164,11 +159,6 @@ export function KnowledgeBaseTreeItem({
           )}
         />
         <span className="min-w-0 flex-1 truncate">{base.name}</span>
-        {isDisabled && (
-          <span className="shrink-0 rounded px-1 py-0.5 text-[10px] text-kb-muted ring-1 ring-kb-border">
-            已停用
-          </span>
-        )}
       </button>
       {showNoViewLock ? (
         <TooltipProvider>
@@ -263,15 +253,6 @@ export function KnowledgeBaseTreeItem({
                     <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
                     删除
                   </DropdownMenuItem>
-                )}
-                {onToggleStatus && (
-                  <>
-                    {(onMove || onDelete) && <DropdownMenuSeparator />}
-                    <DropdownMenuItem className="gap-2 text-[13px]" onSelect={onToggleStatus}>
-                      <CircleOff className="h-3.5 w-3.5 stroke-[1.8] text-kb-muted" />
-                      {isDisabled ? "启用" : "停用"}
-                    </DropdownMenuItem>
-                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -391,7 +372,6 @@ export function KnowledgeCategoryTree({
   onRenameBase,
   onMoveBase,
   onDeleteBase,
-  onToggleBaseStatus,
 }: {
   selectedBaseId?: string;
   pinnedIds: string[];
@@ -411,7 +391,6 @@ export function KnowledgeCategoryTree({
   onRenameBase?: (base: KnowledgeBase) => void;
   onMoveBase?: (base: KnowledgeBase) => void;
   onDeleteBase?: (base: KnowledgeBase) => void;
-  onToggleBaseStatus?: (base: KnowledgeBase) => void;
 }) {
   useKnowledgeStoreVersion();
   const categories = getStoreCategories();
@@ -483,7 +462,6 @@ export function KnowledgeCategoryTree({
           onRenameBase={onRenameBase}
           onMoveBase={onMoveBase}
           onDeleteBase={onDeleteBase}
-          onToggleBaseStatus={onToggleBaseStatus}
         />
       ))}
     </div>
@@ -511,7 +489,6 @@ function CategoryNode({
   onRenameBase,
   onMoveBase,
   onDeleteBase,
-  onToggleBaseStatus,
 }: {
   category: KnowledgeCategory;
   depth: number;
@@ -533,7 +510,6 @@ function CategoryNode({
   onRenameBase?: (base: KnowledgeBase) => void;
   onMoveBase?: (base: KnowledgeBase) => void;
   onDeleteBase?: (base: KnowledgeBase) => void;
-  onToggleBaseStatus?: (base: KnowledgeBase) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const open = expanded.has(category.id);
@@ -711,7 +687,6 @@ function CategoryNode({
               onRenameBase={onRenameBase}
               onMoveBase={onMoveBase}
               onDeleteBase={onDeleteBase}
-              onToggleBaseStatus={onToggleBaseStatus}
             />
           ))}
           {bases.map((base) => (
@@ -728,7 +703,6 @@ function CategoryNode({
               onRename={onRenameBase ? () => onRenameBase(base) : undefined}
               onMove={onMoveBase ? () => onMoveBase(base) : undefined}
               onDelete={onDeleteBase ? () => onDeleteBase(base) : undefined}
-              onToggleStatus={onToggleBaseStatus ? () => onToggleBaseStatus(base) : undefined}
             />
           ))}
         </div>

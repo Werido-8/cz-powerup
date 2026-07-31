@@ -121,7 +121,6 @@ export function CreateKnowledgeBaseDialog({
       categoryId,
       categoryPath: pathLabel ? pathLabel.split(" / ") : undefined,
       fileCount: 0,
-      status: "enabled",
       permission: isPublic
         ? {
             canView: true,
