@@ -30,7 +30,7 @@ export interface ExamSessionPaper {
 }
 
 export function parseEmployeePaperId(sessionId: string): string | null {
-  const prefix = "我的考试-";
+  const prefix = "正式考试-";
   if (!sessionId.startsWith(prefix)) return null;
   return sessionId.slice(prefix.length) || null;
 }
@@ -52,14 +52,18 @@ export function resolveExamSessionPaper(sessionId: string): ExamSessionPaper | n
     duration: adminPaper?.duration ?? 30,
     passLine: 60,
     goal: adminPaper?.goal ?? "取证复习",
-    category: adminPaper?.category ?? "—",
+    category: adminPaper?.category ?? "-",
     difficulty: "中",
     questionCount: questionCount || groups.reduce((s, g) => s + g.questions.length, 0),
   };
 }
 
 export function flattenExamQuestions(groups: EditorGroup[]) {
-  const items: { globalNo: number; groupType: EditorGroup["type"]; question: EditorGroup["questions"][0] }[] = [];
+  const items: {
+    globalNo: number;
+    groupType: EditorGroup["type"];
+    question: EditorGroup["questions"][0];
+  }[] = [];
   let no = 0;
   for (const g of groups) {
     for (const q of g.questions) {
@@ -106,19 +110,33 @@ export function gradeExamAnswer(
 }
 
 /** 兜底：无法解析试卷 id 时使用默认卷面 */
-export function fallbackExamSessionPaper(title: string, count: number): ExamSessionPaper {
-  const groups = structuredClone(EDITOR_GROUPS);
+export function fallbackExamSessionPaper(
+  title: string,
+  count: number,
+  duration = 30,
+  passLine = 60,
+  goal = "个人测评",
+  category = "综合能力",
+  difficulty = "综合",
+): ExamSessionPaper {
+  let remaining = Math.max(1, count);
+  const groups = structuredClone(EDITOR_GROUPS).map((group) => {
+    const questions = group.questions.slice(0, remaining);
+    remaining -= questions.length;
+    return { ...group, questions };
+  });
+  const questionCount = groups.reduce((sum, group) => sum + group.questions.length, 0);
   return {
     employeePaperId: "default",
     adminPaperId: "p1",
     title,
     groups,
-    duration: 30,
-    passLine: 60,
-    goal: "取证复习",
-    category: "调频调压",
-    difficulty: "中",
-    questionCount: count || groups.reduce((s, g) => s + g.questions.length, 0),
+    duration: duration || 30,
+    passLine,
+    goal,
+    category,
+    difficulty,
+    questionCount,
   };
 }
 

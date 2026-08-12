@@ -20,9 +20,10 @@ import {
   filterFiles,
   getAllPublishedFiles,
   getBaseById,
+  isSubmitToPublicMove,
   sortKnowledgeFiles,
 } from "@/lib/knowledge/model";
-import { removeStoreFiles, updateStoreFile } from "@/lib/knowledge/store";
+import { removeStoreFiles, submitStoreFileMove, updateStoreFile } from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import { openFileDetailInNewTab } from "@/lib/knowledge/searchNav";
 import type { FileSearchMode, KnowledgeFile, KnowledgeSortBy } from "@/lib/knowledge/types";
@@ -130,15 +131,34 @@ export function AllKnowledgeFilesPage() {
 
   const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
     const targetBase = getBaseById(targetBaseId);
+    if (!targetBase) {
+      toast.error("目标知识库不存在");
+      return;
+    }
+    const toSubmit = movingFiles.filter((file) =>
+      isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
+    );
+    const movable = movingFiles.filter(
+      (file) => !isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
+    );
     setMoveLoading(true);
-    for (const file of movingFiles) {
+    for (const file of toSubmit) {
+      submitStoreFileMove(file, targetBase);
+    }
+    for (const file of movable) {
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
-        knowledgeBaseName: targetBase?.name,
+        knowledgeBaseName: targetBase.name,
       });
     }
     window.setTimeout(() => {
-      toast.success(`已将「${movingFiles[0]?.name}」移动到「${targetBase?.name ?? "目标知识库"}」`);
+      if (toSubmit.length > 0) {
+        toast.success(
+          `已提交「${toSubmit[0]?.name}」移入「${targetBase.name}」的申请，请等待管理员审批`,
+        );
+      } else {
+        toast.success(`已将「${movingFiles[0]?.name}」移动到「${targetBase.name}」`);
+      }
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();

@@ -47,7 +47,14 @@ import {
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
 import { ExamPaperEditor, type ExamPaperEditorMode } from "@/components/exam/exam-paper-editor";
-import { PageHeader, StatCard, ModuleTabs, ModulePanel, TableListPager, TABLE_PAGE_SIZE_DEFAULT, PillSelect } from "@/components/learning/ui";
+import {
+  PageHeader,
+  StatCard,
+  ModuleTabs,
+  ModulePanel,
+  TableListPager,
+  TABLE_PAGE_SIZE_DEFAULT,
+} from "@/components/learning/ui";
 import { StemCell } from "@/components/common/ellipsis-tooltip";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -105,7 +112,6 @@ import {
   REWRITE_CANDIDATES,
   SIMILAR_QUESTIONS,
   BANK_USAGE,
-  DRAFT_PAPERS,
   REVIEW_DETAILS,
   REVIEW_SIMILAR,
   aggregateStats,
@@ -275,7 +281,7 @@ function createBankQuestionId(rows: BankQuestion[]) {
 
 function BankFilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:flex-row sm:items-center">
       <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
       {children}
     </div>
@@ -283,8 +289,6 @@ function BankFilterField({ label, children }: { label: string; children: React.R
 }
 
 export function BankModule() {
-  const [searchMode, setSearchMode] = useState<"filter" | "ai">("filter");
-  const [aiQuery, setAiQuery] = useState("");
   const [keyword, setKeyword] = useState("");
   const [cat, setCat] = useState("all");
   const [filterType, setFilterType] = useState<QuestionType | "all">("all");
@@ -307,7 +311,6 @@ export function BankModule() {
   const [similar, setSimilar] = useState<BankQuestion | null>(null);
   const [disable, setDisable] = useState<BankQuestion | null>(null);
   const [usage, setUsage] = useState<BankQuestion | null>(null);
-  const [addPaper, setAddPaper] = useState<BankQuestion | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [batchDisableOpen, setBatchDisableOpen] = useState(false);
 
@@ -326,17 +329,11 @@ export function BankModule() {
     });
   }, [rows, cat, filterType, filterStatus, filterDifficulty, keyword]);
 
-  const handleAiSearch = () => {
-    setKeyword(aiQuery.trim());
-    toast.success("AI 已根据描述检索题目");
-  };
-
   const handleFormQuery = () => {
     setCat(draftCat);
     setFilterType(draftType);
     setFilterStatus(draftStatus);
     setFilterDifficulty(draftDifficulty);
-    setKeyword("");
   };
 
   const handleFormReset = () => {
@@ -349,7 +346,6 @@ export function BankModule() {
     setFilterStatus("all");
     setFilterDifficulty("all");
     setKeyword("");
-    setAiQuery("");
   };
 
   const selectCategory = (key: string) => {
@@ -424,21 +420,22 @@ export function BankModule() {
   };
 
   return (
-    <div className="flex gap-4">
-      <aside className="w-[220px] shrink-0">
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
-          <div className="flex items-center gap-2.5 border-b border-border bg-muted/20 px-3 py-3">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
-              <Library className="h-4 w-4" />
+    <div className="flex max-w-full min-w-0 flex-col gap-4 xl:flex-row">
+      <aside className="w-full shrink-0 xl:w-[236px]">
+        <div className="overflow-hidden rounded-2xl border border-[#D8E5E7] bg-[#F7FAFA]">
+          <div className="flex items-center gap-3 border-b border-border px-4 py-4">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-primary shadow-[0_3px_12px_rgba(25,72,82,0.08)]">
+              <Library className="h-[18px] w-[18px]" />
             </div>
             <div className="min-w-0">
-              <div className="text-[12.5px] font-semibold text-foreground">题库分类</div>
-              <div className="text-[10.5px] text-muted-foreground">
-                共 {BANK_CATEGORIES[0]?.count ?? 0} 题
-              </div>
+              <div className="text-[14px] font-semibold text-foreground">题库分类</div>
+              <div className="mt-0.5 text-[11.5px] text-muted-foreground">按业务主题筛选</div>
             </div>
           </div>
-          <nav className="max-h-[min(32rem,60vh)] space-y-0.5 overflow-y-auto p-1.5" aria-label="题库分类">
+          <nav
+            className="flex gap-1 overflow-x-auto p-2.5 xl:block xl:max-h-[min(38rem,68vh)] xl:space-y-1 xl:overflow-y-auto"
+            aria-label="题库分类"
+          >
             {BANK_CATEGORIES.map((c) => {
               const active = c.key === cat;
               const Icon = BANK_CAT_ICONS[c.key] ?? Folder;
@@ -448,19 +445,25 @@ export function BankModule() {
                   type="button"
                   onClick={() => selectCategory(c.key)}
                   className={cn(
-                    "relative flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left transition-colors",
+                    "relative flex min-h-11 min-w-[148px] items-center gap-2.5 rounded-xl px-3 text-left transition-colors xl:w-full xl:min-w-0",
                     active
                       ? "bg-primary-soft/80 font-medium text-primary"
                       : "text-foreground/85 hover:bg-muted/50",
                   )}
                 >
                   {active && (
-                    <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-primary" aria-hidden />
+                    <span
+                      className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-primary"
+                      aria-hidden
+                    />
                   )}
                   <Icon
-                    className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-muted-foreground/70")}
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      active ? "text-primary" : "text-muted-foreground/70",
+                    )}
                   />
-                  <span className="min-w-0 flex-1 truncate text-[12.5px]">{c.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[13.5px]">{c.name}</span>
                   <span
                     className={cn(
                       "shrink-0 rounded-full px-1.5 py-px text-[10.5px] tabular-nums",
@@ -477,124 +480,146 @@ export function BankModule() {
       </aside>
 
       <div className="min-w-0 flex-1">
-        {/* 查询区：模式切换 + 表单项同一行 */}
-        <div className="mb-2 rounded-lg border border-border bg-card px-3 py-2 shadow-[var(--shadow-card)]">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0 text-[11.5px] text-muted-foreground">找题方式</span>
-            <PillSelect
-              className="shrink-0"
-              options={[
-                { value: "filter", label: "条件找题" },
-                { value: "ai", label: "智能找题" },
-              ]}
-              value={searchMode}
-              onChange={(v) => setSearchMode(v as "filter" | "ai")}
-            />
-
-            {searchMode === "filter" ? (
-              <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
-                <BankFilterField label="分类">
-                  <Select value={draftCat} onValueChange={setDraftCat}>
-                    <SelectTrigger className="h-8 w-[128px] rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {BANK_CATEGORIES.map((c) => (
-                        <SelectItem key={c.key} value={c.key} className="text-[12px]">
-                          {c.key === "all" ? "全部" : c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </BankFilterField>
-                <BankFilterField label="题型">
-                  <Select value={draftType} onValueChange={(v) => setDraftType(v as QuestionType | "all")}>
-                    <SelectTrigger className="h-8 w-[112px] rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" className="text-[12px]">全部</SelectItem>
-                      {(["单选题", "多选题", "判断题", "填空题", "案例分析题", "简答题"] as QuestionType[]).map((t) => (
-                        <SelectItem key={t} value={t} className="text-[12px]">{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </BankFilterField>
-                <BankFilterField label="难度">
-                  <Select value={draftDifficulty} onValueChange={(v) => setDraftDifficulty(v as Difficulty | "all")}>
-                    <SelectTrigger className="h-8 w-[96px] rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" className="text-[12px]">全部</SelectItem>
-                      {(["易", "中", "难"] as Difficulty[]).map((d) => (
-                        <SelectItem key={d} value={d} className="text-[12px]">{d}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </BankFilterField>
-                <BankFilterField label="状态">
-                  <Select value={draftStatus} onValueChange={(v) => setDraftStatus(v as "启用" | "禁用" | "all")}>
-                    <SelectTrigger className="h-8 w-[96px] rounded-sm text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" className="text-[12px]">全部</SelectItem>
-                      <SelectItem value="启用" className="text-[12px]">启用</SelectItem>
-                      <SelectItem value="禁用" className="text-[12px]">禁用</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </BankFilterField>
-                <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleFormQuery}
-                    className="inline-flex h-8 items-center gap-1 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
-                  >
-                    <Search className="h-3.5 w-3.5" /> 查询
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFormReset}
-                    className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-3 text-[12px] text-muted-foreground hover:bg-muted"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" /> 重置
-                  </button>
-                </div>
+        <div className="rounded-t-[12px] border border-kb-border bg-kb-surface p-3">
+          <div className="flex min-w-0 flex-wrap items-end gap-3">
+            <BankFilterField label="关键词">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-kb-muted" />
+                <Input
+                  value={keyword}
+                  onChange={(event) => setKeyword(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && handleFormQuery()}
+                  placeholder="搜索题目、知识点或来源"
+                  className="h-10 w-full rounded-[9px] bg-white pl-9 text-[12.5px] sm:w-[260px]"
+                />
               </div>
-            ) : (
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <div className="relative h-8 min-w-0 flex-1">
-                  <Sparkles style={{marginTop: '-7px'}} className="pointer-events-none absolute left-2.5 top-1/2 z-10 h-3.5 w-3.5 -translate-y-1/2 text-primary/70" />
-                  <Input
-                    value={aiQuery}
-                    onChange={(e) => setAiQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAiSearch()}
-                    placeholder="找 5 道 AGC 考核相关的中等难度判断题"
-                    className="h-8 rounded-sm pl-8 text-[12.5px]"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAiSearch}
-                  className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  <Sparkles className="h-3.5 w-3.5" /> 智能找题
-                </button>
-              </div>
-            )}
+            </BankFilterField>
+            <BankFilterField label="分类">
+              <Select value={draftCat} onValueChange={setDraftCat}>
+                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[138px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BANK_CATEGORIES.map((c) => (
+                    <SelectItem key={c.key} value={c.key} className="text-[12px]">
+                      {c.key === "all" ? "全部" : c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </BankFilterField>
+            <BankFilterField label="题型">
+              <Select
+                value={draftType}
+                onValueChange={(v) => setDraftType(v as QuestionType | "all")}
+              >
+                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[122px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[12px]">
+                    全部
+                  </SelectItem>
+                  {(
+                    [
+                      "单选题",
+                      "多选题",
+                      "判断题",
+                      "填空题",
+                      "案例分析题",
+                      "简答题",
+                    ] as QuestionType[]
+                  ).map((t) => (
+                    <SelectItem key={t} value={t} className="text-[12px]">
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </BankFilterField>
+            <BankFilterField label="难度">
+              <Select
+                value={draftDifficulty}
+                onValueChange={(v) => setDraftDifficulty(v as Difficulty | "all")}
+              >
+                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[104px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[12px]">
+                    全部
+                  </SelectItem>
+                  {(["易", "中", "难"] as Difficulty[]).map((d) => (
+                    <SelectItem key={d} value={d} className="text-[12px]">
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </BankFilterField>
+            <BankFilterField label="状态">
+              <Select
+                value={draftStatus}
+                onValueChange={(v) => setDraftStatus(v as "启用" | "禁用" | "all")}
+              >
+                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[104px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-[12px]">
+                    全部
+                  </SelectItem>
+                  <SelectItem value="启用" className="text-[12px]">
+                    启用
+                  </SelectItem>
+                  <SelectItem value="禁用" className="text-[12px]">
+                    禁用
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </BankFilterField>
+            <div className="flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto sm:flex-nowrap">
+              <button
+                type="button"
+                onClick={handleFormQuery}
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-4 text-[13px] font-medium text-white hover:bg-[#2b91a3]"
+              >
+                <Search className="h-3.5 w-3.5" /> 查询
+              </button>
+              <button
+                type="button"
+                onClick={handleFormReset}
+                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-white px-4 text-[13px] text-muted-foreground hover:bg-muted"
+              >
+                <RotateCcw className="h-3.5 w-3.5" /> 重置
+              </button>
+            </div>
           </div>
         </div>
 
         {/* 操作区：新增 + 批量 */}
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2">
+        <div className="mb-4 flex min-h-[52px] flex-wrap items-center justify-between gap-3 rounded-b-[12px] border border-t-0 border-kb-border bg-white px-3 py-2">
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="h-3.5 w-3.5" /> 新增题目
           </button>
-          <div className="flex flex-nowrap items-center gap-2">
+          <div className="flex w-full flex-nowrap items-center justify-between gap-2 sm:w-auto sm:justify-start">
             <span className="whitespace-nowrap text-[12px] text-muted-foreground">
               已选 <span className="font-semibold text-foreground">{selected.size}</span> 项
             </span>
             <button
               type="button"
               disabled={selected.size === 0}
-              onClick={() => { batchSetStatus(selectedRows.map((r) => r.id), "启用"); toast.success(`已启用 ${selected.size} 道题目`); }}
+              onClick={() => {
+                batchSetStatus(
+                  selectedRows.map((r) => r.id),
+                  "启用",
+                );
+                toast.success(`已启用 ${selected.size} 道题目`);
+              }}
               className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] disabled:opacity-40 hover:bg-muted"
             >
               <Power className="h-3.5 w-3.5" /> 启用
@@ -626,12 +651,12 @@ export function BankModule() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-border bg-card">
+        <div className="overflow-hidden rounded-[12px] border border-[#D8E5E7] bg-card">
           <div className="overflow-x-auto">
-            <table className="w-full whitespace-nowrap text-[13px]">
-              <thead className="bg-muted/40 text-[12px] text-muted-foreground">
+            <table className="w-full whitespace-nowrap text-[13.5px]">
+              <thead className="bg-[#F3F7F8] text-[12.5px] text-muted-foreground">
                 <tr>
-                  <Th className="w-10 px-3 py-2.5">
+                  <Th className="w-10 px-4 py-3.5">
                     <input
                       type="checkbox"
                       checked={pageAllChecked}
@@ -639,14 +664,10 @@ export function BankModule() {
                       className="h-3.5 w-3.5 cursor-pointer accent-primary"
                     />
                   </Th>
-                  <Th className="min-w-[240px] px-3 py-2.5">题干</Th>
+                  <Th className="min-w-[300px] px-4 py-3.5">题目内容</Th>
                   <Th className="px-3 py-2.5">题型</Th>
                   <Th className="px-3 py-2.5">知识点</Th>
                   <Th className="px-3 py-2.5">难度</Th>
-                  <Th className="px-3 py-2.5">来源资料</Th>
-                  <Th className="px-3 py-2.5">使用次数</Th>
-                  <Th className="px-3 py-2.5">最近使用</Th>
-                  <Th className="px-3 py-2.5">正确率</Th>
                   <Th className="px-3 py-2.5">状态</Th>
                   <Th className="px-3 py-2.5 text-right">操作</Th>
                 </tr>
@@ -654,14 +675,20 @@ export function BankModule() {
               <tbody>
                 {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+                    <td
+                      colSpan={7}
+                      className="px-4 py-14 text-center text-[14px] text-muted-foreground"
+                    >
                       当前分类或搜索条件下暂无题目
                     </td>
                   </tr>
                 ) : (
                   pageRows.map((b) => (
-                    <tr key={b.id} className="border-t border-border">
-                      <Td className="px-3 py-2.5">
+                    <tr
+                      key={b.id}
+                      className="border-t border-border transition-colors hover:bg-[#F8FBFB]"
+                    >
+                      <Td className="px-4 py-3.5">
                         <input
                           type="checkbox"
                           checked={selected.has(b.id)}
@@ -669,26 +696,40 @@ export function BankModule() {
                           className="h-3.5 w-3.5 cursor-pointer accent-primary"
                         />
                       </Td>
-                      <StemCell text={b.stem} maxWidthClass="max-w-[280px]" className="text-[12.5px]" />
+                      <Td className="min-w-[360px] max-w-[560px] px-4 py-3.5">
+                        <div className="whitespace-normal text-[13.5px] font-medium leading-5 text-foreground">
+                          {b.stem}
+                        </div>
+                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
+                          <span className="max-w-[280px] truncate">来源 {b.source}</span>
+                          <span>使用 {b.usedCount} 次</span>
+                          <span>最近 {b.lastUsed}</span>
+                          <span
+                            className={
+                              b.correctRate >= 70
+                                ? "text-success"
+                                : b.correctRate >= 55
+                                  ? "text-warning-foreground"
+                                  : "text-destructive"
+                            }
+                          >
+                            正确率 {b.correctRate}%
+                          </span>
+                        </div>
+                      </Td>
                       <Td className="px-3 py-2.5 text-muted-foreground">{b.type}</Td>
                       <Td className="px-3 py-2.5">
-                        <Badge variant="secondary" className="max-w-[120px] truncate font-normal">{b.knowledge}</Badge>
+                        <Badge variant="secondary" className="max-w-[120px] truncate font-normal">
+                          {b.knowledge}
+                        </Badge>
                       </Td>
                       <Td className="px-3 py-2.5">{diffOptionBadge(b.difficulty)}</Td>
-                      <Td className="max-w-[160px] truncate px-3 py-2.5 text-[12px] text-muted-foreground">{b.source}</Td>
-                      <Td className="px-3 py-2.5 text-muted-foreground">{b.usedCount}</Td>
-                      <Td className="px-3 py-2.5 text-[12px] text-muted-foreground">{b.lastUsed}</Td>
-                      <Td className="px-3 py-2.5">
-                        <span
-                          className={`font-medium ${b.correctRate >= 70 ? "text-success" : b.correctRate >= 55 ? "text-warning-foreground" : "text-destructive"}`}
-                        >
-                          {b.correctRate}%
-                        </span>
-                      </Td>
                       <Td className="px-3 py-2.5">
                         <span
                           className={`rounded-md px-2 py-0.5 text-[11px] ${
-                            b.status === "启用" ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"
+                            b.status === "启用"
+                              ? "bg-success-soft text-success"
+                              : "bg-muted text-muted-foreground"
                           }`}
                         >
                           {b.status}
@@ -712,19 +753,24 @@ export function BankModule() {
                                 <FileSearch className="mr-2 h-3.5 w-3.5" /> 查相似题
                               </DropdownMenuItem>
                               {b.status === "启用" ? (
-                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setDisable(b)}>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => setDisable(b)}
+                                >
                                   <Ban className="mr-2 h-3.5 w-3.5" /> 禁用
                                 </DropdownMenuItem>
                               ) : (
-                                <DropdownMenuItem onClick={() => { toggleStatus(b.id, "启用"); toast.success("已启用题目"); }}>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    toggleStatus(b.id, "启用");
+                                    toast.success("已启用题目");
+                                  }}
+                                >
                                   <Power className="mr-2 h-3.5 w-3.5" /> 启用
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuItem onClick={() => setUsage(b)}>
                                 <History className="mr-2 h-3.5 w-3.5" /> 查看使用记录
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setAddPaper(b)}>
-                                <PlusCircle className="mr-2 h-3.5 w-3.5" /> 加入试卷
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -750,9 +796,15 @@ export function BankModule() {
       <BankDetailDrawer
         q={detail}
         onClose={() => setDetail(null)}
-        onEdit={(b) => { setDetail(null); setEdit(b); }}
+        onEdit={(b) => {
+          setDetail(null);
+          setEdit(b);
+        }}
         // onRewrite={(b) => { setDetail(null); setRewrite(b); }}
-        onSimilar={(b) => { setDetail(null); setSimilar(b); }}
+        onSimilar={(b) => {
+          setDetail(null);
+          setSimilar(b);
+        }}
       />
       <BankEditDrawer
         q={createOpen ? null : edit}
@@ -766,22 +818,37 @@ export function BankModule() {
       <DisableDialog
         q={disable}
         onClose={() => setDisable(null)}
-        onConfirm={(b) => { toggleStatus(b.id, "禁用"); setDisable(null); toast.success("已禁用题目"); }}
+        onConfirm={(b) => {
+          toggleStatus(b.id, "禁用");
+          setDisable(null);
+          toast.success("已禁用题目");
+        }}
       />
       <UsageDialog q={usage} onClose={() => setUsage(null)} />
-      <AddToPaperDialog q={addPaper} onClose={() => setAddPaper(null)} />
 
       <Dialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>批量删除题目</DialogTitle>
-            <DialogDescription>共 {selectedRows.length} 道题将被永久删除,此操作不可恢复。</DialogDescription>
+            <DialogDescription>
+              共 {selectedRows.length} 道题将被永久删除,此操作不可恢复。
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <button type="button" onClick={() => setBatchDeleteOpen(false)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
             <button
               type="button"
-              onClick={() => { removeRows(selectedRows.map((r) => r.id)); setBatchDeleteOpen(false); toast.success("已批量删除"); }}
+              onClick={() => setBatchDeleteOpen(false)}
+              className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                removeRows(selectedRows.map((r) => r.id));
+                setBatchDeleteOpen(false);
+                toast.success("已批量删除");
+              }}
               className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90"
             >
               确认删除
@@ -794,13 +861,28 @@ export function BankModule() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>批量禁用题目</DialogTitle>
-            <DialogDescription>共 {selectedRows.length} 道题将被禁用,禁用后不可参与组卷。</DialogDescription>
+            <DialogDescription>
+              共 {selectedRows.length} 道题将被禁用,禁用后不可参与组卷。
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <button type="button" onClick={() => setBatchDisableOpen(false)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
             <button
               type="button"
-              onClick={() => { batchSetStatus(selectedRows.map((r) => r.id), "禁用"); setBatchDisableOpen(false); toast.success("已批量禁用"); }}
+              onClick={() => setBatchDisableOpen(false)}
+              className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                batchSetStatus(
+                  selectedRows.map((r) => r.id),
+                  "禁用",
+                );
+                setBatchDisableOpen(false);
+                toast.success("已批量禁用");
+              }}
               className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
             >
               确认禁用
@@ -821,7 +903,13 @@ function DetailRow({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-function OptionList({ options, answer }: { options?: { key: string; text: string }[]; answer?: string }) {
+function OptionList({
+  options,
+  answer,
+}: {
+  options?: { key: string; text: string }[];
+  answer?: string;
+}) {
   if (!options) return null;
   return (
     <div className="space-y-1.5">
@@ -834,7 +922,9 @@ function OptionList({ options, answer }: { options?: { key: string; text: string
               correct ? "border-success/40 bg-success-soft/60" : "border-border bg-background"
             }`}
           >
-            <span className={`font-semibold ${correct ? "text-success" : "text-muted-foreground"}`}>{o.key}</span>
+            <span className={`font-semibold ${correct ? "text-success" : "text-muted-foreground"}`}>
+              {o.key}
+            </span>
             <span className="flex-1">{o.text}</span>
             {correct && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />}
           </div>
@@ -867,28 +957,45 @@ function BankDetailDrawer({
             </SheetHeader>
             <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
               <div>
-                <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">题干</div>
-                <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-[13.5px] font-medium leading-relaxed">{q.stem}</div>
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  题干
+                </div>
+                <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-[13.5px] font-medium leading-relaxed">
+                  {q.stem}
+                </div>
               </div>
               <div className="space-y-2">
                 <DetailRow k="题型" v={q.type} />
-                <DetailRow k="知识点" v={<Badge variant="secondary" className="font-normal">{q.knowledge}</Badge>} />
+                <DetailRow
+                  k="知识点"
+                  v={
+                    <Badge variant="secondary" className="font-normal">
+                      {q.knowledge}
+                    </Badge>
+                  }
+                />
                 <DetailRow k="难度" v={diffOptionBadge(q.difficulty)} />
                 <DetailRow k="来源资料" v={q.source} />
                 {/* <DetailRow k="来源章节" v={d?.section ?? "—"} /> */}
               </div>
               {d?.options && (
                 <div>
-                  <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">选项</div>
+                  <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    选项
+                  </div>
                   <OptionList options={d.options} answer={d.answer} />
                 </div>
               )}
               <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">正确答案</div>
+                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  正确答案
+                </div>
                 <div className="text-[13px] font-semibold text-success">{d?.answer ?? "—"}</div>
               </div>
               <div>
-                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">解析</div>
+                <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  解析
+                </div>
                 <div className="rounded-lg border border-border bg-background px-3 py-2.5 text-[12.5px] leading-relaxed text-muted-foreground">
                   {d?.analysis ?? "—"}
                 </div>
@@ -913,13 +1020,21 @@ function BankDetailDrawer({
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3">
-              <button onClick={() => onSimilar(q)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">查相似题</button>
+              <button
+                onClick={() => onSimilar(q)}
+                className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+              >
+                查相似题
+              </button>
               {/* 本期暂不开放：智能改写
               <button onClick={() => onRewrite(q)} className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 px-3.5 py-2 text-[12.5px] text-primary hover:bg-primary-soft">
                 <Wand2 className="h-3.5 w-3.5" /> 智能改写
               </button>
               */}
-              <button onClick={() => onEdit(q)} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">
+              <button
+                onClick={() => onEdit(q)}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+              >
                 <Pencil className="h-3.5 w-3.5" /> 编辑
               </button>
             </div>
@@ -930,7 +1045,14 @@ function BankDetailDrawer({
   );
 }
 
-const QUESTION_TYPES: QuestionType[] = ["单选题", "多选题", "判断题", "填空题", "案例分析题", "简答题"];
+const QUESTION_TYPES: QuestionType[] = [
+  "单选题",
+  "多选题",
+  "判断题",
+  "填空题",
+  "案例分析题",
+  "简答题",
+];
 const DIFFICULTIES: Difficulty[] = ["易", "中", "难"];
 
 function parseAnswerKeys(answer: string): string[] {
@@ -987,7 +1109,10 @@ function normalizeOptionsForChoice(options: ChoiceOption[]): ChoiceOption[] {
     options.length <= 2 &&
     options.every((o) => o.key === "T" || o.key === "F" || o.key === "A" || o.key === "B");
 
-  if (isJudgeLike && (options.some((o) => o.key === "T" || o.key === "F") || options.length === 2)) {
+  if (
+    isJudgeLike &&
+    (options.some((o) => o.key === "T" || o.key === "F") || options.length === 2)
+  ) {
     const tOpt = options.find((o) => o.key === "T") ?? options[0];
     const fOpt = options.find((o) => o.key === "F") ?? options[1];
     return [
@@ -1024,7 +1149,9 @@ function applyQuestionTypeChange(
   selectedKeys: string[],
 ): { options: ChoiceOption[]; selectedKeys: string[] } {
   if (isChoiceType(nextType)) {
-    const nextOptions = normalizeOptionsForChoice(isChoiceType(prevType) ? rekeyOptions(options) : options);
+    const nextOptions = normalizeOptionsForChoice(
+      isChoiceType(prevType) ? rekeyOptions(options) : options,
+    );
     let nextKeys = isChoiceType(prevType)
       ? selectedKeys.filter((k) => nextOptions.some((o) => o.key === k))
       : migrateSelectedKeysToAbcd(options, selectedKeys, nextOptions);
@@ -1114,11 +1241,15 @@ function ChoiceOptionsEditor({
                 onChange={() => toggleKey(o.key)}
                 className="h-3.5 w-3.5 shrink-0 accent-primary"
               />
-              <span className="w-5 shrink-0 text-center text-[12px] font-medium text-muted-foreground">{o.key}</span>
+              <span className="w-5 shrink-0 text-center text-[12px] font-medium text-muted-foreground">
+                {o.key}
+              </span>
               <Input
                 value={o.text}
                 onChange={(e) =>
-                  onOptionsChange(options.map((x) => (x.key === o.key ? { ...x, text: e.target.value } : x)))
+                  onOptionsChange(
+                    options.map((x) => (x.key === o.key ? { ...x, text: e.target.value } : x)),
+                  )
                 }
                 className="text-[13px]"
               />
@@ -1179,7 +1310,9 @@ function JudgeOptionsEditor({
                 onChange={() => onSelect(o.key)}
                 className="h-3.5 w-3.5 shrink-0 accent-primary"
               />
-              <span className="w-5 shrink-0 text-center text-[12px] font-medium text-muted-foreground">{o.key}</span>
+              <span className="w-5 shrink-0 text-center text-[12px] font-medium text-muted-foreground">
+                {o.key}
+              </span>
               <Input readOnly value={o.text} className="cursor-default bg-muted/30 text-[13px]" />
             </div>
           ))}
@@ -1334,37 +1467,63 @@ function BankEditDrawer({
             </SheetHeader>
             <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
               <BankField label="题干">
-                <Textarea value={stem} onChange={(e) => setStem(e.target.value)} rows={3} className="text-[13px]" />
+                <Textarea
+                  value={stem}
+                  onChange={(e) => setStem(e.target.value)}
+                  rows={3}
+                  className="text-[13px]"
+                />
               </BankField>
               <div className="grid grid-cols-2 gap-3">
                 <BankField label="题型">
                   <Select value={type} onValueChange={(v) => handleTypeChange(v as QuestionType)}>
-                    <SelectTrigger className="text-[13px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="text-[13px]">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {QUESTION_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      {QUESTION_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </BankField>
                 <BankField label="难度">
                   <Select value={difficulty} onValueChange={(v) => setDifficulty(v as Difficulty)}>
-                    <SelectTrigger className="text-[13px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="text-[13px]">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {DIFFICULTIES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      {DIFFICULTIES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </BankField>
               </div>
               {typeWarn && (
                 <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning-soft px-3 py-2 text-[12px] text-warning-foreground">
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> 切换题型可能清空当前选项和答案,请确认。
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />{" "}
+                  切换题型可能清空当前选项和答案,请确认。
                 </div>
               )}
               <div className="grid grid-cols-2 gap-3">
                 <BankField label="知识点">
-                  <Input value={knowledge} onChange={(e) => setKnowledge(e.target.value)} className="text-[13px]" />
+                  <Input
+                    value={knowledge}
+                    onChange={(e) => setKnowledge(e.target.value)}
+                    className="text-[13px]"
+                  />
                 </BankField>
                 <BankField label="来源资料">
-                  <Input value={source} onChange={(e) => setSource(e.target.value)} className="text-[13px]" />
+                  <Input
+                    value={source}
+                    onChange={(e) => setSource(e.target.value)}
+                    className="text-[13px]"
+                  />
                 </BankField>
               </div>
               {isChoice && (
@@ -1389,7 +1548,11 @@ function BankEditDrawer({
 
               {type === "填空题" && (
                 <BankField label="正确答案">
-                  <Input value={textAnswer} onChange={(e) => setTextAnswer(e.target.value)} className="text-[13px]" />
+                  <Input
+                    value={textAnswer}
+                    onChange={(e) => setTextAnswer(e.target.value)}
+                    className="text-[13px]"
+                  />
                 </BankField>
               )}
 
@@ -1399,10 +1562,14 @@ function BankEditDrawer({
                 </BankField>
               )}
 
-              <BankField label="解析"><Textarea defaultValue={d?.analysis} rows={3} className="text-[13px]" /></BankField>
+              <BankField label="解析">
+                <Textarea defaultValue={d?.analysis} rows={3} className="text-[13px]" />
+              </BankField>
               <BankField label="状态">
                 <Select value={status} onValueChange={(v) => setStatus(v as "启用" | "禁用")}>
-                  <SelectTrigger className="text-[13px]"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="启用">启用</SelectItem>
                     <SelectItem value="禁用">禁用</SelectItem>
@@ -1411,13 +1578,24 @@ function BankEditDrawer({
               </BankField>
               {!isCreate && (
                 <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
-                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> 修改正式题库题目会影响后续组卷,不影响已下发试卷的历史答题记录。
+                  <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />{" "}
+                  修改正式题库题目会影响后续组卷,不影响已下发试卷的历史答题记录。
                 </div>
               )}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border px-6 py-3">
-              <button type="button" onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-              <button type="button" onClick={handleSave} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+              >
                 <Save className="h-3.5 w-3.5" /> {isCreate ? "保存题目" : "保存修改"}
               </button>
             </div>
@@ -1459,32 +1637,64 @@ function RewriteDrawer({ q, onClose }: { q: BankQuestion | null; onClose: () => 
           {q && (
             <>
               <SheetHeader className="border-b border-border px-6 py-4">
-                <SheetTitle className="flex items-center gap-2"><Wand2 className="h-4 w-4 text-primary" /> 智能改写题目</SheetTitle>
-                <SheetDescription>AI 对题目做质量诊断并给出改写建议,正式调整需人工确认。</SheetDescription>
+                <SheetTitle className="flex items-center gap-2">
+                  <Wand2 className="h-4 w-4 text-primary" /> 智能改写题目
+                </SheetTitle>
+                <SheetDescription>
+                  AI 对题目做质量诊断并给出改写建议,正式调整需人工确认。
+                </SheetDescription>
               </SheetHeader>
               <div className="grid flex-1 grid-cols-1 gap-0 overflow-y-auto lg:grid-cols-2">
                 <div className="space-y-5 border-border px-6 py-5 lg:border-r">
                   <div>
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">原题信息</div>
-                    <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-[13px] font-medium leading-relaxed">{q.stem}</div>
-                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-muted-foreground">
-                      <span>{q.type}</span>·<Badge variant="secondary" className="font-normal">{q.knowledge}</Badge>·{diffOptionBadge(q.difficulty)}
+                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      原题信息
                     </div>
-                    {d?.options && <div className="mt-3"><OptionList options={d.options} answer={d.answer} /></div>}
-                    <div className="mt-3 text-[12px]"><span className="text-muted-foreground">正确答案:</span> <span className="font-semibold text-success">{d?.answer}</span></div>
-                    <div className="mt-1.5 text-[12px] text-muted-foreground">解析:{d?.analysis}</div>
+                    <div className="rounded-lg bg-muted/40 px-3 py-2.5 text-[13px] font-medium leading-relaxed">
+                      {q.stem}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-muted-foreground">
+                      <span>{q.type}</span>·
+                      <Badge variant="secondary" className="font-normal">
+                        {q.knowledge}
+                      </Badge>
+                      ·{diffOptionBadge(q.difficulty)}
+                    </div>
+                    {d?.options && (
+                      <div className="mt-3">
+                        <OptionList options={d.options} answer={d.answer} />
+                      </div>
+                    )}
+                    <div className="mt-3 text-[12px]">
+                      <span className="text-muted-foreground">正确答案:</span>{" "}
+                      <span className="font-semibold text-success">{d?.answer}</span>
+                    </div>
+                    <div className="mt-1.5 text-[12px] text-muted-foreground">
+                      解析:{d?.analysis}
+                    </div>
                     <div className="mt-1.5 text-[12px] text-muted-foreground">来源:{q.source}</div>
                   </div>
                   <div>
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">题目质量诊断</div>
+                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      题目质量诊断
+                    </div>
                     <div className="space-y-2">
                       {REWRITE_DIAGS.map((diag) => (
-                        <div key={diag.name} className="rounded-lg border border-border bg-background px-3 py-2">
+                        <div
+                          key={diag.name}
+                          className="rounded-lg border border-border bg-background px-3 py-2"
+                        >
                           <div className="flex items-center justify-between">
                             <span className="text-[12.5px] font-medium">{diag.name}</span>
-                            <span className={`rounded-md px-2 py-0.5 text-[11px] ${bankDiagLevel(diag.level)}`}>{diag.level}</span>
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-[11px] ${bankDiagLevel(diag.level)}`}
+                            >
+                              {diag.level}
+                            </span>
                           </div>
-                          <div className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">{diag.note}</div>
+                          <div className="mt-1 text-[11.5px] leading-relaxed text-muted-foreground">
+                            {diag.note}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1493,7 +1703,9 @@ function RewriteDrawer({ q, onClose }: { q: BankQuestion | null; onClose: () => 
 
                 <div className="space-y-5 px-6 py-5">
                   <div>
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">改写目标</div>
+                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      改写目标
+                    </div>
                     <div className="flex flex-wrap gap-1.5">
                       {REWRITE_GOALS.map((g) => (
                         <button
@@ -1525,7 +1737,9 @@ function RewriteDrawer({ q, onClose }: { q: BankQuestion | null; onClose: () => 
                   </div>
 
                   <div>
-                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">改写建议结果</div>
+                    <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      改写建议结果
+                    </div>
                     <div className="space-y-3">
                       {REWRITE_CANDIDATES.map((c) => (
                         <div key={c.id} className="rounded-lg border border-border bg-card p-3.5">
@@ -1533,17 +1747,40 @@ function RewriteDrawer({ q, onClose }: { q: BankQuestion | null; onClose: () => 
                             <span className="text-[13px] font-semibold">{c.title}</span>
                             {/* <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{c.diffChange}</span> */}
                           </div>
-                          <div className="mt-2 text-[12.5px] font-medium leading-relaxed">{c.stem}</div>
-                          {c.options && <div className="mt-2"><OptionList options={c.options} answer={c.answer} /></div>}
-                          <div className="mt-2 text-[12px]"><span className="text-muted-foreground">推荐答案:</span> <span className="font-semibold text-success">{c.answer}</span></div>
-                          <div className="mt-1.5 text-[11.5px] text-muted-foreground">解析:{c.analysis}</div>
-                          <div className="mt-1.5 text-[11.5px] text-muted-foreground">改写理由:{c.reason}</div>
+                          <div className="mt-2 text-[12.5px] font-medium leading-relaxed">
+                            {c.stem}
+                          </div>
+                          {c.options && (
+                            <div className="mt-2">
+                              <OptionList options={c.options} answer={c.answer} />
+                            </div>
+                          )}
+                          <div className="mt-2 text-[12px]">
+                            <span className="text-muted-foreground">推荐答案:</span>{" "}
+                            <span className="font-semibold text-success">{c.answer}</span>
+                          </div>
+                          <div className="mt-1.5 text-[11.5px] text-muted-foreground">
+                            解析:{c.analysis}
+                          </div>
+                          <div className="mt-1.5 text-[11.5px] text-muted-foreground">
+                            改写理由:{c.reason}
+                          </div>
                           {/* <div className="mt-1 text-[11.5px] text-muted-foreground">来源依据:{c.source}</div> */}
                           <div className="mt-2.5 flex flex-wrap gap-1.5">
-                            <button onClick={() => setConfirm(c)} className="rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground hover:bg-primary/90">使用此版本</button>
+                            <button
+                              onClick={() => setConfirm(c)}
+                              className="rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground hover:bg-primary/90"
+                            >
+                              使用此版本
+                            </button>
                             {/* <button onClick={() => toast.info("可继续输入微调指令")} className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] hover:bg-muted">继续微调</button> */}
                             {/* <button onClick={() => toast.success("已复制为新题(草稿)")} className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] hover:bg-muted">复制为新题</button> */}
-                            <button onClick={() => toast.info("已放弃该版本")} className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] text-muted-foreground hover:bg-muted">放弃</button>
+                            <button
+                              onClick={() => toast.info("已放弃该版本")}
+                              className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] text-muted-foreground hover:bg-muted"
+                            >
+                              放弃
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -1552,7 +1789,8 @@ function RewriteDrawer({ q, onClose }: { q: BankQuestion | null; onClose: () => 
                 </div>
               </div>
               <div className="flex items-center gap-2 border-t border-border px-6 py-2.5 text-[11.5px] text-muted-foreground">
-                <Info className="h-3.5 w-3.5 shrink-0 text-primary" /> 智能改写仅提供建议,题目替换和试卷调整需培训负责人确认。
+                <Info className="h-3.5 w-3.5 shrink-0 text-primary" />{" "}
+                智能改写仅提供建议,题目替换和试卷调整需培训负责人确认。
               </div>
             </>
           )}
@@ -1568,9 +1806,32 @@ function RewriteDrawer({ q, onClose }: { q: BankQuestion | null; onClose: () => 
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
-            <button onClick={() => setConfirm(null)} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-            <button onClick={() => { setConfirm(null); toast.success("已覆盖原题"); onClose(); }} className="rounded-lg border border-destructive/40 px-3.5 py-2 text-[12.5px] text-destructive hover:bg-destructive/10">覆盖原题</button>
-            <button onClick={() => { setConfirm(null); toast.success("已另存为新题"); onClose(); }} className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90">另存为新题(推荐)</button>
+            <button
+              onClick={() => setConfirm(null)}
+              className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+            >
+              取消
+            </button>
+            <button
+              onClick={() => {
+                setConfirm(null);
+                toast.success("已覆盖原题");
+                onClose();
+              }}
+              className="rounded-lg border border-destructive/40 px-3.5 py-2 text-[12.5px] text-destructive hover:bg-destructive/10"
+            >
+              覆盖原题
+            </button>
+            <button
+              onClick={() => {
+                setConfirm(null);
+                toast.success("已另存为新题");
+                onClose();
+              }}
+              className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              另存为新题(推荐)
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1615,14 +1876,27 @@ function SimilarDialog({ q, onClose }: { q: BankQuestion | null; onClose: () => 
                         <span className={`font-semibold ${s.similarity >= 80 ? "text-destructive" : s.similarity >= 65 ? "text-warning-foreground" : "text-muted-foreground"}`}>{s.similarity}%</span>
                       </Td> */}
                       <Td>
-                        <span className={`rounded-md px-2 py-0.5 text-[11px] ${s.status === "启用" ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"}`}>{s.status}</span>
+                        <span
+                          className={`rounded-md px-2 py-0.5 text-[11px] ${s.status === "启用" ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"}`}
+                        >
+                          {s.status}
+                        </span>
                       </Td>
                       <Td>
                         <div className="flex flex-nowrap justify-end gap-0.5">
-                          <ActionBtn icon={Eye} label="详情" onClick={() => toast.info("查看相似题详情")} />
+                          <ActionBtn
+                            icon={Eye}
+                            label="详情"
+                            onClick={() => toast.info("查看相似题详情")}
+                          />
                           {/* <ActionBtn icon={GitMerge} label="合并" onClick={() => toast.success("已合并相似题")} /> */}
                           {/* <ActionBtn icon={CheckCircle2} label="保留" onClick={() => toast.info("已保留两题")} /> */}
-                          <ActionBtn icon={Ban} label="禁用" tone="danger" onClick={() => toast.success("已禁用其中一题")} />
+                          <ActionBtn
+                            icon={Ban}
+                            label="禁用"
+                            tone="danger"
+                            onClick={() => toast.success("已禁用其中一题")}
+                          />
                         </div>
                       </Td>
                     </tr>
@@ -1631,7 +1905,13 @@ function SimilarDialog({ q, onClose }: { q: BankQuestion | null; onClose: () => 
               </table>
             </div>
             <DialogFooter className="sm:justify-end">
-              <button type="button" onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">关闭</button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+              >
+                关闭
+              </button>
             </DialogFooter>
           </>
         )}
@@ -1640,7 +1920,15 @@ function SimilarDialog({ q, onClose }: { q: BankQuestion | null; onClose: () => 
   );
 }
 
-function DisableDialog({ q, onClose, onConfirm }: { q: BankQuestion | null; onClose: () => void; onConfirm: (b: BankQuestion) => void }) {
+function DisableDialog({
+  q,
+  onClose,
+  onConfirm,
+}: {
+  q: BankQuestion | null;
+  onClose: () => void;
+  onConfirm: (b: BankQuestion) => void;
+}) {
   const [reason, setReason] = useState<string>(DISABLE_REASONS[0]);
   return (
     <Dialog open={!!q} onOpenChange={(o) => !o && onClose()}>
@@ -1654,15 +1942,31 @@ function DisableDialog({ q, onClose, onConfirm }: { q: BankQuestion | null; onCl
         <div className="py-1">
           <div className="mb-1.5 text-[12px] font-medium text-muted-foreground">禁用原因</div>
           <Select value={reason} onValueChange={setReason}>
-            <SelectTrigger className="text-[13px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="text-[13px]">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              {DISABLE_REASONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+              {DISABLE_REASONS.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <DialogFooter className="sm:justify-end">
-          <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-          <button onClick={() => q && onConfirm(q)} className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90">确认禁用</button>
+          <button
+            onClick={onClose}
+            className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+          >
+            取消
+          </button>
+          <button
+            onClick={() => q && onConfirm(q)}
+            className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90"
+          >
+            确认禁用
+          </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1693,7 +1997,9 @@ function UsageDialog({ q, onClose }: { q: BankQuestion | null; onClose: () => vo
                   <Td className="font-medium">{u.paper}</Td>
                   <Td className="text-muted-foreground">{u.usedAt}</Td>
                   <Td className="text-muted-foreground">{u.assigned}</Td>
-                  <Td><span className="font-medium">{u.avgCorrect}%</span></Td>
+                  <Td>
+                    <span className="font-medium">{u.avgCorrect}%</span>
+                  </Td>
                   <Td className="text-muted-foreground">{u.lastUsed}</Td>
                 </tr>
               ))}
@@ -1704,60 +2010,6 @@ function UsageDialog({ q, onClose }: { q: BankQuestion | null; onClose: () => vo
     </Dialog>
   );
 }
-
-function AddToPaperDialog({ q, onClose }: { q: BankQuestion | null; onClose: () => void }) {
-  const drafts = DRAFT_PAPERS;
-  const [paper, setPaper] = useState<string>(drafts[0]?.id ?? "");
-  const [score, setScore] = useState("2");
-  return (
-    <Dialog open={!!q} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>加入试卷</DialogTitle>
-          <DialogDescription>将当前题目加入指定草稿试卷的题型分组。</DialogDescription>
-        </DialogHeader>
-        {q && (
-          <div className="space-y-3 py-1">
-            <div className="rounded-lg bg-muted/40 px-3 py-2 text-[12px]"><span className="text-muted-foreground">题目:</span> {q.stem}</div>
-            <BankField label="选择试卷">
-              {drafts.length ? (
-                <Select value={paper} onValueChange={setPaper}>
-                  <SelectTrigger className="text-[13px]"><SelectValue placeholder="选择草稿试卷" /></SelectTrigger>
-                  <SelectContent>
-                    {drafts.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="rounded-lg border border-dashed border-border px-3 py-2 text-[12px] text-muted-foreground">暂无草稿试卷,请先新建试卷。</div>
-              )}
-            </BankField>
-            <div className="grid grid-cols-2 gap-3">
-              <BankField label="加入题型分组">
-                <div className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-[12.5px]">
-                  <ListChecks className="h-3.5 w-3.5 text-muted-foreground" /> {q.type}
-                </div>
-              </BankField>
-              <BankField label="分值">
-                <Input value={score} onChange={(e) => setScore(e.target.value)} type="number" className="text-[13px]" />
-              </BankField>
-            </div>
-          </div>
-        )}
-        <DialogFooter className="sm:justify-end">
-          <button onClick={onClose} className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted">取消</button>
-          <button
-            disabled={!drafts.length}
-            onClick={() => { onClose(); toast.success("已加入试卷"); }}
-            className="rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            确认加入
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 
 // ---------- Paper module ----------
 /** 试卷已下发（非草稿且有人收到） */

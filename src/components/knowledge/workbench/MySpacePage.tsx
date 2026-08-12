@@ -84,6 +84,7 @@ import {
   removeStoreFiles,
   removeStorePersonalDirectory,
   subscribeKnowledgeStore,
+  submitStoreFileMove,
   updateStoreBase,
   updateStoreFile,
   updateStorePersonalDirectory,
@@ -145,7 +146,7 @@ type MySpaceSelection =
   | { kind: "personalBase"; baseId: string };
 
 const CARD_PAGE_SIZE = 8;
-const RECENT_ACCESS_BATCH_SIZE = 8;
+const RECENT_ACCESS_BATCH_SIZE = 20;
 
 const mySpaceSortOptions: Array<{ value: KnowledgeSortBy; label: string }> = [
   { value: "updated", label: "按时间排序" },
@@ -177,6 +178,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
   const [refreshSeed, setRefreshSeed] = useState(0);
+  const recentFiles = useMemo(() => getRecentFiles(), [storeVersion, refreshSeed]);
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedIds());
   const [batchLoading, setBatchLoading] = useState<
     "download" | "disable" | "delete" | "move" | null
@@ -344,26 +346,34 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
 
   const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
     const targetBase = getBaseById(targetBaseId);
-    const deferred = movingFiles.filter((file) =>
+    if (!targetBase) {
+      toast.error("目标知识库不存在");
+      return;
+    }
+    const toSubmit = movingFiles.filter((file) =>
       isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
     );
     const movable = movingFiles.filter(
       (file) => !isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
     );
-    if (deferred.length > 0 && movable.length === 0) {
-      toast.message("跨库移动入库（重解析 + 审批）需求已保留，一期暂不开放");
-      setMoveFiles([]);
-      return;
-    }
     setMoveLoading(true);
+    for (const file of toSubmit) {
+      submitStoreFileMove(file, targetBase);
+    }
     for (const file of movable) {
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
-        knowledgeBaseName: targetBase?.name,
+        knowledgeBaseName: targetBase.name,
       });
     }
     window.setTimeout(() => {
-      toast.success(`已将「${movable[0]?.name}」移动到「${targetBase?.name ?? "目标知识库"}」`);
+      if (toSubmit.length > 0) {
+        toast.success(
+          `已提交「${toSubmit[0]?.name}」移入「${targetBase.name}」的申请，请等待管理员审批`,
+        );
+      } else {
+        toast.success(`已将「${movable[0]?.name}」移动到「${targetBase.name}」`);
+      }
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();
@@ -578,8 +588,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
       <main className={cn("scrollbar-thin", kbMainPanel)}>
         {selection.kind === "recent" && (
           <RecentAccessPanel
-            files={getRecentFiles()}
-            sortBy={sortBy}
+            files={recentFiles}
             refreshSeed={refreshSeed}
             onOpen={openFile}
           />
@@ -788,26 +797,33 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
 
 function RecentAccessPanel({
   files,
-  sortBy,
   refreshSeed,
   onOpen,
 }: {
   files: KnowledgeFile[];
-  sortBy: KnowledgeSortBy;
   refreshSeed: number;
   onOpen: (file: KnowledgeFile) => void;
 }) {
   const [visibleCount, setVisibleCount] = useState(RECENT_ACCESS_BATCH_SIZE);
   const scrollRootRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const sorted = useMemo(() => sortKnowledgeFiles(files, sortBy), [files, sortBy]);
+  const sorted = useMemo(
+    () =>
+      [...files].sort((a, b) =>
+        (b.lastAccessedAt ?? b.updatedAt ?? "").localeCompare(a.lastAccessedAt ?? a.updatedAt ?? ""),
+      ),
+    [files],
+  );
   const visibleFiles = useMemo(() => sorted.slice(0, visibleCount), [sorted, visibleCount]);
-  const groups = useMemo(() => groupRecentAccessFiles(visibleFiles), [visibleFiles]);
+  const groups = useMemo(
+    () => groupRecentAccessFiles(visibleFiles).filter((group) => group.items.length > 0),
+    [visibleFiles],
+  );
   const hasMore = visibleCount < sorted.length;
 
   useEffect(() => {
     setVisibleCount(RECENT_ACCESS_BATCH_SIZE);
-  }, [refreshSeed, sortBy, sorted.length]);
+  }, [refreshSeed, sorted.length]);
 
   const empty = (
     <KbEmptyState
@@ -865,9 +881,9 @@ function RecentAccessPanel({
           empty
         ) : (
           <div className="space-y-4">
-            {groups.map((group) => {
-              return <RecentAccessListGroup key={group.label} group={group} onOpen={onOpen} />;
-            })}
+            {groups.map((group) => (
+              <RecentAccessListGroup key={group.label} group={group} onOpen={onOpen} />
+            ))}
             <RecentAccessLoadState
               visibleCount={visibleFiles.length}
               totalCount={sorted.length}
@@ -878,57 +894,6 @@ function RecentAccessPanel({
         )}
       </div>
     </div>
-  );
-}
-
-function RecentAccessEmptyGroup({ label }: { label: string }) {
-  return (
-    <div className="rounded-[8px] bg-[#FAFCFD]/70 px-4 py-5 text-center">
-      <RecentAccessEmptyIllustration />
-      <div className="text-[12.5px] text-[#7C8D95]">暂无{label}访问记录</div>
-      <div className="mt-1 text-[12px] text-[#9AAAB0]">打开知识资料后会自动归入对应时间段。</div>
-    </div>
-  );
-}
-
-function RecentAccessEmptyIllustration() {
-  return (
-    <svg viewBox="0 0 118 62" className="mx-auto mb-2.5 h-[54px] w-[104px]" fill="none" aria-hidden>
-      <path
-        d="M18 49.5H100"
-        stroke="rgb(52,155,172)"
-        strokeOpacity="0.12"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <rect x="34" y="12" width="38" height="42" rx="7" fill="rgb(52,155,172)" fillOpacity="0.08" />
-      <path
-        d="M46 22H61M46 31H65M46 40H58"
-        stroke="rgb(52,155,172)"
-        strokeOpacity="0.42"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <path
-        d="M66 13V24H77"
-        stroke="rgb(52,155,172)"
-        strokeOpacity="0.24"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="79" cy="41" r="12" fill="#F7FBFC" stroke="rgb(52,155,172)" strokeOpacity="0.22" />
-      <path
-        d="M79 34.5V41L83.5 43.5"
-        stroke="rgb(52,155,172)"
-        strokeOpacity="0.5"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="29" cy="21" r="4" fill="rgb(52,155,172)" fillOpacity="0.12" />
-      <circle cx="91" cy="19" r="5" fill="rgb(52,155,172)" fillOpacity="0.08" />
-    </svg>
   );
 }
 
@@ -949,22 +914,16 @@ function RecentAccessListGroup({
         </span>
       </div>
 
-      {group.items.length === 0 ? (
-        <div className="px-1">
-          <RecentAccessEmptyGroup label={group.label} />
-        </div>
-      ) : (
-        <div className="space-y-0.5">
-          {group.items.map((item) => (
-            <RecentAccessListItem
-              key={item.file.id}
-              file={item.file}
-              accessTime={item.accessTime}
-              onOpen={() => onOpen(item.file)}
-            />
-          ))}
-        </div>
-      )}
+      <div className="space-y-0.5">
+        {group.items.map((item) => (
+          <RecentAccessListItem
+            key={item.file.id}
+            file={item.file}
+            accessTime={item.accessTime}
+            onOpen={() => onOpen(item.file)}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -1036,6 +995,12 @@ function stripFileExtension(name: string) {
 }
 
 function groupRecentAccessFiles(files: KnowledgeFile[]) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = (now.getDay() + 6) % 7; // Monday-based week
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfToday.getDate() - day);
+
   const groups: Array<{
     label: string;
     items: Array<{ file: KnowledgeFile; accessTime: string }>;
@@ -1045,15 +1010,45 @@ function groupRecentAccessFiles(files: KnowledgeFile[]) {
     { label: "更早", items: [] },
   ];
 
-  files.forEach((file, index) => {
-    const group = index < 4 ? groups[0] : index < 6 ? groups[1] : groups[2];
-    group.items.push({
+  for (const file of files) {
+    const stamp = file.lastAccessedAt ?? file.updatedAt;
+    const accessDate = parseKnowledgeDateTime(stamp) ?? startOfToday;
+    const item = {
       file,
-      accessTime: formatAccessTime(file.updatedAt, index),
-    });
-  });
+      accessTime: formatAccessTime(stamp, accessDate, startOfToday),
+    };
 
-  return groups;
+    if (accessDate >= startOfToday) {
+      groups[0].items.push(item);
+    } else if (accessDate >= startOfWeek) {
+      groups[1].items.push(item);
+    } else {
+      groups[2].items.push(item);
+    }
+  }
+
+  return groups.filter((group) => group.items.length > 0);
+}
+
+function parseKnowledgeDateTime(value?: string) {
+  if (!value) return null;
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatAccessTime(value: string | undefined, accessDate: Date, startOfToday: Date) {
+  const hh = String(accessDate.getHours()).padStart(2, "0");
+  const mm = String(accessDate.getMinutes()).padStart(2, "0");
+  const time = value?.match(/\d{2}:\d{2}/)?.[0] ?? `${hh}:${mm}`;
+
+  if (accessDate >= startOfToday) {
+    return `今天 ${time}`;
+  }
+
+  const month = String(accessDate.getMonth() + 1).padStart(2, "0");
+  const day = String(accessDate.getDate()).padStart(2, "0");
+  return `${month}-${day} ${time}`;
 }
 
 function FavoriteKnowledgePanel({
@@ -1430,24 +1425,6 @@ function SegmentedFilterTabs({
         );
       })}
     </div>
-  );
-}
-
-function formatAccessTime(value: string | undefined, index: number) {
-  const fallbackTimes = ["09:15", "08:36", "07:42", "07:11", "07-04 16:48", "07-02 13:08"];
-  const time = value?.match(/\d{2}:\d{2}/)?.[0] ?? fallbackTimes[index] ?? "刚刚";
-
-  if (index < 4) {
-    return `今天 ${time}`;
-  }
-
-  return (
-    value
-      ?.replace(/^\d{4}-/, "")
-      .slice(0, 11)
-      .trim() ??
-    fallbackTimes[index] ??
-    time
   );
 }
 

@@ -1,42 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
-  Award,
   BarChart3,
-  ChevronLeft,
-  ChevronRight,
+  CheckCircle2,
   Clock,
   FileText,
+  Flag,
   ShieldCheck,
   Target,
   X,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { PaperQuestionSummary } from "@/components/exam/paper-question-list";
-import { PAPER_SPLIT_PANEL_H } from "@/components/exam/paper-side-panel";
 import {
-  buildExamSummary,
   flattenExamQuestions,
   isExamAnswerFilled,
   type ExamSessionPaper as ExamSessionPaperMeta,
 } from "@/lib/mock/exam-session";
 import {
   defaultOptionsForType,
-  type Difficulty,
   type EditorGroup,
   type EditorQuestion,
   type QuestionType,
 } from "@/lib/mock/examAdmin";
 import { cn } from "@/lib/utils";
 
-function diffClass(d: Difficulty) {
-  return d === "易"
-    ? "bg-success-soft text-success"
-    : d === "中"
-      ? "bg-warning-soft text-warning-foreground"
-      : "bg-destructive/10 text-destructive";
-}
-
-function QuestionExamInteractive({
+function ExamQuestion({
   question,
   type,
   value,
@@ -45,74 +31,74 @@ function QuestionExamInteractive({
   question: EditorQuestion;
   type: QuestionType;
   value?: string | string[];
-  onChange: (val: string | string[]) => void;
+  onChange: (value: string | string[]) => void;
 }) {
   const options =
     question.options ??
     defaultOptionsForType(type) ??
     (type === "单选题" || type === "多选题"
       ? [
-          { key: "A", text: "（选项未配置）" },
-          { key: "B", text: "（选项未配置）" },
-          { key: "C", text: "（选项未配置）" },
-          { key: "D", text: "（选项未配置）" },
+          { key: "A", text: "选项内容未配置" },
+          { key: "B", text: "选项内容未配置" },
+          { key: "C", text: "选项内容未配置" },
+          { key: "D", text: "选项内容未配置" },
         ]
       : undefined);
 
   if (type === "单选题" || type === "多选题" || type === "判断题") {
-    const isMulti = type === "多选题";
+    const multiple = type === "多选题";
     const selected = Array.isArray(value)
       ? value
       : value
-        ? isMulti
+        ? multiple
           ? value.split("")
           : [value]
         : [];
 
-    const toggle = (key: string) => {
-      if (isMulti) {
-        const next = selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key];
-        onChange(next.sort().join(""));
-      } else {
-        onChange(key);
-      }
-    };
-
     return (
-      <div className="mt-3 space-y-1.5">
-        {options?.map((o) => {
-          const checked = selected.includes(o.key);
+      <div className="mt-4 grid gap-1.5">
+        {options?.map((option) => {
+          const checked = selected.includes(option.key);
           return (
             <button
-              key={o.key}
+              key={option.key}
               type="button"
-              onClick={() => toggle(o.key)}
+              onClick={() => {
+                if (!multiple) {
+                  onChange(option.key);
+                  return;
+                }
+                const next = checked
+                  ? selected.filter((key) => key !== option.key)
+                  : [...selected, option.key];
+                onChange(next.sort().join(""));
+              }}
+              aria-pressed={checked}
               className={cn(
-                "flex w-full items-start gap-3 rounded-[6px] px-3 py-2.5 text-left transition-colors",
+                "grid min-h-11 w-full grid-cols-[18px_22px_minmax(0,1fr)] items-center gap-2.5 rounded-[6px] border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
                 checked
-                  ? "border border-primary/35 bg-primary-soft/70"
-                  : "border border-transparent bg-[#F5FAFB] hover:border-[#DCE8EA] hover:bg-[#F0F7F8]",
+                  ? "border-primary/40 bg-primary-soft/70"
+                  : "border-transparent bg-[#f4f8f9] hover:border-primary/25 hover:bg-[#eef7f8]",
               )}
             >
               <span
+                aria-hidden="true"
                 className={cn(
-                  "mt-0.5 grid h-[16px] w-[16px] shrink-0 place-items-center border",
-                  isMulti ? "rounded-[3px]" : "rounded-full",
-                  checked ? "border-primary/50 bg-primary-soft" : "border-[#C8DADD] bg-white",
+                  "h-[16px] w-[16px] rounded-full border",
+                  checked
+                    ? "border-primary bg-primary shadow-[inset_0_0_0_4px_white]"
+                    : "border-[#bad4d9] bg-white",
                 )}
-                aria-hidden
               />
-              <span className="text-[13px] leading-snug text-[#1F3440]/90">
-                <span
-                  className={cn(
-                    "mr-2 inline-flex h-4 min-w-[16px] items-center justify-center rounded-[3px] px-1 text-[10.5px] font-semibold",
-                    checked ? "bg-primary/15 text-primary" : "bg-[#EDF3F5] text-[#6B7F88]",
-                  )}
-                >
-                  {o.key}
-                </span>
-                {o.text}
+              <span
+                className={cn(
+                  "grid h-5 w-5 place-items-center rounded-[4px] text-[10px] font-bold",
+                  checked ? "bg-primary/12 text-primary" : "bg-white/85 text-kb-muted",
+                )}
+              >
+                {option.key}
               </span>
+              <span className="text-[13px] leading-6 text-kb-body">{option.text}</span>
             </button>
           );
         })}
@@ -121,443 +107,37 @@ function QuestionExamInteractive({
   }
 
   if (type === "填空题") {
-    const count = question.blankCount ?? 1;
-    const blanks = Array.isArray(value) ? value : value ? [value] : Array(count).fill("");
+    const blankCount = question.blankCount ?? 1;
+    const blanks = Array.isArray(value) ? value : value ? [value] : Array(blankCount).fill("");
     return (
-      <div className="mt-3 space-y-2">
-        {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3">
-            <span className="w-14 shrink-0 text-[12px] text-muted-foreground">填空 {i + 1}</span>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {Array.from({ length: blankCount }).map((_, index) => (
+          <label key={index} className="grid gap-1.5">
+            <span className="text-[11px] font-medium text-kb-muted">填空 {index + 1}</span>
             <input
-              type="text"
-              value={blanks[i] ?? ""}
-              onChange={(e) => {
+              value={blanks[index] ?? ""}
+              onChange={(event) => {
                 const next = [...blanks];
-                next[i] = e.target.value;
-                onChange(count === 1 ? next[0] : next);
+                next[index] = event.target.value;
+                onChange(blankCount === 1 ? (next[0] ?? "") : next);
               }}
-              placeholder="请填写答案"
-              className="h-9 flex-1 rounded-[6px] border border-[#DCE8EA] bg-white px-3 text-[13px] outline-none transition-colors focus:border-primary/50 focus:ring-1 focus:ring-primary/15"
+              className="min-h-11 rounded-[6px] border border-kb-border bg-[#f8fbfb] px-3.5 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+              placeholder="请输入答案"
             />
-          </div>
+          </label>
         ))}
       </div>
     );
   }
 
-  if (type === "简答题" || type === "案例分析题") {
-    return (
-      <div className="mt-3 rounded-[6px] border border-[#DCE8EA] bg-[#F5FAFB] px-3 py-2">
-        <div className="mb-1.5 text-[11px] text-muted-foreground">作答区</div>
-        <textarea
-          rows={4}
-          value={typeof value === "string" ? value : ""}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="请输入你的作答…"
-          className="min-h-[88px] w-full resize-y rounded-[4px] border border-[#DCE8EA] bg-white px-3 py-2 text-[13px] leading-relaxed outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/15"
-        />
-      </div>
-    );
-  }
-
-  return null;
-}
-
-function ExamPaperInteractiveList({
-  groups,
-  answers,
-  onAnswerChange,
-  focusedId,
-  onFocusQuestion,
-}: {
-  groups: EditorGroup[];
-  answers: Record<string, string | string[]>;
-  onAnswerChange: (id: string, val: string | string[]) => void;
-  focusedId?: string;
-  onFocusQuestion?: (id: string) => void;
-}) {
-  let globalNo = 0;
-
-  if (groups.every((g) => g.questions.length === 0)) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-[12px] bg-white px-6 py-14 text-center shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]">
-        <p className="text-[14px] font-medium text-[#1F3440]/70">暂无题目</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-[10px]">
-      {groups.map((g) => {
-        if (g.questions.length === 0) return null;
-        const sectionScore = g.questions.length * g.perScore;
-
-        return (
-          <section
-            key={g.type}
-            className="overflow-hidden rounded-[12px] bg-white shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]"
-          >
-            <header className="flex items-center justify-between border-b border-[#EDF3F5] bg-[#FAFCFD] px-5 py-3">
-              <div className="flex items-center gap-2">
-                <span className="inline-block h-[1em] w-[5px] shrink-0 rounded-[1px] bg-primary" />
-                <span className="text-[14px] font-bold text-[#1F3440]">{g.type}</span>
-                <span className="text-[12px] text-muted-foreground">
-                  共 {g.questions.length} 题 · 每题 {g.perScore} 分 · 小计 {sectionScore} 分
-                </span>
-              </div>
-            </header>
-
-            <div className="divide-y divide-[#EDF3F5]">
-              {g.questions.map((q) => {
-                globalNo += 1;
-                const filled = isExamAnswerFilled(answers[q.id]);
-                const isFocused = focusedId === q.id;
-                return (
-                  <article
-                    key={q.id}
-                    id={`exam-q-${q.id}`}
-                    onFocus={() => onFocusQuestion?.(q.id)}
-                    className={cn(
-                      "scroll-mt-4 px-5 py-4 transition-colors",
-                      isFocused && "bg-primary-soft/20",
-                      filled && !isFocused && "bg-[#FAFCFD]",
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span
-                        className={cn(
-                          "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold",
-                          filled ? "bg-primary text-primary-foreground" : "bg-primary-soft text-primary",
-                        )}
-                      >
-                        {String(globalNo).padStart(2, "0")}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[14px] font-medium leading-relaxed text-[#1F3440]">{q.stem}</p>
-                        <QuestionExamInteractive
-                          question={q}
-                          type={g.type}
-                          value={answers[q.id]}
-                          onChange={(val) => onAnswerChange(q.id, val)}
-                        />
-                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-[#EDF3F5] pt-3">
-                          {q.isAIGenerated && (
-                            <span className="inline-flex h-[22px] items-center rounded-[4px] bg-[#EAF7F9] px-1.5 text-[11px] font-medium text-primary">
-                              AI 生成
-                            </span>
-                          )}
-                          <Badge
-                            variant="secondary"
-                            className="rounded-[4px] border-0 bg-[#F5FAFB] text-[11px] font-normal text-[#6B7F88]"
-                          >
-                            {q.knowledge}
-                          </Badge>
-                          <span
-                            className={cn(
-                              "rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium",
-                              diffClass(q.difficulty),
-                            )}
-                          >
-                            {q.difficulty}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">{q.score} 分</span>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
-    </div>
-  );
-}
-
-const ANSWER_CARD_PAGE_SIZE = 15;
-const ANSWER_CARD_COLS = 5;
-
-function AnswerSheetPager({
-  page,
-  totalPages,
-  onPrev,
-  onNext,
-  onGoPage,
-}: {
-  page: number;
-  totalPages: number;
-  onPrev: () => void;
-  onNext: () => void;
-  onGoPage: (p: number) => void;
-}) {
-  const canPrev = page > 0;
-  const canNext = page < totalPages - 1;
-
-  return (
-    <div className="mt-3 flex items-center justify-center gap-3">
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={!canPrev}
-        aria-label="上一页"
-        className={cn(
-          "grid h-9 w-9 place-items-center rounded-full border border-[#DCE8EA] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-colors",
-          canPrev
-            ? "text-[#607681] hover:border-primary/35 hover:text-primary"
-            : "cursor-not-allowed text-[#C8DADD]",
-        )}
-      >
-        <ChevronLeft className="h-4 w-4 stroke-[2]" />
-      </button>
-
-      <div className="flex items-center gap-1.5 rounded-full border border-[#DCE8EA] bg-white px-3 py-2 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-        {Array.from({ length: totalPages }).map((_, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onGoPage(i)}
-            aria-label={`第 ${i + 1} 页`}
-            aria-current={i === page ? "page" : undefined}
-            className={cn(
-              "rounded-full transition-all",
-              i === page ? "h-1.5 w-6 bg-primary" : "h-1.5 w-1.5 bg-[#C8DADD] hover:bg-[#9AAAB0]",
-            )}
-          />
-        ))}
-      </div>
-
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={!canNext}
-        aria-label="下一页"
-        className={cn(
-          "grid h-9 w-9 place-items-center rounded-full border border-[#DCE8EA] bg-white shadow-[0_1px_4px_rgba(0,0,0,0.06)] transition-colors",
-          canNext
-            ? "text-[#1F3440] hover:border-primary/35 hover:text-primary"
-            : "cursor-not-allowed text-[#C8DADD]",
-        )}
-      >
-        <ChevronRight className="h-4 w-4 stroke-[2]" />
-      </button>
-    </div>
-  );
-}
-
-function TypeBar({ label, count, total }: { label: string; count: number; total: number }) {
-  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-  return (
-    <div className="flex items-center gap-2">
-      <span className="w-12 shrink-0 text-[10.5px] text-muted-foreground">{label}</span>
-      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary/60 transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="w-8 shrink-0 text-right text-[10.5px] tabular-nums text-muted-foreground">
-        {count} 题
-      </span>
-    </div>
-  );
-}
-
-function ExamSessionSidebar({
-  meta,
-  groups,
-  answers,
-  focusedId,
-  onQuestionJump,
-  onSubmit,
-  remaining,
-  formatTime,
-}: {
-  meta: ExamSessionPaperMeta;
-  groups: EditorGroup[];
-  answers: Record<string, string | string[]>;
-  focusedId?: string;
-  onQuestionJump: (id: string) => void;
-  onSubmit: () => void;
-  remaining: number;
-  formatTime: (s: number) => string;
-}) {
-  const flat = useMemo(() => flattenExamQuestions(groups), [groups]);
-  const answered = flat.filter((item) => isExamAnswerFilled(answers[item.question.id])).length;
-  const typeBreakdown = groups
-    .filter((g) => g.questions.length > 0)
-    .map((g) => ({ label: g.type.replace("题", ""), count: g.questions.length }));
-  const total = typeBreakdown.reduce((s, t) => s + t.count, 0) || meta.questionCount;
-  const timerUrgent = remaining > 0 && remaining < 60;
-
-  const totalPages = Math.max(1, Math.ceil(flat.length / ANSWER_CARD_PAGE_SIZE));
-  const [cardPage, setCardPage] = useState(0);
-
-  useEffect(() => {
-    if (!focusedId) return;
-    const idx = flat.findIndex((item) => item.question.id === focusedId);
-    if (idx >= 0) {
-      setCardPage(Math.floor(idx / ANSWER_CARD_PAGE_SIZE));
-    }
-  }, [focusedId, flat]);
-
-  const pageItems = flat.slice(
-    cardPage * ANSWER_CARD_PAGE_SIZE,
-    (cardPage + 1) * ANSWER_CARD_PAGE_SIZE,
-  );
-
-  return (
-    <aside
-      className={cn(
-        "flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,0.04)]",
-        PAPER_SPLIT_PANEL_H,
-      )}
-    >
-      <div className="shrink-0 rounded-t-xl bg-gradient-to-br from-primary to-[oklch(0.5_0.13_205)] px-4 py-4 text-white">
-        <div className="inline-flex items-center gap-1.5 text-[11px] opacity-90">
-          <Award className="h-3.5 w-3.5" />
-          考试中
-        </div>
-        <div className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug">{meta.title}</div>
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <div className="rounded-lg bg-white/15 px-2 py-2.5 text-center backdrop-blur-sm">
-            <div className="text-[20px] font-bold leading-none tabular-nums">{meta.questionCount}</div>
-            <div className="mt-1 text-[10px] opacity-90">题量</div>
-          </div>
-          <div className="rounded-lg bg-white/15 px-2 py-2.5 text-center backdrop-blur-sm">
-            <div className="text-[20px] font-bold leading-none tabular-nums">{meta.duration}</div>
-            <div className="mt-1 text-[10px] opacity-90">分钟</div>
-          </div>
-          <div className="rounded-lg bg-white/15 px-2 py-2.5 text-center backdrop-blur-sm">
-            <div className="text-[20px] font-bold leading-none tabular-nums">{meta.passLine}</div>
-            <div className="mt-1 text-[10px] opacity-90">及格线</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="shrink-0 border-b border-border/60 px-4 py-3">
-        <div
-          className={cn(
-            "flex items-center justify-between rounded-lg px-3 py-2",
-            timerUrgent ? "bg-destructive/10" : "bg-primary-soft/50",
-          )}
-        >
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" />
-            剩余时间
-          </span>
-          <span
-            className={cn(
-              "text-[16px] font-bold tabular-nums",
-              timerUrgent ? "text-destructive" : "text-primary",
-            )}
-          >
-            {formatTime(remaining)}
-          </span>
-        </div>
-      </div>
-
-      <div className="shrink-0 border-b border-border/60 px-4 py-3.5">
-        <div className="mb-2.5 text-[11px] font-medium text-muted-foreground">试卷信息</div>
-        <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-          <div className="flex items-start gap-1.5">
-            <Target className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/70" />
-            <div>
-              <dt className="text-[10px] text-muted-foreground">考试目标</dt>
-              <dd className="truncate text-[12px] font-medium">{meta.goal}</dd>
-            </div>
-          </div>
-          <div className="flex items-start gap-1.5">
-            <BarChart3 className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/70" />
-            <div>
-              <dt className="text-[10px] text-muted-foreground">难度</dt>
-              <dd className="truncate text-[12px] font-medium text-warning-foreground">{meta.difficulty}</dd>
-            </div>
-          </div>
-          <div className="flex items-start gap-1.5">
-            <FileText className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/70" />
-            <div>
-              <dt className="text-[10px] text-muted-foreground">知识分类</dt>
-              <dd className="truncate text-[12px] font-medium">{meta.category}</dd>
-            </div>
-          </div>
-          <div className="flex items-start gap-1.5">
-            <ShieldCheck className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/70" />
-            <div>
-              <dt className="text-[10px] text-muted-foreground">答题进度</dt>
-              <dd className="truncate text-[12px] font-semibold text-primary">
-                {answered} / {flat.length}
-              </dd>
-            </div>
-          </div>
-        </dl>
-      </div>
-
-      <div className="shrink-0 border-b border-border/60 px-4 py-3.5">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="text-[11px] font-medium text-muted-foreground">答题卡</span>
-          <span className="text-[10.5px] text-muted-foreground">
-            已答 {answered} / {flat.length}
-          </span>
-        </div>
-        <div className="grid grid-cols-5 gap-1.5">
-          {Array.from({ length: ANSWER_CARD_PAGE_SIZE }).map((_, i) => {
-            const item = pageItems[i];
-            if (!item) {
-              return <div key={`empty-${i}`} className="h-8" aria-hidden />;
-            }
-            const filled = isExamAnswerFilled(answers[item.question.id]);
-            const current = focusedId === item.question.id;
-            return (
-              <button
-                key={item.question.id}
-                type="button"
-                onClick={() => onQuestionJump(item.question.id)}
-                className={cn(
-                  "grid h-8 place-items-center rounded-[6px] text-[11px] font-semibold transition-colors",
-                  current
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : filled
-                      ? "bg-success-soft text-success hover:bg-success-soft/80"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80",
-                )}
-              >
-                {item.globalNo}
-              </button>
-            );
-          })}
-        </div>
-
-        {totalPages > 1 && (
-          <AnswerSheetPager
-            page={cardPage}
-            totalPages={totalPages}
-            onPrev={() => setCardPage((p) => Math.max(0, p - 1))}
-            onNext={() => setCardPage((p) => Math.min(totalPages - 1, p + 1))}
-            onGoPage={setCardPage}
-          />
-        )}
-      </div>
-
-      <div className="shrink-0 px-4 py-3.5">
-        <div className="mb-2 text-[11px] font-medium text-muted-foreground">题型构成</div>
-        <div className="space-y-1.5">
-          {typeBreakdown.map((t) => (
-            <TypeBar key={t.label} label={t.label} count={t.count} total={total} />
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-auto shrink-0 space-y-2 border-t border-border/60 p-4">
-        <button
-          type="button"
-          onClick={onSubmit}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-success px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-success/90"
-        >
-          提前交卷
-        </button>
-        <p className="text-center text-[10.5px] leading-relaxed text-muted-foreground">
-          考试模式下不显示解析，提交后可查看完整解析与错题分析
-        </p>
-      </div>
-    </aside>
+    <textarea
+      rows={5}
+      value={typeof value === "string" ? value : ""}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="请输入你的作答"
+      className="mt-4 min-h-[124px] w-full resize-y rounded-[6px] border border-kb-border bg-[#f8fbfb] p-3.5 text-[13px] leading-6 outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
+    />
   );
 }
 
@@ -574,65 +154,319 @@ export function ExamSessionPaperView({
   meta: ExamSessionPaperMeta;
   groups: EditorGroup[];
   answers: Record<string, string | string[]>;
-  onAnswerChange: (id: string, val: string | string[]) => void;
+  onAnswerChange: (id: string, value: string | string[]) => void;
   onSubmit: () => void;
   onExit: () => void;
   remaining: number;
-  formatTime: (s: number) => string;
+  formatTime: (seconds: number) => string;
 }) {
-  const summary = useMemo(() => buildExamSummary(groups), [groups]);
-  const [focusedId, setFocusedId] = useState<string | undefined>(
-    () => flattenExamQuestions(groups)[0]?.question.id,
+  const flat = useMemo(() => flattenExamQuestions(groups), [groups]);
+  const [activeQuestionId, setActiveQuestionId] = useState(flat[0]?.question.id ?? "");
+  const answered = flat.filter((item) => isExamAnswerFilled(answers[item.question.id])).length;
+  const personal = meta.employeePaperId === "default";
+  const timerUrgent = remaining > 0 && remaining < 300;
+  const totalScore = groups.reduce(
+    (sum, group) =>
+      sum + group.questions.reduce((groupSum, question) => groupSum + question.score, 0),
+    0,
   );
+  const maxGroupCount = Math.max(...groups.map((group) => group.questions.length), 1);
 
-  const jumpToQuestion = (id: string) => {
-    setFocusedId(id);
-    document.getElementById(`exam-q-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const jumpToQuestion = (questionId: string) => {
+    setActiveQuestionId(questionId);
+    document.getElementById(`exam-question-${questionId}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   };
 
+  if (!flat.length) {
+    return (
+      <div className="grid h-full place-items-center rounded-[14px] border border-kb-border bg-white text-kb-muted">
+        当前试卷暂无题目
+      </div>
+    );
+  }
+
+  let globalOffset = 0;
+
   return (
-    <>
-      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="rounded-md bg-destructive/10 px-2 py-0.5 text-[10.5px] font-medium text-destructive">
-            模拟考试
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-[12px] border border-kb-border bg-white px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+              personal ? "bg-warning-soft text-warning" : "bg-primary-soft text-primary",
+            )}
+          >
+            {personal ? "模拟考试" : "正式考试"}
           </span>
-          <h1 className="truncate text-[16px] font-semibold">{meta.title}</h1>
+          <h1 className="truncate text-[16px] font-semibold text-kb-heading">{meta.title}</h1>
+          <span className="hidden text-[11px] tabular-nums text-kb-muted sm:inline">
+            已答 {answered} / {flat.length}
+          </span>
         </div>
         <button
           type="button"
           onClick={onExit}
-          className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 text-[12px] text-muted-foreground hover:bg-muted"
+          className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-kb-border px-3.5 text-[12px] text-kb-muted transition-colors hover:bg-kb-surface hover:text-kb-heading"
         >
           <X className="h-3.5 w-3.5" /> 退出
         </button>
-      </div>
+      </header>
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
-        <div className={cn("min-h-0 overflow-y-auto overscroll-contain pr-0.5", PAPER_SPLIT_PANEL_H)}>
-          <div className="space-y-4 pb-2">
-            <PaperQuestionSummary summary={summary} />
-            <ExamPaperInteractiveList
-              groups={groups}
-              answers={answers}
-              onAnswerChange={onAnswerChange}
-              focusedId={focusedId}
-              onFocusQuestion={setFocusedId}
-            />
+      <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_360px] lg:overflow-hidden">
+        <article className="min-h-[640px] overflow-y-auto rounded-[14px] border border-kb-border bg-white lg:min-h-0">
+          {groups
+            .filter((group) => group.questions.length > 0)
+            .map((group, groupIndex) => {
+              const startNo = globalOffset + 1;
+              globalOffset += group.questions.length;
+              const groupScore = group.questions.reduce((sum, question) => sum + question.score, 0);
+              return (
+                <section key={group.type}>
+                  <div className="sticky top-0 z-10 border-b border-kb-border bg-[#f8fafb]/95 px-5 py-3 backdrop-blur sm:px-6">
+                    <div className="mx-auto flex w-full max-w-[1080px] flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="h-5 w-1 rounded-full bg-primary" aria-hidden="true" />
+                        <h2 className="text-[14px] font-semibold text-kb-heading">{group.type}</h2>
+                        <span className="text-[12px] text-kb-muted">
+                          共 {group.questions.length} 题 · 每题 {group.perScore} 分 · 小计{" "}
+                          {groupScore} 分
+                        </span>
+                      </div>
+                      <span className="text-[10.5px] text-kb-muted">第 {groupIndex + 1} 部分</span>
+                    </div>
+                  </div>
+
+                  <div className="mx-auto w-full max-w-[1080px] divide-y divide-divider">
+                    {group.questions.map((question, questionIndex) => {
+                      const globalNo = startNo + questionIndex;
+                      return (
+                        <section
+                          key={question.id}
+                          id={`exam-question-${question.id}`}
+                          className="scroll-mt-12 px-5 py-5 sm:px-6"
+                          onFocusCapture={() => setActiveQuestionId(question.id)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold tabular-nums text-white">
+                              {String(globalNo).padStart(2, "0")}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="pt-0.5 text-[14px] font-medium leading-7 text-kb-heading">
+                                {question.stem}
+                              </h3>
+                              <ExamQuestion
+                                question={question}
+                                type={group.type}
+                                value={answers[question.id]}
+                                onChange={(value) => {
+                                  setActiveQuestionId(question.id);
+                                  onAnswerChange(question.id, value);
+                                }}
+                              />
+                              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-divider pt-2.5 text-[10.5px] text-kb-muted">
+                                <span className="rounded-[4px] bg-kb-surface px-2 py-1">
+                                  {question.knowledge}
+                                </span>
+                                <span
+                                  className={cn(
+                                    "rounded-[4px] px-2 py-1",
+                                    question.difficulty === "难"
+                                      ? "bg-destructive-soft text-destructive"
+                                      : question.difficulty === "中"
+                                        ? "bg-warning-soft text-warning"
+                                        : "bg-success-soft text-success",
+                                  )}
+                                >
+                                  {question.difficulty}
+                                </span>
+                                <span>{question.score} 分</span>
+                              </div>
+                            </div>
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
+        </article>
+
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-kb-border bg-white lg:h-full">
+          <div className="shrink-0 bg-[linear-gradient(135deg,#0c98a7_0%,#078a99_100%)] p-5 text-white">
+            <p className="flex items-center gap-2 text-[11.5px] font-medium text-white/85">
+              <ShieldCheck className="h-4 w-4" /> 考试中
+            </p>
+            <h2 className="mt-3 line-clamp-2 text-[16px] font-semibold leading-6">{meta.title}</h2>
+            <dl className="mt-4 grid grid-cols-3 gap-2">
+              <StatusMetric value={`${flat.length}`} label="题量" inverse />
+              <StatusMetric value={`${meta.duration}`} label="分钟" inverse />
+              <StatusMetric value={`${meta.passLine}`} label="及格线" inverse />
+            </dl>
           </div>
-        </div>
 
-        <ExamSessionSidebar
-          meta={meta}
-          groups={groups}
-          answers={answers}
-          focusedId={focusedId}
-          onQuestionJump={jumpToQuestion}
-          onSubmit={onSubmit}
-          remaining={remaining}
-          formatTime={formatTime}
-        />
+          <div className="shrink-0 border-b border-kb-border p-4">
+            <div className="flex items-center justify-between rounded-full bg-[#f2f7f8] px-4 py-2.5">
+              <span className="flex items-center gap-2 text-[11.5px] text-kb-muted">
+                <Clock className="h-4 w-4" /> 剩余时间
+              </span>
+              <strong
+                className={cn(
+                  "text-[17px] tabular-nums",
+                  timerUrgent ? "text-destructive" : "text-primary",
+                )}
+              >
+                {formatTime(remaining)}
+              </strong>
+            </div>
+          </div>
+
+          <dl className="grid shrink-0 grid-cols-2 gap-4 border-b border-kb-border p-4 text-[11.5px]">
+            <InfoItem icon={Target} label="考试目标" value={meta.goal} />
+            <InfoItem icon={BarChart3} label="难度" value={meta.difficulty} />
+            <InfoItem icon={FileText} label="知识分类" value={meta.category} />
+            <InfoItem icon={ShieldCheck} label="答题进度" value={`${answered} / ${flat.length}`} />
+          </dl>
+
+          <div className="min-h-0 flex-1 overflow-y-auto border-b border-kb-border p-4">
+            <div className="mb-3 flex items-center justify-between text-[11px] text-kb-muted">
+              <span>答题卡</span>
+              <span>
+                已答 {answered} / {flat.length}
+              </span>
+            </div>
+            <div className="space-y-4">
+              {groups
+                .filter((group) => group.questions.length > 0)
+                .map((group) => (
+                  <div key={group.type}>
+                    <div className="mb-2 flex items-center justify-between text-[10.5px] text-kb-muted">
+                      <span>{group.type}</span>
+                      <span>{group.questions.length} 题</span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      {group.questions.map((question) => {
+                        const item = flat.find((entry) => entry.question.id === question.id);
+                        const filled = isExamAnswerFilled(answers[question.id]);
+                        return (
+                          <button
+                            key={question.id}
+                            type="button"
+                            onClick={() => jumpToQuestion(question.id)}
+                            aria-current={activeQuestionId === question.id ? "step" : undefined}
+                            aria-label={`跳转到第 ${item?.globalNo ?? ""} 题${filled ? "，已作答" : ""}`}
+                            className={cn(
+                              "grid h-9 place-items-center rounded-[7px] border text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                              activeQuestionId === question.id
+                                ? "border-primary bg-primary text-white"
+                                : filled
+                                  ? "border-success/10 bg-success-soft text-success"
+                                  : "border-transparent bg-kb-surface text-kb-muted hover:bg-primary-soft hover:text-primary",
+                            )}
+                          >
+                            {item?.globalNo}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          <div className="shrink-0 border-b border-kb-border p-4">
+            <p className="mb-3 text-[11px] text-kb-muted">题型构成</p>
+            <div className="space-y-2">
+              {groups
+                .filter((group) => group.questions.length > 0)
+                .map((group) => (
+                  <div
+                    key={group.type}
+                    className="grid grid-cols-[52px_minmax(0,1fr)_42px] items-center gap-2 text-[10.5px]"
+                  >
+                    <span className="text-kb-body">{group.type.replace("题", "")}</span>
+                    <span className="h-1.5 overflow-hidden rounded-full bg-kb-surface">
+                      <span
+                        className="block h-full rounded-full bg-primary/60"
+                        style={{
+                          width: `${Math.max(10, (group.questions.length / maxGroupCount) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                    <span className="text-right tabular-nums text-kb-muted">
+                      {group.questions.length} 题
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          <div className="shrink-0 p-4">
+            <button
+              type="button"
+              onClick={onSubmit}
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-primary text-[13px] font-semibold text-white transition-colors hover:bg-primary/90"
+            >
+              <Flag className="h-4 w-4" /> 统一交卷
+            </button>
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[10.5px] leading-5 text-kb-muted">
+              <CheckCircle2 className="h-3.5 w-3.5 text-success" /> 交卷前可回看并修改全部答案
+            </p>
+          </div>
+        </aside>
       </div>
-    </>
+    </div>
+  );
+}
+
+function StatusMetric({
+  value,
+  label,
+  inverse = false,
+}: {
+  value: string;
+  label: string;
+  inverse?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-[12px] px-2 py-3 text-center",
+        inverse ? "bg-white/14" : "border border-kb-border bg-kb-surface/30",
+      )}
+    >
+      <strong
+        className={cn("block text-[18px] tabular-nums", inverse ? "text-white" : "text-kb-heading")}
+      >
+        {value}
+      </strong>
+      <span className={cn("text-[10px]", inverse ? "text-white/80" : "text-kb-muted")}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function InfoItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Target;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-2">
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+      <div className="min-w-0">
+        <dt className="text-kb-muted">{label}</dt>
+        <dd className="mt-0.5 truncate font-medium text-kb-heading">{value}</dd>
+      </div>
+    </div>
   );
 }

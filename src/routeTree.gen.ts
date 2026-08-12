@@ -30,6 +30,7 @@ import { Route as TrainingRecordsRouteImport } from './routes/training.records'
 import { Route as TrainingPracticeRouteImport } from './routes/training.practice'
 import { Route as TrainingGrowthRouteImport } from './routes/training.growth'
 import { Route as TrainingExamRouteImport } from './routes/training.exam'
+import { Route as TrainingCustomExamRouteImport } from './routes/training.custom-exam'
 import { Route as ScenarioPeakRouteImport } from './routes/scenario.peak'
 import { Route as ScenarioFaultRouteImport } from './routes/scenario.fault'
 import { Route as KnowledgeUploadsRouteImport } from './routes/knowledge.uploads'
@@ -168,6 +169,11 @@ const TrainingGrowthRoute = TrainingGrowthRouteImport.update({
 const TrainingExamRoute = TrainingExamRouteImport.update({
   id: '/training/exam',
   path: '/training/exam',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingCustomExamRoute = TrainingCustomExamRouteImport.update({
+  id: '/training/custom-exam',
+  path: '/training/custom-exam',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScenarioPeakRoute = ScenarioPeakRouteImport.update({
@@ -368,6 +374,7 @@ export interface FileRoutesByFullPath {
   '/knowledge/uploads': typeof KnowledgeUploadsRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
+  '/training/custom-exam': typeof TrainingCustomExamRoute
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
   '/training/practice': typeof TrainingPracticeRoute
@@ -421,6 +428,7 @@ export interface FileRoutesByTo {
   '/knowledge/mine': typeof KnowledgeMineRoute
   '/knowledge/uploads': typeof KnowledgeUploadsRoute
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
+  '/training/custom-exam': typeof TrainingCustomExamRoute
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
   '/training/practice': typeof TrainingPracticeRoute
@@ -479,6 +487,7 @@ export interface FileRoutesById {
   '/knowledge/uploads': typeof KnowledgeUploadsRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
+  '/training/custom-exam': typeof TrainingCustomExamRoute
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
   '/training/practice': typeof TrainingPracticeRoute
@@ -538,6 +547,7 @@ export interface FileRouteTypes {
     | '/knowledge/uploads'
     | '/scenario/fault'
     | '/scenario/peak'
+    | '/training/custom-exam'
     | '/training/exam'
     | '/training/growth'
     | '/training/practice'
@@ -591,6 +601,7 @@ export interface FileRouteTypes {
     | '/knowledge/mine'
     | '/knowledge/uploads'
     | '/scenario/peak'
+    | '/training/custom-exam'
     | '/training/exam'
     | '/training/growth'
     | '/training/practice'
@@ -648,6 +659,7 @@ export interface FileRouteTypes {
     | '/knowledge/uploads'
     | '/scenario/fault'
     | '/scenario/peak'
+    | '/training/custom-exam'
     | '/training/exam'
     | '/training/growth'
     | '/training/practice'
@@ -702,6 +714,7 @@ export interface RootRouteChildren {
   KnowledgePracticeFileIdRoute: typeof KnowledgePracticeFileIdRoute
   ScenarioFaultRoute: typeof ScenarioFaultRouteWithChildren
   ScenarioPeakRoute: typeof ScenarioPeakRouteWithChildren
+  TrainingCustomExamRoute: typeof TrainingCustomExamRoute
   TrainingExamRoute: typeof TrainingExamRoute
   TrainingGrowthRoute: typeof TrainingGrowthRoute
   TrainingPracticeRoute: typeof TrainingPracticeRoute
@@ -866,6 +879,13 @@ declare module '@tanstack/react-router' {
       path: '/training/exam'
       fullPath: '/training/exam'
       preLoaderRoute: typeof TrainingExamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/training/custom-exam': {
+      id: '/training/custom-exam'
+      path: '/training/custom-exam'
+      fullPath: '/training/custom-exam'
+      preLoaderRoute: typeof TrainingCustomExamRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scenario/peak': {
@@ -1248,6 +1268,7 @@ const rootRouteChildren: RootRouteChildren = {
   KnowledgePracticeFileIdRoute: KnowledgePracticeFileIdRoute,
   ScenarioFaultRoute: ScenarioFaultRouteWithChildren,
   ScenarioPeakRoute: ScenarioPeakRouteWithChildren,
+  TrainingCustomExamRoute: TrainingCustomExamRoute,
   TrainingExamRoute: TrainingExamRoute,
   TrainingGrowthRoute: TrainingGrowthRoute,
   TrainingPracticeRoute: TrainingPracticeRoute,

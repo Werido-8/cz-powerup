@@ -81,15 +81,14 @@ function MindMapBoard({
   onZoomIn: () => void;
   onOpen: () => void;
 }) {
-  const nodes = (
-    branches.length > 0 ? branches : ["适用范围", "执行要求", "风险提示", "闭环管理"]
-  ).slice(0, 4);
+  const tree = useMemo(() => buildFileMindMap(fileName, branches), [fileName, branches]);
+  const layout = useMemo(() => buildMindMapLayout(tree, expanded), [tree, expanded]);
 
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-[8px] border border-kb-border bg-kb-surface",
-        expanded ? "min-h-[390px]" : "min-h-[196px]",
+        "group relative overflow-hidden rounded-[8px] border border-kb-border bg-[#F7FBFC]",
+        expanded ? "min-h-[460px]" : "min-h-[240px]",
       )}
     >
       <div className="absolute right-2 top-2 z-10 flex items-center gap-1 rounded-[7px] border border-kb-border bg-card/95 p-1 opacity-0 shadow-sm transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100">
@@ -126,26 +125,298 @@ function MindMapBoard({
       </div>
 
       <div
-        className="absolute inset-0 origin-center transition-transform duration-150"
+        className={cn(
+          "flex origin-center items-center justify-center px-2 py-4 transition-transform duration-150",
+          expanded ? "min-h-[460px]" : "min-h-[240px]",
+        )}
         style={{ transform: `scale(${zoom / 100})` }}
       >
-        <div className="absolute left-1/2 top-1/2 z-10 w-[44%] max-w-[184px] -translate-x-1/2 -translate-y-1/2 rounded-[7px] border border-primary/25 bg-card px-3 py-2 text-center text-[11.5px] font-medium leading-5 text-kb-heading shadow-sm">
-          <span className="line-clamp-2">{fileName.replace(/\.[^.]+$/, "")}</span>
-        </div>
-        <span className="absolute left-[25%] top-1/2 h-px w-[25%] bg-primary/25" />
-        <span className="absolute right-[25%] top-1/2 h-px w-[25%] bg-primary/25" />
-        <div className="absolute inset-x-3 top-4 grid grid-cols-2 gap-x-9 gap-y-8">
-          {nodes.map((item) => (
-            <div
-              key={item}
-              className="rounded-[6px] border border-primary/15 bg-primary-soft/20 px-2 py-2 text-center text-[10.5px] leading-4 text-kb-body"
-            >
-              {item}
-            </div>
+        <svg
+          viewBox={`0 0 ${layout.width} ${layout.height}`}
+          className={cn("h-auto w-full", expanded ? "max-w-[960px]" : "max-w-[560px]")}
+          role="img"
+          aria-label={`${tree.label}知识脑图`}
+        >
+          {layout.links.map((link) => (
+            <path
+              key={link.id}
+              d={link.d}
+              fill="none"
+              stroke={link.level === 1 ? "rgba(20,150,180,0.45)" : "rgba(20,150,180,0.28)"}
+              strokeWidth={link.level === 1 ? 1.6 : 1.2}
+              strokeLinecap="round"
+            />
           ))}
-        </div>
+
+          <rect
+            x={layout.root.x}
+            y={layout.root.y}
+            width={layout.root.w}
+            height={layout.root.h}
+            rx={10}
+            fill="#1496B4"
+          />
+          {wrapSvgText(layout.root.label, layout.root.x + layout.root.w / 2, layout.root.y + layout.root.h / 2, {
+            maxChars: expanded ? 10 : 8,
+            maxLines: 2,
+            fontSize: expanded ? 13 : 11.5,
+            fill: "#FFFFFF",
+            fontWeight: 600,
+          })}
+
+          {layout.nodes.map((node) => (
+            <g key={node.id}>
+              <rect
+                x={node.x}
+                y={node.y}
+                width={node.w}
+                height={node.h}
+                rx={7}
+                fill={node.level === 1 ? "#FFFFFF" : "#F2F8FA"}
+                stroke={node.level === 1 ? "rgba(20,150,180,0.28)" : "#D8E8EC"}
+                strokeWidth={1}
+              />
+              {wrapSvgText(node.label, node.x + node.w / 2, node.y + node.h / 2, {
+                maxChars: expanded ? (node.level === 1 ? 8 : 7) : node.level === 1 ? 7 : 6,
+                maxLines: 1,
+                fontSize: expanded ? (node.level === 1 ? 12 : 11) : node.level === 1 ? 11 : 10,
+                fill: node.level === 1 ? "#203A43" : "#526670",
+                fontWeight: node.level === 1 ? 600 : 500,
+              })}
+            </g>
+          ))}
+        </svg>
       </div>
     </div>
+  );
+}
+
+type MindMapTreeNode = {
+  label: string;
+  children: Array<{ label: string; children?: string[] }>;
+};
+
+type MindMapLayoutNode = {
+  id: string;
+  label: string;
+  level: 1 | 2;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  cx: number;
+  cy: number;
+  side: "left" | "right";
+};
+
+type MindMapLayoutLink = {
+  id: string;
+  level: 1 | 2;
+  d: string;
+};
+
+function buildFileMindMap(fileName: string, branches: string[]): MindMapTreeNode {
+  const title = fileName.replace(/\.[^.]+$/, "");
+  if (/并网|运行规程|调度|异常/.test(title) || branches.some((item) => /并网|运行/.test(item))) {
+    return {
+      label: title,
+      children: [
+        {
+          label: "适用范围",
+          children: ["并网运行机组", "值班运行人员", "调度联系场景"],
+        },
+        {
+          label: "日常监视",
+          children: ["运行参数巡检", "告警分级确认", "交接班核查"],
+        },
+        {
+          label: "异常处置",
+          children: ["现场状态确认", "分级上报路径", "隔离与复盘"],
+        },
+        {
+          label: "调度协同",
+          children: ["调令接收执行", "联系确认留痕", "闭环销号"],
+        },
+      ],
+    };
+  }
+
+  const primary =
+    branches.length >= 4
+      ? branches.slice(0, 4)
+      : ["核心要点", "执行要求", "风险提示", "闭环管理"];
+
+  return {
+    label: title,
+    children: primary.map((label, index) => ({
+      label,
+      children:
+        index === 0
+          ? ["适用范围", "责任分工"]
+          : index === 1
+            ? ["操作步骤", "确认节点"]
+            : index === 2
+              ? ["常见风险", "处置口径"]
+              : ["记录留痕", "复盘改进"],
+    })),
+  };
+}
+
+function buildMindMapLayout(tree: MindMapTreeNode, expanded: boolean) {
+  const width = expanded ? 920 : 540;
+  const height = expanded ? 420 : 250;
+  const rootW = expanded ? 168 : 128;
+  const rootH = expanded ? 58 : 48;
+  const branchW = expanded ? 108 : 88;
+  const branchH = expanded ? 32 : 28;
+  const leafW = expanded ? 100 : 84;
+  const leafH = expanded ? 26 : 22;
+  const leafGap = expanded ? 8 : 6;
+  const branchGap = expanded ? 28 : 18;
+  const sideGap = expanded ? 56 : 36;
+
+  const root = {
+    label: tree.label,
+    x: (width - rootW) / 2,
+    y: (height - rootH) / 2,
+    w: rootW,
+    h: rootH,
+    cx: width / 2,
+    cy: height / 2,
+  };
+
+  const left = tree.children.slice(0, Math.ceil(tree.children.length / 2));
+  const right = tree.children.slice(Math.ceil(tree.children.length / 2));
+  const nodes: MindMapLayoutNode[] = [];
+  const links: MindMapLayoutLink[] = [];
+
+  const placeSide = (items: MindMapTreeNode["children"], side: "left" | "right") => {
+    const clusterHeights = items.map((item) => {
+      const childCount = Math.min(item.children?.length ?? 0, expanded ? 4 : 3);
+      return (
+        branchH +
+        (childCount > 0 ? 12 + childCount * leafH + Math.max(childCount - 1, 0) * leafGap : 0)
+      );
+    });
+    const totalHeight =
+      clusterHeights.reduce((sum, value) => sum + value, 0) +
+      Math.max(items.length - 1, 0) * branchGap;
+    let cursorY = Math.max(12, (height - totalHeight) / 2);
+
+    items.forEach((item, index) => {
+      const childLabels = (item.children ?? []).slice(0, expanded ? 4 : 3);
+      const clusterH = clusterHeights[index];
+      const branchX = side === "left" ? root.x - sideGap - branchW : root.x + root.w + sideGap;
+      const branchY = cursorY;
+      const branchCx = branchX + branchW / 2;
+      const branchCy = branchY + branchH / 2;
+      const branchId = `${side}-b-${index}`;
+
+      nodes.push({
+        id: branchId,
+        label: item.label,
+        level: 1,
+        x: branchX,
+        y: branchY,
+        w: branchW,
+        h: branchH,
+        cx: branchCx,
+        cy: branchCy,
+        side,
+      });
+
+      const rootJoinX = side === "left" ? root.x : root.x + root.w;
+      const branchJoinX = side === "left" ? branchX + branchW : branchX;
+      const ctrl = side === "left" ? rootJoinX - sideGap * 0.55 : rootJoinX + sideGap * 0.55;
+      links.push({
+        id: `${branchId}-link`,
+        level: 1,
+        d: `M ${rootJoinX} ${root.cy} C ${ctrl} ${root.cy}, ${ctrl} ${branchCy}, ${branchJoinX} ${branchCy}`,
+      });
+
+      if (childLabels.length > 0) {
+        const leafX = side === "left" ? branchX - 20 - leafW : branchX + branchW + 20;
+        childLabels.forEach((label, leafIndex) => {
+          const y = branchY + branchH + 12 + leafIndex * (leafH + leafGap);
+          const leafId = `${branchId}-l-${leafIndex}`;
+          const leafCy = y + leafH / 2;
+          nodes.push({
+            id: leafId,
+            label,
+            level: 2,
+            x: leafX,
+            y,
+            w: leafW,
+            h: leafH,
+            cx: leafX + leafW / 2,
+            cy: leafCy,
+            side,
+          });
+
+          const fromX = side === "left" ? branchX : branchX + branchW;
+          const toX = side === "left" ? leafX + leafW : leafX;
+          const midX = side === "left" ? fromX - 12 : fromX + 12;
+          links.push({
+            id: `${leafId}-link`,
+            level: 2,
+            d: `M ${fromX} ${branchCy} C ${midX} ${branchCy}, ${midX} ${leafCy}, ${toX} ${leafCy}`,
+          });
+        });
+      }
+
+      cursorY += clusterH + branchGap;
+    });
+  };
+
+  placeSide(left, "left");
+  placeSide(right, "right");
+
+  return { width, height, root, nodes, links };
+}
+
+function wrapSvgText(
+  text: string,
+  x: number,
+  y: number,
+  options: {
+    maxChars: number;
+    maxLines: number;
+    fontSize: number;
+    fill: string;
+    fontWeight?: number;
+  },
+) {
+  const lines: string[] = [];
+  let rest = text;
+  while (rest.length > 0 && lines.length < options.maxLines) {
+    if (rest.length <= options.maxChars || lines.length === options.maxLines - 1) {
+      lines.push(
+        rest.length > options.maxChars ? `${rest.slice(0, options.maxChars - 1)}…` : rest,
+      );
+      break;
+    }
+    lines.push(rest.slice(0, options.maxChars));
+    rest = rest.slice(options.maxChars);
+  }
+
+  const lineHeight = options.fontSize + 3;
+  const startY = y - ((lines.length - 1) * lineHeight) / 2 + options.fontSize * 0.35;
+
+  return (
+    <text
+      x={x}
+      y={startY}
+      textAnchor="middle"
+      fill={options.fill}
+      fontSize={options.fontSize}
+      fontWeight={options.fontWeight ?? 500}
+    >
+      {lines.map((line, index) => (
+        <tspan key={`${line}-${index}`} x={x} dy={index === 0 ? 0 : lineHeight}>
+          {line}
+        </tspan>
+      ))}
+    </text>
   );
 }
 

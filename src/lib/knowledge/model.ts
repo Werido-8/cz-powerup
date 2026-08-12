@@ -302,9 +302,42 @@ export function getAllPublishedFiles(user: KnowledgeUser = getCurrentKnowledgeUs
 }
 
 export function getRecentFiles() {
-  return RECENT_FILE_IDS.map((id) => getFileById(id)).filter((file): file is KnowledgeFile =>
-    Boolean(file),
-  );
+  const now = new Date();
+  return RECENT_FILE_IDS.map((id, index) => {
+    const file = getFileById(id);
+    if (!file) return null;
+    return {
+      ...file,
+      lastAccessedAt: buildDemoRecentAccessTime(now, index),
+    };
+  })
+    .filter((file): file is KnowledgeFile => Boolean(file))
+    .sort((a, b) => (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? ""));
+}
+
+/** 演示用访问时间：前若干条落在今天，其次本周，其余更早 */
+function buildDemoRecentAccessTime(now: Date, index: number) {
+  const date = new Date(now);
+  const weekday = (now.getDay() + 6) % 7; // Monday = 0
+
+  if (index < 8) {
+    date.setHours(18 - index, (index * 7) % 60, 0, 0);
+  } else if (index < 16 && weekday > 0) {
+    const daysAgo = 1 + ((index - 8) % weekday);
+    date.setDate(date.getDate() - daysAgo);
+    date.setHours(10 + ((index - 8) % 8), (index * 11) % 60, 0, 0);
+  } else {
+    const daysAgo = 8 + Math.max(0, index - 8) * 2;
+    date.setDate(date.getDate() - daysAgo);
+    date.setHours(9 + (index % 8), (index * 13) % 60, 0, 0);
+  }
+
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${d} ${hh}:${mm}`;
 }
 
 export function getFavoriteFiles() {

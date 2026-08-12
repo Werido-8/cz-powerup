@@ -25,6 +25,7 @@ import {
   addStoreBase,
   getKnowledgeStoreServerSnapshot,
   getKnowledgeStoreVersion,
+  getStoreFileMoveApprovals,
   getStoreUploadApprovals,
   subscribeKnowledgeStore,
   updateStoreBase,
@@ -112,7 +113,10 @@ export function KnowledgeAdminPage({ initialSection }: { initialSection?: AdminS
   const pendingUploadCount = getStoreUploadApprovals().filter(
     (item) => (item.status ?? "pendingApproval") === "pendingApproval",
   ).length;
-  const approvalBadge = pendingUploadCount + permissionRequestCount;
+  const pendingMoveCount = getStoreFileMoveApprovals().filter(
+    (item) => item.status === "pendingMove",
+  ).length;
+  const approvalBadge = pendingUploadCount + pendingMoveCount + permissionRequestCount;
 
   const sectionMeta = SECTION_META[visibleSection];
 

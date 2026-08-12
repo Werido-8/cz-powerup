@@ -6,7 +6,7 @@ import { QUESTIONS } from "@/lib/mock/data";
 
 export const Route = createFileRoute("/training/result/$id")({
   component: ResultPage,
-  head: () => ({ meta: [{ title: "答题结果 · 题库训练" }] }),
+  head: () => ({ meta: [{ title: "答题结果 · 训练中心" }] }),
 });
 
 type Saved = {
@@ -71,19 +71,25 @@ function ResultPage() {
   const all = data.qids.map((qid) => QUESTIONS.find((q) => q.id === qid)!).filter(Boolean);
 
   const fmt = (s: number) => {
-    const m = Math.floor(s / 60).toString().padStart(2, "0");
+    const m = Math.floor(s / 60)
+      .toString()
+      .padStart(2, "0");
     const sec = (s % 60).toString().padStart(2, "0");
     return `${m}:${sec}`;
   };
 
   const passed = score >= 60;
-  const ringColor = passed ? "from-primary to-[oklch(0.5_0.13_205)]" : "from-warning to-[oklch(0.65_0.18_45)]";
+  const ringColor = passed
+    ? "from-primary to-[oklch(0.5_0.13_205)]"
+    : "from-warning to-[oklch(0.65_0.18_45)]";
 
   return (
     <PageShell>
       <div className="mb-6 grid gap-6 rounded-lg border border-border bg-card p-8 shadow-[var(--shadow-card)] md:grid-cols-3">
         <div className="grid place-items-center">
-          <div className={`relative grid h-32 w-32 place-items-center rounded-full bg-gradient-to-br ${ringColor} text-white shadow-[var(--shadow-glow)]`}>
+          <div
+            className={`relative grid h-32 w-32 place-items-center rounded-full bg-gradient-to-br ${ringColor} text-white shadow-[var(--shadow-glow)]`}
+          >
             <div className="text-[36px] font-bold leading-none">{score}</div>
             <div className="absolute bottom-7 text-[10px] opacity-80">/ 100</div>
           </div>
@@ -107,11 +113,16 @@ function ResultPage() {
             <div className="mb-2 text-[12px] font-medium">薄弱知识点</div>
             <div className="flex flex-wrap gap-2">
               {Array.from(new Set(wrong.flatMap((w) => w.knowledgePoints))).map((k) => (
-                <span key={k} className="rounded-full border border-warning/30 bg-warning-soft px-2.5 py-1 text-[11px] text-warning-foreground">
+                <span
+                  key={k}
+                  className="rounded-full border border-warning/30 bg-warning-soft px-2.5 py-1 text-[11px] text-warning-foreground"
+                >
                   {k}
                 </span>
               ))}
-              {wrong.length === 0 && <span className="text-[12px] text-muted-foreground">无 — 表现优秀!</span>}
+              {wrong.length === 0 && (
+                <span className="text-[12px] text-muted-foreground">无，表现优秀!</span>
+              )}
             </div>
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -151,7 +162,10 @@ function ResultPage() {
                     ? "错误"
                     : v;
           return (
-            <div key={q.id} className={`rounded-lg border bg-card p-5 ${isWrong ? "border-destructive/30" : "border-border"}`}>
+            <div
+              key={q.id}
+              className={`rounded-lg border bg-card p-5 ${isWrong ? "border-destructive/30" : "border-border"}`}
+            >
               <div className="flex items-start gap-3">
                 <span
                   className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white ${
@@ -161,7 +175,10 @@ function ResultPage() {
                   {isWrong ? <X className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
                 </span>
                 <div className="flex-1">
-                  <div className="mb-1 text-[11px] text-muted-foreground">第 {i + 1} 题 · {{ single: "单选", multiple: "多选", judge: "判断", text: "简答" }[q.type]}</div>
+                  <div className="mb-1 text-[11px] text-muted-foreground">
+                    第 {i + 1} 题 ·{" "}
+                    {{ single: "单选", multiple: "多选", judge: "判断", text: "简答" }[q.type]}
+                  </div>
                   <div className="text-[13.5px] font-medium leading-relaxed">{q.stem}</div>
                   <div className="mt-3 grid gap-1.5 text-[12.5px]">
                     <div className={isWrong ? "text-destructive" : "text-success"}>
@@ -169,7 +186,14 @@ function ResultPage() {
                     </div>
                     {q.type !== "text" && (
                       <div className="text-success">
-                        正确答案:{Array.isArray(q.answer) ? q.answer.join("、") : q.answer === "T" ? "正确" : q.answer === "F" ? "错误" : q.answer}
+                        正确答案:
+                        {Array.isArray(q.answer)
+                          ? q.answer.join("、")
+                          : q.answer === "T"
+                            ? "正确"
+                            : q.answer === "F"
+                              ? "错误"
+                              : q.answer}
                       </div>
                     )}
                   </div>
@@ -182,7 +206,8 @@ function ResultPage() {
                       params={{ id: q.relatedDocId }}
                       className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
                     >
-                      <BookOpen className="h-3 w-3" /> 查看依据资料 <ChevronRight className="h-3 w-3" />
+                      <BookOpen className="h-3 w-3" /> 查看依据资料{" "}
+                      <ChevronRight className="h-3 w-3" />
                     </Link>
                   )}
                 </div>

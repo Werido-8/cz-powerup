@@ -3,27 +3,11 @@ import { DOCS, QUESTIONS, TOPICS, type Topic } from "./data";
 
 export type TopicPublishStatus = "草稿" | "已发布" | "已下架";
 
-export type TopicSpecialty =
-  | "电气"
-  | "锅炉"
-  | "化学"
-  | "运行值班"
-  | "汽机"
-  | "通用";
+export type TopicSpecialty = "电气" | "锅炉" | "化学" | "运行值班" | "汽机" | "通用";
 
-export type TopicPosition =
-  | "新员工"
-  | "运行人员"
-  | "检修人员"
-  | "管理人员"
-  | "班组长";
+export type TopicPosition = "新员工" | "运行人员" | "检修人员" | "管理人员" | "班组长";
 
-export type TopicScenario =
-  | "入职培训"
-  | "故障复盘"
-  | "标准操作"
-  | "制度学习"
-  | "专项提升";
+export type TopicScenario = "入职培训" | "故障复盘" | "标准操作" | "制度学习" | "专项提升";
 
 export type TopicKnowledgePoint = {
   id: string;
@@ -117,12 +101,12 @@ function buildKnowledgePoints(topicId: string, docIds: string[]): TopicKnowledge
   );
   (TOPIC_EXTRA_KNOWLEDGE[topicId] ?? []).forEach((k) => kpSet.add(k));
   return Array.from(kpSet).map((title, i) => ({
-      id: `${topicId}-kp-${i}`,
-      title,
-      summary: `掌握「${title}」相关概念与现场应用要点。`,
-      source: "ai" as const,
-      confirmed: true,
-    }));
+    id: `${topicId}-kp-${i}`,
+    title,
+    summary: `掌握「${title}」相关概念与现场应用要点。`,
+    source: "ai" as const,
+    confirmed: true,
+  }));
 }
 
 function buildDocQuestions(docIds: string[]): TopicDocQuestion[] {
@@ -158,6 +142,12 @@ function buildQuestionEdits(docIds: string[]): Record<string, EditableTopicQuest
 
 function topicToAdminRecord(topic: Topic, status: TopicPublishStatus): TopicAdminRecord {
   const docQuestions = buildDocQuestions(topic.docIds);
+  if (status === "草稿" && docQuestions.length > 0) {
+    docQuestions[docQuestions.length - 1] = {
+      ...docQuestions[docQuestions.length - 1],
+      confirmed: false,
+    };
+  }
   const questionCount = docQuestions.reduce((n, d) => n + d.questionIds.length, 0);
 
   return {
@@ -179,7 +169,7 @@ function topicToAdminRecord(topic: Topic, status: TopicPublishStatus): TopicAdmi
     maintainer: "李老师",
     aiHints:
       status === "草稿"
-        ? ["资料清单为空，请从学习资料池选择至少 2 份资料", "尚未维护知识点"]
+        ? ["有一组练习题等待人工确认，确认前不可发布"]
         : questionCount < 5
           ? ["题目覆盖不足，建议为每份资料生成 3–5 道题"]
           : undefined,
@@ -280,7 +270,10 @@ export function getTopicQuestionCount(record: TopicAdminRecord) {
   return record.docQuestions.reduce((n, d) => n + d.questionIds.length, 0);
 }
 
-export const EMPTY_TOPIC_DRAFT: Omit<TopicAdminRecord, "id" | "updatedAt" | "maintainer" | "learnerCount"> = {
+export const EMPTY_TOPIC_DRAFT: Omit<
+  TopicAdminRecord,
+  "id" | "updatedAt" | "maintainer" | "learnerCount"
+> = {
   title: "",
   specialty: "运行值班",
   positions: ["运行人员"],

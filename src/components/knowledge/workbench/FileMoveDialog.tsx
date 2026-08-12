@@ -76,10 +76,6 @@ export function FileMoveDialog({
 
   const handleConfirm = () => {
     if (!target || files.length !== 1) return;
-    if (isSubmitApproval) {
-      toast.message("跨库移动入库（重解析 + 审批）需求已保留，一期暂不开放（依赖 RAG）");
-      return;
-    }
     pushRecentMoveId(target);
     onConfirm(files, target);
   };
@@ -99,10 +95,10 @@ export function FileMoveDialog({
           <AppDialogButton
             variant="primary"
             loading={loading}
-            disabled={!target || isSubmitApproval}
+            disabled={!target}
             onClick={handleConfirm}
           >
-            {isSubmitApproval ? "暂未开放" : "确认移动"}
+            {isSubmitApproval ? "提交移入申请" : "确认移动"}
           </AppDialogButton>
         </>
       }
@@ -111,7 +107,9 @@ export function FileMoveDialog({
         <p className="text-[13px] leading-relaxed text-[#526670]">
           {isSubmitApproval ? (
             <>
-              移入专业/公共知识库并触发重解析与审批的能力已写入需求（SR-48），一期暂不实现，依赖 RAG 入库链路后续开放。
+              将
+              <strong className="mx-1 font-semibold text-foreground">{files[0]?.name}</strong>
+              申请移入专业/公共知识库。管理员先审批是否允许移入；批准后文件进入目标库并重新解析，解析完成后再进行内容确认。
             </>
           ) : (
             <>

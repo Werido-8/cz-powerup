@@ -136,7 +136,9 @@ export function TopicEditorWizard({
     return poolDocs.filter((d) => {
       if (docTypeFilter !== "all" && d.docType !== docTypeFilter) return false;
       if (!kw) return true;
-      return d.title.toLowerCase().includes(kw) || d.highlight.some((h) => h.toLowerCase().includes(kw));
+      return (
+        d.title.toLowerCase().includes(kw) || d.highlight.some((h) => h.toLowerCase().includes(kw))
+      );
     });
   }, [poolDocs, docSearch, docTypeFilter]);
 
@@ -219,11 +221,14 @@ export function TopicEditorWizard({
     setAiLoading(true);
     setTimeout(() => {
       const qids = QUESTIONS.filter((q) => q.relatedDocId === docId).map((q) => q.id);
-      const fallback = qids.length > 0 ? qids : [`mock-q-${docId}-1`, `mock-q-${docId}-2`, `mock-q-${docId}-3`];
+      const fallback =
+        qids.length > 0 ? qids : [`mock-q-${docId}-1`, `mock-q-${docId}-2`, `mock-q-${docId}-3`];
       const docQuestions = draft.docQuestions.map((d) =>
         d.docId === docId ? { ...d, questionIds: fallback, generated: true, confirmed: false } : d,
       );
-      const questionEdits: Record<string, EditableTopicQuestion> = { ...(draft.questionEdits ?? {}) };
+      const questionEdits: Record<string, EditableTopicQuestion> = {
+        ...(draft.questionEdits ?? {}),
+      };
       fallback.forEach((qid, i) => {
         questionEdits[qid] = resolveTopicQuestion(qid, questionEdits, docId, i);
       });
@@ -234,7 +239,8 @@ export function TopicEditorWizard({
   };
 
   const canNext = () => {
-    if (step === 1) return draft.title.trim() && draft.learningGoal.trim() && draft.positions.length > 0;
+    if (step === 1)
+      return draft.title.trim() && draft.learningGoal.trim() && draft.positions.length > 0;
     if (step === 2) return draft.docIds.length > 0;
     if (step === 3) return draft.knowledgePoints.length > 0;
     if (step === 4) return draft.docQuestions.every((d) => d.questionIds.length > 0);
@@ -253,7 +259,7 @@ export function TopicEditorWizard({
   };
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto w-full max-w-[1480px] pb-24">
       {/* 步骤条 */}
       <div className="mb-6 rounded-lg border border-border bg-card p-4 shadow-[var(--shadow-card)]">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -422,7 +428,9 @@ export function TopicEditorWizard({
                   onClick={() => setDocTypeFilter("all")}
                   className={cn(
                     "rounded-md px-2 py-1 text-[11.5px]",
-                    docTypeFilter === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    docTypeFilter === "all"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground",
                   )}
                 >
                   全部
@@ -434,7 +442,9 @@ export function TopicEditorWizard({
                     onClick={() => setDocTypeFilter(t)}
                     className={cn(
                       "rounded-md px-2 py-1 text-[11.5px]",
-                      docTypeFilter === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                      docTypeFilter === t
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground",
                     )}
                   >
                     {t}
@@ -447,14 +457,18 @@ export function TopicEditorWizard({
                 disabled={aiLoading}
                 className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/50 px-3 py-1.5 text-[12px] text-primary hover:bg-primary-soft"
               >
-                {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {aiLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
                 AI 推荐资料
               </button>
             </div>
 
             <p className="text-[12px] text-muted-foreground">
-              已选 <strong className="text-foreground">{draft.docIds.length}</strong> 份资料
-              · 学习资料池仅展示可学习、已入库的知识类资料
+              已选 <strong className="text-foreground">{draft.docIds.length}</strong> 份资料 ·
+              学习资料池仅展示可学习、已入库的知识类资料
             </p>
 
             <div className="max-h-[min(28rem,50vh)] space-y-2 overflow-y-auto pr-1">
@@ -467,7 +481,9 @@ export function TopicEditorWizard({
                     onClick={() => toggleDoc(doc.id)}
                     className={cn(
                       "flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors",
-                      selected ? "border-primary/40 bg-primary-soft/25" : "border-divider hover:bg-muted/30",
+                      selected
+                        ? "border-primary/40 bg-primary-soft/25"
+                        : "border-divider hover:bg-muted/30",
                     )}
                   >
                     {selected ? (
@@ -477,7 +493,9 @@ export function TopicEditorWizard({
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-medium text-foreground">{doc.title}</p>
-                      <p className="mt-0.5 line-clamp-1 text-[11.5px] text-muted-foreground">{doc.snippet}</p>
+                      <p className="mt-0.5 line-clamp-1 text-[11.5px] text-muted-foreground">
+                        {doc.snippet}
+                      </p>
                       <div className="mt-1.5 flex flex-wrap gap-2 text-[10.5px] text-muted-foreground">
                         <span>{doc.docType}</span>
                         <span>{doc.source}</span>
@@ -503,7 +521,11 @@ export function TopicEditorWizard({
                 disabled={aiLoading}
                 className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/50 px-3 py-1.5 text-[12px] text-primary"
               >
-                {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {aiLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
                 AI 提炼知识点
               </button>
             </div>
@@ -539,7 +561,11 @@ export function TopicEditorWizard({
                           value={kp.title}
                           onChange={(e) => {
                             const knowledgePoints = [...draft.knowledgePoints];
-                            knowledgePoints[index] = { ...kp, title: e.target.value, source: "manual" };
+                            knowledgePoints[index] = {
+                              ...kp,
+                              title: e.target.value,
+                              source: "manual",
+                            };
                             updateDraft({ knowledgePoints });
                           }}
                           className="mb-1.5 h-8 text-[13px] font-medium"
@@ -548,7 +574,11 @@ export function TopicEditorWizard({
                           value={kp.summary}
                           onChange={(e) => {
                             const knowledgePoints = [...draft.knowledgePoints];
-                            knowledgePoints[index] = { ...kp, summary: e.target.value, source: "manual" };
+                            knowledgePoints[index] = {
+                              ...kp,
+                              summary: e.target.value,
+                              source: "manual",
+                            };
                             updateDraft({ knowledgePoints });
                           }}
                           rows={2}
@@ -662,23 +692,30 @@ export function TopicEditorWizard({
         )}
       </div>
 
-      {/* 底部操作 */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={handleSaveDraft}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-[12.5px] hover:bg-muted"
-        >
-          <Save className="h-3.5 w-3.5" />
-          保存草稿
-        </button>
+      {/* 始终可见的步骤操作，长卷面无需滚到底部 */}
+      <div className="fixed bottom-4 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-[1480px] -translate-x-1/2 items-center justify-between gap-3 rounded-[12px] border border-kb-border bg-white/95 px-3 py-2.5 shadow-[0_14px_40px_rgba(18,59,67,0.16)] backdrop-blur-md sm:px-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={handleSaveDraft}
+            className="inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-[8px] border border-kb-border px-3 text-[12.5px] text-kb-body transition-colors hover:bg-kb-surface"
+          >
+            <Save className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">保存草稿</span>
+            <span className="sm:hidden">保存</span>
+          </button>
+          <span className="hidden items-center gap-1.5 text-[11.5px] text-kb-muted md:inline-flex">
+            <Check className="h-3.5 w-3.5 text-success" />
+            内容已自动保存 · 当前为第 {step} 步「{STEPS[step - 1]}」
+          </span>
+        </div>
 
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           {step > 1 && (
             <button
               type="button"
               onClick={() => setStep((s) => s - 1)}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-2 text-[12.5px] hover:bg-muted"
+              className="inline-flex min-h-10 items-center gap-1 rounded-[8px] border border-kb-border px-3 text-[12.5px] text-kb-body transition-colors hover:bg-kb-surface"
             >
               <ChevronLeft className="h-4 w-4" />
               上一步
@@ -694,7 +731,7 @@ export function TopicEditorWizard({
                 }
                 setStep((s) => s + 1);
               }}
-              className="inline-flex items-center gap-1 rounded-md bg-primary px-4 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+              className="inline-flex min-h-10 items-center gap-1 rounded-[8px] bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               下一步
               <ChevronRight className="h-4 w-4" />
@@ -703,7 +740,7 @@ export function TopicEditorWizard({
             <button
               type="button"
               onClick={handlePublish}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-[8px] bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <Send className="h-3.5 w-3.5" />
               发布专题

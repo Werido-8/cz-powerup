@@ -957,10 +957,12 @@ export function FileApprovalPage({
       updateStoreUploadApproval(current.id, {
         ...contentPatch(),
         status,
+        contentConfirmStatus: status === "approved" ? "confirmed" : "unconfirmed",
         reviewerName: "当前审批人",
         reviewedAt: new Date().toISOString(),
+        reviewNote: status === "rejected" ? undefined : "内容已确认并批准入库",
       });
-      toast.success(status === "approved" ? "文件已通过审批" : "文件已驳回");
+      toast.success(status === "approved" ? "文件已通过审批并正式入库" : "文件已驳回");
     }
     const next = queue.find((item) => item.id !== current.id);
     if (next) {
@@ -1009,7 +1011,29 @@ export function FileApprovalPage({
             ? navigate({ to: "/knowledge/mine", search: { panel: "uploads", view: "confirm" } })
             : navigate({ to: "/knowledge/admin", search: { section: "approvals" } })
         }
-        reject={() => finish("rejected")}
+        reject={() => {
+          const reason =
+            typeof window !== "undefined" ? window.prompt("请输入驳回原因") : "";
+          if (!reason?.trim()) return;
+          updateStoreUploadApproval(current.id, {
+            ...contentPatch(),
+            status: "rejected",
+            contentConfirmStatus: "unconfirmed",
+            reviewerName: "当前审批人",
+            reviewedAt: new Date().toISOString(),
+            reviewNote: reason.trim(),
+          });
+          toast.success("文件已驳回");
+          const next = queue.find((item) => item.id !== current.id);
+          if (next) {
+            navigate({
+              to: "/knowledge/approval/$approvalId",
+              params: { approvalId: next.id },
+            });
+          } else {
+            navigate({ to: "/knowledge/admin", search: { section: "approvals" } });
+          }
+        }}
         approve={() => finish("approved")}
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">

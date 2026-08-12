@@ -33,7 +33,7 @@ import {
 interface MenuItem {
   label: string;
   to: string;
-  children?: { label: string; to: string }[];
+  children?: { label: string; to: string; group?: string }[];
 }
 
 const MENU: MenuItem[] = [
@@ -54,12 +54,16 @@ const MENU: MenuItem[] = [
     label: "能力提升",
     to: "/learn",
     children: [
-      { label: "知识学习", to: "/learn" },
-      { label: "专题维护", to: "/learn-admin" },
-      { label: "题库训练", to: "/training" },
-      { label: "个人沉淀", to: "/assets" },
-      { label: "题库管理", to: "/question-bank" },
-      { label: "考试管理", to: "/exam-admin" },
+      { label: "知识学习", to: "/learn", group: "我的学习" },
+      { label: "个人学习成果", to: "/assets", group: "我的学习" },
+      { label: "训练中心", to: "/training", group: "训练与测评" },
+      { label: "专项练习", to: "/training/practice", group: "训练与测评" },
+      { label: "自主组卷", to: "/training/custom-exam", group: "训练与测评" },
+      { label: "正式考试", to: "/training/exam", group: "训练与测评" },
+      { label: "错题本", to: "/training/wrong", group: "训练与测评" },
+      { label: "专题维护", to: "/learn-admin", group: "内容管理" },
+      { label: "题库管理", to: "/question-bank", group: "内容管理" },
+      { label: "考试管理", to: "/exam-admin", group: "内容管理" },
     ],
   },
   { label: "场景训练", to: "/scenario" },
@@ -71,6 +75,11 @@ const DEMO_ROLE_OPTIONS: KnowledgeUserRole[] = ["employee", "knowledgeAdmin", "s
 function isItemActive(pathname: string, to: string) {
   if (to === "/") return pathname === "/";
   return pathname === to || pathname.startsWith(to + "/");
+}
+
+function isChildActive(pathname: string, to: string) {
+  if (to === "/training") return pathname === "/training" || pathname === "/training/";
+  return isItemActive(pathname, to);
 }
 
 function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
@@ -96,6 +105,35 @@ function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
   }
 
   const childActive = m.children?.some((c) => isItemActive(pathname, c.to));
+  const childGroups = Array.from(
+    new Set(m.children?.map((child) => child.group).filter((group): group is string => !!group)),
+  );
+
+  const renderChild = (c: NonNullable<MenuItem["children"]>[number]) => {
+    const cActive =
+      c.to === "/knowledge"
+        ? pathname === "/knowledge" ||
+          pathname === "/knowledge/" ||
+          pathname.startsWith("/knowledge/kb/") ||
+          pathname.startsWith("/knowledge/lib/") ||
+          pathname.startsWith("/knowledge/dept/") ||
+          pathname.startsWith("/knowledge/space/") ||
+          pathname.startsWith("/knowledge/file/")
+        : isChildActive(pathname, c.to);
+    return (
+      <Link
+        key={c.to}
+        to={c.to}
+        className={`whitespace-nowrap rounded-md px-3 py-2 text-[13px] transition-colors ${
+          cActive
+            ? "bg-primary-soft font-medium text-primary"
+            : "text-popover-foreground hover:bg-muted"
+        }`}
+      >
+        {c.label}
+      </Link>
+    );
+  };
 
   return (
     <div
@@ -126,34 +164,31 @@ function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
 
       {open && (
         <div className="absolute left-0 top-full z-50 pt-1.5">
-          <div className="overflow-hidden rounded-lg border border-border bg-popover shadow-[0_8px_24px_-4px_oklch(0.5_0.05_230_/_0.15)]">
-            <div className="flex flex-col py-1.5">
-              {m.children?.map((c) => {
-                const cActive =
-                  c.to === "/knowledge"
-                    ? pathname === "/knowledge" ||
-                      pathname === "/knowledge/" ||
-                      pathname.startsWith("/knowledge/kb/") ||
-                      pathname.startsWith("/knowledge/lib/") ||
-                      pathname.startsWith("/knowledge/dept/") ||
-                      pathname.startsWith("/knowledge/space/") ||
-                      pathname.startsWith("/knowledge/file/")
-                    : isItemActive(pathname, c.to);
-                return (
-                  <Link
-                    key={c.to}
-                    to={c.to}
-                    className={`whitespace-nowrap px-4 py-2 text-[13px] transition-colors ${
-                      cActive
-                        ? "bg-primary-soft font-medium text-primary"
-                        : "text-popover-foreground hover:bg-muted"
-                    }`}
+          <div className="overflow-hidden rounded-[12px] border border-border bg-popover shadow-[0_12px_30px_-8px_oklch(0.5_0.05_230_/_0.18)]">
+            {childGroups.length > 0 ? (
+              <div className="grid min-w-[430px] grid-cols-[120px_1fr_120px] gap-2 p-2.5">
+                {childGroups.map((group) => (
+                  <section
+                    key={group}
+                    className={`rounded-[9px] p-2 ${group === "内容管理" ? "border border-primary/12 bg-primary-soft/35" : "bg-muted/35"}`}
                   >
-                    {c.label}
-                  </Link>
-                );
-              })}
-            </div>
+                    <div className="flex items-center justify-between gap-1 px-2 pb-1.5 pt-1 text-[10.5px] font-semibold text-muted-foreground">
+                      <span className="whitespace-nowrap">{group}</span>
+                      {group === "内容管理" && (
+                        <span className="shrink-0 whitespace-nowrap rounded bg-white/80 px-1.5 py-0.5 text-[9px] font-medium text-primary">
+                          管理员
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {m.children?.filter((child) => child.group === group).map(renderChild)}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-0.5 p-1.5">{m.children?.map(renderChild)}</div>
+            )}
           </div>
         </div>
       )}
@@ -278,16 +313,54 @@ export function Header({ wide = false }: { wide?: boolean }) {
                     </SheetClose>
                     {item.children && (
                       <div className="ml-4 border-l border-border pl-2">
-                        {item.children.map((child) => (
-                          <SheetClose asChild key={child.to}>
-                            <Link
-                              to={child.to}
-                              className="flex min-h-10 items-center rounded-lg px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
-                            >
-                              {child.label}
-                            </Link>
-                          </SheetClose>
-                        ))}
+                        {Array.from(
+                          new Set(
+                            item.children
+                              .map((child) => child.group)
+                              .filter((group): group is string => !!group),
+                          ),
+                        ).length > 0
+                          ? Array.from(
+                              new Set(
+                                item.children
+                                  .map((child) => child.group)
+                                  .filter((group): group is string => !!group),
+                              ),
+                            ).map((group) => (
+                              <div
+                                key={group}
+                                className={`py-1 ${group === "内容管理" ? "mt-1 border-t border-primary/15 pt-2" : ""}`}
+                              >
+                                <div className="flex items-center justify-between px-3 py-1 text-[10.5px] font-semibold text-muted-foreground/75">
+                                  <span>{group}</span>
+                                  {group === "内容管理" && (
+                                    <span className="text-[9px] text-primary">管理员</span>
+                                  )}
+                                </div>
+                                {item.children
+                                  ?.filter((child) => child.group === group)
+                                  .map((child) => (
+                                    <SheetClose asChild key={child.to}>
+                                      <Link
+                                        to={child.to}
+                                        className="flex min-h-10 items-center rounded-lg px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                                      >
+                                        {child.label}
+                                      </Link>
+                                    </SheetClose>
+                                  ))}
+                              </div>
+                            ))
+                          : item.children.map((child) => (
+                              <SheetClose asChild key={child.to}>
+                                <Link
+                                  to={child.to}
+                                  className="flex min-h-10 items-center rounded-lg px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                  {child.label}
+                                </Link>
+                              </SheetClose>
+                            ))}
                       </div>
                     )}
                   </div>

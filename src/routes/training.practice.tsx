@@ -1,22 +1,22 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
-  Target,
-  ChevronRight,
-  ChevronLeft,
-  Layers,
+  ArrowRight,
   BookOpenCheck,
+  ChevronLeft,
+  Layers3,
+  SlidersHorizontal,
+  Target,
 } from "lucide-react";
 import { z } from "zod";
+import { PageHeader } from "@/components/learning/ui";
 import { PageShell } from "@/components/workbench/PageShell";
-import { KNOWLEDGE_CATEGORIES } from "@/lib/mock/data";
+import { KNOWLEDGE_CATEGORIES, type QuestionType } from "@/lib/mock/data";
 import {
   PRACTICE_TYPE_OPTIONS,
   countAvailableQuestions,
   type PracticeDifficulty,
 } from "@/lib/mock/practice-filter";
-import type { QuestionType } from "@/lib/mock/data";
-import { PageHeader } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 
 const searchSchema = z.object({
@@ -26,43 +26,18 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/training/practice")({
   validateSearch: searchSchema,
   component: PracticePage,
-  head: () => ({ meta: [{ title: "专项练习 · 题库训练" }] }),
+  head: () => ({ meta: [{ title: "专项练习 · 训练中心" }] }),
 });
 
-function ToggleGroup<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (v: T) => void;
-  options: { k: T; l: string }[];
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => (
-        <button
-          key={o.k}
-          type="button"
-          onClick={() => onChange(o.k)}
-          className={cn(
-            "rounded-lg border px-4 py-2 text-[12.5px] transition-colors",
-            value === o.k
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-border bg-background hover:border-primary/40",
-          )}
-        >
-          {o.l}
-        </button>
-      ))}
-    </div>
-  );
-}
+const DIFFICULTY_LABEL: Record<PracticeDifficulty, string> = {
+  all: "全部",
+  easy: "基础",
+  hard: "进阶",
+};
 
 function PracticePage() {
   const navigate = useNavigate();
   const { filters: prefill } = Route.useSearch();
-
   const [selectedCats, setSelectedCats] = useState<Set<string>>(() => {
     if (prefill) return new Set(prefill.split(",").filter(Boolean));
     return new Set(["AGC"]);
@@ -75,39 +50,38 @@ function PracticePage() {
 
   const categoryKeys = useMemo(() => Array.from(selectedCats), [selectedCats]);
   const types = useMemo(() => Array.from(selectedTypes), [selectedTypes]);
-
+  const selectedCategories = KNOWLEDGE_CATEGORIES.filter((item) => selectedCats.has(item.key));
+  const selectedLabels = selectedCategories.map((item) => item.label);
   const available = useMemo(
     () => countAvailableQuestions({ categoryKeys, types, diff }),
     [categoryKeys, types, diff],
   );
-
   const canStart = selectedCats.size > 0 && selectedTypes.size > 0 && available > 0;
   const actualCount = Math.min(count, available);
 
-  const toggleCat = (key: string) => {
-    setSelectedCats((prev) => {
-      const n = new Set(prev);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
+  const toggleCategory = (key: string) => {
+    setSelectedCats((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
   };
 
   const toggleType = (key: QuestionType) => {
-    setSelectedTypes((prev) => {
-      const n = new Set(prev);
-      if (n.has(key)) n.delete(key);
-      else n.add(key);
-      return n;
+    setSelectedTypes((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
   };
 
   const start = () => {
     if (!canStart) return;
-    const sessionId = `专项练习-${Date.now()}`;
     navigate({
       to: "/training/session/$id",
-      params: { id: sessionId },
+      params: { id: `专项练习-${Date.now()}` },
       search: {
         mode: "practice",
         filter: "",
@@ -116,170 +90,280 @@ function PracticePage() {
         diff,
         count: actualCount,
         limit: 0,
+        title: `${selectedLabels.slice(0, 2).join("与")}专项练习`,
       },
     });
   };
 
-  const selectedLabels = KNOWLEDGE_CATEGORIES.filter((c) => selectedCats.has(c.key)).map(
-    (c) => c.label,
-  );
-
   return (
-    <PageShell>
-      <nav aria-label="页面导航" className="mb-2 flex items-center gap-1 text-[12px]">
-        <Link
-          to="/training"
-          className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          题库训练
-        </Link>
-        <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
-        <span className="text-foreground/70">专项练习</span>
-      </nav>
+    <PageShell compact>
+      <div className="flex h-full min-h-0 flex-col">
+        <nav aria-label="页面导航" className="mb-1 flex shrink-0 items-center text-[12px]">
+          <Link
+            to="/training"
+            className="inline-flex min-h-8 items-center gap-1 text-kb-muted hover:text-primary"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" /> 训练中心
+          </Link>
+        </nav>
 
-      <PageHeader
-        title="专项练习"
-        subtitle="按知识点自由组卷，支持多专项、多题型与难度筛选"
-        size="md"
-      />
-
-      <div className="grid gap-5 lg:grid-cols-3 lg:items-stretch">
-        <section className="rounded-lg border border-border bg-card p-5 lg:col-span-2">
-          <div className="mb-3 text-[13px] font-semibold">1 · 选择知识点（可多选）</div>
-          <div className="grid max-h-[min(28rem,55vh)] gap-2.5 overflow-y-auto pr-1 sm:grid-cols-2">
-            {KNOWLEDGE_CATEGORIES.map((c) => {
-              const active = selectedCats.has(c.key);
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => toggleCat(c.key)}
-                  className={cn(
-                    "rounded-lg border p-3 text-left transition-all",
-                    active
-                      ? "border-primary bg-primary-soft shadow-[var(--shadow-card)]"
-                      : "border-border bg-background hover:-translate-y-0.5 hover:border-primary/40",
-                  )}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-[13.5px] font-medium leading-snug">{c.label}</div>
-                    <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10.5px] tabular-nums text-muted-foreground">
-                      {c.questionCount} 题
-                    </span>
-                  </div>
-                  <div className="mt-1 line-clamp-2 text-[11.5px] text-muted-foreground">{c.desc}</div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 mb-3 text-[13px] font-semibold">2 · 题型（可多选）</div>
-          <div className="flex flex-wrap gap-2">
-            {PRACTICE_TYPE_OPTIONS.map((t) => {
-              const active = selectedTypes.has(t.key);
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => toggleType(t.key)}
-                  className={cn(
-                    "rounded-lg border px-3 py-1.5 text-[12.5px] transition-colors",
-                    active
-                      ? "border-primary bg-primary-soft text-primary"
-                      : "border-border hover:border-primary/40",
-                  )}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 mb-3 text-[13px] font-semibold">3 · 难度</div>
-          <ToggleGroup
-            value={diff}
-            onChange={setDiff}
-            options={[
-              { k: "all" as const, l: "全部" },
-              { k: "easy" as const, l: "基础" },
-              { k: "hard" as const, l: "进阶" },
-            ]}
+        <div className="shrink-0">
+          <PageHeader
+            title="专项练习"
+            subtitle="选择需要强化的知识点与练习规则，提交后可逐题查看答案解析。"
+            size="md"
           />
+        </div>
 
-          <div className="mt-6 mb-3 text-[13px] font-semibold">4 · 题量</div>
-          <div className="flex flex-wrap items-center gap-2">
-            {[5, 10, 15, 20].map((n) => (
+        <div className="grid min-h-0 flex-1 items-stretch gap-5 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_350px] xl:overflow-hidden">
+          <main className="min-h-0 min-w-0">
+            <section className="flex h-full min-h-[560px] flex-col overflow-hidden rounded-[18px] border border-kb-border bg-white shadow-[0_12px_36px_rgba(25,69,78,0.04)] xl:min-h-0">
+              <div className="flex shrink-0 items-center gap-3 border-b border-divider px-5 py-4">
+                <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-kb-surface text-primary">
+                  <SlidersHorizontal className="h-[18px] w-[18px]" />
+                </span>
+                <div>
+                  <h2 className="text-[16px] font-semibold text-kb-heading">练习设置</h2>
+                  <p className="mt-0.5 text-[11.5px] text-kb-muted">
+                    所有条件在一个页面内完成，右侧练习方案会实时更新。
+                  </p>
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 divide-y divide-divider overflow-y-auto px-5 sm:px-6">
+                <SettingSection
+                  index="01"
+                  title="练习范围"
+                  description={`已选 ${selectedLabels.length} 个知识点，可抽取 ${available.toLocaleString()} 道题。`}
+                >
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {KNOWLEDGE_CATEGORIES.map((category) => {
+                      const active = selectedCats.has(category.key);
+                      return (
+                        <button
+                          key={category.key}
+                          type="button"
+                          onClick={() => toggleCategory(category.key)}
+                          aria-pressed={active}
+                          className={cn(
+                            "flex min-h-12 items-center justify-between gap-3 rounded-[9px] border px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
+                            active
+                              ? "border-primary/35 bg-primary-soft/60 text-primary"
+                              : "border-kb-border bg-white text-kb-body hover:border-primary/25",
+                          )}
+                        >
+                          <span className="truncate text-[12.5px] font-medium">
+                            {category.label}
+                          </span>
+                          <span className="shrink-0 text-[10.5px] tabular-nums text-kb-muted">
+                            {category.questionCount} 题
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </SettingSection>
+
+                <SettingSection
+                  index="02"
+                  title="题型与难度"
+                  description="按训练目标选择题型，并设置基础、全部或进阶难度。"
+                >
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+                    <div>
+                      <div className="mb-2 text-[11px] font-medium text-kb-muted">
+                        题型（可多选）
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {PRACTICE_TYPE_OPTIONS.map((item) => (
+                          <ChoiceButton
+                            key={item.key}
+                            active={selectedTypes.has(item.key)}
+                            onClick={() => toggleType(item.key)}
+                            label={item.label}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-2 text-[11px] font-medium text-kb-muted">难度</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(["all", "easy", "hard"] as PracticeDifficulty[]).map((value) => (
+                          <ChoiceButton
+                            key={value}
+                            active={diff === value}
+                            onClick={() => setDiff(value)}
+                            label={DIFFICULTY_LABEL[value]}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </SettingSection>
+
+                <SettingSection
+                  index="03"
+                  title="练习题量"
+                  description="建议选择一次可以专注完成的题量，练习中可随时退出。"
+                >
+                  <div className="flex flex-wrap gap-2">
+                    {[5, 10, 15, 20].map((value) => (
+                      <ChoiceButton
+                        key={value}
+                        active={count === value}
+                        onClick={() => setCount(value)}
+                        label={`${value} 题`}
+                      />
+                    ))}
+                  </div>
+                </SettingSection>
+              </div>
+            </section>
+          </main>
+
+          <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+            <section className="relative flex min-h-[360px] flex-1 flex-col overflow-hidden rounded-[18px] border border-kb-border bg-white p-5 shadow-[0_14px_34px_rgba(25,69,78,0.055)]">
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-[62%] bg-[radial-gradient(circle_at_80%_20%,rgba(52,155,172,.12),transparent_62%)]" />
+              <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full border-[22px] border-primary/[0.04]" />
+              <div className="relative flex items-center gap-2 text-[11.5px] font-semibold text-primary">
+                <Layers3 className="h-4 w-4" /> 实时练习预览
+              </div>
+              <h2 className="relative mt-3 text-[19px] font-semibold leading-7 text-kb-heading">
+                {selectedLabels.length
+                  ? `${selectedLabels.slice(0, 2).join("与")}专项练习`
+                  : "待配置练习"}
+              </h2>
+
+              <div className="relative mt-5 grid grid-cols-3 gap-2">
+                <PreviewMetric value={`${actualCount || 0}`} label="题" />
+                <PreviewMetric value={`${types.length}`} label="种题型" />
+                <PreviewMetric value={`${available}`} label="可抽取" />
+              </div>
+
+              <dl className="relative mt-5 space-y-3 border-t border-divider pt-4 text-[11.5px]">
+                <PreviewRow
+                  label="知识点"
+                  value={selectedLabels.length ? selectedLabels.join("、") : "未选择"}
+                />
+                <PreviewRow label="难度" value={DIFFICULTY_LABEL[diff]} />
+                <PreviewRow
+                  label="题型"
+                  value={
+                    types.length
+                      ? types
+                          .map(
+                            (type) =>
+                              PRACTICE_TYPE_OPTIONS.find((item) => item.key === type)?.label,
+                          )
+                          .filter(Boolean)
+                          .join("、")
+                      : "未选择"
+                  }
+                />
+              </dl>
+
+              <div className="relative mt-auto pt-5">
+                <div className="rounded-[10px] border border-primary/10 bg-[#f7fbfb] p-3 text-[10.5px] leading-5 text-kb-muted">
+                  当前条件可生成 {available} 道练习题，本次随机抽取 {actualCount || 0} 道。
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[16px] border border-kb-border bg-[linear-gradient(145deg,#ffffff,#f5fafb)] p-5">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-primary-soft text-primary">
+                  <BookOpenCheck className="h-[18px] w-[18px]" />
+                </span>
+                <div>
+                  <h3 className="text-[13.5px] font-semibold text-kb-heading">
+                    即时练习，提交后看解析
+                  </h3>
+                  <p className="mt-1 text-[11.5px] leading-5 text-kb-muted">
+                    不计入考试成绩，可反复练习；错题会自动进入错题本。
+                  </p>
+                </div>
+              </div>
               <button
-                key={n}
                 type="button"
-                onClick={() => setCount(n)}
-                className={cn(
-                  "rounded-lg border px-4 py-2 text-[12.5px] transition-colors",
-                  count === n
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary/40",
-                )}
+                disabled={!canStart}
+                onClick={start}
+                className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[10px] bg-primary text-[13.5px] font-semibold text-white transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {n} 题
+                <Target className="h-4 w-4" /> 开始专项练习 <ArrowRight className="h-4 w-4" />
               </button>
-            ))}
-          </div>
-        </section>
-
-        <aside className="flex flex-col gap-4">
-          <div className="rounded-lg border border-border bg-card p-5">
-            <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold">
-              <Layers className="h-4 w-4 text-primary" /> 组卷预览
-            </div>
-            <dl className="space-y-2 text-[12.5px]">
-              <div>
-                <dt className="text-muted-foreground">知识点</dt>
-                <dd className="mt-0.5 font-medium">
-                  {selectedLabels.length > 0 ? selectedLabels.join("、") : "未选择"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">题型</dt>
-                <dd className="mt-0.5 font-medium">
-                  {types.length > 0
-                    ? types.map((t) => PRACTICE_TYPE_OPTIONS.find((o) => o.key === t)?.label).join("、")
-                    : "未选择"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">难度</dt>
-                <dd className="mt-0.5 font-medium">
-                  {{ all: "全部", easy: "基础", hard: "进阶" }[diff]}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">可抽题数</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold text-primary">{available}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">本次练习</dt>
-                <dd className="mt-0.5 font-medium">{canStart ? `${actualCount} 题` : "—"}</dd>
-              </div>
-            </dl>
-            <button
-              type="button"
-              disabled={!canStart}
-              onClick={start}
-              className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-[13px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
-            >
-              <Target className="h-4 w-4" /> 开始专项练习
-            </button>
-          </div>
-
-          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 text-[12px] text-muted-foreground">
-            <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
-              <BookOpenCheck className="h-3.5 w-3.5" /> 提示
-            </div>
-            可同时选择多个知识点专项组合练习；提交后错题自动进入错题本。
-          </div>
-        </aside>
+            </section>
+          </aside>
+        </div>
       </div>
     </PageShell>
+  );
+}
+
+function SettingSection({
+  index,
+  title,
+  description,
+  children,
+}: {
+  index: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid gap-4 py-5 lg:grid-cols-[210px_minmax(0,1fr)]">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 text-[10.5px] font-semibold text-primary">{index}</span>
+        <div>
+          <h3 className="text-[13.5px] font-semibold text-kb-heading">{title}</h3>
+          <p className="mt-1 text-[11px] leading-5 text-kb-muted">{description}</p>
+        </div>
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  );
+}
+
+function ChoiceButton({
+  active,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "min-h-10 rounded-[8px] border px-3.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
+        active
+          ? "border-primary/35 bg-primary-soft text-primary"
+          : "border-kb-border bg-white text-kb-body hover:border-primary/30",
+      )}
+    >
+      {label}
+    </button>
+  );
+}
+
+function PreviewMetric({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="rounded-[10px] border border-kb-border bg-white px-2 py-3 text-center">
+      <strong className="block text-[20px] tabular-nums text-kb-heading">{value}</strong>
+      <span className="text-[10px] text-kb-muted">{label}</span>
+    </div>
+  );
+}
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <dt className="shrink-0 text-kb-muted">{label}</dt>
+      <dd className="text-right leading-5 text-kb-heading">{value}</dd>
+    </div>
   );
 }

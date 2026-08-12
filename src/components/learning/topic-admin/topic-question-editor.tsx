@@ -114,12 +114,13 @@ export function resolveTopicQuestion(
 function QuestionEditForm({
   question,
   onChange,
-  compact,
+  variant = "dialog",
 }: {
   question: EditableTopicQuestion;
   onChange: (q: EditableTopicQuestion) => void;
-  compact?: boolean;
+  variant?: "dialog" | "paper";
 }) {
+  const paper = variant === "paper";
   const hasOptions = question.type === "single" || question.type === "multiple";
   const isJudge = question.type === "judge";
   const isMulti = question.type === "multiple";
@@ -175,14 +176,25 @@ function QuestionEditForm({
       : [];
 
   return (
-    <div className={cn("space-y-4", compact && "space-y-3")}>
+    <div className={cn("space-y-4", paper && "space-y-5")}>
       <div>
-        <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">题干</label>
+        <label
+          className={cn(
+            "mb-1.5 block text-[12px] font-medium text-muted-foreground",
+            paper && "text-[11px] tracking-wide",
+          )}
+        >
+          题干
+        </label>
         <textarea
           value={question.stem}
           onChange={(e) => onChange({ ...question, stem: e.target.value })}
-          rows={compact ? 2 : 3}
-          className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          rows={paper ? 2 : 3}
+          className={cn(
+            "w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            paper &&
+              "min-h-[68px] border-kb-border bg-[#fbfcfc] px-4 py-3 text-[14px] font-medium leading-6 text-kb-heading focus-visible:border-primary focus-visible:ring-primary/15",
+          )}
         />
       </div>
 
@@ -203,7 +215,7 @@ function QuestionEditForm({
               </button>
             )}
           </div>
-          <ul className="space-y-2">
+          <ul className={cn("space-y-2", paper && "space-y-1.5")}>
             {options.map((opt) => {
               const isAnswer = answerKeys.includes(opt.key);
               return (
@@ -212,7 +224,7 @@ function QuestionEditForm({
                     type="button"
                     onClick={() => toggleAnswer(opt.key)}
                     className={cn(
-                      "grid h-5 w-5 shrink-0 place-items-center border text-[10px] font-semibold transition-colors",
+                      "grid h-5 w-5 shrink-0 place-items-center border text-[10px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
                       isMulti ? "rounded-[3px]" : "rounded-full",
                       isAnswer
                         ? "border-primary bg-primary text-primary-foreground"
@@ -225,7 +237,11 @@ function QuestionEditForm({
                   <Input
                     value={opt.label}
                     onChange={(e) => updateOption(opt.key, e.target.value)}
-                    className="h-8 flex-1 text-[12.5px]"
+                    className={cn(
+                      "h-8 flex-1 text-[12.5px]",
+                      paper &&
+                        "h-10 border-transparent bg-[#f4f8f9] px-3 text-[13px] shadow-none hover:border-primary/20 focus-visible:border-primary/35 focus-visible:bg-white",
+                    )}
                     placeholder={`选项 ${opt.key}`}
                   />
                   {isMulti && options.length > 2 && (
@@ -244,13 +260,17 @@ function QuestionEditForm({
         </div>
       )}
 
-      <div>
+      <div className={cn(paper && "border-t border-dashed border-divider pt-4")}>
         <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">解析</label>
         <textarea
           value={question.analysis}
           onChange={(e) => onChange({ ...question, analysis: e.target.value })}
           rows={2}
-          className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[12.5px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={cn(
+            "w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[12.5px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            paper &&
+              "min-h-[56px] border-transparent bg-primary-soft/20 px-4 py-2.5 leading-5 focus-visible:border-primary/25 focus-visible:bg-white focus-visible:ring-primary/10",
+          )}
         />
       </div>
     </div>
@@ -280,9 +300,7 @@ function QuestionListRow({
           <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
             {TYPE_LABEL[question.type]}
           </span>
-          {question.confirmed && (
-            <span className="text-[10px] text-success">已确认</span>
-          )}
+          {question.confirmed && <span className="text-[10px] text-success">已确认</span>}
         </div>
         <p className="line-clamp-2 text-[13px] leading-snug text-foreground">{question.stem}</p>
       </div>
@@ -301,16 +319,24 @@ function PaperQuestionBlock({
   onChange: (q: EditableTopicQuestion) => void;
 }) {
   return (
-    <article className="rounded-lg border border-divider p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="grid h-7 w-7 place-items-center rounded-md bg-primary-soft text-[12px] font-bold text-primary">
-          {index}
+    <article className="px-5 py-5 sm:px-6">
+      <div className="mb-4 flex items-center gap-2.5">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold tabular-nums text-white">
+          {String(index).padStart(2, "0")}
         </span>
-        <span className="rounded-md bg-muted px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground">
+        <span className="rounded-[4px] bg-kb-surface px-2 py-1 text-[10.5px] font-medium text-kb-muted">
           {TYPE_LABEL[question.type]}
         </span>
+        <span
+          className={cn(
+            "ml-auto text-[10.5px]",
+            question.confirmed ? "text-success" : "text-kb-muted",
+          )}
+        >
+          {question.confirmed ? "已确认" : "待确认"}
+        </span>
       </div>
-      <QuestionEditForm question={question} onChange={onChange} compact />
+      <QuestionEditForm question={question} onChange={onChange} variant="paper" />
     </article>
   );
 }
@@ -338,7 +364,12 @@ export function TopicQuestionEditorPanel({
   const [dialogDraft, setDialogDraft] = useState<EditableTopicQuestion | null>(null);
 
   const allQuestions = useMemo(() => {
-    const items: { docId: string; docTitle: string; question: EditableTopicQuestion; globalIndex: number }[] = [];
+    const items: {
+      docId: string;
+      docTitle: string;
+      question: EditableTopicQuestion;
+      globalIndex: number;
+    }[] = [];
     let n = 0;
     docIds.forEach((docId) => {
       const doc = DOCS.find((d) => d.id === docId);
@@ -436,7 +467,9 @@ export function TopicQuestionEditorPanel({
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <BookOpen className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="truncate text-[13.5px] font-medium">{doc?.title ?? docId}</span>
+                    <span className="truncate text-[13.5px] font-medium">
+                      {doc?.title ?? docId}
+                    </span>
                     <span className="shrink-0 text-[11px] text-muted-foreground">
                       {docItems.length} 道题
                     </span>
@@ -494,19 +527,25 @@ export function TopicQuestionEditorPanel({
           })}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-5">
           {docIds.map((docId) => {
             const doc = DOCS.find((d) => d.id === docId);
             const dq = docQuestions.find((d) => d.docId === docId);
             const docItems = allQuestions.filter((item) => item.docId === docId);
 
             return (
-              <section key={docId}>
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-divider pb-2">
+              <section
+                key={docId}
+                className="overflow-hidden rounded-[12px] border border-kb-border bg-white shadow-[0_12px_30px_rgba(22,74,84,0.04)]"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-kb-border bg-[#f8fafb] px-5 py-3.5 sm:px-6">
                   <div className="flex items-center gap-2">
+                    <span className="h-5 w-1 rounded-full bg-primary" aria-hidden="true" />
                     <FileText className="h-4 w-4 text-primary" />
-                    <h3 className="text-[14px] font-semibold text-foreground">{doc?.title ?? docId}</h3>
-                    <span className="text-[11px] text-muted-foreground">{docItems.length} 题</span>
+                    <h3 className="text-[14px] font-semibold text-kb-heading">
+                      {doc?.title ?? docId}
+                    </h3>
+                    <span className="text-[11px] text-kb-muted">共 {docItems.length} 题</span>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -534,7 +573,7 @@ export function TopicQuestionEditorPanel({
                 {docItems.length === 0 ? (
                   <p className="py-6 text-center text-[12px] text-muted-foreground">暂无题目</p>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="divide-y divide-divider">
                     {docItems.map((item) => (
                       <PaperQuestionBlock
                         key={item.question.id}

@@ -1,17 +1,11 @@
 import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import {
-  PAPERS,
-  getAggregatesForPaper,
-  type Paper,
-} from "@/lib/mock/examAdmin";
+import { PAPERS, getAggregatesForPaper, type Paper } from "@/lib/mock/examAdmin";
 import { cn } from "@/lib/utils";
-import { Search, Send, Sparkles, Plus, Pencil, Eye, ChevronRight } from "lucide-react";
+import { Search, Send, Pencil, Eye, ChevronRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 type ExamSplitViewProps = {
-  onGenerate: () => void;
-  onNew: () => void;
   onEdit: (p: Paper) => void;
   onAssign: (p: Paper) => void;
   onPreview: (p: Paper) => void;
@@ -50,30 +44,28 @@ function recordStatusTag(status: string) {
 const PERSON_TABLE_COLS =
   "grid grid-cols-[minmax(64px,1fr)_minmax(72px,1fr)_minmax(64px,0.9fr)_68px_52px_60px_56px_64px] items-center gap-2";
 
-export function ExamSplitView({
-  onGenerate,
-  onNew,
-  onEdit,
-  onAssign,
-  onPreview,
-}: ExamSplitViewProps) {
+export function ExamSplitView({ onEdit, onAssign, onPreview }: ExamSplitViewProps) {
   const [keyword, setKeyword] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | Paper["status"]>("all");
+  const [timeFilter, setTimeFilter] = useState("all");
   const [selectedId, setSelectedId] = useState(PAPERS[0]?.id ?? "");
 
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
-    if (!kw) return PAPERS;
-    return PAPERS.filter((p) =>
-      [p.name, p.category, p.goal, p.status].some((f) => f.toLowerCase().includes(kw)),
-    );
-  }, [keyword]);
+    return PAPERS.filter((p) => {
+      if (statusFilter !== "all" && p.status !== statusFilter) return false;
+      if (timeFilter === "month" && !p.createdAt.includes("2026-06")) return false;
+      if (!kw) return true;
+      return [p.name, p.category, p.goal, p.status].some((f) => f.toLowerCase().includes(kw));
+    });
+  }, [keyword, statusFilter, timeFilter]);
 
   const selected = PAPERS.find((p) => p.id === selectedId) ?? filtered[0];
   const aggregates = selected ? getAggregatesForPaper(selected.id) : [];
   const rate = selected ? finishRate(selected) : null;
 
   return (
-    <div className="flex h-[calc(100vh-220px)] min-h-[520px] flex-col gap-3">
+    <div className="flex h-[calc(100vh-300px)] min-h-[520px] flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-[200px] flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -84,26 +76,32 @@ export function ExamSplitView({
             className="h-8 pl-8 text-[12px]"
           />
         </div>
-        <button
-          type="button"
-          onClick={onGenerate}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+        <select
+          value={statusFilter}
+          onChange={(event) => setStatusFilter(event.target.value as "all" | Paper["status"])}
+          className="h-8 rounded-md border border-border bg-white px-2.5 text-[12px] text-muted-foreground"
+          aria-label="考试状态"
         >
-          <Sparkles className="h-3.5 w-3.5" /> 智能组卷
-        </button>
-        <button
-          type="button"
-          onClick={onNew}
-          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border px-3 text-[12.5px] hover:bg-muted"
+          <option value="all">全部状态</option>
+          <option value="草稿">草稿</option>
+          <option value="已下发">已下发</option>
+          <option value="已结束">已结束</option>
+        </select>
+        <select
+          value={timeFilter}
+          onChange={(event) => setTimeFilter(event.target.value)}
+          className="h-8 rounded-md border border-border bg-white px-2.5 text-[12px] text-muted-foreground"
+          aria-label="创建时间"
         >
-          <Plus className="h-3.5 w-3.5" /> 新建试卷
-        </button>
+          <option value="all">全部时间</option>
+          <option value="month">本月创建</option>
+        </select>
       </div>
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(280px,340px)_1fr]">
         <div className="flex flex-col overflow-hidden rounded-lg border border-border bg-card">
           <div className="border-b border-[#EDF3F5] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#425B66]">
-            历次考试（{filtered.length}）
+            考试列表（{filtered.length}）
           </div>
           <div className="scrollbar-thin flex-1 overflow-y-auto bg-white">
             {filtered.map((p) => {
@@ -133,9 +131,7 @@ export function ExamSplitView({
                     >
                       {p.status}
                     </span>
-                    <span className="text-[12px] text-[#607681]">
-                      参与 {p.assigned ?? 0} 人
-                    </span>
+                    <span className="text-[12px] text-[#607681]">参与 {p.assigned ?? 0} 人</span>
                     <span className="text-[12px] text-[#607681]">{p.questionCount} 题</span>
                   </div>
                   <div className="mt-2 text-[11px] text-[#91A3AA]">创建 {p.createdAt}</div>
@@ -153,19 +149,42 @@ export function ExamSplitView({
                   <div className="min-w-0">
                     <h3 className="text-[15px] font-semibold">{selected.name}</h3>
                     <p className="mt-0.5 text-[12px] text-muted-foreground">
-                      {selected.goal} · {selected.category} · {selected.duration} 分钟 · {selected.status}
+                      {selected.goal} · {selected.category} · {selected.duration} 分钟 ·{" "}
+                      {selected.status}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-3 text-[12px]">
                       <StatPill label="参与" value={`${selected.assigned} 人`} />
-                      <StatPill label="完成" value={`${selected.finished} 人${rate != null ? ` (${rate}%)` : ""}`} />
-                      <StatPill label="平均正确率" value={selected.avgCorrect ? `${selected.avgCorrect}%` : "—"} highlight />
-                      <StatPill label="平均分" value={selected.avgScore ? `${selected.avgScore} 分` : "—"} />
-                      <StatPill label="平均用时" value={selected.avgDuration ? `${selected.avgDuration} 分` : "—"} />
+                      <StatPill
+                        label="完成"
+                        value={`${selected.finished} 人${rate != null ? ` (${rate}%)` : ""}`}
+                      />
+                      <StatPill
+                        label="平均正确率"
+                        value={selected.avgCorrect ? `${selected.avgCorrect}%` : "—"}
+                        highlight
+                      />
+                      <StatPill
+                        label="平均分"
+                        value={selected.avgScore ? `${selected.avgScore} 分` : "—"}
+                      />
+                      <StatPill
+                        label="平均用时"
+                        value={selected.avgDuration ? `${selected.avgDuration} 分` : "—"}
+                      />
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    <ActionBtn icon={Pencil} label="编辑" onClick={() => onEdit(selected)} primary />
-                    <ActionBtn icon={Send} label="下发" onClick={() => onAssign(selected)} />
+                    <ActionBtn
+                      icon={Pencil}
+                      label="编辑"
+                      onClick={() => onEdit(selected)}
+                      primary
+                    />
+                    <ActionBtn
+                      icon={Send}
+                      label={selected.status === "已下发" ? "查看下发" : "下发考试"}
+                      onClick={() => onAssign(selected)}
+                    />
                     <ActionBtn icon={Eye} label="预览" onClick={() => onPreview(selected)} />
                   </div>
                 </div>
@@ -261,9 +280,22 @@ export function ExamSplitView({
   );
 }
 
-function StatPill({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function StatPill({
+  label,
+  value,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+}) {
   return (
-    <span className={cn("rounded-md px-2 py-0.5", highlight ? "bg-primary-soft text-primary" : "bg-muted/60 text-foreground")}>
+    <span
+      className={cn(
+        "rounded-md px-2 py-0.5",
+        highlight ? "bg-primary-soft text-primary" : "bg-muted/60 text-foreground",
+      )}
+    >
       {label} <strong>{value}</strong>
     </span>
   );
@@ -286,7 +318,9 @@ function ActionBtn({
       onClick={onClick}
       className={cn(
         "inline-flex h-8 items-center gap-1 rounded-md px-2.5 text-[12px] font-medium",
-        primary ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:bg-muted",
+        primary
+          ? "bg-primary text-primary-foreground hover:bg-primary/90"
+          : "border border-border hover:bg-muted",
       )}
     >
       <Icon className="h-3.5 w-3.5" /> {label}

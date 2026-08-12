@@ -1,9 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { BookOpen, ClipboardList, Layers, Users } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
 import { TopicAdminSplitView } from "@/components/learning/topic-admin/topic-admin-split-view";
-import { PageHeader, OverviewStatCard, ModulePanel } from "@/components/learning/ui";
-import { TOPIC_ADMIN_STATS, type TopicAdminRecord } from "@/lib/mock/topicAdmin";
+import { PageHeader } from "@/components/learning/ui";
+import { type TopicAdminRecord } from "@/lib/mock/topicAdmin";
 
 export const Route = createFileRoute("/learn-admin/")({
   component: LearnAdminIndexPage,
@@ -14,13 +13,6 @@ export const Route = createFileRoute("/learn-admin/")({
     ],
   }),
 });
-
-const STAT_ICONS: Record<string, React.ReactNode> = {
-  total: <Layers className="h-[18px] w-[18px]" />,
-  published: <BookOpen className="h-[18px] w-[18px]" />,
-  draft: <ClipboardList className="h-[18px] w-[18px]" />,
-  learners: <Users className="h-[18px] w-[18px]" />,
-};
 
 function LearnAdminIndexPage() {
   const navigate = useNavigate();
@@ -45,33 +37,18 @@ function LearnAdminIndexPage() {
   };
 
   return (
-    <PageShell>
-      <PageHeader
-        title="专题维护"
-        subtitle="围绕岗位能力与业务场景组织精品学习资料，维护知识点与文档关联题目后发布。"
-        size="md"
-      />
+    <PageShell compact>
+      <div className="flex h-full min-h-0 w-full flex-col">
+        <PageHeader
+          title="专题维护"
+          subtitle="组织学习内容、核对练习覆盖，并在同一个工作台完成发布交付。"
+          size="md"
+        />
 
-      <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-        {TOPIC_ADMIN_STATS.map((s, i) => (
-          <OverviewStatCard
-            key={s.key}
-            label={s.label}
-            value={s.value}
-            hint={s.hint}
-            detail={s.detail}
-            icon={STAT_ICONS[s.key]}
-            tint={i}
-            emphasis={s.tone === "warning" ? "remind" : "primary"}
-          />
-        ))}
-      </section>
-
-      <ModulePanel>
-        <div className="p-4">
+        <div className="min-h-0 flex-1 overflow-y-auto xl:overflow-hidden">
           <TopicAdminSplitView onNew={handleNew} onEdit={handleEdit} onPreview={handlePreview} />
         </div>
-      </ModulePanel>
+      </div>
     </PageShell>
   );
 }

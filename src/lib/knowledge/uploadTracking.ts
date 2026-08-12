@@ -472,14 +472,14 @@ export interface UploadActionItem {
 
 // 复用的原子操作（标签尽量四字）
 const A = {
-  withdraw: { kind: "withdraw", label: "撤回申请", icon: RotateCcw } as UploadActionItem,
+  withdraw: { kind: "withdraw", label: "撤回审核", icon: RotateCcw } as UploadActionItem,
   preview: { kind: "preview", label: "预览文件", icon: Eye } as UploadActionItem,
   viewFile: { kind: "preview", label: "查看文件", icon: Eye } as UploadActionItem,
   submitDetail: { kind: "submitDetail", label: "提交详情", icon: Info } as UploadActionItem,
   detail: { kind: "detail", label: "查看详情", icon: Info } as UploadActionItem,
   rejectReason: { kind: "reason", label: "驳回原因", icon: Info } as UploadActionItem,
   errorReason: { kind: "reason", label: "异常原因", icon: Info } as UploadActionItem,
-  delete: { kind: "delete", label: "删除记录", icon: Trash2, danger: true } as UploadActionItem,
+  delete: { kind: "delete", label: "删除文件", icon: Trash2, danger: true } as UploadActionItem,
   progress: { kind: "progress", label: "解析进度", icon: RefreshCw } as UploadActionItem,
   terminate: { kind: "terminate", label: "终止解析", icon: Square } as UploadActionItem,
   startParse: { kind: "startParse", label: "开始解析", icon: RefreshCw } as UploadActionItem,
@@ -525,7 +525,7 @@ export function getTrackingActions(view: UploadView, record: UploadRecord): Uplo
       case "PENDING":
         return mark([A.withdraw]);
       case "REJECTED":
-        return mark([A.rejectReason]);
+        return mark([A.rejectReason, A.delete]);
       default:
         return mark([A.viewFile]);
     }
@@ -562,7 +562,7 @@ export function getTrackingActions(view: UploadView, record: UploadRecord): Uplo
     case "reviewPending":
       return mark([A.withdraw, A.preview]);
     case "reviewRejected":
-      return mark([A.rejectReason, A.preview]);
+      return mark([A.rejectReason, A.delete]);
     case "parseWaiting":
       return mark([A.startParse]);
     case "parseProcessing":

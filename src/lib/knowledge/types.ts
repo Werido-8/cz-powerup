@@ -125,6 +125,7 @@ export interface KnowledgeFile {
   pinned?: boolean;
   /** 按知识库元数据字段存储的值 */
   metadata?: Record<string, string | string[]>;
+  lastAccessedAt?: string;
   /** 演示用全文检索内容 */
   fullTextContent?: string;
 }
@@ -191,6 +192,15 @@ export interface PermissionRequest {
 
 export type ApprovalStatus = "pendingApproval" | "approved" | "rejected" | "parsing";
 
+/** 审批台入库来源：直传 / 个人库移入 */
+export type UploadSourceType = "direct" | "move";
+
+/** 审批台内容复核状态 */
+export type ContentConfirmStatus = "confirmed" | "unconfirmed";
+
+/** 文件移动（移入公共/专业库）审批状态 */
+export type FileMoveApprovalStatus = "pendingMove" | "approved" | "rejected";
+
 export type KnowledgeExerciseType = "single" | "multiple" | "judge";
 
 export interface KnowledgeExerciseOption {
@@ -217,6 +227,8 @@ export interface UploadApproval {
   fileName: string;
   knowledgeBaseName: string;
   knowledgeBaseId?: string;
+  /** 关联文件 ID（撤回删除、移入入库时使用） */
+  fileId?: string;
   submitterName: string;
   submittedAt: string;
   fileSize?: string;
@@ -224,6 +236,10 @@ export interface UploadApproval {
   riskHint?: string;
   status?: ApprovalStatus;
   parseStatus?: KnowledgeParseStatus;
+  /** 上传类型：文件直传 / 文件移动 */
+  uploadType?: UploadSourceType;
+  /** 内容确认状态：管理员是否已完成 AI 内容复核 */
+  contentConfirmStatus?: ContentConfirmStatus;
   reviewerName?: string;
   reviewedAt?: string;
   reviewNote?: string;
@@ -238,6 +254,24 @@ export interface UploadApproval {
   aiAnswers?: string[];
   aiExercises?: KnowledgeExercise[];
   categoryId?: string;
+}
+
+/** 审批台「文件移动列表」：个人库移入公共/专业库的第一步审批 */
+export interface FileMoveApproval {
+  id: string;
+  fileId: string;
+  fileName: string;
+  sourceKnowledgeBaseId: string;
+  sourceKnowledgeBaseName: string;
+  targetKnowledgeBaseId: string;
+  targetKnowledgeBaseName: string;
+  submitterName: string;
+  submittedAt: string;
+  fileSize?: string;
+  status: FileMoveApprovalStatus;
+  rejectReason?: string;
+  reviewerName?: string;
+  reviewedAt?: string;
 }
 
 export interface ParseException {

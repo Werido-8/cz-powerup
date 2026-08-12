@@ -1,4 +1,10 @@
-import type { FilePublishStatus, KnowledgeParseStatus } from "./types";
+import type {
+  ApprovalStatus,
+  ContentConfirmStatus,
+  FilePublishStatus,
+  KnowledgeParseStatus,
+  UploadSourceType,
+} from "./types";
 
 export type KnowledgeStatusTone = "neutral" | "accent" | "success" | "warning" | "danger";
 
@@ -52,6 +58,38 @@ export function approvalStatusTone(status: FilePublishStatus): KnowledgeStatusTo
   if (status === "parsing" || status === "parseFailed") return "accent";
   if (status === "disabled") return "danger";
   return "neutral";
+}
+
+/** 审批台入库列表「审核状态」：移动类型在待内容审时回显「批准移入」 */
+export function uploadApprovalReviewLabel(
+  status: ApprovalStatus | undefined,
+  uploadType?: UploadSourceType,
+) {
+  if (status === "approved") return "已通过";
+  if (status === "rejected") return "已驳回";
+  if (status === "parsing") return "解析中";
+  if (uploadType === "move") return "批准移入";
+  return "待审批";
+}
+
+export function uploadApprovalReviewTone(
+  status: ApprovalStatus | undefined,
+): KnowledgeStatusTone {
+  if (status === "approved") return "success";
+  if (status === "rejected") return "danger";
+  return "warning";
+}
+
+export function uploadSourceTypeLabel(type?: UploadSourceType) {
+  return type === "move" ? "文件移动" : "文件直传";
+}
+
+export function contentConfirmStatusLabel(status?: ContentConfirmStatus) {
+  return status === "confirmed" ? "已确认" : "未确认";
+}
+
+export function contentConfirmStatusTone(status?: ContentConfirmStatus): KnowledgeStatusTone {
+  return status === "confirmed" ? "success" : "warning";
 }
 
 export function parseStatusLabel(status?: KnowledgeParseStatus) {

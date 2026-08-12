@@ -26,10 +26,10 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/exam")({
   component: ExamPage,
-  head: () => ({ meta: [{ title: "我的考试 · 题库训练" }] }),
+  head: () => ({ meta: [{ title: "正式考试 · 训练中心" }] }),
 });
 
-type ExamGoal = "取证复习" | "复证巩固" | "岗位达标" | "阶段测评" | "日常自测";
+type ExamGoal = "取证复习" | "复证巩固" | "岗位达标" | "阶段测评" | "个人组卷";
 type ExamStatus = "未开始" | "已提交";
 
 interface PastAttempt {
@@ -135,13 +135,13 @@ const PAPERS: EmployeePaper[] = [
     ],
   },
   {
-    id: "新员工-日常自测卷",
-    title: "新员工基础日常自测",
+    id: "新员工-个人组卷",
+    title: "新员工基础个人测评",
     count: 30,
     limit: 45,
     weight: "基础",
     level: "易",
-    goal: "日常自测",
+    goal: "个人组卷",
     status: "未开始",
     assignedAt: "2026-05-28",
     history: [],
@@ -198,7 +198,7 @@ const PAPERS: EmployeePaper[] = [
     limit: 40,
     weight: "继保",
     level: "中",
-    goal: "日常自测",
+    goal: "个人组卷",
     status: "未开始",
     assignedAt: "2026-06-09",
     history: [],
@@ -278,12 +278,12 @@ const PAPERS: EmployeePaper[] = [
   },
   {
     id: "两票三制-日常卷",
-    title: "两票三制与现场安全日常测评",
+    title: "两票三制与现场安全个人测评",
     count: 25,
     limit: 30,
     weight: "安全",
     level: "易",
-    goal: "日常自测",
+    goal: "个人组卷",
     status: "未开始",
     assignedAt: "2026-06-02",
     history: [],
@@ -338,12 +338,12 @@ const PAPERS: EmployeePaper[] = [
   },
   {
     id: "运行规程-日常卷",
-    title: "运行规程与两票三制日常自测",
+    title: "运行规程与两票三制个人考试",
     count: 20,
     limit: 30,
     weight: "规程",
     level: "易",
-    goal: "日常自测",
+    goal: "个人组卷",
     status: "已提交",
     assignedAt: "2026-05-25",
     latestResultId: "exam-规程-20260525",
@@ -371,7 +371,14 @@ const PAPERS: EmployeePaper[] = [
   },
 ];
 
-const GOALS: (ExamGoal | "全部")[] = ["全部", "取证复习", "复证巩固", "岗位达标", "阶段测评", "日常自测"];
+const GOALS: (ExamGoal | "全部")[] = [
+  "全部",
+  "取证复习",
+  "复证巩固",
+  "岗位达标",
+  "阶段测评",
+  "个人组卷",
+];
 const STATUSES: (ExamStatus | "全部")[] = ["全部", "未开始", "已提交"];
 
 /** 左右栏固定高度（非 min-h），内容超出在内部滚动 */
@@ -406,27 +413,29 @@ function ExamPage() {
   const [from, setFrom] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  const officialPapers = useMemo(() => PAPERS.filter((p) => p.goal !== "个人组卷"), []);
   const filtered = useMemo(() => {
-    return PAPERS.filter((p) => {
+    return officialPapers.filter((p) => {
       if (kw && !p.title.includes(kw)) return false;
       if (goal !== "全部" && p.goal !== goal) return false;
       if (status !== "全部" && p.status !== status) return false;
       if (from && p.assignedAt < from) return false;
       return true;
     });
-  }, [kw, goal, status, from]);
+  }, [officialPapers, kw, goal, status, from]);
 
-  const paper = PAPERS.find((p) => p.id === picked) ?? PAPERS[0];
+  const paper = filtered.find((p) => p.id === picked) ?? filtered[0] ?? officialPapers[0];
   const bestScore = paper.history.reduce<number | null>((max, h) => {
     if (h.score == null) return max;
     return max == null ? h.score : Math.max(max, h.score);
   }, null);
-  const latestResultId = paper.latestResultId ?? paper.history.find((h) => h.status === "已提交")?.resultId;
+  const latestResultId =
+    paper.latestResultId ?? paper.history.find((h) => h.status === "已提交")?.resultId;
 
   const start = () => {
     navigate({
       to: "/training/session/$id",
-      params: { id: `我的考试-${paper.id}` },
+      params: { id: `正式考试-${paper.id}` },
       search: { mode: "exam", filter: "", count: paper.count, limit: paper.limit },
     });
   };
@@ -441,19 +450,23 @@ function ExamPage() {
           className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-primary"
         >
           <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          题库训练
+          训练中心
         </Link>
         <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
-        <span className="text-foreground/70">我的考试</span>
+        <span className="text-foreground/70">正式考试</span>
       </nav>
       <PageHeader
-        title="我的考试"
-        subtitle="培训负责人下发的考试，默认展示待完成与最新下发。"
+        title="正式考试"
+        subtitle="查看单位下发的考试安排、参加考试并回顾已提交答卷"
         size="md"
       />
-
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
-        <section className={cn("flex flex-col overflow-hidden rounded-lg border border-border bg-card", PANEL_H)}>
+        <section
+          className={cn(
+            "flex flex-col overflow-hidden rounded-lg border border-border bg-card",
+            PANEL_H,
+          )}
+        >
           {/* filter toolbar */}
           <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2.5 border-b border-border bg-muted/20 px-4 py-2.5">
             <div className="flex h-8 w-44 items-center gap-2 rounded-md border border-border bg-card px-2.5 transition-colors focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/15">
@@ -478,7 +491,7 @@ function ExamPage() {
                 onChange={(e) => setGoal(e.target.value as ExamGoal | "全部")}
                 className={cn(selectClass, "min-w-[96px]")}
               >
-                {GOALS.map((g) => (
+                {GOALS.filter((item) => item !== "个人组卷").map((g) => (
                   <option key={g} value={g}>
                     {g}
                   </option>
@@ -512,130 +525,159 @@ function ExamPage() {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-            <div className="mb-3 shrink-0 text-[13px] font-semibold">我的考试 ({filtered.length})</div>
+            <div className="mb-3 shrink-0 text-[13px] font-semibold">
+              下发的正式考试 ({filtered.length})
+            </div>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
               <div className="space-y-2">
-              {filtered.length === 0 && (
-                <div className="rounded-md border border-dashed border-border px-4 py-10 text-center text-[12px] text-muted-foreground">
-                  没有符合条件的考试
-                </div>
-              )}
-              {filtered.map((p) => {
-                const active = p.id === picked;
-                const open = expanded === p.id;
-                return (
-                  <div key={p.id}>
-                    <button
-                      type="button"
-                      onClick={() => setPicked(p.id)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors",
-                        active
-                          ? "border-primary/50 bg-primary-soft/60"
-                          : "border-border/80 bg-background hover:border-primary/30 hover:bg-muted/30",
-                      )}
-                    >
-                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
-                        <ClipboardList className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[13.5px] font-medium">{p.title}</span>
-                          <span className={cn("rounded px-1.5 py-px text-[10px] font-medium", statusPill(p.status))}>
-                            {p.status}
-                          </span>
+                {filtered.length === 0 && (
+                  <div className="rounded-md border border-dashed border-border px-4 py-10 text-center text-[12px] text-muted-foreground">
+                    没有符合条件的正式考试
+                  </div>
+                )}
+                {filtered.map((p) => {
+                  const active = p.id === picked;
+                  const open = expanded === p.id;
+                  return (
+                    <div key={p.id}>
+                      <button
+                        type="button"
+                        onClick={() => setPicked(p.id)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors",
+                          active
+                            ? "border-primary/50 bg-primary-soft/60"
+                            : "border-border/80 bg-background hover:border-primary/30 hover:bg-muted/30",
+                        )}
+                      >
+                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
+                          <ClipboardList className="h-4 w-4" />
                         </div>
-                        <ExamCardMeta goal={p.goal} count={p.count} limit={p.limit} assignedAt={p.assignedAt} />
-                        {p.history.length > 0 && (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExpanded(open ? null : p.id);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[13.5px] font-medium">{p.title}</span>
+                            <span
+                              className={cn(
+                                "rounded px-1.5 py-px text-[10px] font-medium",
+                                statusPill(p.status),
+                              )}
+                            >
+                              {p.status}
+                            </span>
+                          </div>
+                          <ExamCardMeta
+                            goal={p.goal}
+                            count={p.count}
+                            limit={p.limit}
+                            assignedAt={p.assignedAt}
+                            dateVerb="下发"
+                          />
+                          {p.history.length > 0 && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
                                 e.stopPropagation();
                                 setExpanded(open ? null : p.id);
-                              }
-                            }}
-                            className="mt-1.5 inline-flex items-center gap-1 rounded border border-border/80 bg-card px-1.5 py-px text-[10.5px] text-primary hover:bg-muted"
-                          >
-                            <History className="h-3 w-3" />
-                            历史作答 {p.history.length} 次
-                            {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                          </span>
-                        )}
-                      </div>
-                      <ChevronRight
-                        className={cn("h-3.5 w-3.5 shrink-0", active ? "text-primary" : "text-muted-foreground/60")}
-                      />
-                    </button>
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.stopPropagation();
+                                  setExpanded(open ? null : p.id);
+                                }
+                              }}
+                              className="mt-1.5 inline-flex items-center gap-1 rounded border border-border/80 bg-card px-1.5 py-px text-[10.5px] text-primary hover:bg-muted"
+                            >
+                              <History className="h-3 w-3" />
+                              历史作答 {p.history.length} 次
+                              {open ? (
+                                <ChevronUp className="h-3 w-3" />
+                              ) : (
+                                <ChevronDown className="h-3 w-3" />
+                              )}
+                            </span>
+                          )}
+                        </div>
+                        <ChevronRight
+                          className={cn(
+                            "h-3.5 w-3.5 shrink-0",
+                            active ? "text-primary" : "text-muted-foreground/60",
+                          )}
+                        />
+                      </button>
 
-                    {open && p.history.length > 0 && (
-                      <div className="ml-12 mt-1 overflow-hidden rounded-md border border-border/80">
-                        <table className="w-full text-[11.5px]">
-                          <thead className="bg-muted/40 text-[10.5px] text-muted-foreground">
-                            <tr>
-                              <th className="px-2.5 py-1.5 text-left font-normal">下发时间</th>
-                              <th className="px-2.5 py-1.5 text-left font-normal">提交时间</th>
-                              <th className="px-2.5 py-1.5 text-left font-normal">分数</th>
-                              <th className="px-2.5 py-1.5 text-right font-normal">操作</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {p.history.map((h) => (
-                              <tr key={h.resultId} className="border-t border-border/60">
-                                <td className="px-2.5 py-1.5">{h.assignedAt}</td>
-                                <td className="px-2.5 py-1.5">{h.submittedAt ?? "—"}</td>
-                                <td className="px-2.5 py-1.5 font-medium tabular-nums">{h.score ?? "—"}</td>
-                                <td className="px-2.5 py-1.5 text-right">
-                                  {h.status === "已提交" && (
-                                    <Link
-                                      to="/training/result/$id"
-                                      params={{ id: h.resultId }}
-                                      onClick={(e) => e.stopPropagation()}
-                                      className={listActionClass("textPrimary")}
-                                    >
-                                      <FileSearch className="h-3 w-3" />
-                                      查看详情
-                                    </Link>
-                                  )}
-                                </td>
+                      {open && p.history.length > 0 && (
+                        <div className="ml-12 mt-1 overflow-hidden rounded-md border border-border/80">
+                          <table className="w-full text-[11.5px]">
+                            <thead className="bg-muted/40 text-[10.5px] text-muted-foreground">
+                              <tr>
+                                <th className="px-2.5 py-1.5 text-left font-normal">下发时间</th>
+                                <th className="px-2.5 py-1.5 text-left font-normal">提交时间</th>
+                                <th className="px-2.5 py-1.5 text-left font-normal">分数</th>
+                                <th className="px-2.5 py-1.5 text-right font-normal">操作</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                            </thead>
+                            <tbody>
+                              {p.history.map((h) => (
+                                <tr key={h.resultId} className="border-t border-border/60">
+                                  <td className="px-2.5 py-1.5">{h.assignedAt}</td>
+                                  <td className="px-2.5 py-1.5">{h.submittedAt ?? "-"}</td>
+                                  <td className="px-2.5 py-1.5 font-medium tabular-nums">
+                                    {h.score ?? "-"}
+                                  </td>
+                                  <td className="px-2.5 py-1.5 text-right">
+                                    {h.status === "已提交" && (
+                                      <Link
+                                        to="/training/result/$id"
+                                        params={{ id: h.resultId }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={listActionClass("textPrimary")}
+                                      >
+                                        <FileSearch className="h-3 w-3" />
+                                        查看详情
+                                      </Link>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             <div className="mt-4 shrink-0 rounded-md border border-warning/25 bg-warning-soft/30 p-3.5">
               <div className="mb-1.5 inline-flex items-center gap-1.5 text-[12px] font-medium text-warning-foreground">
                 <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                考试须知
+                正式考试须知
               </div>
               <ul className="space-y-0.5 pl-4 text-[11.5px] leading-relaxed text-warning-foreground/85 [&>li]:list-disc">
-                <li>试卷限时，超时自动提交；中途可暂停查看题号但计时不停。</li>
-                <li>支持单选 / 多选 / 判断 / 简答四类题型，提交前可回看修改。</li>
-                <li>本次结果仅作为培训自评，不替代正式上岗考核。</li>
+                <li>正式考试由培训负责人下发，请在规定时间内完成。</li>
+                <li>试卷限时，超时自动提交，提交前可回看修改。</li>
+                <li>考试成绩与作答记录会保留在正式考试档案中。</li>
               </ul>
             </div>
           </div>
         </section>
 
-        <aside className={cn("flex flex-col overflow-hidden rounded-lg border border-border bg-card", PANEL_H)}>
+        <aside
+          className={cn(
+            "flex flex-col overflow-hidden rounded-lg border border-border bg-card",
+            PANEL_H,
+          )}
+        >
           <div className="shrink-0 rounded-t-lg bg-gradient-to-br from-primary to-[oklch(0.5_0.13_205)] px-4 py-4 text-white">
             <div className="inline-flex items-center gap-1.5 text-[11px] opacity-90">
               <Award className="h-3.5 w-3.5" />
               试卷预览
             </div>
-            <div className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug">{paper.title}</div>
+            <div className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug">
+              {paper.title}
+            </div>
             <div className="mt-4 grid grid-cols-3 gap-2">
               <PreviewCell n={paper.count} l="题量" />
               <PreviewCell n={paper.limit} l="分钟" />
@@ -647,7 +689,12 @@ function ExamPage() {
             <div className="mb-2.5 text-[11px] font-medium text-muted-foreground">试卷信息</div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-[11.5px]">
               <MetaItem icon={Target} label="考试目标" value={paper.goal} />
-              <MetaItem icon={BarChart3} label="难度" value={paper.level} valueClass={levelTone(paper.level)} />
+              <MetaItem
+                icon={BarChart3}
+                label="难度"
+                value={paper.level}
+                valueClass={levelTone(paper.level)}
+              />
               <MetaItem icon={FileText} label="知识权重" value={paper.weight} />
               <MetaItem icon={Clock} label="下发时间" value={paper.assignedAt} />
             </dl>
@@ -686,7 +733,11 @@ function ExamPage() {
               <TypeBar label="单选题" count={Math.round(paper.count * 0.45)} total={paper.count} />
               <TypeBar label="多选题" count={Math.round(paper.count * 0.2)} total={paper.count} />
               <TypeBar label="判断题" count={Math.round(paper.count * 0.2)} total={paper.count} />
-              <TypeBar label="简答题" count={paper.count - Math.round(paper.count * 0.85)} total={paper.count} />
+              <TypeBar
+                label="简答题"
+                count={paper.count - Math.round(paper.count * 0.85)}
+                total={paper.count}
+              />
             </div>
           </div>
 
@@ -727,11 +778,13 @@ function ExamCardMeta({
   count,
   limit,
   assignedAt,
+  dateVerb,
 }: {
   goal: string;
   count: number;
   limit: number;
   assignedAt: string;
+  dateVerb: "下发" | "创建";
 }) {
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-1">
@@ -744,7 +797,9 @@ function ExamCardMeta({
       <MetaChip icon={Clock}>
         <span className="tabular-nums">{limit}</span> 分钟
       </MetaChip>
-      <MetaChip icon={Calendar}>下发 {assignedAt}</MetaChip>
+      <MetaChip icon={Calendar}>
+        {dateVerb} {assignedAt}
+      </MetaChip>
     </div>
   );
 }
@@ -797,7 +852,9 @@ function TypeBar({ label, count, total }: { label: string; count: number; total:
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full bg-primary/60" style={{ width: `${pct}%` }} />
       </div>
-      <span className="w-8 shrink-0 text-right text-[10.5px] tabular-nums text-muted-foreground">{count} 题</span>
+      <span className="w-8 shrink-0 text-right text-[10.5px] tabular-nums text-muted-foreground">
+        {count} 题
+      </span>
     </div>
   );
 }

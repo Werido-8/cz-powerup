@@ -23,15 +23,15 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/records")({
   component: PracticeRecordsPage,
-  head: () => ({ meta: [{ title: "练习记录 · 题库训练" }] }),
+  head: () => ({ meta: [{ title: "练习记录 · 训练中心" }] }),
 });
 
 const SOURCE_OPTIONS = [
   { value: "all", label: "全部来源" },
   { value: "专项练习", label: "专项练习" },
   { value: "错题本", label: "错题本" },
-  { value: "模拟考试", label: "模拟考试" },
-  { value: "考试", label: "考试" },
+  { value: "模拟考试", label: "自主组卷" },
+  { value: "考试", label: "正式考试" },
 ];
 
 function matchSource(record: PracticeRecord, filter: string) {
@@ -69,18 +69,13 @@ function PracticeRecordsPage() {
           className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-primary"
         >
           <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          题库训练
+          训练中心
         </Link>
         <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
         <span className="text-foreground/70">练习记录</span>
       </nav>
 
-      <PageHeader
-        title="练习记录"
-        subtitle="查看历次练习与考试结果，支持再练一次"
-        size="md"
-      />
-
+      <PageHeader title="练习记录" subtitle="查看历次练习与考试结果，支持再练一次" size="md" />
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <PillSelect options={SOURCE_OPTIONS} value={sourceFilter} onChange={handleSourceChange} />
         <span className="text-[12px] text-muted-foreground">共 {filtered.length} 条记录</span>
@@ -120,10 +115,20 @@ function PracticeRecordsPage() {
                 {pageRecords.map((r) => (
                   <RecordRow
                     key={r.id}
-                    cells={[r.title, r.source, r.completedAt, `${r.accuracy}%`, `错题 ${r.wrongCount}`]}
+                    cells={[
+                      r.title,
+                      r.source,
+                      r.completedAt,
+                      `${r.accuracy}%`,
+                      `错题 ${r.wrongCount}`,
+                    ]}
                     actions={
                       <>
-                        <Link to="/training/result/$id" params={{ id: r.id }} className={listActionClass()}>
+                        <Link
+                          to="/training/result/$id"
+                          params={{ id: r.id }}
+                          className={listActionClass()}
+                        >
                           <FileSearch className="h-3.5 w-3.5" />
                           查看结果
                         </Link>

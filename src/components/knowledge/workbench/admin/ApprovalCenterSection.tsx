@@ -1,4 +1,4 @@
-import { Check, ClipboardCheck, FileText, FileUp, ShieldCheck, X } from "lucide-react";
+import { Check, ClipboardCheck, FileText, FileUp, FolderInput, ShieldCheck, X } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
@@ -18,13 +18,21 @@ import {
 } from "@/components/knowledge/ui";
 import { PERMISSION_REQUESTS } from "@/lib/knowledge/data";
 import {
+  uploadApprovalReviewLabel,
+  uploadApprovalReviewTone,
+  uploadSourceTypeLabel,
+} from "@/lib/knowledge/status";
+import {
+  approveStoreFileMove,
   getKnowledgeStoreServerSnapshot,
   getKnowledgeStoreVersion,
+  getStoreFileMoveApprovals,
   getStoreUploadApprovals,
+  rejectStoreFileMove,
   subscribeKnowledgeStore,
 } from "@/lib/knowledge/store";
 import type {
-  ApprovalStatus,
+  FileMoveApproval,
   KnowledgeBase,
   PermissionRequest,
   UploadApproval,
@@ -34,47 +42,38 @@ import { FileListCheckbox } from "../FileListCheckbox";
 import { useFileSelection } from "../useFileSelection";
 import { ApprovalListToolbar } from "./ApprovalListToolbar";
 
-type ApprovalTab = "uploads" | "permissions";
+type ApprovalTab = "moves" | "uploads" | "permissions";
 
 const APPROVAL_TABS: {
   key: ApprovalTab;
   label: string;
-  desc: string;
   icon: typeof FileUp;
 }[] = [
   {
+    key: "moves",
+    label: "文件移动",
+    icon: FolderInput,
+  },
+  {
     key: "uploads",
     label: "文件入库",
-    desc: "专业/公共库解析完成后审核文件与 AI 内容（不含个人库确认）",
     icon: FileUp,
   },
   {
     key: "permissions",
     label: "权限申请",
-    desc: "处理访问权限与库管理权限申请",
     icon: ShieldCheck,
   },
 ];
 
+const MOVE_GRID =
+  "grid-cols-[minmax(220px,1.3fr)_minmax(130px,0.9fr)_minmax(130px,0.9fr)_100px_140px_minmax(200px,auto)] min-w-[1020px]";
+
 const UPLOAD_GRID =
-  "grid-cols-[minmax(240px,1.4fr)_minmax(150px,1fr)_100px_108px_108px_120px_96px] min-w-[980px]";
+  "grid-cols-[minmax(220px,1.3fr)_minmax(140px,0.95fr)_90px_96px_100px_108px_120px_96px] min-w-[1080px]";
 
 const PERMISSION_GRID =
   "grid-cols-[36px_120px_minmax(200px,1.2fr)_minmax(200px,1fr)_100px_minmax(180px,auto)] min-w-[860px]";
-
-function approvalStatusLabel(status?: ApprovalStatus) {
-  if (status === "parsing") return "解析中";
-  if (status === "approved") return "已通过";
-  if (status === "rejected") return "已驳回";
-  return "待审批";
-}
-
-function approvalStatusTone(status?: ApprovalStatus) {
-  if (status === "parsing") return "warning" as const;
-  if (status === "approved") return "success" as const;
-  if (status === "rejected") return "danger" as const;
-  return "warning" as const;
-}
 
 function parseApprovalStatusLabel() {
   return "解析完成";
@@ -94,8 +93,9 @@ export function ApprovalCenterSection({
     getKnowledgeStoreServerSnapshot,
   );
   const manageableIds = new Set(manageableBases.map((base) => base.id));
-  const [tab, setTab] = useState<ApprovalTab>("uploads");
+  const [tab, setTab] = useState<ApprovalTab>("moves");
   const uploadItems = getStoreUploadApprovals();
+  const moveItems = getStoreFileMoveApprovals().filter((item) => item.status === "pendingMove");
   const [permissionItems, setPermissionItems] = useState(() =>
     PERMISSION_REQUESTS.filter((request) => manageableIds.has(request.knowledgeBaseId)),
   );
@@ -103,6 +103,9 @@ export function ApprovalCenterSection({
   const [fileQuery, setFileQuery] = useState("");
   const [submitterFilter, setSubmitterFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("pendingApproval");
+  const [uploadTypeFilter, setUploadTypeFilter] = useState("all");
+  const [moveQuery, setMoveQuery] = useState("");
+  const [moveSubmitterFilter, setMoveSubmitterFilter] = useState("all");
   const [permissionQuery, setPermissionQuery] = useState("");
   const [applicantFilter, setApplicantFilter] = useState("all");
   const [permissionBaseFilter, setPermissionBaseFilter] = useState("all");
@@ -116,6 +119,11 @@ export function ApprovalCenterSection({
     return [{ value: "all", label: "全部提交人" }, ...names.map((n) => ({ value: n, label: n }))];
   }, [uploadItems]);
 
+  const moveSubmitterOptions = useMemo(() => {
+    const names = Array.from(new Set(moveItems.map((item) => item.submitterName)));
+    return [{ value: "all", label: "全部提交人" }, ...names.map((n) => ({ value: n, label: n }))];
+  }, [moveItems]);
+
   const applicantOptions = useMemo(() => {
     const names = Array.from(new Set(permissionItems.map((item) => item.applicantName)));
     return [{ value: "all", label: "全部申请人" }, ...names.map((n) => ({ value: n, label: n }))];
@@ -126,6 +134,22 @@ export function ApprovalCenterSection({
     return [{ value: "all", label: "全部知识库" }, ...bases.map((n) => ({ value: n, label: n }))];
   }, [permissionItems]);
 
+  const filteredMoveItems = useMemo(() => {
+    const q = moveQuery.trim().toLowerCase();
+    return moveItems
+      .filter((item) => {
+        if (moveSubmitterFilter !== "all" && item.submitterName !== moveSubmitterFilter) return false;
+        if (!q) return true;
+        return (
+          item.fileName.toLowerCase().includes(q) ||
+          item.targetKnowledgeBaseName.toLowerCase().includes(q) ||
+          item.sourceKnowledgeBaseName.toLowerCase().includes(q) ||
+          item.submitterName.toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  }, [moveItems, moveQuery, moveSubmitterFilter]);
+
   const filteredUploadItems = useMemo(() => {
     const q = fileQuery.trim().toLowerCase();
     return uploadItems
@@ -133,6 +157,8 @@ export function ApprovalCenterSection({
         if (submitterFilter !== "all" && item.submitterName !== submitterFilter) return false;
         const status = item.status ?? "pendingApproval";
         if (statusFilter !== "all" && status !== statusFilter) return false;
+        const uploadType = item.uploadType ?? "direct";
+        if (uploadTypeFilter !== "all" && uploadType !== uploadTypeFilter) return false;
         if (!q) return true;
         return (
           item.fileName.toLowerCase().includes(q) ||
@@ -146,7 +172,7 @@ export function ApprovalCenterSection({
         if (aPending !== bPending) return aPending ? -1 : 1;
         return b.submittedAt.localeCompare(a.submittedAt);
       });
-  }, [fileQuery, statusFilter, submitterFilter, uploadItems]);
+  }, [fileQuery, statusFilter, submitterFilter, uploadItems, uploadTypeFilter]);
 
   const filteredPermissionItems = useMemo(() => {
     const q = permissionQuery.trim().toLowerCase();
@@ -162,16 +188,44 @@ export function ApprovalCenterSection({
     });
   }, [applicantFilter, permissionBaseFilter, permissionItems, permissionQuery]);
 
-  const currentItems = tab === "uploads" ? filteredUploadItems : filteredPermissionItems;
+  const currentItems =
+    tab === "moves"
+      ? filteredMoveItems
+      : tab === "uploads"
+        ? filteredUploadItems
+        : filteredPermissionItems;
   const filteredIds = useMemo(() => currentItems.map((item) => item.id), [currentItems]);
 
   useEffect(() => {
     setPage(1);
-  }, [tab, fileQuery, submitterFilter, statusFilter, permissionQuery, applicantFilter, permissionBaseFilter, pageSize]);
+  }, [
+    tab,
+    fileQuery,
+    submitterFilter,
+    statusFilter,
+    uploadTypeFilter,
+    moveQuery,
+    moveSubmitterFilter,
+    permissionQuery,
+    applicantFilter,
+    permissionBaseFilter,
+    pageSize,
+  ]);
 
   useEffect(() => {
     selection.clear();
-  }, [tab, fileQuery, submitterFilter, statusFilter, permissionQuery, applicantFilter, permissionBaseFilter]);
+  }, [
+    tab,
+    fileQuery,
+    submitterFilter,
+    statusFilter,
+    uploadTypeFilter,
+    moveQuery,
+    moveSubmitterFilter,
+    permissionQuery,
+    applicantFilter,
+    permissionBaseFilter,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(currentItems.length / pageSize) || 1);
   const safePage = Math.min(page, totalPages);
@@ -231,8 +285,36 @@ export function ApprovalCenterSection({
     }
   }, [removeSelected, selection.selectedArray]);
 
+  const handleApproveMove = useCallback((id: string, fileName: string) => {
+    approveStoreFileMove(id);
+    toast.success(`已批准「${fileName}」移入，将重新解析后进入入库审批`);
+  }, []);
+
+  const handleRejectMove = useCallback((id: string, fileName: string) => {
+    const reason =
+      typeof window !== "undefined" ? window.prompt(`请输入驳回「${fileName}」移入的原因`) : "";
+    if (!reason?.trim()) return;
+    rejectStoreFileMove(id, reason.trim());
+    toast.success(`已驳回「${fileName}」移入申请`);
+  }, []);
+
   const filterBar =
-    tab === "uploads" ? (
+    tab === "moves" ? (
+      <div className="flex flex-wrap items-center gap-2 border-b border-[#E8F0F2] px-4 py-3">
+        <SearchInput
+          value={moveQuery}
+          onChange={setMoveQuery}
+          placeholder="搜索文件名 / 目标库 / 提交人"
+          className="h-9 min-w-[200px] max-w-[280px] flex-1 !rounded-[8px] py-0"
+        />
+        <KbFilterPills
+          label="提交人"
+          value={moveSubmitterFilter}
+          onChange={setMoveSubmitterFilter}
+          options={moveSubmitterOptions}
+        />
+      </div>
+    ) : tab === "uploads" ? (
       <div className="flex flex-wrap items-center gap-2 border-b border-[#E8F0F2] px-4 py-3">
         <SearchInput
           value={fileQuery}
@@ -245,6 +327,16 @@ export function ApprovalCenterSection({
           value={submitterFilter}
           onChange={setSubmitterFilter}
           options={submitterOptions}
+        />
+        <KbFilterPills
+          label="上传类型"
+          value={uploadTypeFilter}
+          onChange={setUploadTypeFilter}
+          options={[
+            { value: "all", label: "全部类型" },
+            { value: "direct", label: "文件直传" },
+            { value: "move", label: "文件移动" },
+          ]}
         />
         <KbFilterPills
           label="状态"
@@ -292,7 +384,6 @@ export function ApprovalCenterSection({
         <div role="tablist" aria-label="审批台" className="flex items-center gap-1">
           {APPROVAL_TABS.map((item) => {
             const active = tab === item.key;
-            const count = item.key === "uploads" ? uploadItems.length : permissionItems.length;
             return (
               <button
                 key={item.key}
@@ -309,16 +400,6 @@ export function ApprovalCenterSection({
               >
                 <item.icon className="h-3.5 w-3.5 stroke-[1.8]" />
                 {item.label}
-                {count > 0 && (
-                  <span
-                    className={cn(
-                      "min-w-4 rounded-full px-1.5 py-px text-center text-[10px] leading-4",
-                      active ? "bg-primary-soft text-primary" : "bg-muted text-kb-muted",
-                    )}
-                  >
-                    {count}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -332,14 +413,7 @@ export function ApprovalCenterSection({
 
       {filterBar}
 
-
-      {tab === "uploads" ? (
-        <div className="flex min-h-[52px] items-center border-b border-divider px-4 py-2.5">
-          <p className="text-[13px] text-muted-foreground">
-            文件已完成解析。点击“审批”进入工作台，核对并修改 AI 生成内容后再提交结果。
-          </p>
-        </div>
-      ) : (
+      {tab === "uploads" ? null : tab === "permissions" ? (
         <ApprovalListToolbar
           selectedCount={selection.selectedCount}
           totalCount={currentItems.length}
@@ -351,12 +425,18 @@ export function ApprovalCenterSection({
           onClearSelection={selection.clear}
           batchLoading={batchLoading}
           entityLabel="条申请"
-          left={<p className="text-[13px] text-muted-foreground">勾选申请后可批量通过或驳回</p>}
+          left={<p className="text-[13px] text-muted-foreground">可批量通过或驳回已勾选申请</p>}
         />
-      )}
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-x-auto">
-        {tab === "uploads" ? (
+        {tab === "moves" ? (
+          <FileMoveApprovalTable
+            items={pagedItems as FileMoveApproval[]}
+            onApprove={handleApproveMove}
+            onReject={handleRejectMove}
+          />
+        ) : tab === "uploads" ? (
           <UploadApprovalTable
             items={pagedItems as UploadApproval[]}
             onReview={(approvalId) =>
@@ -403,7 +483,7 @@ export function ApprovalCenterSection({
       <KbPageHeader
         label="状态流转"
         title="审批台"
-        description="集中处理文件上传审批与权限申请；公共库上传先解析后进入待审。"
+        description="处理文件移入、入库内容确认与权限申请；直传入库为单次审批，移入为两次审批。"
       />
       <div className="mb-4">{tabPanel}</div>
     </KbPageContent>
@@ -411,6 +491,69 @@ export function ApprovalCenterSection({
 }
 
 type SelectionApi = ReturnType<typeof useFileSelection>;
+
+function FileMoveApprovalTable({
+  items,
+  onApprove,
+  onReject,
+}: {
+  items: FileMoveApproval[];
+  onApprove: (id: string, fileName: string) => void;
+  onReject: (id: string, fileName: string) => void;
+}) {
+  return (
+    <KbDataTable
+      variant="flat"
+      minWidth={MOVE_GRID}
+      header={
+        <>
+          <span>文件名</span>
+          <span>原知识库</span>
+          <span>目标知识库</span>
+          <span>提交人</span>
+          <span>提交时间</span>
+          <span className="text-right">操作</span>
+        </>
+      }
+      empty={
+        <KbEmptyState
+          title="暂无文件移动申请"
+          description="个人库文件申请移入专业/公共库后会出现在这里。"
+        />
+      }
+    >
+      {items.map((item) => (
+        <KbDataTableRow key={item.id} variant="flat" className={MOVE_GRID}>
+          <KbTableCellFile
+            name={item.fileName}
+            subtitle={item.fileSize}
+            type={item.fileName.endsWith(".pdf") ? "pdf" : "docx"}
+            size="sm"
+            nameWeight="normal"
+          />
+          <KbTableCellBase name={item.sourceKnowledgeBaseName} />
+          <KbTableCellBase name={item.targetKnowledgeBaseName} />
+          <KbTableCellUser name={item.submitterName} />
+          <span className="text-kb-muted">{item.submittedAt}</span>
+          <span className="flex flex-nowrap items-center justify-end gap-2 whitespace-nowrap" onClick={(event) => event.stopPropagation()}>
+            <KbIconTextButton
+              icon={Check}
+              label="批准移入"
+              variant="primary-text"
+              onClick={() => onApprove(item.id, item.fileName)}
+            />
+            <KbIconTextButton
+              icon={X}
+              label="驳回移入"
+              variant="danger-text"
+              onClick={() => onReject(item.id, item.fileName)}
+            />
+          </span>
+        </KbDataTableRow>
+      ))}
+    </KbDataTable>
+  );
+}
 
 function UploadApprovalTable({
   items,
@@ -428,6 +571,7 @@ function UploadApprovalTable({
           <span>文件名</span>
           <span>归属知识库</span>
           <span>提交人</span>
+          <span>上传类型</span>
           <span>解析状态</span>
           <span>审核状态</span>
           <span>提交时间</span>
@@ -438,6 +582,7 @@ function UploadApprovalTable({
     >
       {items.map((item) => {
         const status = item.status ?? "pendingApproval";
+        const uploadType = item.uploadType ?? "direct";
         return (
           <KbDataTableRow
             key={item.id}
@@ -455,13 +600,18 @@ function UploadApprovalTable({
             <KbTableCellBase name={item.knowledgeBaseName} />
             <KbTableCellUser name={item.submitterName} />
             <span>
+              <KbStatusTag tone={uploadType === "move" ? "accent" : "neutral"} variant="outline">
+                {uploadSourceTypeLabel(uploadType)}
+              </KbStatusTag>
+            </span>
+            <span>
               <KbStatusTag tone="success" variant="outline" dot>
                 {parseApprovalStatusLabel()}
               </KbStatusTag>
             </span>
             <span>
-              <KbStatusTag tone={approvalStatusTone(status)} variant="outline" dot>
-                {approvalStatusLabel(status)}
+              <KbStatusTag tone={uploadApprovalReviewTone(status)} variant="outline" dot>
+                {uploadApprovalReviewLabel(status, uploadType)}
               </KbStatusTag>
             </span>
             <span className="text-kb-muted">{item.submittedAt}</span>
@@ -469,7 +619,7 @@ function UploadApprovalTable({
               <KbIconTextButton
                 icon={status === "pendingApproval" ? ClipboardCheck : FileText}
                 label={status === "pendingApproval" ? "审批" : "查看"}
-                variant={status === "pendingApproval" ? "primary-text" : "default"}
+                variant={status === "pendingApproval" ? "primary-text" : "ghost"}
                 onClick={() => onReview(item.id)}
               />
             </span>

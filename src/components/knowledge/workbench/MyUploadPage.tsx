@@ -57,7 +57,9 @@ import {
   getKnowledgeStoreVersion,
   getStoreFileConfirms,
   getStoreUploadRecords,
+  removeStoreUploadRecord,
   subscribeKnowledgeStore,
+  withdrawStoreUpload,
 } from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeBase, UploadRecord } from "@/lib/knowledge/types";
@@ -232,7 +234,7 @@ export function UploadTrackingPanel({
     const q = searchQuery.trim().toLowerCase();
     return uploadRecords.filter((record) => {
       if (!belongsToView(currentView, record)) return false;
-      if (!matchViewStatus(currentView, record, statusFilter)) return false;
+      if (currentView !== "all" && !matchViewStatus(currentView, record, statusFilter)) return false;
       const base = getBaseById(record.targetKnowledgeBaseId);
       if (categoryFilter !== "all" && base?.categoryId !== categoryFilter) return false;
       if (!q) return true;
@@ -445,17 +447,19 @@ export function UploadTrackingPanel({
                     placeholder="搜索文件名 / 目标知识库"
                     className="min-w-[220px] max-w-[320px] shrink-0"
                   />
-                  <FilterPills
-                    value={statusFilter}
-                    onChange={(v) =>
-                      onSearchChange({
-                        ...search,
-                        status: v === "all" ? undefined : v,
-                      })
-                    }
-                    options={getViewStatusOptions(currentView)}
-                    label={getViewStatusFilterLabel(currentView)}
-                  />
+                  {currentView !== "all" && (
+                    <FilterPills
+                      value={statusFilter}
+                      onChange={(v) =>
+                        onSearchChange({
+                          ...search,
+                          status: v === "all" ? undefined : v,
+                        })
+                      }
+                      options={getViewStatusOptions(currentView)}
+                      label={getViewStatusFilterLabel(currentView)}
+                    />
+                  )}
                   {currentView === "all" && (
                     <FilterPills
                       value={categoryFilter}
@@ -573,7 +577,11 @@ export function UploadTrackingPanel({
       <TrackingActionDialogs
         dialog={actionDialog}
         onClose={() => setActionDialog(null)}
-        onConfirm={(msg) => {
+        onConfirm={(msg, kind, record) => {
+          if (record && (kind === "withdraw" || kind === "delete")) {
+            if (kind === "withdraw") withdrawStoreUpload(record.id);
+            else removeStoreUploadRecord(record.id);
+          }
           toast.success(msg);
           setActionDialog(null);
           setRefreshSeed((v) => v + 1);
@@ -869,20 +877,63 @@ function FilterPills<T extends string>({ value, onChange, options, label }: { va
 
 /* ─── 操作弹框（复用并扩展） ─── */
 
-function TrackingActionDialogs({ dialog, onClose, onConfirm }: { dialog: ActionDialog; onClose: () => void; onConfirm: (msg: string) => void }) {
+function TrackingActionDialogs({
+  dialog,
+  onClose,
+  onConfirm,
+}: {
+  dialog: ActionDialog;
+  onClose: () => void;
+  onConfirm: (msg: string, kind?: UploadActionKind, record?: UploadRecord) => void;
+}) {
   if (!dialog) return null;
   const { record, kind } = dialog;
   const file = getFileById(record.fileId);
 
-  const confirm = (title: string, icon: LucideIcon, desc: ReactNode, label: string, msg: string, danger?: boolean) => (
-    <ConfirmDialog open title={title} titleIcon={icon} fileName={record.fileName} description={desc} confirmLabel={label} danger={danger} onClose={onClose} onConfirm={() => onConfirm(msg)} />
+  const confirm = (
+    title: string,
+    icon: LucideIcon,
+    desc: ReactNode,
+    label: string,
+    msg: string,
+    danger?: boolean,
+  ) => (
+    <ConfirmDialog
+      open
+      title={title}
+      titleIcon={icon}
+      fileName={record.fileName}
+      description={desc}
+      confirmLabel={label}
+      danger={danger}
+      onClose={onClose}
+      onConfirm={() => onConfirm(msg, kind, record)}
+    />
   );
 
   switch (kind) {
     case "withdraw":
-      return confirm("撤回审核申请", RotateCcw, <>撤回后，<strong className="font-medium text-kb-heading">{record.fileName}</strong> 将不再进入审批流程，你可以修改文件信息后重新提交。</>, "确认撤回", "已撤回审核申请");
+      return confirm(
+        "撤回审核",
+        RotateCcw,
+        <>文件将撤回并删除此文件，是否继续？</>,
+        "确认撤回",
+        "已撤回审核并删除文件",
+        true,
+      );
     case "delete":
-      return confirm("删除上传记录", Trash2, <>确定删除 <strong className="font-medium text-kb-heading">{record.fileName}</strong> 的上传记录？删除后不可恢复。</>, "确认删除", "上传记录已删除", true);
+      return confirm(
+        "删除文件",
+        Trash2,
+        <>
+          确定删除已驳回文件{" "}
+          <strong className="font-medium text-kb-heading">{record.fileName}</strong>
+          ？删除后不可恢复。
+        </>,
+        "确认删除",
+        "文件已删除",
+        true,
+      );
     case "terminate":
       return confirm("终止文件解析", Ban, <>终止后，本次解析任务将停止，文件将恢复为待解析状态。</>, "确认终止", "已终止解析");
     case "startParse":

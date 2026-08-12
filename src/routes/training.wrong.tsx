@@ -29,7 +29,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/wrong")({
   component: WrongPage,
-  head: () => ({ meta: [{ title: "错题本 · 题库训练" }] }),
+  head: () => ({ meta: [{ title: "错题本 · 训练中心" }] }),
 });
 
 const TYPE_LABEL: Record<string, string> = {
@@ -80,7 +80,7 @@ function WrongPage() {
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
 
   const drawerDoc = useMemo(
-    () => (drawerDocId ? DOCS.find((d) => d.id === drawerDocId) ?? null : null),
+    () => (drawerDocId ? (DOCS.find((d) => d.id === drawerDocId) ?? null) : null),
     [drawerDocId],
   );
 
@@ -158,7 +158,7 @@ function WrongPage() {
           className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-primary"
         >
           <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          题库训练
+          训练中心
         </Link>
         <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
         <span className="text-foreground/70">错题本</span>
@@ -173,7 +173,12 @@ function WrongPage() {
             <Link
               to="/training/session/$id"
               params={{ id: "错题集中复习" }}
-              search={{ mode: "review", filter: "", count: Math.max(1, state.wrong.length), limit: 0 }}
+              search={{
+                mode: "review",
+                filter: "",
+                count: Math.max(1, state.wrong.length),
+                limit: 0,
+              }}
               className={listActionClass("primary")}
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -182,7 +187,6 @@ function WrongPage() {
           ) : undefined
         }
       />
-
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="flex flex-col gap-3 border-b border-border bg-muted/20 px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center">
           <PillSelect
@@ -217,12 +221,11 @@ function WrongPage() {
                 if (!q) return null;
                 const fav = state.favoriteQuestions.includes(w.qid);
                 const open = expanded === w.qid;
-                const relatedDoc = q.relatedDocId ? DOCS.find((d) => d.id === q.relatedDocId) : undefined;
+                const relatedDoc = q.relatedDocId
+                  ? DOCS.find((d) => d.id === q.relatedDocId)
+                  : undefined;
                 return (
-                  <div
-                    key={w.qid}
-                    className="border-b border-divider px-4 py-3.5 last:border-b-0"
-                  >
+                  <div key={w.qid} className="border-b border-divider px-4 py-3.5 last:border-b-0">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="mb-2 flex flex-wrap items-center gap-1.5">
@@ -239,12 +242,18 @@ function WrongPage() {
                           ))}
                         </div>
 
-                        <div className="text-[13.5px] font-medium leading-snug text-foreground">{q.stem}</div>
+                        <div className="text-[13.5px] font-medium leading-snug text-foreground">
+                          {q.stem}
+                        </div>
 
                         <div className="mt-3 flex flex-wrap items-center gap-4 text-[10.5px] text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
                             <AlertCircle className="h-3 w-3 shrink-0 text-muted-foreground/55" />
-                            错误 <span className="tabular-nums text-foreground/80">{w.wrongCount}</span> 次
+                            错误{" "}
+                            <span className="tabular-nums text-foreground/80">
+                              {w.wrongCount}
+                            </span>{" "}
+                            次
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <Clock className="h-3 w-3 shrink-0 text-muted-foreground/55" />
@@ -260,7 +269,12 @@ function WrongPage() {
                           >
                             <FileSearch className="h-3.5 w-3.5 shrink-0" />
                             {open ? "收起解析" : "查看解析"}
-                            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+                            <ChevronDown
+                              className={cn(
+                                "h-3.5 w-3.5 transition-transform",
+                                open && "rotate-180",
+                              )}
+                            />
                           </button>
 
                           {relatedDoc && (
@@ -358,7 +372,11 @@ function WrongPage() {
 
           <p className="mt-4 text-[11.5px] text-muted-foreground">
             错题由练习与考试答错自动收录；「收藏」会同步至
-            <Link to="/assets" search={{ tab: "fav" }} className="mx-0.5 text-primary hover:underline">
+            <Link
+              to="/assets"
+              search={{ tab: "fav" }}
+              className="mx-0.5 text-primary hover:underline"
+            >
               个人沉淀 · 我的收藏
             </Link>
             。

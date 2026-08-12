@@ -62,6 +62,7 @@ import {
   removeStoreFiles,
   removeStorePersonalDirectory,
   subscribeKnowledgeStore,
+  submitStoreFileMove,
   updateStoreBase,
   updateStoreCategory,
   updateStoreFile,
@@ -310,26 +311,34 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   const handleConfirmMove = (files: KnowledgeFile[], targetBaseId: string) => {
     const targetBase = getBaseById(targetBaseId);
-    const deferred = files.filter((file) =>
+    if (!targetBase) {
+      toast.error("目标知识库不存在");
+      return;
+    }
+    const toSubmit = files.filter((file) =>
       isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
     );
     const movable = files.filter(
       (file) => !isSubmitToPublicMove(file.knowledgeBaseId, targetBaseId),
     );
-    if (deferred.length > 0 && movable.length === 0) {
-      toast.message("跨库移动入库（重解析 + 审批）需求已保留，一期暂不开放");
-      setMoveFiles([]);
-      return;
-    }
     setMoveLoading(true);
+    for (const file of toSubmit) {
+      submitStoreFileMove(file, targetBase);
+    }
     for (const file of movable) {
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
-        knowledgeBaseName: targetBase?.name,
+        knowledgeBaseName: targetBase.name,
       });
     }
     window.setTimeout(() => {
-      toast.success(`已将「${movable[0]?.name}」移动到「${targetBase?.name ?? "目标知识库"}」`);
+      if (toSubmit.length > 0) {
+        toast.success(
+          `已提交「${toSubmit[0]?.name}」移入「${targetBase.name}」的申请，请等待管理员审批`,
+        );
+      } else {
+        toast.success(`已将「${movable[0]?.name}」移动到「${targetBase.name}」`);
+      }
       setMoveLoading(false);
       setMoveFiles([]);
       fileSelection.clear();

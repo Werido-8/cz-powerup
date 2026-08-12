@@ -1,81 +1,79 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, ClipboardCheck, Library, Wand2 } from "lucide-react";
+import { ClipboardCheck, Library } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PageShell } from "@/components/workbench/PageShell";
-import { PageHeader, ModuleTabs, ModulePanel, OverviewStatCard } from "@/components/learning/ui";
 import { ReviewModule } from "@/components/exam/review-module";
 import { BankModule } from "@/components/exam/bank-module";
-import { BANK_OVERVIEW_STATS } from "@/lib/mock/examAdmin";
+import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/learning/ui";
 
 export const Route = createFileRoute("/question-bank")({
   component: QuestionBankPage,
   head: () => ({
     meta: [
       { title: "题库管理 · 涉网运行 AI 训练平台" },
-      { name: "description", content: "题目审核、录入与题库分类维护。" },
+      { name: "description", content: "题目资产分类、来源维护与审核入库。" },
     ],
   }),
 });
 
-type TabKey = "review" | "bank";
+type TabKey = "bank" | "review";
 
-const TABS: { key: TabKey; label: string; icon: typeof Library; desc: string }[] = [
-  { key: "review", label: "题目审核", icon: ClipboardCheck, desc: "待审核题目" },
-  { key: "bank", label: "题库维护", icon: Library, desc: "正式题库资产" },
+const TABS: { key: TabKey; label: string; icon: typeof Library; count: string }[] = [
+  { key: "bank", label: "题库维护", icon: Library, count: "1,842" },
+  { key: "review", label: "审核队列", icon: ClipboardCheck, count: "23" },
 ];
-
-const STAT_ICONS: Record<string, React.ReactNode> = {
-  pending: <ClipboardCheck className="h-[18px] w-[18px]" />,
-  bank: <Library className="h-[18px] w-[18px]" />,
-  active: <CheckCircle2 className="h-[18px] w-[18px]" />,
-  optimize: <Wand2 className="h-[18px] w-[18px]" />,
-};
 
 function QuestionBankPage() {
   const [tab, setTab] = useState<TabKey>("bank");
-
   return (
     <TooltipProvider delayDuration={200}>
       <PageShell>
-        <PageHeader
-          title="题库管理"
-          subtitle="题目录入、审核与分类维护，供多人协同共建题库资产。"
-          size="md"
-        />
-
-        <section className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {BANK_OVERVIEW_STATS.map((s, i) => (
-            <OverviewStatCard
-              key={s.key}
-              label={s.label}
-              value={s.value}
-              hint={s.hint}
-              detail={s.detail}
-              icon={STAT_ICONS[s.key]}
-              tint={i}
-              emphasis={s.tone === "warning" ? "remind" : "primary"}
-            />
-          ))}
-        </section>
-
-        <ModulePanel>
-          <ModuleTabs
-            compact
-            tabs={TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              desc: t.desc,
-              icon: <t.icon className="h-4 w-4" />,
-            }))}
-            value={tab}
-            onChange={setTab}
+        <div className="w-full">
+          <PageHeader
+            title="题库管理"
+            subtitle="维护题目分类、来源与状态；审核通过后进入正式题库。"
+            size="md"
           />
-          <div className="p-4">
-            {tab === "review" && <ReviewModule />}
-            {tab === "bank" && <BankModule />}
+
+          <nav
+            className="mb-4 flex min-h-12 gap-7 border-b border-kb-border"
+            aria-label="题库管理工作区"
+          >
+            {TABS.map((item) => {
+              const active = item.key === tab;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setTab(item.key)}
+                  className={cn(
+                    "relative inline-flex min-h-12 items-center gap-2 text-[13.5px] font-medium transition-colors",
+                    active ? "text-primary" : "text-kb-muted hover:text-kb-heading",
+                  )}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <item.icon className="h-[17px] w-[17px]" />
+                  {item.label}
+                  <span
+                    className={cn(
+                      "rounded-md px-1.5 py-0.5 text-[10.5px] tabular-nums",
+                      active ? "bg-primary-soft text-primary" : "bg-kb-surface text-kb-muted",
+                    )}
+                  >
+                    {item.count}
+                  </span>
+                  {active && <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary" />}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="rounded-[14px] border border-kb-border bg-white p-4 shadow-[0_12px_30px_-24px_rgba(25,72,82,0.28)] md:p-5">
+            {tab === "review" ? <ReviewModule /> : <BankModule />}
           </div>
-        </ModulePanel>
+        </div>
       </PageShell>
     </TooltipProvider>
   );
