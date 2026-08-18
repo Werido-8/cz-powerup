@@ -70,7 +70,7 @@ export const AI_EXAM_DRAFT_KEY = "exam-ai-draft-v1";
 
 // ─────────────────── 内部 mock helpers ───────────────────
 
-const STEMS: Partial<Record<QuestionType, ((knowledge: string, i: number) => string)>> = {
+const STEMS: Partial<Record<QuestionType, (knowledge: string, i: number) => string>> = {
   单选题: (k, i) =>
     [
       `AGC 控制方式下，机组出力偏差超过 ±${i + 2}% 时应优先采取哪项措施？`,
@@ -129,7 +129,10 @@ function buildGroups(params: AiDraftParams): AiDraftGroup[] {
 
       const options =
         type === "判断题"
-          ? [{ key: "T", text: "正确" }, { key: "F", text: "错误" }]
+          ? [
+              { key: "T", text: "正确" },
+              { key: "F", text: "错误" },
+            ]
           : type === "单选题" || type === "多选题"
             ? [
                 { key: "A", text: `${knowledge} 相关核心概念与操作规范` },
@@ -139,8 +142,7 @@ function buildGroups(params: AiDraftParams): AiDraftGroup[] {
               ]
             : undefined;
 
-      const answer =
-        type === "判断题" ? "T" : type === "单选题" ? "A" : "AB";
+      const answer = type === "判断题" ? "T" : type === "单选题" ? "A" : "AB";
 
       const analysis = params.genAnalysis
         ? `本题考察 ${knowledge} 相关知识。根据《两细则》规定，${knowledge} 中运行人员应熟悉核心考核指标与处置流程，重点关注响应时间与精度要求。`
@@ -193,18 +195,24 @@ export async function generateExamDraft(params: AiDraftParams): Promise<AiExamDr
   const posStr = params.positions.filter(Boolean).join("、") || "值班员";
   const name = [params.category, params.goal].filter(Boolean).join(" · ") + " 考试";
 
+  const groups = buildGroups(params);
+  const totalScore = groups.reduce(
+    (sum, group) => sum + group.questions.length * group.perScore,
+    0,
+  );
+
   const basicInfo: PaperBasicInfo = {
     name,
-    goal: (params.goal as any) || "取证复习",
+    goal: (params.goal || "取证复习") as PaperBasicInfo["goal"],
     category: params.category,
     position: posStr,
     duration: String(params.duration),
-    passLine: String(params.passScore),
+    passLine: String(Math.min(params.passScore, totalScore)),
+    scoreMode: "fixed",
+    totalScore: String(totalScore),
     difficulty: params.difficulty || "中",
     note: `AI 起草 · 依据需求：${params.prompt.slice(0, 60)}${params.prompt.length > 60 ? "…" : ""}`,
   };
-
-  const groups = buildGroups(params);
 
   return {
     basicInfo,

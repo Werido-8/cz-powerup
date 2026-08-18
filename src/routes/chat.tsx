@@ -75,7 +75,7 @@ import {
   CHAT_KNOWLEDGE_BASES,
   KnowledgeBaseSelectorDialog,
 } from "@/components/chat/knowledge-base-selector-dialog";
-import { DialogLoading } from "@/components/chat/dialog-loading";
+import { ConversationLoadingSkeleton, DialogLoading } from "@/components/chat/dialog-loading";
 import { ChatConversationSearchDialog } from "@/components/chat/chat-conversation-search-dialog";
 import { getCurrentKnowledgeUser } from "@/lib/knowledge/demoRole";
 import { getFileById } from "@/lib/knowledge/model";
@@ -2175,9 +2175,7 @@ function AnswerBubble({
               <div className="relative mb-3">
                 <textarea
                   value={dislikeComment}
-                  onChange={(e) =>
-                    setDislikeComment(e.target.value.slice(0, DISLIKE_FEEDBACK_MAX))
-                  }
+                  onChange={(e) => setDislikeComment(e.target.value.slice(0, DISLIKE_FEEDBACK_MAX))}
                   placeholder="请输入其他反馈"
                   rows={3}
                   maxLength={DISLIKE_FEEDBACK_MAX}
@@ -2636,6 +2634,7 @@ function ChatPage() {
   const [commonQuestions, setCommonQuestions] = useState(() => readCommonQuestions());
   const [storageReady, setStorageReady] = useState(false);
   const [chatPageReady, setChatPageReady] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [citationView, setCitationView] = useState<{
     citations: AnswerCitation[];
     index: number;
@@ -2653,6 +2652,7 @@ function ChatPage() {
   const [generatingMsgIds, setGeneratingMsgIds] = useState<Set<string>>(() => new Set());
   const genTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const responseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const historyLoadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -2895,11 +2895,16 @@ function ChatPage() {
   };
 
   const newConv = useCallback(() => {
+    if (historyLoadingTimerRef.current) {
+      clearTimeout(historyLoadingTimerRef.current);
+      historyLoadingTimerRef.current = null;
+    }
     if (responseTimerRef.current) {
       clearTimeout(responseTimerRef.current);
       responseTimerRef.current = null;
       setLoading(false);
     }
+    setHistoryLoading(false);
     setPendingNewConv(true);
     setHistoryDrawerOpen(false);
     setCitationPanelOpen(false);
@@ -3064,6 +3069,7 @@ function ChatPage() {
     const generationTimers = genTimersRef.current;
     return () => {
       if (responseTimerRef.current) clearTimeout(responseTimerRef.current);
+      if (historyLoadingTimerRef.current) clearTimeout(historyLoadingTimerRef.current);
       generationTimers.forEach((timer) => clearTimeout(timer));
       generationTimers.clear();
     };
@@ -3091,6 +3097,12 @@ function ChatPage() {
   };
 
   const selectConversation = (id: string) => {
+    if (!pendingNewConv && activeId === id) {
+      setHistoryDrawerOpen(false);
+      return;
+    }
+    if (historyLoadingTimerRef.current) clearTimeout(historyLoadingTimerRef.current);
+    setHistoryLoading(true);
     setActiveId(id);
     setPendingNewConv(false);
     setHistoryDrawerOpen(false);
@@ -3099,6 +3111,10 @@ function ChatPage() {
     if (!selected || selected.messages.length === 0) {
       setCitationView({ citations: [], index: 0 });
     }
+    historyLoadingTimerRef.current = setTimeout(() => {
+      historyLoadingTimerRef.current = null;
+      setHistoryLoading(false);
+    }, 420);
   };
 
   const openShareConversation = (id: string) => {
@@ -3213,6 +3229,10 @@ function ChatPage() {
             {!chatPageReady ? (
               <div className="flex min-h-0 flex-1 items-center justify-center bg-[#f7fafb]">
                 <DialogLoading />
+              </div>
+            ) : historyLoading ? (
+              <div className="flex min-h-0 flex-1 items-center justify-center bg-[#f7fafb]">
+                <ConversationLoadingSkeleton />
               </div>
             ) : (
               <>

@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { DEFAULT_COLLECTIONS, type Collection } from "./scenario";
 import { QUIZ_SETS, type QuizSet } from "./learning-hub";
-import { getQuestionIdsForDoc } from "./learning-progress";
+import { getAutoGradableQuestionIdsForDoc, getQuestionIdsForDoc } from "./learning-progress";
 
 const KEY = "ai-grid-mock-store-v7";
 
@@ -53,8 +53,12 @@ export type ScenarioFavorite = {
 export type DocProgressEntry = {
   readStatus: "未学" | "学习中" | "已学";
   answeredIds: string[];
+  /** 最近一次关联练习中答对的题目，用于自动判定已学习。 */
+  correctIds?: string[];
   practiceSessionId?: string;
   manuallyLearned?: boolean;
+  /** 仅记录有效学习行为，单次打开资料不会更新该时间。 */
+  lastActivityAt?: string;
 };
 
 export type RecentDocEntry = {
@@ -236,7 +240,10 @@ function read(): MockState {
     if (!raw) return DEFAULT;
     const parsed = { ...DEFAULT, ...JSON.parse(raw) } as MockState;
     parsed.reviews = Array.isArray(parsed.reviews)
-      ? parsed.reviews.filter((r): r is SpacedReviewItem => !!r && typeof r === "object" && "kind" in r && "sourceId" in r)
+      ? parsed.reviews.filter(
+          (r): r is SpacedReviewItem =>
+            !!r && typeof r === "object" && "kind" in r && "sourceId" in r,
+        )
       : DEFAULT.reviews;
     parsed.wrong = Array.isArray(parsed.wrong) ? parsed.wrong : DEFAULT.wrong;
     parsed.favorites = Array.isArray(parsed.favorites) ? parsed.favorites : DEFAULT.favorites;
@@ -244,7 +251,9 @@ function read(): MockState {
       ? parsed.favoriteQuestions
       : DEFAULT.favoriteQuestions;
     parsed.notes = Array.isArray(parsed.notes) ? parsed.notes : DEFAULT.notes;
-    parsed.collections = Array.isArray(parsed.collections) ? parsed.collections : DEFAULT.collections;
+    parsed.collections = Array.isArray(parsed.collections)
+      ? parsed.collections
+      : DEFAULT.collections;
     parsed.scenarioFavorites = Array.isArray(parsed.scenarioFavorites)
       ? parsed.scenarioFavorites
       : DEFAULT.scenarioFavorites;
@@ -254,7 +263,9 @@ function read(): MockState {
     parsed.recentDocs = Array.isArray(parsed.recentDocs) ? parsed.recentDocs : DEFAULT.recentDocs;
     parsed.quizSets = Array.isArray(parsed.quizSets) ? parsed.quizSets : DEFAULT.quizSets;
     parsed.docProgress =
-      parsed.docProgress && typeof parsed.docProgress === "object" ? parsed.docProgress : DEFAULT.docProgress;
+      parsed.docProgress && typeof parsed.docProgress === "object"
+        ? parsed.docProgress
+        : DEFAULT.docProgress;
     return parsed;
   } catch {
     return DEFAULT;
@@ -376,7 +387,19 @@ export function useMockStore() {
     const s = read();
     const cur = s.reviews.find((r) => r.id === id);
     if (cur) Object.assign(cur, patch);
-    else s.reviews = [...s.reviews, { id, kind: "doc", sourceId: id, title: "", addedAt: new Date().toISOString(), round: 0, ...patch }];
+    else
+      s.reviews = [
+        ...s.reviews,
+        {
+          id,
+          kind: "doc",
+          sourceId: id,
+          title: "",
+          addedAt: new Date().toISOString(),
+          round: 0,
+          ...patch,
+        },
+      ];
     write(s);
   }, []);
 
@@ -408,12 +431,9 @@ export function useMockStore() {
     write(s);
   }, []);
 
-  const hasSpacedReview = useCallback(
-    (kind: "doc" | "wrong", sourceId: string) => {
-      return read().reviews.some((r) => r.kind === kind && r.sourceId === sourceId);
-    },
-    [],
-  );
+  const hasSpacedReview = useCallback((kind: "doc" | "wrong", sourceId: string) => {
+    return read().reviews.some((r) => r.kind === kind && r.sourceId === sourceId);
+  }, []);
 
   // ---------- Collections ----------
   const createCollection = useCallback((c: Omit<Collection, "id" | "updatedAt">) => {
@@ -433,14 +453,16 @@ export function useMockStore() {
       s.collections = s.collections.map((c) => {
         if (c.id !== collectionId) return c;
         const next: Collection = { ...c };
-        if (item.docId && !next.docIds.includes(item.docId)) next.docIds = [...next.docIds, item.docId];
+        if (item.docId && !next.docIds.includes(item.docId))
+          next.docIds = [...next.docIds, item.docId];
         if (item.noteId) {
           next.noteIds = next.noteIds || [];
           if (!next.noteIds.includes(item.noteId)) next.noteIds = [...next.noteIds, item.noteId];
         }
         if (item.scenarioId) {
           next.scenarioIds = next.scenarioIds || [];
-          if (!next.scenarioIds.includes(item.scenarioId)) next.scenarioIds = [...next.scenarioIds, item.scenarioId];
+          if (!next.scenarioIds.includes(item.scenarioId))
+            next.scenarioIds = [...next.scenarioIds, item.scenarioId];
         }
         next.updatedAt = new Date().toLocaleString("zh-CN", { hour12: false });
         return next;
@@ -451,21 +473,25 @@ export function useMockStore() {
   );
 
   // ---------- Scenario favorites ----------
-  const saveScenarioFavorite = useCallback(
-    (sf: Omit<ScenarioFavorite, "id" | "savedAt">) => {
-      const s = read();
-      s.scenarioFavorites = [
-        { ...sf, id: `sf-${Date.now()}`, savedAt: new Date().toLocaleString("zh-CN", { hour12: false }) },
-        ...s.scenarioFavorites,
-      ];
-      write(s);
-    },
-    [],
-  );
+  const saveScenarioFavorite = useCallback((sf: Omit<ScenarioFavorite, "id" | "savedAt">) => {
+    const s = read();
+    s.scenarioFavorites = [
+      {
+        ...sf,
+        id: `sf-${Date.now()}`,
+        savedAt: new Date().toLocaleString("zh-CN", { hour12: false }),
+      },
+      ...s.scenarioFavorites,
+    ];
+    write(s);
+  }, []);
 
   const pushRecentScenario = useCallback((scenarioId: string) => {
     const s = read();
-    s.recentScenarios = [scenarioId, ...s.recentScenarios.filter((x) => x !== scenarioId)].slice(0, 6);
+    s.recentScenarios = [scenarioId, ...s.recentScenarios.filter((x) => x !== scenarioId)].slice(
+      0,
+      6,
+    );
     write(s);
   }, []);
 
@@ -497,6 +523,7 @@ export function useMockStore() {
       const current = s.docProgress[docId] ?? {
         readStatus: "未学" as const,
         answeredIds: [],
+        correctIds: [],
       };
       s.docProgress = {
         ...s.docProgress,
@@ -507,22 +534,64 @@ export function useMockStore() {
     [],
   );
 
-  const markDocLearned = useCallback((docId: string, learned = true) => {
-    updateDocProgress(docId, {
-      readStatus: learned ? "已学" : "未学",
-      manuallyLearned: learned,
-    });
-  }, [updateDocProgress]);
+  const markDocLearned = useCallback(
+    (docId: string, learned = true) => {
+      updateDocProgress(docId, {
+        readStatus: learned ? "已学" : "未学",
+        manuallyLearned: learned,
+        lastActivityAt: new Date().toISOString(),
+      });
+    },
+    [updateDocProgress],
+  );
+
+  const markDocLearningInProgress = useCallback((docId: string, practiceSessionId?: string) => {
+    const s = read();
+    const current = s.docProgress[docId] ?? {
+      readStatus: "未学" as const,
+      answeredIds: [],
+      correctIds: [],
+    };
+
+    if (current.readStatus === "已学" || current.manuallyLearned) return;
+
+    s.docProgress = {
+      ...s.docProgress,
+      [docId]: {
+        ...current,
+        readStatus: "学习中",
+        practiceSessionId: practiceSessionId ?? current.practiceSessionId,
+        lastActivityAt: new Date().toISOString(),
+      },
+    };
+    write(s);
+  }, []);
+
+  const startDocPractice = useCallback(
+    (docId: string) => markDocLearningInProgress(docId, `doc-practice-${docId}`),
+    [markDocLearningInProgress],
+  );
 
   const recordDocAnswers = useCallback(
-    (docId: string, answeredIds: string[]) => {
+    (docId: string, answeredIds: string[], correctIds: string[]) => {
       const s = read();
-      const qIds = answeredIds;
-      const allDone = getQuestionIdsForDoc(docId).every((id) => qIds.includes(id));
+      const relatedQuestionIds = getQuestionIdsForDoc(docId);
+      const relatedSet = new Set(relatedQuestionIds);
+      const relevantAnsweredIds = answeredIds.filter((id) => relatedSet.has(id));
+      const relevantCorrectIds = correctIds.filter((id) => relatedSet.has(id));
+      const current = s.docProgress[docId];
+      const autoGradableQuestionIds = getAutoGradableQuestionIdsForDoc(docId);
+      const allCorrect =
+        autoGradableQuestionIds.length > 0 &&
+        autoGradableQuestionIds.every((id) => relevantCorrectIds.includes(id));
+      const keepManualLearned = current?.manuallyLearned === true;
+
       updateDocProgress(docId, {
-        answeredIds: qIds,
-        readStatus: allDone ? "已学" : "学习中",
-        manuallyLearned: allDone ? true : undefined,
+        answeredIds: relevantAnsweredIds,
+        correctIds: relevantCorrectIds,
+        readStatus: allCorrect || keepManualLearned ? "已学" : "学习中",
+        manuallyLearned: keepManualLearned,
+        lastActivityAt: new Date().toISOString(),
       });
     },
     [updateDocProgress],
@@ -532,9 +601,11 @@ export function useMockStore() {
     (docId: string) => {
       updateDocProgress(docId, {
         answeredIds: [],
+        correctIds: [],
         readStatus: "未学",
         manuallyLearned: false,
         practiceSessionId: undefined,
+        lastActivityAt: undefined,
       });
     },
     [updateDocProgress],
@@ -567,6 +638,8 @@ export function useMockStore() {
     getQuizSetByMsgId,
     updateDocProgress,
     markDocLearned,
+    markDocLearningInProgress,
+    startDocPractice,
     recordDocAnswers,
     clearDocPractice,
   };

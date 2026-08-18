@@ -43,6 +43,7 @@ const TYPE_ICONS: Record<MaterialDisplayType, LucideIcon> = {
 const DOC_TYPE_LABEL: Record<Doc["docType"], string> = {
   规程标准: "规程制度",
   典型操作: "典型操作",
+  厂家SOP: "厂家 SOP",
   故障处置: "故障处置",
   厂站资料: "厂站资料",
   历史案例: "事故复盘",
@@ -71,6 +72,7 @@ export function getMaterialType(doc: Doc): MaterialDisplayType {
   if (/规程|制度/.test(title) || doc.docType === "规程标准") return "规程";
 
   switch (doc.docType) {
+    case "厂家SOP":
     case "典型操作":
       return "SOP";
     case "故障处置":

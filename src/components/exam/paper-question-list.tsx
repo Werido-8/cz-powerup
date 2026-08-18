@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -7,6 +7,8 @@ import {
   GripVertical,
   LayoutList,
   Plus,
+  RefreshCw,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +18,7 @@ import {
   EDITOR_GROUPS,
   PAPER_QUESTION_TYPES,
   TYPE_PER_SCORE,
+  createMockAiAppendQuestions,
   defaultOptionsForType,
   editorQuestionFromBank,
   type Difficulty,
@@ -71,9 +74,7 @@ export function QuestionStudentPreview({
                 className={cn(
                   "mt-0.5 grid h-[16px] w-[16px] shrink-0 place-items-center border",
                   isMulti ? "rounded-[3px]" : "rounded-full",
-                  isCorrect
-                    ? "border-primary/50 bg-primary-soft"
-                    : "border-[#C8DADD] bg-white",
+                  isCorrect ? "border-primary/50 bg-primary-soft" : "border-[#C8DADD] bg-white",
                 )}
                 aria-hidden
               />
@@ -81,9 +82,7 @@ export function QuestionStudentPreview({
                 <span
                   className={cn(
                     "mr-2 inline-flex h-4 min-w-[16px] items-center justify-center rounded-[3px] px-1 text-[10.5px] font-semibold",
-                    isCorrect
-                      ? "bg-primary/15 text-primary"
-                      : "bg-[#EDF3F5] text-[#6B7F88]",
+                    isCorrect ? "bg-primary/15 text-primary" : "bg-[#EDF3F5] text-[#6B7F88]",
                   )}
                 >
                   {o.key}
@@ -118,7 +117,10 @@ export function QuestionStudentPreview({
 
   if (type === "简答题" || type === "案例分析题") {
     return (
-      <div className="mt-3 rounded-[6px] border border-dashed border-[#DCE8EA] bg-[#F5FAFB] px-3 py-2" aria-readonly>
+      <div
+        className="mt-3 rounded-[6px] border border-dashed border-[#DCE8EA] bg-[#F5FAFB] px-3 py-2"
+        aria-readonly
+      >
         <div className="mb-1 text-[11px] text-muted-foreground">作答区（学员填写）</div>
         <div className="min-h-[80px] rounded-[4px] bg-white/80" />
       </div>
@@ -131,18 +133,21 @@ export function QuestionStudentPreview({
 export function usePaperQuestionGroups(initialGroups: EditorGroup[] = EDITOR_GROUPS) {
   const [groups, setGroups] = useState<EditorGroup[]>(() => structuredClone(initialGroups));
   const [collapsed, setCollapsed] = useState<Set<QuestionType>>(new Set());
+  const initialGroupsRef = useRef(initialGroups);
 
   const resetGroups = useCallback(
-    (override?: EditorGroup[]) => setGroups(structuredClone(override ?? initialGroups)),
-    [initialGroups],
+    (override?: EditorGroup[]) => setGroups(structuredClone(override ?? initialGroupsRef.current)),
+    [],
   );
 
   const expandAll = useCallback(() => setCollapsed(new Set()), []);
+  const collapseAll = useCallback((types: QuestionType[]) => setCollapsed(new Set(types)), []);
 
   const toggleCollapse = (t: QuestionType) =>
     setCollapsed((prev) => {
       const n = new Set(prev);
-      n.has(t) ? n.delete(t) : n.add(t);
+      if (n.has(t)) n.delete(t);
+      else n.add(t);
       return n;
     });
 
@@ -161,7 +166,9 @@ export function usePaperQuestionGroups(initialGroups: EditorGroup[] = EDITOR_GRO
 
   const removeQuestion = (type: QuestionType, id: string) => {
     setGroups((prev) =>
-      prev.map((g) => (g.type === type ? { ...g, questions: g.questions.filter((q) => q.id !== id) } : g)),
+      prev.map((g) =>
+        g.type === type ? { ...g, questions: g.questions.filter((q) => q.id !== id) } : g,
+      ),
     );
   };
 
@@ -189,6 +196,21 @@ export function usePaperQuestionGroups(initialGroups: EditorGroup[] = EDITOR_GRO
     expandAll();
   };
 
+  const updateGroupScore = useCallback((type: QuestionType, value: number) => {
+    const perScore = Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : 0;
+    setGroups((prev) =>
+      prev.map((group) =>
+        group.type === type
+          ? {
+              ...group,
+              perScore,
+              questions: group.questions.map((question) => ({ ...question, score: perScore })),
+            }
+          : group,
+      ),
+    );
+  }, []);
+
   const appendFromBank = useCallback((type: QuestionType, bankIds: string[]) => {
     if (bankIds.length === 0) return;
     const picked = BANK_QUESTIONS.filter((b) => bankIds.includes(b.id));
@@ -204,12 +226,31 @@ export function usePaperQuestionGroups(initialGroups: EditorGroup[] = EDITOR_GRO
     );
   }, []);
 
+  const aiAppend = (type: QuestionType, context: { knowledge: string; difficulty: Difficulty }) => {
+    const group = groups.find((item) => item.type === type);
+    if (!group) return 0;
+    const added = createMockAiAppendQuestions(
+      type,
+      context,
+      group.perScore,
+      group.questions.map((question) => question.id),
+    );
+    if (added.length > 0) {
+      setGroups((prev) =>
+        prev.map((item) =>
+          item.type === type ? { ...item, questions: [...item.questions, ...added] } : item,
+        ),
+      );
+    }
+    return added.length;
+  };
+
   const totalCount = groups.reduce((s, g) => s + g.questions.length, 0);
   const totalScore = groups.reduce((s, g) => s + g.questions.length * g.perScore, 0);
 
   const summary: { label: string; value: string | number }[] = [
     { label: "当前题量", value: totalCount },
-    { label: "试卷总分", value: totalScore },
+    { label: "当前卷面分", value: totalScore },
     ...groups.map((g) => ({ label: g.type.replace("题", ""), value: g.questions.length })),
   ];
 
@@ -222,19 +263,31 @@ export function usePaperQuestionGroups(initialGroups: EditorGroup[] = EDITOR_GRO
     moveGroup,
     removeGroup,
     addGroup,
+    updateGroupScore,
     appendFromBank,
+    aiAppend,
     resetGroups,
+    collapseAll,
     expandAll,
     summary,
   };
 }
 
 /** 横向摘要条 — 专业信息列表样式 */
-export function PaperQuestionSummary({ summary }: { summary: { label: string; value: string | number }[] }) {
+export function PaperQuestionSummary({
+  summary,
+  showTotalScore = true,
+}: {
+  summary: { label: string; value: string | number }[];
+  showTotalScore?: boolean;
+}) {
+  const visibleSummary = showTotalScore
+    ? summary
+    : summary.filter((item) => item.label !== "当前卷面分");
   return (
     <div className="flex items-center rounded-[12px] bg-white px-5 py-3 shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]">
       <div className="flex flex-1 flex-wrap items-center">
-        {summary.map((s, i) => (
+        {visibleSummary.map((s, i) => (
           <div
             key={s.label}
             className={cn(
@@ -303,21 +356,37 @@ export function PaperQuestionList({
   collapsed,
   onToggleCollapse,
   onAdd,
+  onAiAppend,
   onMoveQuestion,
   onRemoveQuestion,
+  onSwap,
+  aiAppendReady = false,
+  aiAppendTooltip,
+  aiAppendDisabledTooltip,
   onMoveGroup,
   onRemoveGroup,
   canRemoveGroup = true,
+  showScores = true,
+  showScoreEditor = false,
+  onScoreChange,
 }: {
   groups: EditorGroup[];
   collapsed: Set<QuestionType>;
   onToggleCollapse: (t: QuestionType) => void;
   onAdd: (t: QuestionType) => void;
+  onAiAppend?: (t: QuestionType) => void;
   onMoveQuestion: (type: QuestionType, idx: number, dir: -1 | 1) => void;
   onRemoveQuestion: (type: QuestionType, id: string) => void;
+  onSwap?: () => void;
+  aiAppendReady?: boolean;
+  aiAppendTooltip?: string;
+  aiAppendDisabledTooltip?: string;
   onMoveGroup?: (type: QuestionType, dir: -1 | 1) => void;
   onRemoveGroup?: (type: QuestionType) => void;
   canRemoveGroup?: boolean;
+  showScores?: boolean;
+  showScoreEditor?: boolean;
+  onScoreChange?: (type: QuestionType, score: number) => void;
 }) {
   if (groups.length === 0) {
     return (
@@ -326,7 +395,9 @@ export function PaperQuestionList({
           <LayoutList className="h-5 w-5 text-[#9AAAB0]" />
         </div>
         <p className="text-[14px] font-medium text-[#1F3440]/70">暂无题型模块</p>
-        <p className="mt-1 text-[12px] text-muted-foreground">请在上方添加题型，再为各模块添加题目</p>
+        <p className="mt-1 text-[12px] text-muted-foreground">
+          请在上方添加题型，再为各模块添加题目
+        </p>
       </div>
     );
   }
@@ -361,14 +432,35 @@ export function PaperQuestionList({
                   <div>
                     <div className="text-[14px] font-semibold text-[#1F3440]">{g.type}</div>
                     <div className="text-[11.5px] text-muted-foreground">
-                      {g.questions.length} 题 · 每题 {g.perScore} 分 · 小计{" "}
-                      <span className="font-medium text-[#1F3440]">{groupScore}</span> 分
+                      {showScores ? (
+                        <>
+                          {g.questions.length} 题 · 每题 {g.perScore} 分 · 小计{" "}
+                          <span className="font-medium text-[#1F3440]">{groupScore}</span> 分
+                        </>
+                      ) : (
+                        <>{g.questions.length} 题 · 不设分数</>
+                      )}
                     </div>
                   </div>
                 </button>
               </div>
 
               <div className="flex flex-wrap items-center gap-1">
+                {showScores && showScoreEditor && onScoreChange && (
+                  <label className="mr-1 inline-flex h-8 items-center gap-1 rounded-[7px] border border-[#DCE8EA] bg-white px-2 text-[11px] text-[#6B7F88]">
+                    <span>每题</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={g.perScore}
+                      aria-label={`${g.type}每题分值`}
+                      onChange={(event) => onScoreChange(g.type, Number(event.target.value))}
+                      className="h-6 w-11 border-0 bg-transparent p-0 text-center text-[12px] font-semibold tabular-nums text-[#1F3440] outline-none focus:ring-0"
+                    />
+                    <span>分</span>
+                  </label>
+                )}
                 {onMoveGroup && (
                   <>
                     <IconBtn
@@ -403,6 +495,26 @@ export function PaperQuestionList({
                     }}
                   />
                 )}
+                {onAiAppend && (
+                  <button
+                    type="button"
+                    disabled={!aiAppendReady}
+                    title={aiAppendReady ? aiAppendTooltip : aiAppendDisabledTooltip}
+                    onClick={() => onAiAppend(g.type)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-primary/25 bg-primary-soft px-3 text-[12px] font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" /> AI 补题
+                  </button>
+                )}
+                {onSwap && (
+                  <button
+                    type="button"
+                    onClick={onSwap}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[8px] border border-[#DCE8EA] bg-white px-3 text-[12px] font-medium text-[#425B66] transition-colors hover:border-primary/40 hover:bg-primary-soft hover:text-primary"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> 智能换题
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onAdd(g.type)}
@@ -417,7 +529,10 @@ export function PaperQuestionList({
             {!isCol && (
               <div className="divide-y divide-[#EDF3F5]">
                 {g.questions.map((q, idx) => (
-                  <article key={q.id} className="group/question px-5 py-4 transition-colors hover:bg-[#FAFCFD]">
+                  <article
+                    key={q.id}
+                    className="group/question px-5 py-4 transition-colors hover:bg-[#FAFCFD]"
+                  >
                     <div className="flex items-start gap-3">
                       {/* Question number */}
                       <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary-soft text-[11px] font-bold text-primary">
@@ -452,7 +567,9 @@ export function PaperQuestionList({
                           >
                             {q.difficulty}
                           </span>
-                          <span className="text-[11px] text-muted-foreground">{q.score} 分</span>
+                          {showScores && (
+                            <span className="text-[11px] text-muted-foreground">{q.score} 分</span>
+                          )}
                           <span className="text-[11px] text-[#9AAAB0]">来源：{q.source}</span>
                         </div>
                       </div>
@@ -555,7 +672,9 @@ export function PaperReadonlyList({ groups }: { groups: EditorGroup[] }) {
                         {String(globalNo).padStart(2, "0")}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[14px] font-medium leading-relaxed text-[#1F3440]">{q.stem}</p>
+                        <p className="text-[14px] font-medium leading-relaxed text-[#1F3440]">
+                          {q.stem}
+                        </p>
                         <QuestionStudentPreview question={q} type={g.type} />
                         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-[#EDF3F5] pt-3">
                           {q.isAIGenerated && (

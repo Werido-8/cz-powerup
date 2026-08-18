@@ -18,7 +18,7 @@ function LearnAdminIndexPage() {
   const navigate = useNavigate();
 
   const handleNew = () => {
-    navigate({ to: "/learn-admin/topic/new", search: { source: undefined } });
+    navigate({ to: "/learn-admin/topic/new", search: { preview: undefined } });
   };
 
   const handleEdit = (record: TopicAdminRecord) => {

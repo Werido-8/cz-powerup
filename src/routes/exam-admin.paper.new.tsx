@@ -29,7 +29,9 @@ import { Input } from "@/components/ui/input";
 import {
   PAPER_CATEGORIES,
   PAPER_DRAFT_KEY,
+  PAPERS,
   TYPE_PER_SCORE,
+  getPaperQuestionGroups,
   type Difficulty,
   type EditorGroup,
   type ExamGoal,
@@ -43,7 +45,7 @@ import { generateExamDraft, type AiDraftParams } from "@/services/examAi";
 
 const searchSchema = z.object({
   step: z.coerce.number().default(1),
-  source: z.enum(["ai", "manual"]).optional(),
+  source: z.enum(["ai", "manual", "existing"]).optional(),
 });
 
 export const Route = createFileRoute("/exam-admin/paper/new")({
@@ -59,6 +61,11 @@ const NORMAL_STEPS = ["基本信息", "组卷策略", "下发设置"];
 const NORMAL_HINTS = [
   "填写试卷基础信息，用于后续组卷和下发",
   "配置题型模块，可从题库选题或新增题目",
+  "选择下发对象，确认后提交试卷",
+];
+const EXISTING_HINTS = [
+  "选择一份已有试卷作为本次考试的基础，原试卷不会被覆盖",
+  "按需调整题型、题目和分值",
   "选择下发对象，确认后提交试卷",
 ];
 
@@ -112,11 +119,19 @@ const EMPTY_BASIC: PaperBasicInfo = {
   position: "",
   duration: "30",
   passLine: "60",
+  totalScore: "100",
+  scoreMode: "fixed",
   difficulty: "中",
   note: "",
 };
 
 type Draft = { basicInfo: PaperBasicInfo; groups: EditorGroup[] };
+
+function formatScore(value: number) {
+  return Number.isInteger(value)
+    ? String(value)
+    : value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
 
 function loadDraft(): Draft | null {
   try {
@@ -179,14 +194,14 @@ function SelectField({
 }: {
   value: string;
   onChange: (v: string) => void;
-  options: readonly string[] | { value: string; label: string }[];
+  options: ReadonlyArray<string | { readonly value: string; readonly label: string }>;
   placeholder?: string;
 }) {
   return (
     <div className="relative">
       <select value={value} onChange={(e) => onChange(e.target.value)} className={SELECT_CLS}>
         {placeholder && <option value="">{placeholder}</option>}
-        {(options as any[]).map((opt) => {
+        {options.map((opt) => {
           const v = typeof opt === "string" ? opt : opt.value;
           const l = typeof opt === "string" ? opt : opt.label;
           return (
@@ -273,9 +288,7 @@ function AiDraftStepContent(p: AiStepProps) {
       .map((s) => s.trim())
       .filter(Boolean);
     const idx = cur.indexOf(pos);
-    p.setPositionsInput(
-      (idx >= 0 ? cur.filter((x) => x !== pos) : [...cur, pos]).join("、"),
-    );
+    p.setPositionsInput((idx >= 0 ? cur.filter((x) => x !== pos) : [...cur, pos]).join("、"));
   };
 
   return (
@@ -321,7 +334,8 @@ function AiDraftStepContent(p: AiStepProps) {
 
         <p className="mt-2 flex items-start gap-1.5 text-[12px] text-[#91A3AA]">
           <Info className="mt-px h-3.5 w-3.5 shrink-0" />
-          AI 将根据你的描述生成试卷基础信息、题型配置、题目、答案、解析和资料依据。生成后仍可人工修改。
+          AI
+          将根据你的描述生成试卷基础信息、题型配置、题目、答案、解析和资料依据。生成后仍可人工修改。
         </p>
 
         {/* 快捷模板 */}
@@ -353,11 +367,7 @@ function AiDraftStepContent(p: AiStepProps) {
           {/* 考试目标 */}
           <div>
             <label className="mb-1 block text-[13px] font-medium text-[#425B66]">考试目标</label>
-            <SelectField
-              value={p.aiGoal}
-              onChange={p.setAiGoal}
-              options={AI_GOAL_OPTIONS}
-            />
+            <SelectField value={p.aiGoal} onChange={p.setAiGoal} options={AI_GOAL_OPTIONS} />
           </div>
 
           {/* 分类 */}
@@ -404,9 +414,7 @@ function AiDraftStepContent(p: AiStepProps) {
 
           {/* 题目总数 */}
           <div>
-            <label className="mb-1 block text-[13px] font-medium text-[#425B66]">
-              题目总数
-            </label>
+            <label className="mb-1 block text-[13px] font-medium text-[#425B66]">题目总数</label>
             <input
               type="number"
               min={1}
@@ -469,7 +477,9 @@ function AiDraftStepContent(p: AiStepProps) {
               />
             </div>
             <div>
-              <label className="mb-1 block text-[13px] font-medium text-[#425B66]">时长（分钟）</label>
+              <label className="mb-1 block text-[13px] font-medium text-[#425B66]">
+                时长（分钟）
+              </label>
               <input
                 type="number"
                 min={1}
@@ -482,7 +492,9 @@ function AiDraftStepContent(p: AiStepProps) {
 
           {/* 及格线 */}
           <div>
-            <label className="mb-1 block text-[13px] font-medium text-[#425B66]">及格线（分）</label>
+            <label className="mb-1 block text-[13px] font-medium text-[#425B66]">
+              及格线（分）
+            </label>
             <input
               type="number"
               min={0}
@@ -533,8 +545,9 @@ function NewPaperWizardPage() {
   const navigate = useNavigate();
 
   const isAiMode = source === "ai";
+  const isExistingMode = source === "existing";
   const STEPS = isAiMode ? AI_STEPS : NORMAL_STEPS;
-  const STEP_HINTS = isAiMode ? AI_HINTS : NORMAL_HINTS;
+  const STEP_HINTS = isAiMode ? AI_HINTS : isExistingMode ? EXISTING_HINTS : NORMAL_HINTS;
   const maxStep = STEPS.length;
   const currentStep = Math.min(Math.max(Number(step || 1), 1), maxStep);
 
@@ -556,7 +569,7 @@ function NewPaperWizardPage() {
   const [aiSingleCount, setAiSingleCount] = useState(10);
   const [aiMultiCount, setAiMultiCount] = useState(5);
   const [aiJudgeCount, setAiJudgeCount] = useState(5);
-  const [aiDifficulty, setAiDifficulty] = useState<Difficulty | "">( "中");
+  const [aiDifficulty, setAiDifficulty] = useState<Difficulty | "">("中");
   const [aiDuration, setAiDuration] = useState(30);
   const [aiPassScore, setAiPassScore] = useState(60);
   const [aiSourceScope, setAiSourceScope] = useState<"bank" | "bank+kb" | "kb">("bank");
@@ -574,6 +587,7 @@ function NewPaperWizardPage() {
   const [draftReady, setDraftReady] = useState(false);
   const [assigneeCount, setAssigneeCount] = useState(0);
   const [fromAiDraft, setFromAiDraft] = useState(false);
+  const [selectedExistingPaperId, setSelectedExistingPaperId] = useState<string | null>(null);
 
   const {
     groups,
@@ -584,16 +598,19 @@ function NewPaperWizardPage() {
     moveGroup,
     removeGroup,
     addGroup,
+    updateGroupScore,
     resetGroups,
     summary,
     appendFromBank,
-  } = usePaperQuestionGroups([{ type: "单选题", perScore: TYPE_PER_SCORE["单选题"], questions: [] }]);
+  } = usePaperQuestionGroups([
+    { type: "单选题", perScore: TYPE_PER_SCORE["单选题"], questions: [] },
+  ]);
 
   const [addType, setAddType] = useState<QuestionType | null>(null);
 
-  // 载入草稿（仅普通模式）
+  // 载入草稿（已有试卷模式保持当前选择，不覆盖为本地草稿）
   useEffect(() => {
-    if (!isAiMode) {
+    if (!isAiMode && !isExistingMode) {
       const draft = loadDraft();
       if (draft) {
         setBasicInfo(draft.basicInfo);
@@ -601,23 +618,63 @@ function NewPaperWizardPage() {
       }
     }
     setDraftReady(true);
-  }, [isAiMode, resetGroups]);
+  }, [isAiMode, isExistingMode, resetGroups]);
 
   // 自动保存
   useEffect(() => {
-    if (!draftReady) return;
+    if (!draftReady || isExistingMode) return;
     saveDraft({ basicInfo, groups });
-  }, [basicInfo, groups, draftReady]);
+  }, [basicInfo, groups, draftReady, isExistingMode]);
 
   const updateBasic = <K extends keyof PaperBasicInfo>(key: K, val: PaperBasicInfo[K]) => {
     setBasicInfo((p) => ({ ...p, [key]: val }));
   };
 
+  const selectExistingPaper = (paper: (typeof PAPERS)[number]) => {
+    const paperGroups = getPaperQuestionGroups(paper.id);
+    const paperTotalScore = paperGroups.reduce(
+      (sum, group) => sum + group.questions.length * group.perScore,
+      0,
+    );
+    setSelectedExistingPaperId(paper.id);
+    setBasicInfo({
+      ...EMPTY_BASIC,
+      name: paper.name,
+      goal: paper.goal,
+      category: paper.category,
+      position: "值班员 / 值班长",
+      duration: String(paper.duration),
+      totalScore: formatScore(paperTotalScore),
+      passLine: formatScore(Math.min(Number(EMPTY_BASIC.passLine) || 60, paperTotalScore)),
+      difficulty: "中",
+    });
+    resetGroups(paperGroups);
+    setFromAiDraft(false);
+  };
+
   // ── 计算 ──
   const totalQuestions = groups.reduce((s, g) => s + g.questions.length, 0);
-  const totalScore = (summary.find((s) => s.label === "试卷总分")?.value ?? 0) as number;
+  const totalScore = (summary.find((s) => s.label === "当前卷面分")?.value ?? 0) as number;
+  const scoreMode = basicInfo.scoreMode ?? "fixed";
+  const targetScore = Number(basicInfo.totalScore ?? "");
+  const hasValidTargetScore = Number.isFinite(targetScore) && targetScore > 0;
+  const passLine = Number(basicInfo.passLine);
+  const isPassLineValid =
+    hasValidTargetScore && Number.isFinite(passLine) && passLine >= 0 && passLine <= targetScore;
+  const isScoreMatched = hasValidTargetScore && Math.abs(totalScore - targetScore) < 0.001;
+  const scoreDifference = hasValidTargetScore ? totalScore - targetScore : 0;
+  const isScoreConfigurationValid = scoreMode !== "fixed" || (isScoreMatched && isPassLineValid);
+  const scoreStatusText = !hasValidTargetScore
+    ? "请先在基本信息中设置目标总分"
+    : !isScoreMatched
+      ? scoreDifference < 0
+        ? `还差 ${formatScore(Math.abs(scoreDifference))} 分`
+        : `已超出 ${formatScore(scoreDifference)} 分`
+      : !isPassLineValid
+        ? `请将及格线设置为 0 至 ${formatScore(targetScore)} 分`
+        : "卷面分与目标总分一致，可继续下发";
   const canCompleteBasic = basicInfo.name.trim().length > 0;
-  const canCompleteStrategy = groups.length > 0 && totalQuestions > 0;
+  const canCompleteStrategy = groups.length > 0 && totalQuestions > 0 && isScoreConfigurationValid;
 
   const maxReachableStep = useMemo(() => {
     if (isAiMode) {
@@ -712,23 +769,71 @@ function NewPaperWizardPage() {
   // ── 普通下一步 ──
   const handleNext = () => {
     if (contentStep === 1) {
-      if (!basicInfo.name.trim()) { toast.error("请填写试卷名称"); return; }
+      if (isExistingMode && !selectedExistingPaperId) {
+        toast.error("请先选择一份已有试卷");
+        return;
+      }
+      if (!basicInfo.name.trim()) {
+        toast.error("请填写试卷名称");
+        return;
+      }
       goStep(currentStep + 1);
     } else if (contentStep === 2) {
-      if (groups.length === 0) { toast.error("请至少添加一种题型"); return; }
-      if (totalQuestions < 1) { toast.error("请至少添加 1 道题目"); return; }
+      if (groups.length === 0) {
+        toast.error("请至少添加一种题型");
+        return;
+      }
+      if (totalQuestions < 1) {
+        toast.error("请至少添加 1 道题目");
+        return;
+      }
+      if (scoreMode === "fixed") {
+        if (!hasValidTargetScore) {
+          toast.error("请设置大于 0 的目标总分");
+          return;
+        }
+        if (!isPassLineValid) {
+          toast.error("及格线需大于等于 0，且不能超过目标总分");
+          return;
+        }
+        if (!isScoreMatched) {
+          toast.error(
+            `当前卷面 ${formatScore(totalScore)} 分，与目标总分 ${formatScore(targetScore)} 分不一致，请调整题型分值或总分`,
+          );
+          return;
+        }
+      }
       goStep(currentStep + 1);
     }
   };
 
-  const handlePrev = () => { if (currentStep > 1) goStep(currentStep - 1); };
+  const handlePrev = () => {
+    if (currentStep > 1) goStep(currentStep - 1);
+  };
 
   const handleRemoveGroup = (type: QuestionType) => {
-    if (groups.length <= 1) { toast.warning("至少保留一种题型"); return; }
+    if (groups.length <= 1) {
+      toast.warning("至少保留一种题型");
+      return;
+    }
     removeGroup(type);
   };
 
   const finish = (mode: "assign" | "draft") => {
+    if (mode === "assign" && scoreMode === "fixed") {
+      if (!hasValidTargetScore) {
+        toast.error("请设置大于 0 的目标总分");
+        return;
+      }
+      if (!isPassLineValid) {
+        toast.error("及格线需大于等于 0，且不能超过目标总分");
+        return;
+      }
+      if (!isScoreMatched) {
+        toast.error("卷面分与目标总分不一致，不能下发");
+        return;
+      }
+    }
     sessionStorage.removeItem(PAPER_DRAFT_KEY);
     toast.success(mode === "assign" ? "试卷已下发" : "试卷已暂存为草稿");
     navigate({ to: "/exam-admin" });
@@ -740,7 +845,6 @@ function NewPaperWizardPage() {
     <PageShell>
       <div className="relative -mx-6 -my-7 min-h-[calc(100vh-64px)] bg-[#F5FAFB] px-6 py-7 lg:-mx-8 lg:px-8">
         <div className="relative mx-auto w-full max-w-[1180px] pb-24">
-
           {/* ── 页面头部 ── */}
           <div className="mb-5">
             <Link
@@ -756,7 +860,7 @@ function NewPaperWizardPage() {
                 <FileText className="h-[18px] w-[18px] text-primary" />
               )}
               <h1 className="text-[20px] font-semibold text-[#1F3440]">
-                {isAiMode ? "智能组卷" : "新建试卷"}
+                {isAiMode ? "智能组卷" : isExistingMode ? "选用已有试卷" : "手动组卷"}
               </h1>
             </div>
           </div>
@@ -786,7 +890,9 @@ function NewPaperWizardPage() {
                     <button
                       type="button"
                       disabled={!reachable}
-                      onClick={() => { if (n !== currentStep && canOpenStep(n)) goStep(n); }}
+                      onClick={() => {
+                        if (n !== currentStep && canOpenStep(n)) goStep(n);
+                      }}
                       aria-current={active ? "step" : undefined}
                       className={cn(
                         "group flex flex-col items-center gap-2 rounded-[8px] px-2 py-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
@@ -798,7 +904,8 @@ function NewPaperWizardPage() {
                       <span
                         className={cn(
                           "flex h-9 w-9 items-center justify-center rounded-full text-[13px] font-semibold transition-all",
-                          active && "bg-primary text-white shadow-[0_0_0_4px_rgba(52,155,172,0.14)]",
+                          active &&
+                            "bg-primary text-white shadow-[0_0_0_4px_rgba(52,155,172,0.14)]",
                           done && "border border-primary/25 bg-primary text-white",
                           !active && !done && "border border-[#DCE8EA] bg-white text-[#9AAAB0]",
                         )}
@@ -879,7 +986,50 @@ function NewPaperWizardPage() {
           )}
 
           {/* Step 1: 基本信息 */}
-          {contentStep === 1 && (
+          {contentStep === 1 && isExistingMode ? (
+            <section className="rounded-[8px] border border-[#DCE8EA] bg-white p-5 lg:p-6">
+              <SectionTitle>选择已有试卷</SectionTitle>
+              <p className="-mt-2 mb-4 text-[12.5px] text-[#6B7F88]">
+                选用后可继续调整题型、题目和下发对象，原试卷不会被覆盖。
+              </p>
+              <div className="overflow-hidden rounded-[8px] border border-[#DCE8EA]">
+                {PAPERS.filter((paper) => paper.status !== "草稿").map((paper) => {
+                  const selected = selectedExistingPaperId === paper.id;
+                  return (
+                    <button
+                      key={paper.id}
+                      type="button"
+                      onClick={() => selectExistingPaper(paper)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-4 border-b border-[#EDF3F5] px-4 py-3 text-left last:border-b-0 transition-colors",
+                        selected ? "bg-primary-soft/60" : "hover:bg-[#F8FBFB]",
+                      )}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-[13.5px] font-medium text-[#1F3440]">
+                          {paper.name}
+                        </span>
+                        <span className="mt-1 block text-[11.5px] text-[#6B7F88]">
+                          {paper.goal} · {paper.category} · {paper.questionCount} 题 ·{" "}
+                          {paper.duration} 分钟
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          "shrink-0 rounded-md border px-2.5 py-1 text-[11.5px] font-medium",
+                          selected
+                            ? "border-primary bg-primary text-white"
+                            : "border-[#DCE8EA] bg-white text-[#6B7F88]",
+                        )}
+                      >
+                        {selected ? "已选择" : "选择"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : contentStep === 1 ? (
             <section className="rounded-[12px] bg-white p-6 shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)] lg:p-7">
               {fromAiDraft && (
                 <div className="mb-5 flex items-center gap-2 rounded-[8px] border border-[#B8DFE5] bg-[#EAF7F9] px-4 py-2.5">
@@ -911,7 +1061,9 @@ function NewPaperWizardPage() {
                         className={SELECT_CLS}
                       >
                         {GOAL_OPTIONS.map((g) => (
-                          <option key={g} value={g}>{g}</option>
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
                         ))}
                       </select>
                       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9AAAB0]" />
@@ -927,7 +1079,9 @@ function NewPaperWizardPage() {
                       >
                         <option value="">请选择</option>
                         {PAPER_CATEGORIES.map((c) => (
-                          <option key={c} value={c}>{c}</option>
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
                         ))}
                       </select>
                       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9AAAB0]" />
@@ -956,30 +1110,87 @@ function NewPaperWizardPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <div
+                  className={cn(
+                    "grid grid-cols-1 gap-5",
+                    scoreMode === "fixed" ? "sm:grid-cols-3" : "sm:grid-cols-2",
+                  )}
+                >
                   <div>
-                    <FieldLabel>及格线（分）</FieldLabel>
-                    <Input
-                      type="number"
-                      value={basicInfo.passLine}
-                      onChange={(e) => updateBasic("passLine", e.target.value)}
-                      className={INPUT_CLS}
-                    />
-                  </div>
-                  <div>
-                    <FieldLabel>难度</FieldLabel>
+                    <FieldLabel>成绩设置</FieldLabel>
                     <div className="relative">
                       <select
-                        value={basicInfo.difficulty}
-                        onChange={(e) => updateBasic("difficulty", e.target.value as Difficulty | "")}
+                        value={scoreMode}
+                        onChange={(e) =>
+                          updateBasic(
+                            "scoreMode",
+                            e.target.value as NonNullable<PaperBasicInfo["scoreMode"]>,
+                          )
+                        }
                         className={SELECT_CLS}
                       >
-                        {DIFFICULTY_OPTIONS.map((d) => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
+                        <option value="fixed">固定总分</option>
+                        <option value="variable">按题计分，不设总分</option>
+                        <option value="unscored">不设分数</option>
                       </select>
                       <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9AAAB0]" />
                     </div>
+                  </div>
+                  {scoreMode === "fixed" ? (
+                    <>
+                      <div>
+                        <FieldLabel required hint="卷面分需与总分一致">
+                          总分（分）
+                        </FieldLabel>
+                        <Input
+                          type="number"
+                          min="1"
+                          step="0.5"
+                          value={basicInfo.totalScore ?? ""}
+                          onChange={(e) => updateBasic("totalScore", e.target.value)}
+                          aria-label="目标总分"
+                          aria-invalid={!hasValidTargetScore}
+                          className={INPUT_CLS}
+                        />
+                      </div>
+                      <div>
+                        <FieldLabel required>及格线（分）</FieldLabel>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.5"
+                          value={basicInfo.passLine}
+                          onChange={(e) => updateBasic("passLine", e.target.value)}
+                          aria-label="及格线"
+                          aria-invalid={!isPassLineValid}
+                          className={INPUT_CLS}
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="pt-6 text-[12px] leading-5 text-[#6B7F88]">
+                      {scoreMode === "variable"
+                        ? "保留题目分值，但不汇总为固定总分。"
+                        : "只记录完成和答题情况，不计算分数与通过率。"}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <FieldLabel>难度</FieldLabel>
+                  <div className="relative sm:w-[calc(50%-0.625rem)]">
+                    <select
+                      value={basicInfo.difficulty}
+                      onChange={(e) => updateBasic("difficulty", e.target.value as Difficulty | "")}
+                      className={SELECT_CLS}
+                    >
+                      {DIFFICULTY_OPTIONS.map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9AAAB0]" />
                   </div>
                 </div>
 
@@ -994,7 +1205,7 @@ function NewPaperWizardPage() {
                 </div>
               </div>
             </section>
-          )}
+          ) : null}
 
           {/* Step 2: 组卷策略 */}
           {contentStep === 2 && (
@@ -1012,7 +1223,46 @@ function NewPaperWizardPage() {
                 </div>
               )}
               <PaperTypeToolbar groups={groups} onAddGroup={addGroup} />
-              <PaperQuestionSummary summary={summary} />
+              <PaperQuestionSummary summary={summary} showTotalScore={scoreMode === "fixed"} />
+              {scoreMode === "fixed" && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={cn(
+                    "flex flex-wrap items-center gap-x-5 gap-y-2 rounded-[8px] border px-4 py-3",
+                    isScoreConfigurationValid
+                      ? "border-success/25 bg-success-soft/45"
+                      : "border-warning/25 bg-warning-soft/45",
+                  )}
+                >
+                  <div>
+                    <span className="text-[11px] text-[#6B7F88]">当前卷面分</span>
+                    <strong className="ml-2 text-[15px] tabular-nums text-[#1F3440]">
+                      {formatScore(totalScore)} 分
+                    </strong>
+                  </div>
+                  <div className="h-4 w-px bg-[#DCE8EA]" aria-hidden />
+                  <div>
+                    <span className="text-[11px] text-[#6B7F88]">目标总分</span>
+                    <strong className="ml-2 text-[15px] tabular-nums text-[#1F3440]">
+                      {hasValidTargetScore ? `${formatScore(targetScore)} 分` : "未设置"}
+                    </strong>
+                  </div>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1.5 text-[12px] font-medium",
+                      isScoreConfigurationValid ? "text-success" : "text-warning-foreground",
+                    )}
+                  >
+                    {isScoreConfigurationValid ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Info className="h-3.5 w-3.5" />
+                    )}
+                    {scoreStatusText}
+                  </span>
+                </div>
+              )}
               <PaperQuestionList
                 groups={groups}
                 collapsed={collapsed}
@@ -1022,6 +1272,9 @@ function NewPaperWizardPage() {
                 onRemoveQuestion={removeQuestion}
                 onMoveGroup={moveGroup}
                 onRemoveGroup={handleRemoveGroup}
+                showScores={scoreMode !== "unscored"}
+                showScoreEditor={scoreMode === "fixed"}
+                onScoreChange={updateGroupScore}
               />
               <AddQuestionDialog
                 open={addType !== null}
@@ -1048,7 +1301,13 @@ function NewPaperWizardPage() {
                   {basicInfo.category && <span>{basicInfo.category}</span>}
                   <span className="text-[#DCE8EA]">|</span>
                   <span>{totalQuestions} 题</span>
-                  <span>总分 {totalScore} 分</span>
+                  <span>
+                    {scoreMode === "fixed"
+                      ? `卷面 ${formatScore(totalScore)} / 总分 ${hasValidTargetScore ? formatScore(targetScore) : "未设置"} 分`
+                      : scoreMode === "variable"
+                        ? "按题计分，不设总分"
+                        : "不设分数"}
+                  </span>
                   <span>{basicInfo.duration} 分钟</span>
                   {basicInfo.difficulty && <span>难度：{basicInfo.difficulty}</span>}
                 </div>
@@ -1083,7 +1342,12 @@ function NewPaperWizardPage() {
               )}
               {contentStep === 2 && totalQuestions > 0 && (
                 <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-medium text-primary">
-                  {totalQuestions} 题 · {totalScore} 分
+                  {totalQuestions} 题 ·{" "}
+                  {scoreMode === "fixed"
+                    ? `卷面 ${formatScore(totalScore)} / ${hasValidTargetScore ? formatScore(targetScore) : "—"} 分`
+                    : scoreMode === "variable"
+                      ? "按题计分"
+                      : "不设分数"}
                 </span>
               )}
               {contentStep === 3 && assigneeCount > 0 && (
@@ -1165,8 +1429,13 @@ function NewPaperWizardPage() {
                   </button>
                   <button
                     type="button"
-                    disabled={assigneeCount === 0}
+                    disabled={assigneeCount === 0 || !isScoreConfigurationValid}
                     onClick={() => finish("assign")}
+                    title={
+                      !isScoreConfigurationValid
+                        ? "卷面分需等于目标总分，且及格线需在有效范围内"
+                        : undefined
+                    }
                     className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-primary px-5 text-[13px] font-medium text-white transition-colors hover:bg-[#2F8D9D] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <Send className="h-4 w-4" />

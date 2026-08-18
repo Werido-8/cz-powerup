@@ -15,6 +15,7 @@ import { Route as QuestionBankRouteImport } from './routes/question-bank'
 import { Route as LearnAdminRouteImport } from './routes/learn-admin'
 import { Route as KnowledgeRouteImport } from './routes/knowledge'
 import { Route as GovernanceRouteImport } from './routes/governance'
+import { Route as FileCompareRouteImport } from './routes/file-compare'
 import { Route as ExamAdminRouteImport } from './routes/exam-admin'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as AssetsRouteImport } from './routes/assets'
@@ -24,6 +25,7 @@ import { Route as ScenarioIndexRouteImport } from './routes/scenario.index'
 import { Route as LearnIndexRouteImport } from './routes/learn.index'
 import { Route as LearnAdminIndexRouteImport } from './routes/learn-admin.index'
 import { Route as KnowledgeIndexRouteImport } from './routes/knowledge.index'
+import { Route as FileCompareIndexRouteImport } from './routes/file-compare.index'
 import { Route as ExamAdminIndexRouteImport } from './routes/exam-admin.index'
 import { Route as TrainingWrongRouteImport } from './routes/training.wrong'
 import { Route as TrainingRecordsRouteImport } from './routes/training.records'
@@ -38,6 +40,7 @@ import { Route as KnowledgeMineRouteImport } from './routes/knowledge.mine'
 import { Route as KnowledgeAllRouteImport } from './routes/knowledge.all'
 import { Route as KnowledgeAdminRouteImport } from './routes/knowledge.admin'
 import { Route as KnowledgePracticeFileIdRouteImport } from './routes/knowledge-practice.$fileId'
+import { Route as ExamAdminAnalysisRouteImport } from './routes/exam-admin.analysis'
 import { Route as ScenarioTypicalIndexRouteImport } from './routes/scenario.typical.index'
 import { Route as ScenarioFaultIndexRouteImport } from './routes/scenario.fault.index'
 import { Route as TrainingSessionIdRouteImport } from './routes/training.session.$id'
@@ -52,7 +55,12 @@ import { Route as KnowledgeFileFileIdRouteImport } from './routes/knowledge.file
 import { Route as KnowledgeDeptDeptIdRouteImport } from './routes/knowledge.dept.$deptId'
 import { Route as KnowledgeConfirmConfirmIdRouteImport } from './routes/knowledge.confirm.$confirmId'
 import { Route as KnowledgeApprovalApprovalIdRouteImport } from './routes/knowledge.approval.$approvalId'
+import { Route as FileCompareTaskIdReaderRouteImport } from './routes/file-compare.$taskId.reader'
+import { Route as FileCompareTaskIdOverviewRouteImport } from './routes/file-compare.$taskId.overview'
+import { Route as FileCompareTaskIdInfoRouteImport } from './routes/file-compare.$taskId.info'
+import { Route as FileCompareTaskIdChangesRouteImport } from './routes/file-compare.$taskId.changes'
 import { Route as ExamAdminPaperNewRouteImport } from './routes/exam-admin.paper.new'
+import { Route as ExamAdminExamExamIdRouteImport } from './routes/exam-admin.exam.$examId'
 import { Route as AssetsCollectionIdRouteImport } from './routes/assets.collection.$id'
 import { Route as ScenarioTypicalResultIdRouteImport } from './routes/scenario.typical.result.$id'
 import { Route as ScenarioSootblowResultIdRouteImport } from './routes/scenario.sootblow.result.$id'
@@ -94,6 +102,11 @@ const KnowledgeRoute = KnowledgeRouteImport.update({
 const GovernanceRoute = GovernanceRouteImport.update({
   id: '/governance',
   path: '/governance',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FileCompareRoute = FileCompareRouteImport.update({
+  id: '/file-compare',
+  path: '/file-compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExamAdminRoute = ExamAdminRouteImport.update({
@@ -140,6 +153,11 @@ const KnowledgeIndexRoute = KnowledgeIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => KnowledgeRoute,
+} as any)
+const FileCompareIndexRoute = FileCompareIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => FileCompareRoute,
 } as any)
 const ExamAdminIndexRoute = ExamAdminIndexRouteImport.update({
   id: '/',
@@ -210,6 +228,11 @@ const KnowledgePracticeFileIdRoute = KnowledgePracticeFileIdRouteImport.update({
   id: '/knowledge-practice/$fileId',
   path: '/knowledge-practice/$fileId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ExamAdminAnalysisRoute = ExamAdminAnalysisRouteImport.update({
+  id: '/analysis',
+  path: '/analysis',
+  getParentRoute: () => ExamAdminRoute,
 } as any)
 const ScenarioTypicalIndexRoute = ScenarioTypicalIndexRouteImport.update({
   id: '/scenario/typical/',
@@ -283,9 +306,36 @@ const KnowledgeApprovalApprovalIdRoute =
     path: '/approval/$approvalId',
     getParentRoute: () => KnowledgeRoute,
   } as any)
+const FileCompareTaskIdReaderRoute = FileCompareTaskIdReaderRouteImport.update({
+  id: '/$taskId/reader',
+  path: '/$taskId/reader',
+  getParentRoute: () => FileCompareRoute,
+} as any)
+const FileCompareTaskIdOverviewRoute =
+  FileCompareTaskIdOverviewRouteImport.update({
+    id: '/$taskId/overview',
+    path: '/$taskId/overview',
+    getParentRoute: () => FileCompareRoute,
+  } as any)
+const FileCompareTaskIdInfoRoute = FileCompareTaskIdInfoRouteImport.update({
+  id: '/$taskId/info',
+  path: '/$taskId/info',
+  getParentRoute: () => FileCompareRoute,
+} as any)
+const FileCompareTaskIdChangesRoute =
+  FileCompareTaskIdChangesRouteImport.update({
+    id: '/$taskId/changes',
+    path: '/$taskId/changes',
+    getParentRoute: () => FileCompareRoute,
+  } as any)
 const ExamAdminPaperNewRoute = ExamAdminPaperNewRouteImport.update({
   id: '/paper/new',
   path: '/paper/new',
+  getParentRoute: () => ExamAdminRoute,
+} as any)
+const ExamAdminExamExamIdRoute = ExamAdminExamExamIdRouteImport.update({
+  id: '/exam/$examId',
+  path: '/exam/$examId',
   getParentRoute: () => ExamAdminRoute,
 } as any)
 const AssetsCollectionIdRoute = AssetsCollectionIdRouteImport.update({
@@ -361,12 +411,14 @@ export interface FileRoutesByFullPath {
   '/assets': typeof AssetsRouteWithChildren
   '/chat': typeof ChatRoute
   '/exam-admin': typeof ExamAdminRouteWithChildren
+  '/file-compare': typeof FileCompareRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/learn-admin': typeof LearnAdminRouteWithChildren
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/exam-admin/analysis': typeof ExamAdminAnalysisRoute
   '/knowledge-practice/$fileId': typeof KnowledgePracticeFileIdRoute
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
@@ -381,13 +433,19 @@ export interface FileRoutesByFullPath {
   '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
   '/exam-admin/': typeof ExamAdminIndexRoute
+  '/file-compare/': typeof FileCompareIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/learn-admin/': typeof LearnAdminIndexRoute
   '/learn/': typeof LearnIndexRoute
   '/scenario/': typeof ScenarioIndexRoute
   '/training/': typeof TrainingIndexRoute
   '/assets/collection/$id': typeof AssetsCollectionIdRoute
+  '/exam-admin/exam/$examId': typeof ExamAdminExamExamIdRoute
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
+  '/file-compare/$taskId/changes': typeof FileCompareTaskIdChangesRoute
+  '/file-compare/$taskId/info': typeof FileCompareTaskIdInfoRoute
+  '/file-compare/$taskId/overview': typeof FileCompareTaskIdOverviewRoute
+  '/file-compare/$taskId/reader': typeof FileCompareTaskIdReaderRoute
   '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/confirm/$confirmId': typeof KnowledgeConfirmConfirmIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
@@ -422,6 +480,7 @@ export interface FileRoutesByTo {
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/exam-admin/analysis': typeof ExamAdminAnalysisRoute
   '/knowledge-practice/$fileId': typeof KnowledgePracticeFileIdRoute
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
@@ -435,13 +494,19 @@ export interface FileRoutesByTo {
   '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
   '/exam-admin': typeof ExamAdminIndexRoute
+  '/file-compare': typeof FileCompareIndexRoute
   '/knowledge': typeof KnowledgeIndexRoute
   '/learn-admin': typeof LearnAdminIndexRoute
   '/learn': typeof LearnIndexRoute
   '/scenario': typeof ScenarioIndexRoute
   '/training': typeof TrainingIndexRoute
   '/assets/collection/$id': typeof AssetsCollectionIdRoute
+  '/exam-admin/exam/$examId': typeof ExamAdminExamExamIdRoute
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
+  '/file-compare/$taskId/changes': typeof FileCompareTaskIdChangesRoute
+  '/file-compare/$taskId/info': typeof FileCompareTaskIdInfoRoute
+  '/file-compare/$taskId/overview': typeof FileCompareTaskIdOverviewRoute
+  '/file-compare/$taskId/reader': typeof FileCompareTaskIdReaderRoute
   '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/confirm/$confirmId': typeof KnowledgeConfirmConfirmIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
@@ -474,12 +539,14 @@ export interface FileRoutesById {
   '/assets': typeof AssetsRouteWithChildren
   '/chat': typeof ChatRoute
   '/exam-admin': typeof ExamAdminRouteWithChildren
+  '/file-compare': typeof FileCompareRouteWithChildren
   '/governance': typeof GovernanceRoute
   '/knowledge': typeof KnowledgeRouteWithChildren
   '/learn-admin': typeof LearnAdminRouteWithChildren
   '/question-bank': typeof QuestionBankRoute
   '/scene': typeof SceneRoute
   '/search': typeof SearchRoute
+  '/exam-admin/analysis': typeof ExamAdminAnalysisRoute
   '/knowledge-practice/$fileId': typeof KnowledgePracticeFileIdRoute
   '/knowledge/admin': typeof KnowledgeAdminRoute
   '/knowledge/all': typeof KnowledgeAllRoute
@@ -494,13 +561,19 @@ export interface FileRoutesById {
   '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
   '/exam-admin/': typeof ExamAdminIndexRoute
+  '/file-compare/': typeof FileCompareIndexRoute
   '/knowledge/': typeof KnowledgeIndexRoute
   '/learn-admin/': typeof LearnAdminIndexRoute
   '/learn/': typeof LearnIndexRoute
   '/scenario/': typeof ScenarioIndexRoute
   '/training/': typeof TrainingIndexRoute
   '/assets/collection/$id': typeof AssetsCollectionIdRoute
+  '/exam-admin/exam/$examId': typeof ExamAdminExamExamIdRoute
   '/exam-admin/paper/new': typeof ExamAdminPaperNewRoute
+  '/file-compare/$taskId/changes': typeof FileCompareTaskIdChangesRoute
+  '/file-compare/$taskId/info': typeof FileCompareTaskIdInfoRoute
+  '/file-compare/$taskId/overview': typeof FileCompareTaskIdOverviewRoute
+  '/file-compare/$taskId/reader': typeof FileCompareTaskIdReaderRoute
   '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/confirm/$confirmId': typeof KnowledgeConfirmConfirmIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
@@ -534,12 +607,14 @@ export interface FileRouteTypes {
     | '/assets'
     | '/chat'
     | '/exam-admin'
+    | '/file-compare'
     | '/governance'
     | '/knowledge'
     | '/learn-admin'
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/exam-admin/analysis'
     | '/knowledge-practice/$fileId'
     | '/knowledge/admin'
     | '/knowledge/all'
@@ -554,13 +629,19 @@ export interface FileRouteTypes {
     | '/training/records'
     | '/training/wrong'
     | '/exam-admin/'
+    | '/file-compare/'
     | '/knowledge/'
     | '/learn-admin/'
     | '/learn/'
     | '/scenario/'
     | '/training/'
     | '/assets/collection/$id'
+    | '/exam-admin/exam/$examId'
     | '/exam-admin/paper/new'
+    | '/file-compare/$taskId/changes'
+    | '/file-compare/$taskId/info'
+    | '/file-compare/$taskId/overview'
+    | '/file-compare/$taskId/reader'
     | '/knowledge/approval/$approvalId'
     | '/knowledge/confirm/$confirmId'
     | '/knowledge/dept/$deptId'
@@ -595,6 +676,7 @@ export interface FileRouteTypes {
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/exam-admin/analysis'
     | '/knowledge-practice/$fileId'
     | '/knowledge/admin'
     | '/knowledge/all'
@@ -608,13 +690,19 @@ export interface FileRouteTypes {
     | '/training/records'
     | '/training/wrong'
     | '/exam-admin'
+    | '/file-compare'
     | '/knowledge'
     | '/learn-admin'
     | '/learn'
     | '/scenario'
     | '/training'
     | '/assets/collection/$id'
+    | '/exam-admin/exam/$examId'
     | '/exam-admin/paper/new'
+    | '/file-compare/$taskId/changes'
+    | '/file-compare/$taskId/info'
+    | '/file-compare/$taskId/overview'
+    | '/file-compare/$taskId/reader'
     | '/knowledge/approval/$approvalId'
     | '/knowledge/confirm/$confirmId'
     | '/knowledge/dept/$deptId'
@@ -646,12 +734,14 @@ export interface FileRouteTypes {
     | '/assets'
     | '/chat'
     | '/exam-admin'
+    | '/file-compare'
     | '/governance'
     | '/knowledge'
     | '/learn-admin'
     | '/question-bank'
     | '/scene'
     | '/search'
+    | '/exam-admin/analysis'
     | '/knowledge-practice/$fileId'
     | '/knowledge/admin'
     | '/knowledge/all'
@@ -666,13 +756,19 @@ export interface FileRouteTypes {
     | '/training/records'
     | '/training/wrong'
     | '/exam-admin/'
+    | '/file-compare/'
     | '/knowledge/'
     | '/learn-admin/'
     | '/learn/'
     | '/scenario/'
     | '/training/'
     | '/assets/collection/$id'
+    | '/exam-admin/exam/$examId'
     | '/exam-admin/paper/new'
+    | '/file-compare/$taskId/changes'
+    | '/file-compare/$taskId/info'
+    | '/file-compare/$taskId/overview'
+    | '/file-compare/$taskId/reader'
     | '/knowledge/approval/$approvalId'
     | '/knowledge/confirm/$confirmId'
     | '/knowledge/dept/$deptId'
@@ -705,6 +801,7 @@ export interface RootRouteChildren {
   AssetsRoute: typeof AssetsRouteWithChildren
   ChatRoute: typeof ChatRoute
   ExamAdminRoute: typeof ExamAdminRouteWithChildren
+  FileCompareRoute: typeof FileCompareRouteWithChildren
   GovernanceRoute: typeof GovernanceRoute
   KnowledgeRoute: typeof KnowledgeRouteWithChildren
   LearnAdminRoute: typeof LearnAdminRouteWithChildren
@@ -776,6 +873,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GovernanceRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/file-compare': {
+      id: '/file-compare'
+      path: '/file-compare'
+      fullPath: '/file-compare'
+      preLoaderRoute: typeof FileCompareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/exam-admin': {
       id: '/exam-admin'
       path: '/exam-admin'
@@ -838,6 +942,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/knowledge/'
       preLoaderRoute: typeof KnowledgeIndexRouteImport
       parentRoute: typeof KnowledgeRoute
+    }
+    '/file-compare/': {
+      id: '/file-compare/'
+      path: '/'
+      fullPath: '/file-compare/'
+      preLoaderRoute: typeof FileCompareIndexRouteImport
+      parentRoute: typeof FileCompareRoute
     }
     '/exam-admin/': {
       id: '/exam-admin/'
@@ -937,6 +1048,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgePracticeFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/exam-admin/analysis': {
+      id: '/exam-admin/analysis'
+      path: '/analysis'
+      fullPath: '/exam-admin/analysis'
+      preLoaderRoute: typeof ExamAdminAnalysisRouteImport
+      parentRoute: typeof ExamAdminRoute
+    }
     '/scenario/typical/': {
       id: '/scenario/typical/'
       path: '/scenario/typical'
@@ -1035,11 +1153,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KnowledgeApprovalApprovalIdRouteImport
       parentRoute: typeof KnowledgeRoute
     }
+    '/file-compare/$taskId/reader': {
+      id: '/file-compare/$taskId/reader'
+      path: '/$taskId/reader'
+      fullPath: '/file-compare/$taskId/reader'
+      preLoaderRoute: typeof FileCompareTaskIdReaderRouteImport
+      parentRoute: typeof FileCompareRoute
+    }
+    '/file-compare/$taskId/overview': {
+      id: '/file-compare/$taskId/overview'
+      path: '/$taskId/overview'
+      fullPath: '/file-compare/$taskId/overview'
+      preLoaderRoute: typeof FileCompareTaskIdOverviewRouteImport
+      parentRoute: typeof FileCompareRoute
+    }
+    '/file-compare/$taskId/info': {
+      id: '/file-compare/$taskId/info'
+      path: '/$taskId/info'
+      fullPath: '/file-compare/$taskId/info'
+      preLoaderRoute: typeof FileCompareTaskIdInfoRouteImport
+      parentRoute: typeof FileCompareRoute
+    }
+    '/file-compare/$taskId/changes': {
+      id: '/file-compare/$taskId/changes'
+      path: '/$taskId/changes'
+      fullPath: '/file-compare/$taskId/changes'
+      preLoaderRoute: typeof FileCompareTaskIdChangesRouteImport
+      parentRoute: typeof FileCompareRoute
+    }
     '/exam-admin/paper/new': {
       id: '/exam-admin/paper/new'
       path: '/paper/new'
       fullPath: '/exam-admin/paper/new'
       preLoaderRoute: typeof ExamAdminPaperNewRouteImport
+      parentRoute: typeof ExamAdminRoute
+    }
+    '/exam-admin/exam/$examId': {
+      id: '/exam-admin/exam/$examId'
+      path: '/exam/$examId'
+      fullPath: '/exam-admin/exam/$examId'
+      preLoaderRoute: typeof ExamAdminExamExamIdRouteImport
       parentRoute: typeof ExamAdminRoute
     }
     '/assets/collection/$id': {
@@ -1141,7 +1294,9 @@ const AssetsRouteWithChildren =
   AssetsRoute._addFileChildren(AssetsRouteChildren)
 
 interface ExamAdminRouteChildren {
+  ExamAdminAnalysisRoute: typeof ExamAdminAnalysisRoute
   ExamAdminIndexRoute: typeof ExamAdminIndexRoute
+  ExamAdminExamExamIdRoute: typeof ExamAdminExamExamIdRoute
   ExamAdminPaperNewRoute: typeof ExamAdminPaperNewRoute
   ExamAdminPaperPaperIdEditRoute: typeof ExamAdminPaperPaperIdEditRoute
   ExamAdminPaperPaperIdPreviewRoute: typeof ExamAdminPaperPaperIdPreviewRoute
@@ -1149,7 +1304,9 @@ interface ExamAdminRouteChildren {
 }
 
 const ExamAdminRouteChildren: ExamAdminRouteChildren = {
+  ExamAdminAnalysisRoute: ExamAdminAnalysisRoute,
   ExamAdminIndexRoute: ExamAdminIndexRoute,
+  ExamAdminExamExamIdRoute: ExamAdminExamExamIdRoute,
   ExamAdminPaperNewRoute: ExamAdminPaperNewRoute,
   ExamAdminPaperPaperIdEditRoute: ExamAdminPaperPaperIdEditRoute,
   ExamAdminPaperPaperIdPreviewRoute: ExamAdminPaperPaperIdPreviewRoute,
@@ -1159,6 +1316,26 @@ const ExamAdminRouteChildren: ExamAdminRouteChildren = {
 
 const ExamAdminRouteWithChildren = ExamAdminRoute._addFileChildren(
   ExamAdminRouteChildren,
+)
+
+interface FileCompareRouteChildren {
+  FileCompareIndexRoute: typeof FileCompareIndexRoute
+  FileCompareTaskIdChangesRoute: typeof FileCompareTaskIdChangesRoute
+  FileCompareTaskIdInfoRoute: typeof FileCompareTaskIdInfoRoute
+  FileCompareTaskIdOverviewRoute: typeof FileCompareTaskIdOverviewRoute
+  FileCompareTaskIdReaderRoute: typeof FileCompareTaskIdReaderRoute
+}
+
+const FileCompareRouteChildren: FileCompareRouteChildren = {
+  FileCompareIndexRoute: FileCompareIndexRoute,
+  FileCompareTaskIdChangesRoute: FileCompareTaskIdChangesRoute,
+  FileCompareTaskIdInfoRoute: FileCompareTaskIdInfoRoute,
+  FileCompareTaskIdOverviewRoute: FileCompareTaskIdOverviewRoute,
+  FileCompareTaskIdReaderRoute: FileCompareTaskIdReaderRoute,
+}
+
+const FileCompareRouteWithChildren = FileCompareRoute._addFileChildren(
+  FileCompareRouteChildren,
 )
 
 interface KnowledgeKbKbIdRouteChildren {
@@ -1259,6 +1436,7 @@ const rootRouteChildren: RootRouteChildren = {
   AssetsRoute: AssetsRouteWithChildren,
   ChatRoute: ChatRoute,
   ExamAdminRoute: ExamAdminRouteWithChildren,
+  FileCompareRoute: FileCompareRouteWithChildren,
   GovernanceRoute: GovernanceRoute,
   KnowledgeRoute: KnowledgeRouteWithChildren,
   LearnAdminRoute: LearnAdminRouteWithChildren,

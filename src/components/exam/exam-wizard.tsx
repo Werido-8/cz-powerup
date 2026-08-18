@@ -16,7 +16,7 @@ import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react";
 type ExamWizardProps = {
   open: boolean;
   onClose: () => void;
-  onComplete: (paper: Partial<Paper>) => void;
+  onComplete: (paper: Partial<Paper> & { deadline?: string }) => void;
 };
 
 const STEPS = ["条件输入", "AI 出题", "编辑筛选", "预览确认", "下发设置"];
@@ -44,7 +44,7 @@ export function ExamWizard({ open, onClose, onComplete }: ExamWizardProps) {
       name: prompt.slice(0, 40) || "AI 组卷试卷",
       questionCount: count,
       deadline: deadline || undefined,
-      source: "AI 组卷",
+      source: "智能组卷",
       status: "草稿",
     });
     toast.success("组卷向导完成，已创建草稿试卷");

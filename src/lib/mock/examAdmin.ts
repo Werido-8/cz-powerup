@@ -80,7 +80,13 @@ export interface AnswerDetailItem {
 }
 
 export const EXAM_STATS = [
-  { key: "pending", label: "待审核题目", value: "23", hint: "AI 生成 17 · 人工 6", tone: "warning" as const },
+  {
+    key: "pending",
+    label: "待审核题目",
+    value: "23",
+    hint: "AI 生成 17 · 人工 6",
+    tone: "warning" as const,
+  },
   { key: "bank", label: "题库总量", value: "1,842", hint: "本月新增 86", tone: "primary" as const },
   { key: "issued", label: "已下发试卷", value: "37", hint: "进行中 9", tone: "primary" as const },
   { key: "finish", label: "答题完成率", value: "82%", hint: "近 30 天", tone: "success" as const },
@@ -194,7 +200,7 @@ export function buildExamAdminStats(papers: Paper[]): ExamStatItem[] {
   ];
 }
 
-export const REVIEW_QUESTIONS: ReviewQuestion[] = [
+const REVIEW_QUESTION_SEEDS: ReviewQuestion[] = [
   {
     id: "rq1",
     stem: "AGC 投入运行后,机组实际出力与调度指令偏差持续超过 ±3% 时,应优先采取下列哪项处理?",
@@ -250,6 +256,172 @@ export const REVIEW_QUESTIONS: ReviewQuestion[] = [
     origin: "AI 生成",
     status: "待审核",
   },
+];
+
+const ADDITIONAL_REVIEW_QUESTIONS = [
+  [
+    "AVC 投入闭环控制前，应核对哪些母线电压与无功边界条件？",
+    "多选题",
+    "AVC 控制",
+    "中",
+    "AVC 控制策略说明 v2024.03",
+    "AI 生成",
+  ],
+  [
+    "一次调频动作后，运行人员应重点监视哪些机组参数？",
+    "多选题",
+    "一次调频",
+    "中",
+    "一次调频运行导则 v2024.02",
+    "人工录入",
+  ],
+  [
+    "AGC 指令长时间不刷新时，应如何判断调度链路是否异常？",
+    "案例分析题",
+    "AGC 异常处置",
+    "难",
+    "AGC 异常处置卡 v2024.06",
+    "AI 生成",
+  ],
+  [
+    "主变并列运行前必须满足哪些基本条件？",
+    "多选题",
+    "主变并列",
+    "中",
+    "厂站运行规程 v2024.07",
+    "AI 生成",
+  ],
+  [
+    "保护装置检修压板退出后，可以不登记直接恢复运行。(判断)",
+    "判断题",
+    "继电保护",
+    "易",
+    "继电保护现场管理细则 v2024.01",
+    "人工录入",
+  ],
+  [
+    "母线电压越上限时，AVC 的首选调节对象应遵循什么原则？",
+    "单选题",
+    "AVC 控制",
+    "中",
+    "AVC 控制策略说明 v2024.03",
+    "AI 生成",
+  ],
+  [
+    "一次调频贡献电量的考核统计周期如何确定？",
+    "单选题",
+    "一次调频 / 两细则",
+    "难",
+    "两个细则考核知识点汇编 v2024.05",
+    "AI 生成",
+  ],
+  [
+    "发生直流系统接地告警后，查找接地点时有哪些操作禁忌？",
+    "多选题",
+    "直流系统",
+    "中",
+    "直流系统异常处置规程 v2023.12",
+    "人工录入",
+  ],
+  [
+    "发电机失磁保护动作后，值班人员应按什么顺序开展检查？",
+    "案例分析题",
+    "发电机保护",
+    "难",
+    "发电机保护事故案例 v2023.10",
+    "AI 生成",
+  ],
+  [
+    "倒闸操作票执行中发现设备名称与现场不一致，应如何处置？",
+    "单选题",
+    "倒闸操作",
+    "易",
+    "倒闸操作管理制度 v2024.04",
+    "人工录入",
+  ],
+  [
+    "AGC 可用率下降时，应区分哪些设备侧与通信侧原因？",
+    "多选题",
+    "AGC 可用率",
+    "中",
+    "AGC 控制器 SOP v2024.06",
+    "AI 生成",
+  ],
+  [
+    "厂用电快切装置闭锁后，运行人员应立即强制启动切换。(判断)",
+    "判断题",
+    "厂用电快切",
+    "中",
+    "厂用电系统运行规程 v2024.02",
+    "AI 生成",
+  ],
+  [
+    "发生线路重合闸拒动时，现场检查应优先确认哪些信号？",
+    "多选题",
+    "重合闸",
+    "中",
+    "线路保护异常处置卡 v2024.01",
+    "AI 生成",
+  ],
+  [
+    "机组无功出力达到限制值后，AVC 仍持续增磁可能带来什么风险？",
+    "案例分析题",
+    "AVC 限值",
+    "难",
+    "AVC 控制策略说明 v2024.03",
+    "AI 生成",
+  ],
+  [
+    "执行接地线装设操作前，应完成哪些验电与闭锁确认？",
+    "多选题",
+    "安全操作",
+    "易",
+    "电业安全工作规程 v2024.01",
+    "人工录入",
+  ],
+  [
+    "一次调频退出期间，运行日志至少应记录哪些信息？",
+    "多选题",
+    "一次调频",
+    "易",
+    "一次调频运行导则 v2024.02",
+    "AI 生成",
+  ],
+  [
+    "保护动作报告中的启动量、动作量与出口量分别说明什么？",
+    "简答题",
+    "继电保护",
+    "难",
+    "继电保护分析手册 v2023.11",
+    "AI 生成",
+  ],
+  [
+    "新员工首次独立巡检前，需要完成哪些授权与能力确认？",
+    "多选题",
+    "新员工基础",
+    "易",
+    "运行岗位培训管理办法 v2024.05",
+    "人工录入",
+  ],
+] satisfies Array<
+  readonly [string, QuestionType, string, Difficulty, string, ReviewQuestion["origin"]]
+>;
+
+export const REVIEW_QUESTIONS: ReviewQuestion[] = [
+  ...REVIEW_QUESTION_SEEDS,
+  ...ADDITIONAL_REVIEW_QUESTIONS.map(
+    ([stem, type, knowledge, difficulty, source, origin], index): ReviewQuestion => ({
+      id: `rq${index + REVIEW_QUESTION_SEEDS.length + 1}`,
+      stem,
+      type,
+      knowledge,
+      difficulty,
+      source,
+      similarRisk: index % 7 === 0 ? "高" : index % 3 === 0 ? "中" : "低",
+      origin,
+      status: "待审核",
+    }),
+  ),
 ];
 
 export const BANK_QUESTIONS: BankQuestion[] = [
@@ -607,11 +779,66 @@ export const EXAM_ADMIN_STATS = buildExamAdminStats(PAPERS);
 export const PAPER_CATEGORIES = Array.from(new Set(PAPERS.map((p) => p.category))).sort();
 
 export const ASSIGN_RECORDS: AssignRecord[] = [
-  { id: "a1", user: "李工", team: "运行一班", position: "值班员", status: "已提交", score: 88, correctRate: 88, duration: 24, submittedAt: "2026-06-12 10:24", rule: "每人独立卷面" },
-  { id: "a2", user: "王工", team: "运行一班", position: "值班长", status: "已提交", score: 76, correctRate: 76, duration: 28, submittedAt: "2026-06-12 11:02", rule: "每人独立卷面" },
-  { id: "a3", user: "赵工", team: "运行二班", position: "值班员", status: "进行中", score: null, correctRate: null, duration: null, submittedAt: null, rule: "每人独立卷面" },
-  { id: "a4", user: "孙工", team: "运行二班", position: "副值", status: "未开始", score: null, correctRate: null, duration: null, submittedAt: null, rule: "每人独立卷面" },
-  { id: "a5", user: "周工", team: "运行三班", position: "值班员", status: "已提交", score: 64, correctRate: 64, duration: 30, submittedAt: "2026-06-13 09:15", rule: "题目+选项乱序" },
+  {
+    id: "a1",
+    user: "李工",
+    team: "运行一班",
+    position: "值班员",
+    status: "已提交",
+    score: 88,
+    correctRate: 88,
+    duration: 24,
+    submittedAt: "2026-06-12 10:24",
+    rule: "每人独立卷面",
+  },
+  {
+    id: "a2",
+    user: "王工",
+    team: "运行一班",
+    position: "值班长",
+    status: "已提交",
+    score: 76,
+    correctRate: 76,
+    duration: 28,
+    submittedAt: "2026-06-12 11:02",
+    rule: "每人独立卷面",
+  },
+  {
+    id: "a3",
+    user: "赵工",
+    team: "运行二班",
+    position: "值班员",
+    status: "进行中",
+    score: null,
+    correctRate: null,
+    duration: null,
+    submittedAt: null,
+    rule: "每人独立卷面",
+  },
+  {
+    id: "a4",
+    user: "孙工",
+    team: "运行二班",
+    position: "副值",
+    status: "未开始",
+    score: null,
+    correctRate: null,
+    duration: null,
+    submittedAt: null,
+    rule: "每人独立卷面",
+  },
+  {
+    id: "a5",
+    user: "周工",
+    team: "运行三班",
+    position: "值班员",
+    status: "已提交",
+    score: 64,
+    correctRate: 64,
+    duration: 30,
+    submittedAt: "2026-06-13 09:15",
+    rule: "题目+选项乱序",
+  },
 ];
 
 export const ANSWER_DETAIL: AnswerDetailItem[] = [
@@ -702,11 +929,36 @@ export const GEN_PREVIEW = {
   ],
   dupRisk: "低",
   questions: [
-    { no: 1, stem: "AGC 控制方式下机组响应速率不满足要求的考核方式?", type: "单选题" as QuestionType, difficulty: "中" as Difficulty },
-    { no: 2, stem: "一次调频死区设置过大的影响?", type: "判断题" as QuestionType, difficulty: "易" as Difficulty },
-    { no: 3, stem: "结合调差率分析机组频繁动作原因。", type: "案例分析题" as QuestionType, difficulty: "难" as Difficulty },
-    { no: 4, stem: "两细则中对调峰考核的计分规则?", type: "单选题" as QuestionType, difficulty: "中" as Difficulty },
-    { no: 5, stem: "AGC 与一次调频协调配合的要点有哪些?", type: "多选题" as QuestionType, difficulty: "中" as Difficulty },
+    {
+      no: 1,
+      stem: "AGC 控制方式下机组响应速率不满足要求的考核方式?",
+      type: "单选题" as QuestionType,
+      difficulty: "中" as Difficulty,
+    },
+    {
+      no: 2,
+      stem: "一次调频死区设置过大的影响?",
+      type: "判断题" as QuestionType,
+      difficulty: "易" as Difficulty,
+    },
+    {
+      no: 3,
+      stem: "结合调差率分析机组频繁动作原因。",
+      type: "案例分析题" as QuestionType,
+      difficulty: "难" as Difficulty,
+    },
+    {
+      no: 4,
+      stem: "两细则中对调峰考核的计分规则?",
+      type: "单选题" as QuestionType,
+      difficulty: "中" as Difficulty,
+    },
+    {
+      no: 5,
+      stem: "AGC 与一次调频协调配合的要点有哪些?",
+      type: "多选题" as QuestionType,
+      difficulty: "中" as Difficulty,
+    },
   ],
 };
 
@@ -766,7 +1018,9 @@ export const TYPE_PER_SCORE: Record<QuestionType, number> = {
   案例分析题: 8,
 };
 
-export function defaultOptionsForType(type: QuestionType): { key: string; text: string }[] | undefined {
+export function defaultOptionsForType(
+  type: QuestionType,
+): { key: string; text: string }[] | undefined {
   if (type === "判断题") {
     return [
       { key: "T", text: "正确" },
@@ -790,6 +1044,34 @@ export function editorQuestionFromBank(bank: BankQuestion, score: number): Edito
     answer: detail?.answer,
     blankCount: bank.type === "填空题" ? Math.max(1, options?.length ?? 1) : undefined,
   };
+}
+
+export function createMockAiAppendQuestions(
+  type: QuestionType,
+  context: { knowledge: string; difficulty: Difficulty },
+  score: number,
+  existingIds: string[],
+  count = 3,
+): EditorQuestion[] {
+  const isAlreadyUsed = (bankId: string) =>
+    existingIds.some((id) => id === bankId || id.endsWith(`-${bankId}`));
+  const candidates = BANK_QUESTIONS.filter(
+    (question) =>
+      question.type === type && question.status === "启用" && !isAlreadyUsed(question.id),
+  ).sort((a, b) => {
+    const relevance = (question: BankQuestion) =>
+      Number(question.knowledge.includes(context.knowledge)) * 2 +
+      Number(question.difficulty === context.difficulty);
+    return relevance(b) - relevance(a);
+  });
+
+  return candidates.slice(0, count).map((question, index) => ({
+    ...editorQuestionFromBank(question, score),
+    id: `mock-ai-${existingIds.length + index + 1}-${question.id}`,
+    knowledge: context.knowledge || question.knowledge,
+    difficulty: context.difficulty,
+    isAIGenerated: true,
+  }));
 }
 
 export interface EditorGroup {
@@ -963,19 +1245,109 @@ export const PAPER_PREVIEW: PreviewSection[] = [
 // ---------- Per-person answer details (for records drawer) ----------
 export const PERSON_ANSWERS: Record<string, AnswerDetailItem[]> = {
   a1: [
-    { no: 1, stem: "AGC 投入后机组出力与调度指令偏差持续超过 ±3% 应优先采取?", type: "单选题", correctAnswer: "B. 检查 AGC 通道及测点,必要时切至手动", userAnswer: "B. 检查 AGC 通道及测点,必要时切至手动", isCorrect: true, analysis: "偏差持续超限应先排查通道与测点,避免盲目调整出力。", evidence: "AGC 控制器 SOP v2024.06 · 第 4.2 节", wrongTags: [] },
-    { no: 2, stem: "一次调频的负荷响应应在频率越限后多少秒内开始?", type: "单选题", correctAnswer: "A. 3 秒内", userAnswer: "A. 3 秒内", isCorrect: true, analysis: "一次调频要求快速响应,应在 3 秒内开始动作。", evidence: "两细则考核知识点汇编 v2024.05 · 第 2.1 节", wrongTags: [] },
-    { no: 3, stem: "主变停役前必须确认的安全措施包括哪些?", type: "多选题", correctAnswer: "ABD", userAnswer: "ABD", isCorrect: true, analysis: "安全措施完整。", evidence: "厂站运行规程(华东 A 厂) v2024.07 · 第 6.3 节", wrongTags: [] },
+    {
+      no: 1,
+      stem: "AGC 投入后机组出力与调度指令偏差持续超过 ±3% 应优先采取?",
+      type: "单选题",
+      correctAnswer: "B. 检查 AGC 通道及测点,必要时切至手动",
+      userAnswer: "B. 检查 AGC 通道及测点,必要时切至手动",
+      isCorrect: true,
+      analysis: "偏差持续超限应先排查通道与测点,避免盲目调整出力。",
+      evidence: "AGC 控制器 SOP v2024.06 · 第 4.2 节",
+      wrongTags: [],
+    },
+    {
+      no: 2,
+      stem: "一次调频的负荷响应应在频率越限后多少秒内开始?",
+      type: "单选题",
+      correctAnswer: "A. 3 秒内",
+      userAnswer: "A. 3 秒内",
+      isCorrect: true,
+      analysis: "一次调频要求快速响应,应在 3 秒内开始动作。",
+      evidence: "两细则考核知识点汇编 v2024.05 · 第 2.1 节",
+      wrongTags: [],
+    },
+    {
+      no: 3,
+      stem: "主变停役前必须确认的安全措施包括哪些?",
+      type: "多选题",
+      correctAnswer: "ABD",
+      userAnswer: "ABD",
+      isCorrect: true,
+      analysis: "安全措施完整。",
+      evidence: "厂站运行规程(华东 A 厂) v2024.07 · 第 6.3 节",
+      wrongTags: [],
+    },
   ],
   a2: [
-    { no: 1, stem: "AGC 投入后机组出力与调度指令偏差持续超过 ±3% 应优先采取?", type: "单选题", correctAnswer: "B. 检查 AGC 通道及测点,必要时切至手动", userAnswer: "A. 立即手动大幅调整出力以消除偏差", isCorrect: false, analysis: "不应盲目调整出力,应先排查通道与测点。", evidence: "AGC 控制器 SOP v2024.06 · 第 4.2 节", wrongTags: ["AGC / 两细则", "异常处置"] },
-    { no: 2, stem: "一次调频的负荷响应应在频率越限后多少秒内开始?", type: "单选题", correctAnswer: "A. 3 秒内", userAnswer: "A. 3 秒内", isCorrect: true, analysis: "一次调频要求快速响应。", evidence: "两细则考核知识点汇编 v2024.05 · 第 2.1 节", wrongTags: [] },
-    { no: 3, stem: "主变停役前必须确认的安全措施包括哪些?", type: "多选题", correctAnswer: "ABD", userAnswer: "AB", isCorrect: false, analysis: "漏选 D(验明无电压并装设接地线)。", evidence: "厂站运行规程(华东 A 厂) v2024.07 · 第 6.3 节", wrongTags: ["主变停役", "安全措施"] },
+    {
+      no: 1,
+      stem: "AGC 投入后机组出力与调度指令偏差持续超过 ±3% 应优先采取?",
+      type: "单选题",
+      correctAnswer: "B. 检查 AGC 通道及测点,必要时切至手动",
+      userAnswer: "A. 立即手动大幅调整出力以消除偏差",
+      isCorrect: false,
+      analysis: "不应盲目调整出力,应先排查通道与测点。",
+      evidence: "AGC 控制器 SOP v2024.06 · 第 4.2 节",
+      wrongTags: ["AGC / 两细则", "异常处置"],
+    },
+    {
+      no: 2,
+      stem: "一次调频的负荷响应应在频率越限后多少秒内开始?",
+      type: "单选题",
+      correctAnswer: "A. 3 秒内",
+      userAnswer: "A. 3 秒内",
+      isCorrect: true,
+      analysis: "一次调频要求快速响应。",
+      evidence: "两细则考核知识点汇编 v2024.05 · 第 2.1 节",
+      wrongTags: [],
+    },
+    {
+      no: 3,
+      stem: "主变停役前必须确认的安全措施包括哪些?",
+      type: "多选题",
+      correctAnswer: "ABD",
+      userAnswer: "AB",
+      isCorrect: false,
+      analysis: "漏选 D(验明无电压并装设接地线)。",
+      evidence: "厂站运行规程(华东 A 厂) v2024.07 · 第 6.3 节",
+      wrongTags: ["主变停役", "安全措施"],
+    },
   ],
   a5: [
-    { no: 1, stem: "AGC 投入后机组出力与调度指令偏差持续超过 ±3% 应优先采取?", type: "单选题", correctAnswer: "B. 检查 AGC 通道及测点,必要时切至手动", userAnswer: "C. 退出一次调频功能", isCorrect: false, analysis: "退出一次调频与偏差处置无关。", evidence: "AGC 控制器 SOP v2024.06 · 第 4.2 节", wrongTags: ["AGC / 两细则"] },
-    { no: 2, stem: "一次调频的负荷响应应在频率越限后多少秒内开始?", type: "单选题", correctAnswer: "A. 3 秒内", userAnswer: "C. 15 秒内", isCorrect: false, analysis: "应在 3 秒内开始动作。", evidence: "两细则考核知识点汇编 v2024.05 · 第 2.1 节", wrongTags: ["一次调频", "响应时序"] },
-    { no: 3, stem: "主变停役前必须确认的安全措施包括哪些?", type: "多选题", correctAnswer: "ABD", userAnswer: "ABD", isCorrect: true, analysis: "安全措施完整。", evidence: "厂站运行规程(华东 A 厂) v2024.07 · 第 6.3 节", wrongTags: [] },
+    {
+      no: 1,
+      stem: "AGC 投入后机组出力与调度指令偏差持续超过 ±3% 应优先采取?",
+      type: "单选题",
+      correctAnswer: "B. 检查 AGC 通道及测点,必要时切至手动",
+      userAnswer: "C. 退出一次调频功能",
+      isCorrect: false,
+      analysis: "退出一次调频与偏差处置无关。",
+      evidence: "AGC 控制器 SOP v2024.06 · 第 4.2 节",
+      wrongTags: ["AGC / 两细则"],
+    },
+    {
+      no: 2,
+      stem: "一次调频的负荷响应应在频率越限后多少秒内开始?",
+      type: "单选题",
+      correctAnswer: "A. 3 秒内",
+      userAnswer: "C. 15 秒内",
+      isCorrect: false,
+      analysis: "应在 3 秒内开始动作。",
+      evidence: "两细则考核知识点汇编 v2024.05 · 第 2.1 节",
+      wrongTags: ["一次调频", "响应时序"],
+    },
+    {
+      no: 3,
+      stem: "主变停役前必须确认的安全措施包括哪些?",
+      type: "多选题",
+      correctAnswer: "ABD",
+      userAnswer: "ABD",
+      isCorrect: true,
+      analysis: "安全措施完整。",
+      evidence: "厂站运行规程(华东 A 厂) v2024.07 · 第 6.3 节",
+      wrongTags: [],
+    },
   ],
 };
 
@@ -1006,8 +1378,7 @@ export interface OptimizeSuggestion {
 
 export const OPTIMIZE = {
   score: 78,
-  summary:
-    "这套试卷适合取证复习,但 AGC 考点占比偏高,多选题偏少,建议补充 AVC 和一次调频题目。",
+  summary: "这套试卷适合取证复习,但 AGC 考点占比偏高,多选题偏少,建议补充 AVC 和一次调频题目。",
   knowledge: [
     { name: "AGC / 两细则", ratio: 45, level: "偏高" },
     { name: "AVC", ratio: 5, level: "偏低" },
@@ -1311,12 +1682,12 @@ export function syntheticPreviewQuestion(
     type === "判断题"
       ? defaultOptionsForType("判断题")
       : type === "单选题" || type === "多选题"
-        ? template ?? [
+        ? (template ?? [
             { key: "A", text: "选项 A" },
             { key: "B", text: "选项 B" },
             { key: "C", text: "选项 C" },
             { key: "D", text: "选项 D" },
-          ]
+          ])
         : undefined;
   return {
     id,
@@ -1375,7 +1746,8 @@ export const BANK_DETAILS: Record<string, BankDetail> = {
       { key: "D", text: "验明无电压并装设接地线" },
     ],
     answer: "ABD",
-    analysis: "主变停役需断开断路器、拉开隔离开关并验明无电压后装设接地线;投入备自投与停役流程无关。",
+    analysis:
+      "主变停役需断开断路器、拉开隔离开关并验明无电压后装设接地线;投入备自投与停役流程无关。",
     section: "厂站运行规程(华东 A 厂) v2024.07 · 第 6.3 节 主变停役操作",
   },
   bq4: {
@@ -1421,7 +1793,11 @@ export interface RewriteDiag {
 }
 
 export const REWRITE_DIAGS: RewriteDiag[] = [
-  { name: "题干清晰度", level: "建议优化", note: "题干中“响应慢”表述偏口语,建议明确为“AGC 响应速率不满足考核要求”。" },
+  {
+    name: "题干清晰度",
+    level: "建议优化",
+    note: "题干中“响应慢”表述偏口语,建议明确为“AGC 响应速率不满足考核要求”。",
+  },
   { name: "选项干扰度", level: "建议优化", note: "B、C 选项区分度不足,建议增强干扰项的迷惑性。" },
   { name: "答案唯一性", level: "通过", note: "正确答案唯一,无歧义。" },
   { name: "解析完整度", level: "建议优化", note: "当前解析未说明依据来源,建议补充资料章节。" },
@@ -1547,9 +1923,27 @@ export interface BankUsageRecord {
 }
 
 export const BANK_USAGE: BankUsageRecord[] = [
-  { paper: "AGC / 两细则取证复习考试", usedAt: "2026-06-10", assigned: 5, avgCorrect: 71, lastUsed: "2026-06-12" },
-  { paper: "新员工基础日常自测", usedAt: "2026-05-28", assigned: 56, avgCorrect: 78, lastUsed: "2026-06-01" },
-  { paper: "调频调压阶段测评", usedAt: "2026-05-15", assigned: 18, avgCorrect: 69, lastUsed: "2026-05-18" },
+  {
+    paper: "AGC / 两细则取证复习考试",
+    usedAt: "2026-06-10",
+    assigned: 5,
+    avgCorrect: 71,
+    lastUsed: "2026-06-12",
+  },
+  {
+    paper: "新员工基础日常自测",
+    usedAt: "2026-05-28",
+    assigned: 56,
+    avgCorrect: 78,
+    lastUsed: "2026-06-01",
+  },
+  {
+    paper: "调频调压阶段测评",
+    usedAt: "2026-05-15",
+    assigned: 18,
+    avgCorrect: 69,
+    lastUsed: "2026-05-18",
+  },
 ];
 
 // Draft papers available for 加入试卷
@@ -1639,11 +2033,24 @@ export const REVIEW_DETAILS: Record<string, ReviewQuestionDetail> = {
       { key: "D", text: "立即通知运行值长后再处理" },
     ],
     answer: "B",
-    analysis: "持续偏差超过 ±3% 应优先确认 AGC 控制器状态,必要时退出 AGC 改手动,避免被两细则考核扣分。",
-    genReason: "基于 AGC 控制器 SOP v2024.06 第 4.2 节关于 AGC 响应偏差处理流程生成,考点为偏差超限时的优先处理动作。",
+    analysis:
+      "持续偏差超过 ±3% 应优先确认 AGC 控制器状态,必要时退出 AGC 改手动,避免被两细则考核扣分。",
+    genReason:
+      "基于 AGC 控制器 SOP v2024.06 第 4.2 节关于 AGC 响应偏差处理流程生成,考点为偏差超限时的优先处理动作。",
     evidences: [
-      { kind: "主依据", source: "AGC 控制器 SOP v2024.06", location: "第 4.2 节 / P.18", excerpt: "AGC 控制下,实际出力与调度指令偏差持续超过 ±3% 时,应优先检查控制器状态,必要时退出 AGC 改手动控制。" },
-      { kind: "补充依据", source: "两细则考核知识点汇编 v2024.05", location: "第 2.1 章 / P.7", excerpt: "AGC 响应偏差长期不达标将按两细则进行考核扣分。" },
+      {
+        kind: "主依据",
+        source: "AGC 控制器 SOP v2024.06",
+        location: "第 4.2 节 / P.18",
+        excerpt:
+          "AGC 控制下,实际出力与调度指令偏差持续超过 ±3% 时,应优先检查控制器状态,必要时退出 AGC 改手动控制。",
+      },
+      {
+        kind: "补充依据",
+        source: "两细则考核知识点汇编 v2024.05",
+        location: "第 2.1 章 / P.7",
+        excerpt: "AGC 响应偏差长期不达标将按两细则进行考核扣分。",
+      },
     ],
   },
   rq2: {
@@ -1655,12 +2062,23 @@ export const REVIEW_DETAILS: Record<string, ReviewQuestionDetail> = {
     analysis: "一次调频死区设置过大会导致小幅频率波动时机组不动作,影响电网频率支撑能力。",
     genReason: "基于两细则考核知识点汇编中关于一次调频死区参数与动作灵敏度的关系生成。",
     evidences: [
-      { kind: "主依据", source: "两细则考核知识点汇编 v2024.05", location: "第 3.4 节 / P.22", excerpt: "一次调频死区应严格按照规程设置,过大死区将造成机组在频率小幅波动时不参与调频。" },
-      { kind: "相似案例依据", source: "某厂一次调频考核扣分复盘 2025Q1", location: "案例 3", excerpt: "因死区设置不当,机组多次未参与一次调频,被两细则考核扣分。" },
+      {
+        kind: "主依据",
+        source: "两细则考核知识点汇编 v2024.05",
+        location: "第 3.4 节 / P.22",
+        excerpt: "一次调频死区应严格按照规程设置,过大死区将造成机组在频率小幅波动时不参与调频。",
+      },
+      {
+        kind: "相似案例依据",
+        source: "某厂一次调频考核扣分复盘 2025Q1",
+        location: "案例 3",
+        excerpt: "因死区设置不当,机组多次未参与一次调频,被两细则考核扣分。",
+      },
     ],
   },
   rq3: {
-    analysis: "应先断开断路器,确认无电流后再操作中性点接地刀闸,顺序错误可能造成接地刀闸带负荷拉弧。",
+    analysis:
+      "应先断开断路器,确认无电流后再操作中性点接地刀闸,顺序错误可能造成接地刀闸带负荷拉弧。",
     genReason: "基于厂站运行规程典型误操作案例生成,考查停役操作顺序与风险识别。",
     scoringPoints: [
       "指出误操作风险:带负荷拉接地刀闸造成弧光短路",
@@ -1668,7 +2086,12 @@ export const REVIEW_DETAILS: Record<string, ReviewQuestionDetail> = {
       "提出补救措施和上报要求",
     ],
     evidences: [
-      { kind: "主依据", source: "厂站运行规程(华东 A 厂) v2024.07", location: "第 6.3 节", excerpt: "主变停役应严格按断路器 → 隔离开关 → 接地刀闸顺序操作。" },
+      {
+        kind: "主依据",
+        source: "厂站运行规程(华东 A 厂) v2024.07",
+        location: "第 6.3 节",
+        excerpt: "主变停役应严格按断路器 → 隔离开关 → 接地刀闸顺序操作。",
+      },
     ],
   },
   rq4: {
@@ -1682,7 +2105,12 @@ export const REVIEW_DETAILS: Record<string, ReviewQuestionDetail> = {
     analysis: "B 错误,安控装置联动需与录波、保护等装置协同配合。",
     genReason: "基于安控装置运行规程关于联动配合要求生成。",
     evidences: [
-      { kind: "主依据", source: "安控装置运行规程 v2023.09", location: "第 5 章", excerpt: "安控装置联动需考虑运行方式、冗余通道并通过试验验证。" },
+      {
+        kind: "主依据",
+        source: "安控装置运行规程 v2023.09",
+        location: "第 5 章",
+        excerpt: "安控装置联动需考虑运行方式、冗余通道并通过试验验证。",
+      },
     ],
     note: "退回原因:选项 B 表述存在歧义,需重写。",
   },
@@ -1697,8 +2125,18 @@ export const REVIEW_DETAILS: Record<string, ReviewQuestionDetail> = {
     analysis: "母差动作后应在 3 分钟内完成对故障母线的隔离,防止事故扩大。",
     genReason: "基于差动保护误动复盘案例库典型处置时限要求生成。",
     evidences: [
-      { kind: "主依据", source: "差动保护误动复盘案例库 v2023.11", location: "处置时限章节", excerpt: "故障母线应在 3 分钟内完成隔离。" },
-      { kind: "补充依据", source: "厂站运行规程", location: "保护动作章节", excerpt: "母差跳闸后应迅速隔离故障设备。" },
+      {
+        kind: "主依据",
+        source: "差动保护误动复盘案例库 v2023.11",
+        location: "处置时限章节",
+        excerpt: "故障母线应在 3 分钟内完成隔离。",
+      },
+      {
+        kind: "补充依据",
+        source: "厂站运行规程",
+        location: "保护动作章节",
+        excerpt: "母差跳闸后应迅速隔离故障设备。",
+      },
     ],
   },
 };
@@ -1718,17 +2156,72 @@ export interface ReviewSimilarItem {
 
 export const REVIEW_SIMILAR: Record<string, ReviewSimilarItem[]> = {
   rq1: [
-    { id: "bq1", stem: "AGC 控制方式下,机组响应调度指令的速率不满足要求会被两细则如何考核?", type: "单选题", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", similarity: 82, status: "启用", usedCount: 28, correctRate: 71 },
-    { id: "bq6", stem: "AGC 投自动后,机组实际出力偏离调度指令的允许范围是多少?", type: "单选题", knowledge: "AGC / 两细则", difficulty: "中", source: "AGC 控制器 SOP v2024.06", similarity: 76, status: "启用", usedCount: 19, correctRate: 68 },
+    {
+      id: "bq1",
+      stem: "AGC 控制方式下,机组响应调度指令的速率不满足要求会被两细则如何考核?",
+      type: "单选题",
+      knowledge: "AGC / 两细则",
+      difficulty: "中",
+      source: "AGC 控制器 SOP v2024.06",
+      similarity: 82,
+      status: "启用",
+      usedCount: 28,
+      correctRate: 71,
+    },
+    {
+      id: "bq6",
+      stem: "AGC 投自动后,机组实际出力偏离调度指令的允许范围是多少?",
+      type: "单选题",
+      knowledge: "AGC / 两细则",
+      difficulty: "中",
+      source: "AGC 控制器 SOP v2024.06",
+      similarity: 76,
+      status: "启用",
+      usedCount: 19,
+      correctRate: 68,
+    },
   ],
   rq2: [
-    { id: "bq2", stem: "一次调频死区设置不当对机组参与电网调频有何影响?", type: "单选题", knowledge: "一次调频", difficulty: "易", source: "两细则考核知识点汇编 v2024.05", similarity: 88, status: "启用", usedCount: 41, correctRate: 64 },
-    { id: "bq7", stem: "一次调频未动作的常见原因不包括下列哪项?", type: "单选题", knowledge: "一次调频", difficulty: "中", source: "两细则考核知识点汇编 v2024.05", similarity: 71, status: "启用", usedCount: 22, correctRate: 70 },
+    {
+      id: "bq2",
+      stem: "一次调频死区设置不当对机组参与电网调频有何影响?",
+      type: "单选题",
+      knowledge: "一次调频",
+      difficulty: "易",
+      source: "两细则考核知识点汇编 v2024.05",
+      similarity: 88,
+      status: "启用",
+      usedCount: 41,
+      correctRate: 64,
+    },
+    {
+      id: "bq7",
+      stem: "一次调频未动作的常见原因不包括下列哪项?",
+      type: "单选题",
+      knowledge: "一次调频",
+      difficulty: "中",
+      source: "两细则考核知识点汇编 v2024.05",
+      similarity: 71,
+      status: "启用",
+      usedCount: 22,
+      correctRate: 70,
+    },
   ],
   rq3: [],
   rq4: [],
   rq5: [
-    { id: "bq8", stem: "母差保护动作后,运行人员的首要任务是什么?", type: "单选题", knowledge: "差动保护", difficulty: "中", source: "差动保护误动复盘案例库 v2023.11", similarity: 74, status: "启用", usedCount: 12, correctRate: 66 },
+    {
+      id: "bq8",
+      stem: "母差保护动作后,运行人员的首要任务是什么?",
+      type: "单选题",
+      knowledge: "差动保护",
+      difficulty: "中",
+      source: "差动保护误动复盘案例库 v2023.11",
+      similarity: 74,
+      status: "启用",
+      usedCount: 12,
+      correctRate: 66,
+    },
   ],
 };
 

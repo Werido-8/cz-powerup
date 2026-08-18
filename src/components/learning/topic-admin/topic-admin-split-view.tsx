@@ -21,6 +21,23 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { DOCS } from "@/lib/mock/data";
 import {
   TOPIC_ADMIN_RECORDS,
@@ -220,9 +237,12 @@ function TopicWorkspace({
   onPreview: (record: TopicAdminRecord) => void;
 }) {
   const release = getReleaseReadiness(record);
+  const [unpublishOpen, setUnpublishOpen] = useState(false);
+  const [releaseSheetOpen, setReleaseSheetOpen] = useState(false);
 
   const publish = () => {
     if (!release.ready) return;
+    setReleaseSheetOpen(false);
     toast.success(`《${record.title}》已提交发布`);
   };
 
@@ -244,6 +264,11 @@ function TopicWorkspace({
               <span className="text-[11.5px] text-kb-muted">{record.specialty}</span>
               <span className="text-[11.5px] text-kb-muted">·</span>
               <span className="text-[11.5px] text-kb-muted">{record.scenario}</span>
+              {record.status === "已发布" && (
+                <span className="rounded-md border border-success/20 bg-success-soft px-2 py-1 text-[10.5px] text-success">
+                  线上版本
+                </span>
+              )}
             </div>
             <h2 className="mt-2 text-[22px] font-semibold tracking-[-0.02em] text-kb-heading sm:text-[24px]">
               {record.title}
@@ -251,6 +276,13 @@ function TopicWorkspace({
             <p className="mt-1.5 max-w-4xl text-[12.5px] leading-5 text-kb-muted">{record.intro}</p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setReleaseSheetOpen(true)}
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-[9px] border border-kb-border bg-white px-3 text-[12px] font-medium text-kb-body hover:bg-kb-surface min-[1440px]:hidden"
+            >
+              <ClipboardCheck className="h-4 w-4" /> 发布检查
+            </button>
             <button
               type="button"
               onClick={() => onPreview(record)}
@@ -268,14 +300,19 @@ function TopicWorkspace({
             {record.status === "已发布" && (
               <button
                 type="button"
-                onClick={() => toast.message("专题下架前将再次确认影响范围")}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-[9px] px-2.5 text-[12px] text-kb-muted hover:bg-kb-surface"
+                onClick={() => setUnpublishOpen(true)}
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-[9px] px-2.5 text-[12px] text-destructive hover:bg-destructive/10"
               >
                 <Archive className="h-4 w-4" /> 下架
               </button>
             )}
           </div>
         </div>
+        {record.status === "已发布" && (
+          <p className="relative mt-3 max-w-3xl rounded-md border border-remind/20 bg-remind-soft/45 px-3 py-2 text-[11.5px] text-remind-foreground">
+            编辑将创建未发布草稿，不会立即改变员工正在学习的线上版本。
+          </p>
+        )}
       </header>
 
       <section className="border-b border-kb-border px-5 py-4 sm:px-6" aria-label="专题发布流程">
@@ -297,7 +334,7 @@ function TopicWorkspace({
             {release.ready ? "发布条件完整" : `${release.completed}/4 项已完成`}
           </span>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <ReadinessStep index="01" label="基本信息" detail="目标与适用范围" ready />
           <ReadinessStep
             index="02"
@@ -320,7 +357,7 @@ function TopicWorkspace({
         </div>
       </section>
 
-      <div className="grid flex-1 gap-5 p-5 sm:p-6 2xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid flex-1 gap-5 p-5 sm:p-6 min-[1440px]:grid-cols-[minmax(0,1fr)_320px]">
         <section className="min-w-0">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
@@ -494,7 +531,7 @@ function TopicWorkspace({
           </div>
         </section>
 
-        <aside className="space-y-4 2xl:sticky 2xl:top-5 2xl:self-start">
+        <aside className="hidden space-y-4 min-[1440px]:sticky min-[1440px]:top-5 min-[1440px]:block min-[1440px]:self-start">
           <div className="overflow-hidden rounded-[12px] border border-kb-border bg-white">
             <div className="border-b border-kb-border px-4 py-4">
               <div className="flex items-center justify-between gap-3">
@@ -590,6 +627,85 @@ function TopicWorkspace({
         <span>维护人：{record.maintainer}</span>
         <span>最近更新：{record.updatedAt}</span>
       </footer>
+
+      <Sheet open={releaseSheetOpen} onOpenChange={setReleaseSheetOpen}>
+        <SheetContent className="w-full p-0 sm:max-w-md">
+          <SheetHeader className="border-b border-kb-border px-5 py-4 text-left">
+            <SheetTitle>发布检查</SheetTitle>
+            <SheetDescription>确认员工端发布所需的资料、知识点与练习均已准备。</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-4 px-5 py-5">
+            <div className="rounded-lg border border-kb-border bg-kb-surface/45 px-3 py-2.5 text-[12px] text-kb-body">
+              已完成 {release.completed}/4 项
+              <span
+                className={cn(
+                  "ml-2 rounded-md px-2 py-0.5 text-[10.5px]",
+                  release.ready
+                    ? "bg-success-soft text-success"
+                    : "bg-remind-soft text-remind-foreground",
+                )}
+              >
+                {release.ready ? "可发布" : "仍需完善"}
+              </span>
+            </div>
+            <div className="space-y-1 rounded-lg border border-kb-border px-3 py-2">
+              <CheckRow label="基本信息已填写" value="目标与范围" ready />
+              <CheckRow
+                label="资料来源已确定"
+                value={`${record.docIds.length} 份`}
+                ready={release.materialsReady}
+              />
+              <CheckRow
+                label="知识点已确认"
+                value={`${record.knowledgePoints.filter((item) => item.confirmed).length} 条`}
+                ready={release.knowledgeReady}
+              />
+              <CheckRow
+                label="关联练习已核对"
+                value={`${release.questionCount} 道`}
+                ready={release.exercisesReady}
+              />
+            </div>
+            {record.status === "草稿" && (
+              <button
+                type="button"
+                onClick={publish}
+                disabled={!release.ready}
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[9px] bg-primary px-4 text-[12px] font-semibold text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-kb-surface disabled:text-kb-muted"
+              >
+                <Send className="h-4 w-4" /> {release.ready ? "提交发布" : "完成检查后发布"}
+              </button>
+            )}
+            {record.status === "已发布" && (
+              <div className="flex items-start gap-2 rounded-lg border border-success/20 bg-success-soft/40 px-3 py-2.5 text-[12px] text-success">
+                <CircleCheck className="mt-0.5 h-4 w-4 shrink-0" />
+                当前版本已面向 {record.learnerCount} 名员工发布。
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={unpublishOpen} onOpenChange={setUnpublishOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认下架专题？</AlertDialogTitle>
+            <AlertDialogDescription>
+              下架后，{record.learnerCount}{" "}
+              名已在学员工将无法继续打开该专题；既有学习记录会保留。此操作不会删除专题内容。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => toast.success(`《${record.title}》已下架，历史学习记录已保留`)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              确认下架
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

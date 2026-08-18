@@ -14,7 +14,7 @@ import {
 import { z } from "zod";
 import { PageShell } from "@/components/workbench/PageShell";
 import { ExamSessionPaperView } from "@/components/exam/exam-session-paper";
-import { QUESTIONS, TOPICS, type Question, type QuestionType } from "@/lib/mock/data";
+import { DOCS, QUESTIONS, TOPICS, type Question, type QuestionType } from "@/lib/mock/data";
 import {
   fallbackExamSessionPaper,
   flattenExamQuestions,
@@ -58,7 +58,7 @@ function SessionPage() {
   const { mode, filter, filters, types, diff, count, limit, passScore, docId, topicId, title } =
     Route.useSearch() as z.infer<typeof searchSchema>;
   const navigate = useNavigate();
-  const { addWrong, recordDocAnswers } = useMockStore();
+  const { addWrong, recordDocAnswers, startDocPractice } = useMockStore();
 
   const isExamMode = mode === "exam";
   const examPaper = useMemo(() => {
@@ -78,7 +78,8 @@ function SessionPage() {
   }, [isExamMode, id, count, limit, passScore, title, filter, filters, diff]);
 
   const topic = topicId ? TOPICS.find((t) => t.id === topicId) : undefined;
-  const isTopicPractice = Boolean(topicId && topic);
+  const doc = docId ? DOCS.find((item) => item.id === docId) : undefined;
+  const isTopicPractice = Boolean(!docId && topicId && topic);
 
   const topicItems: TopicQuestionItem[] = useMemo(() => {
     if (!topic) return [];
@@ -124,6 +125,17 @@ function SessionPage() {
     if (pool.length === 0) pool = QUESTIONS;
     return pool.slice(0, Math.max(1, count));
   }, [filter, filters, types, diff, count, docId, isTopicPractice, topicItems]);
+
+  useEffect(() => {
+    if (mode !== "practice") return;
+    if (docId) {
+      startDocPractice(docId);
+      return;
+    }
+    if (isTopicPractice) {
+      topic?.docIds.forEach((id) => startDocPractice(id));
+    }
+  }, [docId, isTopicPractice, mode, startDocPractice, topic]);
 
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -212,13 +224,16 @@ function SessionPage() {
     }
 
     const wrongIds: string[] = [];
+    const correctIds: string[] = [];
     questions.forEach((qq) => {
       if (qq.type === "text") return;
       const a = answers[qq.id];
       const correct = Array.isArray(qq.answer)
         ? Array.isArray(a) && [...a].sort().join() === [...qq.answer].sort().join()
         : a === qq.answer;
-      if (!correct) {
+      if (correct) {
+        correctIds.push(qq.id);
+      } else {
         wrongIds.push(qq.id);
         addWrong(qq.id);
       }
@@ -236,13 +251,17 @@ function SessionPage() {
       }),
     );
     if (isTopicPractice && topicId) {
-      const byDoc = new Map<string, string[]>();
+      const correctSet = new Set(correctIds);
+      const byDoc = new Map<string, { answeredIds: string[]; correctIds: string[] }>();
       topicItems.forEach((item) => {
-        const list = byDoc.get(item.docId) ?? [];
-        list.push(item.question.id);
-        byDoc.set(item.docId, list);
+        const entry = byDoc.get(item.docId) ?? { answeredIds: [], correctIds: [] };
+        entry.answeredIds.push(item.question.id);
+        if (correctSet.has(item.question.id)) entry.correctIds.push(item.question.id);
+        byDoc.set(item.docId, entry);
       });
-      byDoc.forEach((qids, did) => recordDocAnswers(did, qids));
+      byDoc.forEach(({ answeredIds, correctIds: docCorrectIds }, did) =>
+        recordDocAnswers(did, answeredIds, docCorrectIds),
+      );
       clearTopicPracticeDraft(topicId);
       navigate({
         to: "/training/result/$id",
@@ -255,6 +274,7 @@ function SessionPage() {
       recordDocAnswers(
         docId,
         questions.map((qq) => qq.id),
+        correctIds,
       );
     }
     navigate({ to: "/training/result/$id", params: { id }, search: docId ? { docId } : undefined });
@@ -285,7 +305,7 @@ function SessionPage() {
     ? (topic?.title ?? "专题练习")
     : isExamMode && examPaper
       ? examPaper.title
-      : decodeURIComponent(id);
+      : (doc?.title ?? decodeURIComponent(id));
   const displaySessionTitle =
     title ?? (sessionTitle.startsWith("专项练习-") ? "知识点专项练习" : sessionTitle);
   const modeLabel = isTopicPractice

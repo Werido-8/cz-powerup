@@ -281,8 +281,8 @@ function createBankQuestionId(rows: BankQuestion[]) {
 
 function BankFilterField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex w-full flex-col items-stretch gap-1.5 sm:w-auto sm:flex-row sm:items-center">
-      <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
+    <div className="inline-flex min-w-0 items-center gap-2">
+      <span className="shrink-0 text-[12px] font-medium text-muted-foreground">{label}</span>
       {children}
     </div>
   );
@@ -420,11 +420,11 @@ export function BankModule() {
   };
 
   return (
-    <div className="flex max-w-full min-w-0 flex-col gap-4 xl:flex-row">
-      <aside className="w-full shrink-0 xl:w-[236px]">
-        <div className="overflow-hidden rounded-2xl border border-[#D8E5E7] bg-[#F7FAFA]">
-          <div className="flex items-center gap-3 border-b border-border px-4 py-4">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-primary shadow-[0_3px_12px_rgba(25,72,82,0.08)]">
+    <div className="flex max-w-full min-w-0 flex-col gap-4 border-t border-kb-border pt-4 xl:flex-row">
+      <aside className="w-full shrink-0 border-b border-kb-border pb-3 xl:w-[238px] xl:border-b-0 xl:border-r xl:pb-0 xl:pr-4">
+        <div>
+          <div className="flex items-center gap-3 border-b border-border px-1 pb-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-kb-border bg-white text-primary">
               <Library className="h-[18px] w-[18px]" />
             </div>
             <div className="min-w-0">
@@ -433,7 +433,7 @@ export function BankModule() {
             </div>
           </div>
           <nav
-            className="flex gap-1 overflow-x-auto p-2.5 xl:block xl:max-h-[min(38rem,68vh)] xl:space-y-1 xl:overflow-y-auto"
+            className="flex gap-1 overflow-x-auto px-1 pt-2 xl:block xl:max-h-[min(38rem,68vh)] xl:space-y-1 xl:overflow-y-auto"
             aria-label="题库分类"
           >
             {BANK_CATEGORIES.map((c) => {
@@ -445,7 +445,7 @@ export function BankModule() {
                   type="button"
                   onClick={() => selectCategory(c.key)}
                   className={cn(
-                    "relative flex min-h-11 min-w-[148px] items-center gap-2.5 rounded-xl px-3 text-left transition-colors xl:w-full xl:min-w-0",
+                    "relative flex min-h-10 min-w-[148px] items-center gap-2.5 rounded-md px-3 text-left transition-colors xl:w-full xl:min-w-0",
                     active
                       ? "bg-primary-soft/80 font-medium text-primary"
                       : "text-foreground/85 hover:bg-muted/50",
@@ -480,8 +480,8 @@ export function BankModule() {
       </aside>
 
       <div className="min-w-0 flex-1">
-        <div className="rounded-t-[12px] border border-kb-border bg-kb-surface p-3">
-          <div className="flex min-w-0 flex-wrap items-end gap-3">
+        <div className="border-b border-kb-border py-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
             <BankFilterField label="关键词">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-kb-muted" />
@@ -490,13 +490,13 @@ export function BankModule() {
                   onChange={(event) => setKeyword(event.target.value)}
                   onKeyDown={(event) => event.key === "Enter" && handleFormQuery()}
                   placeholder="搜索题目、知识点或来源"
-                  className="h-10 w-full rounded-[9px] bg-white pl-9 text-[12.5px] sm:w-[260px]"
+                  className="h-9 w-full rounded-md border-kb-border bg-white pl-9 text-[12.5px] sm:w-[250px]"
                 />
               </div>
             </BankFilterField>
             <BankFilterField label="分类">
               <Select value={draftCat} onValueChange={setDraftCat}>
-                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[138px]">
+                <SelectTrigger className="h-9 w-[138px] rounded-md border-kb-border bg-white text-[13px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -513,7 +513,7 @@ export function BankModule() {
                 value={draftType}
                 onValueChange={(v) => setDraftType(v as QuestionType | "all")}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[122px]">
+                <SelectTrigger className="h-9 w-[122px] rounded-md border-kb-border bg-white text-[13px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -542,7 +542,7 @@ export function BankModule() {
                 value={draftDifficulty}
                 onValueChange={(v) => setDraftDifficulty(v as Difficulty | "all")}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[104px]">
+                <SelectTrigger className="h-9 w-[104px] rounded-md border-kb-border bg-white text-[13px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -562,7 +562,7 @@ export function BankModule() {
                 value={draftStatus}
                 onValueChange={(v) => setDraftStatus(v as "启用" | "禁用" | "all")}
               >
-                <SelectTrigger className="h-10 w-full rounded-lg bg-white text-[13px] sm:w-[104px]">
+                <SelectTrigger className="h-9 w-[104px] rounded-md border-kb-border bg-white text-[13px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -578,18 +578,18 @@ export function BankModule() {
                 </SelectContent>
               </Select>
             </BankFilterField>
-            <div className="flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto sm:flex-nowrap">
+            <div className="flex w-full flex-wrap items-center gap-1.5 lg:ml-auto lg:w-auto lg:flex-nowrap">
               <button
                 type="button"
                 onClick={handleFormQuery}
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-4 text-[13px] font-medium text-white hover:bg-[#2b91a3]"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-[13px] font-medium text-white hover:bg-[#2b91a3]"
               >
                 <Search className="h-3.5 w-3.5" /> 查询
               </button>
               <button
                 type="button"
                 onClick={handleFormReset}
-                className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-border bg-white px-4 text-[13px] text-muted-foreground hover:bg-muted"
+                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-white px-4 text-[13px] text-muted-foreground hover:bg-muted"
               >
                 <RotateCcw className="h-3.5 w-3.5" /> 重置
               </button>
@@ -598,11 +598,11 @@ export function BankModule() {
         </div>
 
         {/* 操作区：新增 + 批量 */}
-        <div className="mb-4 flex min-h-[52px] flex-wrap items-center justify-between gap-3 rounded-b-[12px] border border-t-0 border-kb-border bg-white px-3 py-2">
+        <div className="mb-3 flex min-h-[48px] flex-wrap items-center justify-between gap-3 border-b border-kb-border px-0 py-2">
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="h-3.5 w-3.5" /> 新增题目
           </button>
@@ -651,7 +651,7 @@ export function BankModule() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[12px] border border-[#D8E5E7] bg-card">
+        <div className="overflow-hidden rounded-[8px] border border-[#D8E5E7] bg-card">
           <div className="overflow-x-auto">
             <table className="w-full whitespace-nowrap text-[13.5px]">
               <thead className="bg-[#F3F7F8] text-[12.5px] text-muted-foreground">
@@ -704,17 +704,26 @@ export function BankModule() {
                           <span className="max-w-[280px] truncate">来源 {b.source}</span>
                           <span>使用 {b.usedCount} 次</span>
                           <span>最近 {b.lastUsed}</span>
-                          <span
-                            className={
-                              b.correctRate >= 70
-                                ? "text-success"
-                                : b.correctRate >= 55
-                                  ? "text-warning-foreground"
-                                  : "text-destructive"
-                            }
-                          >
-                            正确率 {b.correctRate}%
-                          </span>
+                          {b.usedCount > 0 ? (
+                            <span
+                              className={
+                                b.correctRate >= 70
+                                  ? "text-success"
+                                  : b.correctRate >= 55
+                                    ? "text-warning-foreground"
+                                    : "text-destructive"
+                              }
+                            >
+                              正确率 {b.correctRate}%
+                            </span>
+                          ) : (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help">正确率 —</span>
+                              </TooltipTrigger>
+                              <TooltipContent>暂无已提交答卷，暂不计算正确率</TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                       </Td>
                       <Td className="px-3 py-2.5 text-muted-foreground">{b.type}</Td>
@@ -738,7 +747,6 @@ export function BankModule() {
                       <Td className="px-3 py-2.5 text-right">
                         <div className="inline-flex flex-nowrap items-center justify-end gap-0.5">
                           <ActionBtn icon={Eye} label="查看详情" onClick={() => setDetail(b)} />
-                          <ActionBtn icon={Pencil} label="编辑" onClick={() => setEdit(b)} />
                           {/* 本期暂不开放：智能改写
                           <ActionBtn icon={Wand2} label="智能改写" tone="primary" onClick={() => setRewrite(b)} />
                           */}
@@ -749,6 +757,9 @@ export function BankModule() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem onClick={() => setEdit(b)}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> 编辑
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setSimilar(b)}>
                                 <FileSearch className="mr-2 h-3.5 w-3.5" /> 查相似题
                               </DropdownMenuItem>
@@ -1007,7 +1018,9 @@ function BankDetailDrawer({
                 </div>
                 <div className="rounded-lg border border-border bg-card p-3">
                   <div className="text-[11px] text-muted-foreground">历史正确率</div>
-                  <div className="mt-1 text-[18px] font-semibold">{q.correctRate}%</div>
+                  <div className="mt-1 text-[18px] font-semibold">
+                    {q.usedCount > 0 ? `${q.correctRate}%` : "—"}
+                  </div>
                 </div>
                 <div className="rounded-lg border border-border bg-card p-3">
                   <div className="text-[11px] text-muted-foreground">最近使用</div>

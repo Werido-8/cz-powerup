@@ -9,7 +9,6 @@ import {
 import { toast } from "sonner";
 import { AiAppendConfirmDialog, type AiAppendContext } from "@/components/exam/ai-append-confirm-dialog";
 import {
-  AI_APPEND_BATCH_SIZE,
   AI_APPEND_DISABLED_TOOLTIP,
   AI_APPEND_ENABLED_TOOLTIP,
   AI_APPEND_INCOMPLETE_MSG,
@@ -145,7 +144,7 @@ export function ExamPaperEditor({
   const isEdit = !!paper;
   const isAiMode = mode === "ai" && !isEdit;
 
-  const { groups, collapsed, toggleCollapse, move, remove, aiAppend, resetGroups, collapseAll, expandAll, summary } =
+  const { groups, collapsed, toggleCollapse, moveQuestion, removeQuestion, aiAppend, resetGroups, collapseAll, expandAll, summary } =
     usePaperQuestionGroups(EMPTY_EDITOR_GROUPS);
 
   const [aiPrompt, setAiPrompt] = useState("");
@@ -249,11 +248,15 @@ export function ExamPaperEditor({
 
   const handleConfirmAiAppend = () => {
     if (!pendingAppendType || !basicInfo.difficulty) return;
-    aiAppend(pendingAppendType, {
+    const appendedCount = aiAppend(pendingAppendType, {
       knowledge: basicInfo.category,
       difficulty: basicInfo.difficulty,
     });
-    toast.success(`已为${pendingAppendType}补 ${AI_APPEND_BATCH_SIZE} 道题`);
+    if (appendedCount > 0) {
+      toast.success(`已为${pendingAppendType}补 ${appendedCount} 道题`);
+    } else {
+      toast.info("当前题库没有可补充的同题型题目");
+    }
     setAppendConfirmOpen(false);
     setPendingAppendType(null);
   };
@@ -426,8 +429,8 @@ export function ExamPaperEditor({
                 onToggleCollapse={toggleCollapse}
                 onAdd={onAddQuestion}
                 onAiAppend={handleAiAppendRequest}
-                onMove={move}
-                onRemove={remove}
+                onMoveQuestion={moveQuestion}
+                onRemoveQuestion={removeQuestion}
                 onSwap={onSwapQuestion}
                 aiAppendReady={contextReady}
                 aiAppendTooltip={AI_APPEND_ENABLED_TOOLTIP}

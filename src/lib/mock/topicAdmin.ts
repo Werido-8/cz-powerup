@@ -194,6 +194,7 @@ export const TOPIC_ADMIN_RECORDS: TopicAdminRecord[] = [
     docQuestions: [],
     status: "草稿",
     updatedAt: "2025-06-30",
+    learnerCount: 0,
     maintainer: "王老师",
     aiHints: ["资料清单为空", "知识点未维护", "尚未生成关联题目"],
   },

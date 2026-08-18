@@ -1,15 +1,21 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import { Header } from "./Header";
 
 export function PageShell({
   children,
   compact,
   wide,
+  subBar,
+  mainClassName,
 }: {
   children: ReactNode;
   compact?: boolean;
   /** Enables the 2K desktop density treatment used by the knowledge workspace. */
   wide?: boolean;
+  /** 顶部导航下方的通栏区域（多页签栏等） */
+  subBar?: ReactNode;
+  mainClassName?: string;
 }) {
   return (
     <div
@@ -20,12 +26,14 @@ export function PageShell({
       }
     >
       <Header wide={wide} />
+      {subBar}
       <main
-        className={
+        className={cn(
           compact
             ? `page-shell__main min-h-0 w-full flex-1 overflow-hidden px-4 py-3${wide ? " page-shell__main--wide" : ""}`
-            : "w-full px-6 py-7 lg:px-8"
-        }
+            : "w-full px-6 py-7 lg:px-8",
+          mainClassName,
+        )}
       >
         {children}
       </main>

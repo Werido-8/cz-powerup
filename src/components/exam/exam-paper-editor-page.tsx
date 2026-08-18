@@ -10,10 +10,7 @@ import {
   usePaperQuestionGroups,
 } from "@/components/exam/paper-question-list";
 import { AddQuestionDialog, AssignDialog } from "@/components/exam/exam-dialogs";
-import {
-  PaperBasicInfoPanel,
-  PAPER_SPLIT_PANEL_H,
-} from "@/components/exam/paper-side-panel";
+import { PaperBasicInfoPanel, PAPER_SPLIT_PANEL_H } from "@/components/exam/paper-side-panel";
 import { cn } from "@/lib/utils";
 import {
   EMPTY_EDITOR_GROUPS,
@@ -32,6 +29,10 @@ export interface PaperBasicInfo {
   position: string;
   duration: string;
   passLine: string;
+  /** 固定总分试卷的目标分值。 */
+  totalScore?: string;
+  /** 未设置时兼容旧草稿，按固定总分处理。 */
+  scoreMode?: "fixed" | "variable" | "unscored";
   difficulty: Difficulty | "";
   note: string;
 }
@@ -43,6 +44,7 @@ const EMPTY_BASIC_INFO: PaperBasicInfo = {
   position: "",
   duration: "",
   passLine: "60",
+  totalScore: "100",
   difficulty: "",
   note: "",
 };
@@ -63,7 +65,8 @@ export function ExamPaperEditorPage({
   onSave,
 }: ExamPaperEditorPageProps) {
   const isEdit = !!paper;
-  const seedGroups = initialGroups ?? (paper ? getPaperQuestionGroups(paper.id) : EMPTY_EDITOR_GROUPS);
+  const seedGroups =
+    initialGroups ?? (paper ? getPaperQuestionGroups(paper.id) : EMPTY_EDITOR_GROUPS);
 
   const {
     groups,
@@ -183,7 +186,9 @@ export function ExamPaperEditorPage({
       </div>
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
-        <div className={cn("min-h-0 overflow-y-auto overscroll-contain pr-0.5", PAPER_SPLIT_PANEL_H)}>
+        <div
+          className={cn("min-h-0 overflow-y-auto overscroll-contain pr-0.5", PAPER_SPLIT_PANEL_H)}
+        >
           <div className="space-y-4 pb-2">
             <PaperTypeToolbar groups={groups} onAddGroup={addGroup} />
             <PaperQuestionSummary summary={summary} />

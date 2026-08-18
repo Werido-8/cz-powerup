@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   BookOpen,
+  AlertTriangle,
   Check,
   CheckSquare,
   ChevronLeft,
@@ -9,6 +10,7 @@ import {
   ClipboardList,
   Eye,
   Loader2,
+  Pencil,
   Save,
   Send,
   Sparkles,
@@ -127,6 +129,13 @@ export function TopicEditorWizard({
     // }
   });
   const [aiLoading, setAiLoading] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [knowledgeFilter, setKnowledgeFilter] = useState<"all" | "pending" | "confirmed">("all");
+  const [expandedKnowledgeIds, setExpandedKnowledgeIds] = useState<Set<string>>(new Set());
+  const [aiKnowledgeResult, setAiKnowledgeResult] = useState<{
+    created: number;
+    skipped: number;
+  } | null>(null);
   const [docSearch, setDocSearch] = useState("");
   const [docTypeFilter, setDocTypeFilter] = useState("all");
 
@@ -145,12 +154,53 @@ export function TopicEditorWizard({
   const docTypes = useMemo(() => [...new Set(poolDocs.map((d) => d.docType))], [poolDocs]);
 
   const updateDraft = (patch: Partial<DraftState>) => {
+    setDirty(true);
     setDraft((prev) => {
       const next = { ...prev, ...patch, updatedAt: new Date().toISOString().slice(0, 10) };
       saveDraft(next, topicId);
       return next;
     });
   };
+
+  useEffect(() => {
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [dirty]);
+
+  const handleBack = () => {
+    if (dirty && !window.confirm("当前有未保存的修改，确认离开专题编辑吗？")) return;
+    onBack();
+  };
+
+  const updateKnowledgePoint = (id: string, patch: Partial<TopicKnowledgePoint>) => {
+    updateDraft({
+      knowledgePoints: draft.knowledgePoints.map((item) =>
+        item.id === id ? { ...item, ...patch } : item,
+      ),
+    });
+  };
+
+  const knowledgeStats = useMemo(
+    () => ({
+      total: draft.knowledgePoints.length,
+      pending: draft.knowledgePoints.filter((item) => !item.confirmed).length,
+      confirmed: draft.knowledgePoints.filter((item) => item.confirmed).length,
+    }),
+    [draft.knowledgePoints],
+  );
+
+  const visibleKnowledgePoints = useMemo(() => {
+    const sorted = [...draft.knowledgePoints].sort(
+      (a, b) => Number(a.confirmed) - Number(b.confirmed),
+    );
+    if (knowledgeFilter === "pending") return sorted.filter((item) => !item.confirmed);
+    if (knowledgeFilter === "confirmed") return sorted.filter((item) => item.confirmed);
+    return sorted;
+  }, [draft.knowledgePoints, knowledgeFilter]);
 
   const toggleDoc = (docId: string) => {
     const has = draft.docIds.includes(docId);
@@ -211,9 +261,20 @@ export function TopicEditorWizard({
           source: "ai",
           confirmed: false,
         }));
-      updateDraft({ knowledgePoints: [...draft.knowledgePoints, ...knowledgePoints] });
+      const existingTitles = new Set(
+        draft.knowledgePoints.map((item) => item.title.trim().toLowerCase()),
+      );
+      const newKnowledgePoints = knowledgePoints.filter(
+        (item) => !existingTitles.has(item.title.trim().toLowerCase()),
+      );
+      updateDraft({ knowledgePoints: [...draft.knowledgePoints, ...newKnowledgePoints] });
+      setExpandedKnowledgeIds(new Set(newKnowledgePoints.map((item) => item.id)));
+      setAiKnowledgeResult({
+        created: newKnowledgePoints.length,
+        skipped: knowledgePoints.length - newKnowledgePoints.length,
+      });
       setAiLoading(false);
-      toast.success("AI 已生成知识点草稿，请逐条确认");
+      toast.success(`AI 已生成 ${newKnowledgePoints.length} 条知识点草稿，请逐条确认`);
     }, 1400);
   };
 
@@ -242,18 +303,31 @@ export function TopicEditorWizard({
     if (step === 1)
       return draft.title.trim() && draft.learningGoal.trim() && draft.positions.length > 0;
     if (step === 2) return draft.docIds.length > 0;
-    if (step === 3) return draft.knowledgePoints.length > 0;
+    if (step === 3)
+      return (
+        draft.knowledgePoints.length > 0 &&
+        draft.knowledgePoints.every(
+          (item) => item.confirmed && item.title.trim() && item.summary.trim(),
+        )
+      );
     if (step === 4) return draft.docQuestions.every((d) => d.questionIds.length > 0);
     return true;
   };
 
   const handleSaveDraft = () => {
     saveDraft(draft, topicId);
+    setDirty(false);
     toast.success("草稿已保存");
   };
 
   const handlePublish = () => {
-    updateDraft({ status: "已发布", publishedAt: new Date().toISOString().slice(0, 10) });
+    const publishedDraft: DraftState = {
+      ...draft,
+      status: "已发布",
+      publishedAt: new Date().toISOString().slice(0, 10),
+    };
+    saveDraft(publishedDraft, topicId);
+    setDirty(false);
     toast.success("专题已发布，员工可在专题学习中查看");
     onBack();
   };
@@ -265,7 +339,7 @@ export function TopicEditorWizard({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <button
             type="button"
-            onClick={onBack}
+            onClick={handleBack}
             className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -310,6 +384,18 @@ export function TopicEditorWizard({
         </div>
         <p className="mt-3 text-[12.5px] text-muted-foreground">{STEP_HINTS[step - 1]}</p>
       </div>
+
+      {existing?.status === "已发布" && (
+        <div className="mb-4 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-soft/50 px-3.5 py-3 text-[12.5px] text-warning-foreground">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-medium">当前专题已有线上版本</p>
+            <p className="mt-0.5 text-muted-foreground">
+              本次修改先保存为未发布草稿；只有在最后一步提交发布后，员工端内容才会更新。
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* 步骤内容 */}
       <div className="mb-6 rounded-lg border border-border bg-card p-5 shadow-[var(--shadow-card)]">
@@ -511,10 +597,13 @@ export function TopicEditorWizard({
 
         {step === 3 && (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[13px] text-muted-foreground">
-                共 {draft.knowledgePoints.length} 条知识点，请确认后发布
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[14px] font-semibold text-foreground">知识点维护</h3>
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
+                  待确认项优先展开；已确认项收起展示，修改后需重新确认。
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={handleAiKnowledge}
@@ -530,94 +619,213 @@ export function TopicEditorWizard({
               </button>
             </div>
 
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-divider bg-muted/20 px-3 py-2.5">
+              <div className="flex flex-wrap gap-1.5">
+                {(
+                  [
+                    { value: "all", label: "全部", count: knowledgeStats.total },
+                    { value: "pending", label: "待确认", count: knowledgeStats.pending },
+                    { value: "confirmed", label: "已确认", count: knowledgeStats.confirmed },
+                  ] as const
+                ).map((filter) => (
+                  <button
+                    key={filter.value}
+                    type="button"
+                    onClick={() => setKnowledgeFilter(filter.value)}
+                    className={cn(
+                      "rounded-md border px-2.5 py-1 text-[11.5px] transition-colors",
+                      knowledgeFilter === filter.value
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-card text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {filter.label} {filter.count}
+                  </button>
+                ))}
+              </div>
+              {knowledgeStats.pending > 0 && (
+                <span className="text-[11.5px] text-warning-foreground">
+                  仍有 {knowledgeStats.pending} 条待确认
+                </span>
+              )}
+            </div>
+
+            {aiKnowledgeResult && (
+              <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary-soft/30 px-3 py-2.5 text-[12px]">
+                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                <span>
+                  本次生成 <strong>{aiKnowledgeResult.created}</strong> 条知识点
+                  {aiKnowledgeResult.skipped > 0 && (
+                    <>，已跳过 {aiKnowledgeResult.skipped} 条重复内容</>
+                  )}
+                  。AI 结果仅作为草稿，需人工确认后才能进入下一步。
+                </span>
+              </div>
+            )}
+
             {draft.knowledgePoints.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border py-10 text-center text-[13px] text-muted-foreground">
                 暂无知识点，可手动添加或使用 AI 根据已选资料生成
               </div>
+            ) : visibleKnowledgePoints.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border py-8 text-center text-[13px] text-muted-foreground">
+                当前筛选下暂无知识点
+              </div>
             ) : (
               <ul className="space-y-2">
-                {draft.knowledgePoints.map((kp, index) => (
-                  <li key={kp.id} className="rounded-lg border border-divider p-3">
-                    <div className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const knowledgePoints = draft.knowledgePoints.map((k) =>
-                            k.id === kp.id ? { ...k, confirmed: !k.confirmed } : k,
-                          );
-                          updateDraft({ knowledgePoints });
-                        }}
-                        className={cn(
-                          "mt-0.5 rounded border px-2 py-0.5 text-[10.5px]",
-                          kp.confirmed
-                            ? "border-success/40 bg-success-soft text-success"
-                            : "border-border text-muted-foreground",
-                        )}
-                      >
-                        {kp.confirmed ? "已确认" : "待确认"}
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <Input
-                          value={kp.title}
-                          onChange={(e) => {
-                            const knowledgePoints = [...draft.knowledgePoints];
-                            knowledgePoints[index] = {
-                              ...kp,
-                              title: e.target.value,
-                              source: "manual",
-                            };
-                            updateDraft({ knowledgePoints });
-                          }}
-                          className="mb-1.5 h-8 text-[13px] font-medium"
-                        />
-                        <textarea
-                          value={kp.summary}
-                          onChange={(e) => {
-                            const knowledgePoints = [...draft.knowledgePoints];
-                            knowledgePoints[index] = {
-                              ...kp,
-                              summary: e.target.value,
-                              source: "manual",
-                            };
-                            updateDraft({ knowledgePoints });
-                          }}
-                          rows={2}
-                          className="w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-[12px] outline-none"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateDraft({
-                            knowledgePoints: draft.knowledgePoints.filter((k) => k.id !== kp.id),
-                          })
-                        }
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                {visibleKnowledgePoints.map((kp) => {
+                  const expanded = !kp.confirmed || expandedKnowledgeIds.has(kp.id);
+                  return (
+                    <li
+                      key={kp.id}
+                      className={cn(
+                        "rounded-lg border transition-colors",
+                        kp.confirmed
+                          ? "border-divider bg-card"
+                          : "border-warning/30 bg-warning-soft/20",
+                      )}
+                    >
+                      {!expanded ? (
+                        <div className="flex min-h-[68px] items-center gap-3 px-3 py-2.5">
+                          <span className="shrink-0 rounded-md bg-success-soft px-2 py-0.5 text-[10.5px] text-success">
+                            已确认
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-[13px] font-medium text-foreground">
+                              {kp.title}
+                            </p>
+                            <p className="mt-0.5 line-clamp-1 text-[11.5px] text-muted-foreground">
+                              {kp.summary}
+                            </p>
+                          </div>
+                          <span className="hidden shrink-0 text-[10.5px] text-muted-foreground sm:inline">
+                            {kp.source === "ai" ? "AI 提炼" : "人工维护"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedKnowledgeIds((current) => new Set(current).add(kp.id))
+                            }
+                            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[11.5px] text-primary hover:bg-primary-soft"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            展开编辑
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-3">
+                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={cn(
+                                  "rounded-md px-2 py-0.5 text-[10.5px]",
+                                  kp.confirmed
+                                    ? "bg-success-soft text-success"
+                                    : "bg-warning-soft text-warning-foreground",
+                                )}
+                              >
+                                {kp.confirmed ? "已确认" : "待确认"}
+                              </span>
+                              <span className="text-[10.5px] text-muted-foreground">
+                                {kp.source === "ai" ? "AI 提炼草稿" : "人工维护"}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              aria-label={`删除知识点：${kp.title || "未命名"}`}
+                              onClick={() =>
+                                updateDraft({
+                                  knowledgePoints: draft.knowledgePoints.filter(
+                                    (item) => item.id !== kp.id,
+                                  ),
+                                })
+                              }
+                              className="rounded-md p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <Input
+                            value={kp.title}
+                            aria-label="知识点名称"
+                            placeholder="输入知识点名称"
+                            onChange={(event) =>
+                              updateKnowledgePoint(kp.id, {
+                                title: event.target.value,
+                                source: "manual",
+                                confirmed: false,
+                              })
+                            }
+                            className="mb-1.5 h-8 text-[13px] font-medium"
+                          />
+                          <textarea
+                            value={kp.summary}
+                            aria-label="知识点说明"
+                            placeholder="说明需要掌握的概念、判断或操作要点"
+                            onChange={(event) =>
+                              updateKnowledgePoint(kp.id, {
+                                summary: event.target.value,
+                                source: "manual",
+                                confirmed: false,
+                              })
+                            }
+                            rows={2}
+                            className="w-full resize-none rounded-md border border-input bg-background px-2 py-1.5 text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          />
+                          <div className="mt-2 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (!kp.title.trim() || !kp.summary.trim()) {
+                                  toast.error("请先填写知识点名称和说明");
+                                  return;
+                                }
+                                updateKnowledgePoint(kp.id, { confirmed: !kp.confirmed });
+                                if (!kp.confirmed) {
+                                  setExpandedKnowledgeIds((current) => {
+                                    const next = new Set(current);
+                                    next.delete(kp.id);
+                                    return next;
+                                  });
+                                }
+                              }}
+                              className={cn(
+                                "rounded-md border px-3 py-1.5 text-[11.5px] font-medium",
+                                kp.confirmed
+                                  ? "border-border text-muted-foreground hover:bg-muted"
+                                  : "border-primary bg-primary text-primary-foreground hover:bg-primary/90",
+                              )}
+                            >
+                              {kp.confirmed ? "取消确认" : "确认知识点"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
 
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                const id = `kp-manual-${Date.now()}`;
                 updateDraft({
                   knowledgePoints: [
                     ...draft.knowledgePoints,
                     {
-                      id: `kp-manual-${Date.now()}`,
+                      id,
                       title: "",
                       summary: "",
                       source: "manual",
                       confirmed: false,
                     },
                   ],
-                })
-              }
+                });
+                setKnowledgeFilter("all");
+                setExpandedKnowledgeIds((current) => new Set(current).add(id));
+              }}
               className="text-[12.5px] text-primary hover:underline"
             >
               + 手动添加知识点
@@ -705,8 +913,18 @@ export function TopicEditorWizard({
             <span className="sm:hidden">保存</span>
           </button>
           <span className="hidden items-center gap-1.5 text-[11.5px] text-kb-muted md:inline-flex">
-            <Check className="h-3.5 w-3.5 text-success" />
-            内容已自动保存 · 当前为第 {step} 步「{STEPS[step - 1]}」
+            {dirty ? (
+              <AlertTriangle className="h-3.5 w-3.5 text-warning-foreground" />
+            ) : (
+              <Check className="h-3.5 w-3.5 text-success" />
+            )}
+            {step === 3 && knowledgeStats.pending > 0
+              ? `还有 ${knowledgeStats.pending} 条知识点待确认`
+              : dirty
+                ? "有未确认保存的修改"
+                : "草稿已保存"}{" "}
+            · 当前为第 {step} 步「
+            {STEPS[step - 1]}」
           </span>
         </div>
 
@@ -726,12 +944,25 @@ export function TopicEditorWizard({
               type="button"
               onClick={() => {
                 if (!canNext()) {
-                  toast.error("请完成当前步骤必填项");
+                  toast.error(
+                    step === 3 ? "请补全并确认全部知识点后再进入下一步" : "请完成当前步骤必填项",
+                  );
                   return;
                 }
                 setStep((s) => s + 1);
               }}
-              className="inline-flex min-h-10 items-center gap-1 rounded-[8px] bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              disabled={!canNext()}
+              title={
+                !canNext()
+                  ? step === 3
+                    ? "请补全并确认全部知识点后再进入下一步"
+                    : "请完成当前步骤必填项"
+                  : undefined
+              }
+              className={cn(
+                "inline-flex min-h-10 items-center gap-1 rounded-[8px] bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90",
+                !canNext() && "cursor-not-allowed opacity-60 hover:bg-primary",
+              )}
             >
               下一步
               <ChevronRight className="h-4 w-4" />

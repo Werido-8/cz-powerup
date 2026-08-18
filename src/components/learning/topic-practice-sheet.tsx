@@ -1,12 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BookOpen, ChevronLeft, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,6 +21,7 @@ import {
   saveTopicPracticeDraft,
   type TopicQuestionItem,
 } from "@/lib/mock/topic-practice";
+import { useMockStore } from "@/lib/mock/store";
 
 const TYPE_LABEL: Record<Question["type"], string> = {
   single: "单选题",
@@ -35,6 +31,13 @@ const TYPE_LABEL: Record<Question["type"], string> = {
 };
 
 type Answers = Record<string, string | string[]>;
+
+function isQuestionCorrect(question: Question, answer: string | string[] | undefined) {
+  if (question.type === "text") return false;
+  return Array.isArray(question.answer)
+    ? Array.isArray(answer) && [...answer].sort().join() === [...question.answer].sort().join()
+    : answer === question.answer;
+}
 
 export function TopicPracticeSheet({
   topic,
@@ -48,6 +51,7 @@ export function TopicPracticeSheet({
   onSaved?: () => void;
 }) {
   const items = useMemo(() => getTopicQuestions(topic), [topic]);
+  const { addWrong, recordDocAnswers, startDocPractice } = useMockStore();
   const [answers, setAnswers] = useState<Answers>({});
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
 
@@ -55,7 +59,10 @@ export function TopicPracticeSheet({
     if (!open) return;
     const draft = loadTopicPracticeDraft(topic.id);
     setAnswers(draft?.answers ?? {});
-  }, [open, topic.id]);
+    Array.from(new Set(items.map((item) => item.docId))).forEach((docId) =>
+      startDocPractice(docId),
+    );
+  }, [items, open, startDocPractice, topic.id]);
 
   const answeredCount = items.filter((item) => {
     const a = answers[item.question.id];
@@ -83,6 +90,30 @@ export function TopicPracticeSheet({
     onSaved?.();
   };
 
+  const handleSubmit = () => {
+    const byDoc = new Map<string, { answeredIds: string[]; correctIds: string[] }>();
+
+    items.forEach((item) => {
+      const { docId, question } = item;
+      const entry = byDoc.get(docId) ?? { answeredIds: [], correctIds: [] };
+      entry.answeredIds.push(question.id);
+      if (isQuestionCorrect(question, answers[question.id])) {
+        entry.correctIds.push(question.id);
+      } else if (question.type !== "text") {
+        addWrong(question.id);
+      }
+      byDoc.set(docId, entry);
+    });
+
+    byDoc.forEach(({ answeredIds, correctIds }, docId) =>
+      recordDocAnswers(docId, answeredIds, correctIds),
+    );
+    clearTopicPracticeDraft(topic.id);
+    toast.success("练习已提交，已同步更新资料学习状态");
+    onSaved?.();
+    onOpenChange(false);
+  };
+
   const grouped = useMemo(() => {
     const map = new Map<string, { docTitle: string; items: TopicQuestionItem[] }>();
     items.forEach((item) => {
@@ -100,9 +131,14 @@ export function TopicPracticeSheet({
           <DialogHeader className="shrink-0 border-b border-divider px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 pr-8">
               <div>
-                <DialogTitle className="text-left text-[16px]">{topic.title} · 专题练习卷</DialogTitle>
+                <DialogTitle className="text-left text-[16px]">
+                  {topic.title} · 专题练习卷
+                </DialogTitle>
                 <p className="mt-1 text-left text-[12px] text-muted-foreground">
                   汇总本专题 {items.length} 道题 · 已作答 {answeredCount} 题
+                </p>
+                <p className="mt-1 text-left text-[11px] text-muted-foreground">
+                  关联客观题全部答对会自动标记资料已学习；简答题资料可手动标记。
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -177,11 +213,7 @@ export function TopicPracticeSheet({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  handleSave();
-                  toast.success("练习已提交，系统将同步更新关联题进度");
-                  onOpenChange(false);
-                }}
+                onClick={handleSubmit}
                 className="rounded-md bg-primary px-4 py-1.5 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
               >
                 提交练习

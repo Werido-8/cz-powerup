@@ -10,7 +10,6 @@ import {
   X,
   Sparkles,
   Target,
-  
   Info,
   ClipboardList,
   ListTree,
@@ -20,6 +19,8 @@ import { DOCS, QUESTIONS, TOPICS, type Doc } from "@/lib/mock/data";
 import { useMockStore } from "@/lib/mock/store";
 import {
   getEffectiveDocStatus,
+  getAutoGradableQuestionIdsForDoc,
+  getDocProgress,
   getDocPracticeSessionId,
   getQuestionIdsForDoc,
   isDocLearned,
@@ -66,12 +67,49 @@ export const Route = createFileRoute("/learn/doc/$id")({
 function DocPage() {
   const { doc } = Route.useLoaderData() as { doc: Doc };
   const search = useSearch({ from: "/learn/doc/$id" });
-  const { state, toggleFavorite, addNote, addToCollection, removeSpacedReview, markDocLearned, clearDocPractice, pushRecentDoc } =
-    useMockStore();
+  const {
+    state,
+    toggleFavorite,
+    addNote,
+    addToCollection,
+    removeSpacedReview,
+    markDocLearned,
+    pushRecentDoc,
+    markDocLearningInProgress,
+    startDocPractice,
+  } = useMockStore();
 
   useEffect(() => {
     pushRecentDoc(doc.id);
   }, [doc.id, pushRecentDoc]);
+
+  useEffect(() => {
+    let timer: number | undefined;
+
+    const stopReadingTimer = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timer = undefined;
+      }
+    };
+
+    const startReadingTimer = () => {
+      if (document.visibilityState !== "visible") return;
+      timer = window.setTimeout(() => markDocLearningInProgress(doc.id), 30_000);
+    };
+
+    const onVisibilityChange = () => {
+      stopReadingTimer();
+      startReadingTimer();
+    };
+
+    startReadingTimer();
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      stopReadingTimer();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [doc.id, markDocLearningInProgress]);
 
   useEffect(() => {
     if (search.focus === "contributions") {
@@ -90,13 +128,22 @@ function DocPage() {
 
   const fav = state.favorites.includes(doc.id);
   const topic = TOPICS.find((t) => t.id === doc.topicId);
-  const topicDocs = topic ? topic.docIds.map((id) => DOCS.find((d) => d.id === id)).filter(Boolean) as Doc[] : [];
+  const topicDocs = topic
+    ? (topic.docIds.map((id) => DOCS.find((d) => d.id === id)).filter(Boolean) as Doc[])
+    : [];
   const topicIdx = topicDocs.findIndex((d) => d.id === doc.id);
   const prev = topicIdx > 0 ? topicDocs[topicIdx - 1] : undefined;
-  const next = topicIdx >= 0 && topicIdx < topicDocs.length - 1 ? topicDocs[topicIdx + 1] : undefined;
+  const next =
+    topicIdx >= 0 && topicIdx < topicDocs.length - 1 ? topicDocs[topicIdx + 1] : undefined;
   const relatedIds = getQuestionIdsForDoc(doc.id);
   const related = QUESTIONS.filter((q) => relatedIds.includes(q.id));
-  const practiceComplete = related.length > 0 && related.every((q) => getEffectiveDocStatus(doc.id, state) === "已学");
+  const autoGradableQuestionIds = getAutoGradableQuestionIdsForDoc(doc.id);
+  const docProgress = getDocProgress(doc.id, state);
+  const practiceComplete =
+    autoGradableQuestionIds.length > 0 &&
+    autoGradableQuestionIds.every((questionId) =>
+      (docProgress.correctIds ?? []).includes(questionId),
+    );
   const saveNote = (alsoCollection = false) => {
     if (!noteText.trim()) {
       toast.error("请填写笔记内容");
@@ -146,7 +193,9 @@ function DocPage() {
               <span className="rounded-md border border-border bg-background px-2 py-0.5 text-[10.5px] text-muted-foreground">
                 {doc.source}
               </span>
-              <span className={`rounded-md px-2 py-0.5 text-[10.5px] ${learned ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"}`}>
+              <span
+                className={`rounded-md px-2 py-0.5 text-[10.5px] ${learned ? "bg-success-soft text-success" : "bg-muted text-muted-foreground"}`}
+              >
                 {learned ? "已学" : docStatus}
               </span>
             </div>
@@ -164,15 +213,19 @@ function DocPage() {
                   search={{
                     mode: "practice",
                     docId: doc.id,
-                    topicId: topic?.id ?? "",
                     filter: "",
                     count: related.length,
                     limit: 0,
                   }}
+                  onClick={() => startDocPractice(doc.id)}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
                 >
                   <Target className="h-3.5 w-3.5" />
-                  {practiceComplete ? "已完成练习" : docStatus === "学习中" ? "继续练习" : "开始关联练习"}
+                  {practiceComplete
+                    ? "已完成练习"
+                    : docStatus === "学习中"
+                      ? "继续练习"
+                      : "开始关联练习"}
                 </Link>
               ) : (
                 <span className="text-[12px] text-muted-foreground">暂无关联题目</span>
@@ -284,7 +337,10 @@ function DocPage() {
             {doc.id === "d5" ? (
               <RichMindMap />
             ) : (
-              <MindMap title={doc.title} nodes={doc.toc.map((t) => ({ id: t.id, title: t.title }))} />
+              <MindMap
+                title={doc.title}
+                nodes={doc.toc.map((t) => ({ id: t.id, title: t.title }))}
+              />
             )}
           </div>
 
@@ -302,7 +358,6 @@ function DocPage() {
               <Row k="关联设备" v={doc.equipment} />
               {topic && <Row k="所属专题" v={topic.title} />}
             </dl>
-
           </div>
 
           {/* 我提交的题目（员工贡献 + 审核反馈） */}
@@ -325,13 +380,16 @@ function DocPage() {
                         {q.type === "single"
                           ? "单选"
                           : q.type === "multiple"
-                          ? "多选"
-                          : q.type === "judge"
-                          ? "判断"
-                          : "简答"}
+                            ? "多选"
+                            : q.type === "judge"
+                              ? "判断"
+                              : "简答"}
                       </span>
                       {q.knowledgePoints.slice(0, 2).map((k) => (
-                        <span key={k} className="rounded bg-primary-soft px-1.5 py-0.5 text-accent-foreground">
+                        <span
+                          key={k}
+                          className="rounded bg-primary-soft px-1.5 py-0.5 text-accent-foreground"
+                        >
                           {k}
                         </span>
                       ))}
@@ -387,7 +445,10 @@ function DocPage() {
           >
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-[15px] font-semibold">新建笔记</h3>
-              <button onClick={() => setNoteOpen(false)} className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setNoteOpen(false)}
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -457,7 +518,6 @@ function DocPage() {
           </div>
         </div>
       )}
-
     </PageShell>
   );
 }
@@ -491,7 +551,15 @@ function MindMap({ title, nodes }: { title: string; nodes: { id: string; title: 
                 strokeWidth="1.2"
                 fill="none"
               />
-              <rect x={rightX} y={y} width={W - rightX - 8} height={28} rx={6} className="fill-card stroke-border" strokeWidth={1} />
+              <rect
+                x={rightX}
+                y={y}
+                width={W - rightX - 8}
+                height={28}
+                rx={6}
+                className="fill-card stroke-border"
+                strokeWidth={1}
+              />
               <text x={rightX + 8} y={y + 18} className="fill-foreground" fontSize="10.5">
                 {n.title.length > 14 ? n.title.slice(0, 13) + "…" : n.title}
               </text>
@@ -499,7 +567,14 @@ function MindMap({ title, nodes }: { title: string; nodes: { id: string; title: 
           );
         })}
         <rect x={cx - 60} y={cy - 18} width={120} height={36} rx={10} className="fill-primary" />
-        <text x={cx} y={cy + 4} textAnchor="middle" className="fill-primary-foreground" fontSize="11" fontWeight="600">
+        <text
+          x={cx}
+          y={cy + 4}
+          textAnchor="middle"
+          className="fill-primary-foreground"
+          fontSize="11"
+          fontWeight="600"
+        >
           {title.length > 8 ? title.slice(0, 7) + "…" : title}
         </text>
       </svg>

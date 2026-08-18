@@ -46,6 +46,7 @@ const MENU: MenuItem[] = [
       { label: "知识总览", to: "/knowledge" },
       // { label: "全库资料", to: "/knowledge/all" },
       { label: "我的空间", to: "/knowledge/mine" },
+      { label: "文件比对", to: "/file-compare" },
       { label: "知识管理", to: "/knowledge/admin" },
     ],
   },
@@ -63,7 +64,8 @@ const MENU: MenuItem[] = [
       { label: "错题本", to: "/training/wrong", group: "训练与测评" },
       { label: "专题维护", to: "/learn-admin", group: "内容管理" },
       { label: "题库管理", to: "/question-bank", group: "内容管理" },
-      { label: "考试管理", to: "/exam-admin", group: "内容管理" },
+      { label: "考试任务", to: "/exam-admin", group: "内容管理" },
+      { label: "成绩分析", to: "/exam-admin/analysis", group: "内容管理" },
     ],
   },
   { label: "场景训练", to: "/scenario" },
@@ -79,6 +81,13 @@ function isItemActive(pathname: string, to: string) {
 
 function isChildActive(pathname: string, to: string) {
   if (to === "/training") return pathname === "/training" || pathname === "/training/";
+  if (to === "/exam-admin") {
+    return (
+      pathname === "/exam-admin" ||
+      pathname === "/exam-admin/" ||
+      (pathname.startsWith("/exam-admin/") && !pathname.startsWith("/exam-admin/analysis"))
+    );
+  }
   return isItemActive(pathname, to);
 }
 

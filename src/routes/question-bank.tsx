@@ -7,6 +7,7 @@ import { ReviewModule } from "@/components/exam/review-module";
 import { BankModule } from "@/components/exam/bank-module";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/learning/ui";
+import { REVIEW_QUESTIONS } from "@/lib/mock/examAdmin";
 
 export const Route = createFileRoute("/question-bank")({
   component: QuestionBankPage,
@@ -22,7 +23,12 @@ type TabKey = "bank" | "review";
 
 const TABS: { key: TabKey; label: string; icon: typeof Library; count: string }[] = [
   { key: "bank", label: "题库维护", icon: Library, count: "1,842" },
-  { key: "review", label: "审核队列", icon: ClipboardCheck, count: "23" },
+  {
+    key: "review",
+    label: "审核队列",
+    icon: ClipboardCheck,
+    count: String(REVIEW_QUESTIONS.length),
+  },
 ];
 
 function QuestionBankPage() {
@@ -70,9 +76,7 @@ function QuestionBankPage() {
             })}
           </nav>
 
-          <div className="rounded-[14px] border border-kb-border bg-white p-4 shadow-[0_12px_30px_-24px_rgba(25,72,82,0.28)] md:p-5">
-            {tab === "review" ? <ReviewModule /> : <BankModule />}
-          </div>
+          <div className="pt-1">{tab === "review" ? <ReviewModule /> : <BankModule />}</div>
         </div>
       </PageShell>
     </TooltipProvider>

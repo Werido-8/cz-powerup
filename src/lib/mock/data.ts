@@ -7,7 +7,7 @@ export type DocType =
   | "故障处置"
   | "厂站资料"
   | "历史案例"
-  // | "厂家SOP"
+  | "厂家SOP"
   | "两细则/考核";
 
 export type LearnStatus = "未学" | "学习中" | "已学" | "需复习";
@@ -40,7 +40,7 @@ export const DOC_TYPES: DocType[] = [
   "故障处置",
   "厂站资料",
   "历史案例",
-  // "厂家SOP",
+  "厂家SOP",
   "两细则/考核",
 ];
 
