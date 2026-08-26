@@ -15,7 +15,7 @@ import {
   Target,
 } from "lucide-react";
 import { PageHeader } from "@/components/learning/ui";
-import { PageShell } from "@/components/workbench/PageShell";
+import { TrainingPageShell } from "@/components/learning/training-breadcrumb";
 import { useMockStore } from "@/lib/mock/store";
 import {
   RECOMMENDED_PRACTICES,
@@ -70,50 +70,47 @@ function TrainingHome() {
   const todayPractice = RECOMMENDED_PRACTICES[0];
 
   return (
-    <PageShell compact>
-      <div className="flex h-full min-h-0 w-full flex-col [&_h1]:font-semibold">
-        <div className="shrink-0">
-          <PageHeader
-            title="训练中心"
-            subtitle="先完成今天最值得练的一组题，再按结果决定下一步。"
-            size="md"
-            className="mb-2"
-            action={
-              <Link
-                to="/training/records"
-                className="inline-flex min-h-11 items-center gap-2 rounded-full border border-kb-border bg-white px-4 text-[13px] font-medium text-kb-body shadow-[0_4px_16px_rgba(22,65,74,0.04)] transition hover:border-primary/35 hover:text-primary"
-              >
-                <History className="h-4 w-4" /> 训练记录
-              </Link>
-            }
-          />
-        </div>
+    <TrainingPageShell className="[&_h1]:font-semibold">
+      <PageHeader
+        title="训练中心"
+        subtitle="先完成今天最值得练的一组题，再按结果决定下一步。"
+        size="md"
+        className="mb-2 shrink-0"
+        action={
+          <Link
+            to="/training/records"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-kb-border bg-white px-4 text-[13px] font-medium text-kb-body shadow-[0_4px_16px_rgba(22,65,74,0.04)] transition hover:border-primary/35 hover:text-primary"
+          >
+            <History className="h-4 w-4" /> 训练记录
+          </Link>
+        }
+      />
 
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto xl:overflow-hidden">
-          <section className="grid shrink-0 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,.92fr)] xl:items-stretch">
-            <article className="relative flex h-full overflow-hidden rounded-[20px] border border-[#cfe4e8] bg-white p-4 shadow-[0_18px_50px_rgba(28,88,99,0.07)] xl:p-5">
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-[42%] bg-[radial-gradient(circle_at_72%_38%,rgba(52,155,172,.11),transparent_64%)]" />
-              <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full border-[32px] border-primary/[0.055]" />
+        <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto xl:overflow-hidden">
+          <section className="grid gap-3 xl:min-h-0 xl:flex-[1.08] xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,.92fr)] xl:items-stretch">
+            <article className="relative flex h-full min-h-[260px] flex-col overflow-hidden rounded-[16px] border border-kb-border bg-white p-4 shadow-[0_8px_24px_rgba(24,76,86,0.035)] xl:min-h-0">
+              <div className="pointer-events-none absolute inset-y-0 right-0 w-[38%] bg-[radial-gradient(circle_at_72%_38%,rgba(52,155,172,.08),transparent_64%)]" />
+              <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full border-[28px] border-primary/[0.04]" />
 
               <div className="relative flex min-h-0 flex-1 flex-col justify-between">
                 <div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/75 px-3 py-1 text-[12px] font-semibold text-primary backdrop-blur">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-[#f4fafb] px-3 py-1 text-[12px] font-semibold text-primary">
                       <Target className="h-3.5 w-3.5" /> 今日推荐
                     </span>
                     <span className="text-[12px] text-kb-muted">依据近 7 天答题表现生成</span>
                   </div>
-                  <h2 className="mt-2 text-[22px] font-bold tracking-[-0.035em] text-kb-heading xl:text-[26px]">
+                  <h2 className="mt-2 text-[20px] font-bold tracking-[-0.03em] text-kb-heading xl:text-[22px]">
                     {todayPractice.title}
                   </h2>
-                  <p className="mt-1.5 max-w-2xl text-[13px] leading-6 text-kb-muted">
+                  <p className="mt-1.5 text-[13px] leading-6 text-kb-muted line-clamp-3">
                     AGC 相关题目正确率低于个人平均水平。先完成这组短练习，系统会据此更新薄弱点与错题建议。
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {todayPractice.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-full border border-white bg-white/75 px-3 py-1 text-[12px] text-kb-body shadow-sm"
+                        className="rounded-full border border-kb-border bg-[#f7fafb] px-3 py-1 text-[12px] text-kb-body"
                       >
                         {tag}
                       </span>
@@ -123,15 +120,16 @@ function TrainingHome() {
                 <Link
                   to="/training/practice"
                   search={{ filters: todayPractice.filter }}
-                  className="mt-4 inline-flex min-h-11 w-fit items-center gap-2 rounded-[12px] bg-primary px-5 text-[14px] font-semibold text-white shadow-[0_10px_24px_rgba(52,155,172,0.22)] transition hover:-translate-y-0.5 hover:bg-[#2b91a3]"
+                  className="mt-4 inline-flex min-h-10 w-fit items-center gap-2 rounded-[10px] bg-primary px-5 text-[13px] font-semibold text-white shadow-[0_8px_18px_rgba(52,155,172,0.2)] transition hover:-translate-y-0.5 hover:bg-[#2b91a3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 active:translate-y-px motion-reduce:transform-none"
                 >
-                  <Play className="h-4 w-4 fill-current" /> 开始今日练习
-                  <ArrowRight className="h-4 w-4" />
+                  <Play className="h-4 w-4 fill-current" aria-hidden />
+                  开始今日练习
+                  <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
               </div>
             </article>
 
-            <aside className="flex min-h-0 flex-col rounded-[16px] border border-kb-border bg-white p-3.5 shadow-[0_8px_24px_rgba(24,76,86,0.035)]">
+            <aside className="flex h-full min-h-0 flex-col rounded-[16px] border border-kb-border bg-white p-3.5 shadow-[0_8px_24px_rgba(24,76,86,0.035)]">
               <div className="flex min-h-8 items-start justify-between gap-4">
                 <div className="flex min-w-0 items-start gap-2.5">
                   <Grid2X2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
@@ -183,7 +181,7 @@ function TrainingHome() {
             </aside>
           </section>
 
-          <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(420px,1fr)] xl:items-stretch">
+          <section className="grid min-h-0 gap-3 xl:flex-[1.32] xl:grid-cols-[minmax(0,1.35fr)_minmax(420px,1fr)] xl:items-stretch">
             <article className="flex h-full min-h-0 flex-col rounded-[18px] border border-kb-border bg-white p-4">
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">
@@ -308,8 +306,8 @@ function TrainingHome() {
           </section>
 
           {recentRecords.length > 0 && (
-            <section className="shrink-0 rounded-[16px] border border-kb-border bg-white px-4 py-2">
-              <div className="mb-1 flex items-center justify-between gap-3">
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-[16px] border border-kb-border bg-white px-4 py-1.5 xl:flex-[0.52]">
+              <div className="mb-1 flex shrink-0 items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-primary-soft text-primary">
                     <History className="h-3.5 w-3.5" />
@@ -323,12 +321,12 @@ function TrainingHome() {
                   全部 <ChevronRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
-              <div className="grid gap-x-4 sm:grid-cols-2">
+              <div className="grid min-h-0 flex-1 gap-x-4 overflow-y-auto sm:grid-cols-2">
                 {recentRecords.slice(0, 8).map((record) => (
                   <Link
                     key={record.id}
                     to="/training/records"
-                    className="group flex min-h-8 items-center gap-2 rounded-[8px] px-1 py-0.5 transition hover:bg-[#f7fafb]"
+                    className="group flex min-h-7 items-center gap-2 rounded-[8px] px-1 py-px transition hover:bg-[#f7fafb]"
                   >
                     <span
                       className={cn(
@@ -359,7 +357,6 @@ function TrainingHome() {
             </section>
           )}
         </div>
-      </div>
-    </PageShell>
+    </TrainingPageShell>
   );
 }
