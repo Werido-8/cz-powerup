@@ -2,16 +2,15 @@ import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import type { CompareOverviewSearch } from "@/lib/file-compare/navigation";
 
-export type CompareTabKey = "overview" | "reader" | "changes" | "info";
+export type CompareTabKey = "overview" | "reader" | "info";
 
 const TABS: { key: CompareTabKey; label: string; to: string }[] = [
   { key: "overview", label: "差异概览", to: "/file-compare/$taskId/overview" },
   { key: "reader", label: "对照阅读", to: "/file-compare/$taskId/reader" },
-  { key: "changes", label: "变更清单", to: "/file-compare/$taskId/changes" },
   { key: "info", label: "文件信息", to: "/file-compare/$taskId/info" },
 ];
 
-/** 页面内四个主页签，通过路由切换并保留筛选条件 */
+/** 比对工作区一级页签：差异概览 / 对照核验 / 文件信息 */
 export function CompareModuleTabs({
   taskId,
   active,
@@ -24,7 +23,7 @@ export function CompareModuleTabs({
   return (
     <nav
       aria-label="比对结果视图"
-      className="flex h-11 shrink-0 items-stretch gap-8 border-b border-kb-border px-5"
+      className="flex h-10 shrink-0 items-stretch gap-8 border-t border-kb-border px-5"
     >
       {TABS.map((tab) => {
         const isActive = tab.key === active;

@@ -378,9 +378,10 @@ function CustomExamPage() {
           </main>
 
           <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto">
-            <section className="relative flex min-h-[390px] flex-1 flex-col overflow-hidden rounded-[18px] border border-kb-border bg-white p-5 shadow-[0_14px_34px_rgba(25,69,78,0.055)]">
-              <div className="pointer-events-none absolute inset-y-0 right-0 w-[62%] bg-[radial-gradient(circle_at_80%_20%,rgba(52,155,172,.12),transparent_62%)]" />
+            <section className="relative flex min-h-[390px] flex-1 flex-col overflow-hidden rounded-[18px] border border-kb-border bg-[#f4fafb] p-5 shadow-[0_14px_34px_rgba(25,69,78,0.055)]">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(90%_55%_at_100%_0%,rgba(52,155,172,0.18),transparent_62%),radial-gradient(80%_50%_at_0%_100%,rgba(52,155,172,0.08),transparent_55%),linear-gradient(180deg,#eef7f8_0%,#f7fbfb_48%,#f4fafb_100%)]" />
               <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full border-[22px] border-primary/[0.04]" />
+              <div className="pointer-events-none absolute -bottom-16 -left-14 h-52 w-52 rounded-full border-[22px] border-primary/[0.035]" />
               <div className="relative flex items-center gap-2 text-[11.5px] font-semibold text-primary">
                 <Layers3 className="h-4 w-4" /> 实时试卷预览
               </div>

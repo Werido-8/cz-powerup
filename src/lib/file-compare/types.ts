@@ -9,6 +9,14 @@ export type CompareTaskStatus = "done" | "running" | "failed";
 
 export type CompareSide = "base" | "target";
 
+export type DiffMatchKind = "auto" | "semantic" | "unmatched";
+
+export interface DiffMatchState {
+  kind: DiffMatchKind;
+  baseLabel: string;
+  targetLabel?: string;
+}
+
 export type ReaderLayout = "dual" | "single";
 
 export const READER_ZOOM_OPTIONS = [80, 90, 100, 110, 125] as const;

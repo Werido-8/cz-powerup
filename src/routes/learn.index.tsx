@@ -14,6 +14,7 @@ import {
   Search,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
+import { LearningHome } from "@/components/learning/learning-home";
 import { RecentTopicAccess } from "@/components/learning/recent-topic-access";
 import { CardBatchPager, PageHeader, TableListPager } from "@/components/learning/ui";
 import { DOCS, DOC_TYPES, type Doc } from "@/lib/mock/data";
@@ -35,7 +36,7 @@ const learnSearchSchema = z.object({
 export const Route = createFileRoute("/learn/")({
   validateSearch: learnSearchSchema,
   component: LearnPage,
-  head: () => ({ meta: [{ title: "知识学习 · 涉网运行能力智能提升平台" }] }),
+  head: () => ({ meta: [{ title: "学习首页 · 涉网运行能力智能提升平台" }] }),
 });
 
 type TabKey = "topic" | "materials";
@@ -94,6 +95,7 @@ const STATUS_DOT_STYLE: Record<DocReadStatus, string> = {
   已学: "bg-success",
 };
 
+/** 一行 4 张，默认展示 3 行。 */
 const TOPIC_CARD_PAGE_SIZE = 12;
 const TOPIC_LIST_PAGE_SIZE = 20;
 /** 专题列表演示进度。真实学习记录存在时始终优先使用真实数据。 */
@@ -135,56 +137,64 @@ function LearnPage() {
     navigate({ to: "/learn", search: { tab: next }, replace: true });
   };
 
+  if (!search.tab) return <LearningHome />;
+
   return (
-    <PageShell>
-      <div className="w-full [&_h1]:font-semibold">
-        <PageHeader
-          title="知识学习"
-          subtitle="继续当前学习，或按岗位与任务选择经过审核的专题和资料。"
-        />
-
-        <nav
-          className="mb-5 flex min-h-12 items-end justify-between gap-2 border-b border-kb-border sm:justify-start sm:gap-7"
-          aria-label="知识学习分类"
-        >
-          {TABS.map((item) => {
-            const active = item.key === tab;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => switchTab(item.key)}
-                className={cn(
-                  "relative inline-flex min-h-12 items-center gap-1.5 whitespace-nowrap px-0.5 text-[13px] font-medium transition-colors sm:gap-2 sm:px-1 sm:text-[14px]",
-                  active ? "text-primary" : "text-kb-muted hover:text-kb-heading",
-                )}
-                aria-current={active ? "page" : undefined}
-              >
-                <item.icon className="h-[17px] w-[17px]" />
-                {item.label}
-                {active && <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary" />}
-              </button>
-            );
-          })}
-        </nav>
-
-        {tab === "topic" ? (
-          <TopicWorkspace
-            query={query}
-            onQueryChange={setQuery}
-            specialty={specialty}
-            onSpecialtyChange={setSpecialty}
-            state={state}
+    <PageShell compact>
+      <div className="flex h-full min-h-0 w-full flex-col [&_h1]:font-semibold">
+        <div className="shrink-0">
+          <PageHeader
+            title="知识学习"
+            subtitle="继续当前学习，或按岗位与任务选择经过审核的专题和资料。"
+            size="md"
+            className="mb-2"
           />
-        ) : (
-          <MaterialWorkspace
-            query={query}
-            onQueryChange={setQuery}
-            docType={docType}
-            onDocTypeChange={setDocType}
-            state={state}
-          />
-        )}
+
+          <nav
+            className="mb-3 flex min-h-9 items-end justify-between gap-2 border-b border-kb-border sm:justify-start sm:gap-6"
+            aria-label="知识学习分类"
+          >
+            {TABS.map((item) => {
+              const active = item.key === tab;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => switchTab(item.key)}
+                  className={cn(
+                    "relative inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap px-0.5 text-[13px] font-medium transition-colors sm:gap-2 sm:px-1 sm:text-[14px]",
+                    active ? "text-primary" : "text-kb-muted hover:text-kb-heading",
+                  )}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                  {active && <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary" />}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {tab === "topic" ? (
+            <TopicWorkspace
+              query={query}
+              onQueryChange={setQuery}
+              specialty={specialty}
+              onSpecialtyChange={setSpecialty}
+              state={state}
+            />
+          ) : (
+            <MaterialWorkspace
+              query={query}
+              onQueryChange={setQuery}
+              docType={docType}
+              onDocTypeChange={setDocType}
+              state={state}
+            />
+          )}
+        </div>
       </div>
     </PageShell>
   );
@@ -236,13 +246,13 @@ function TopicWorkspace({
   };
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
-      <aside className="hidden self-start space-y-3 lg:sticky lg:top-4 lg:block">
-        <section className="rounded-lg border border-kb-border bg-white p-2.5 shadow-[var(--shadow-card)]">
-          <div className="px-2 pb-2.5 pt-0.5 text-[15px] font-semibold text-kb-heading">
+    <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[214px_minmax(0,1fr)]">
+      <aside className="hidden min-h-0 lg:flex lg:flex-col lg:gap-2.5">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-kb-border bg-white p-2 shadow-[var(--shadow-card)]">
+          <div className="shrink-0 px-2 pb-1.5 pt-0.5 text-[14px] font-semibold text-kb-heading">
             专业分类
           </div>
-          <div className="space-y-1">
+          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto scrollbar-thin">
             {SPECIALTIES.map((item) => {
               const active = item.key === specialty;
               const count = ENRICHED_TOPICS.filter(item.matches).length;
@@ -253,7 +263,7 @@ function TopicWorkspace({
                   onClick={() => onSpecialtyChange(item.key)}
                   aria-pressed={active}
                   className={cn(
-                    "flex min-h-10 w-full items-center justify-between rounded-[3px] px-3 text-left text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+                    "flex min-h-8 w-full items-center justify-between rounded-[3px] px-2.5 text-left text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
                     active ? "bg-primary text-white shadow-sm" : "text-kb-body hover:bg-kb-surface",
                   )}
                 >
@@ -270,15 +280,15 @@ function TopicWorkspace({
               );
             })}
           </div>
-          <div className="mt-2.5 border-t border-kb-border px-2.5 pb-1 pt-2.5 text-[11.5px] leading-5 text-kb-muted">
+          <div className="mt-2 shrink-0 border-t border-kb-border px-2 pb-0.5 pt-2 text-[11px] leading-4 text-kb-muted">
             专题资料由培训老师从知识库筛选，并在发布前完成人工确认。
           </div>
         </section>
-        <RecentTopicAccess state={state} />
+        <RecentTopicAccess state={state} className="shrink-0" />
       </aside>
 
-      <main className="min-w-0">
-        <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
+      <main className="flex min-h-0 min-w-0 flex-col">
+        <div className="-mx-1 mb-2 flex shrink-0 gap-2 overflow-x-auto px-1 pb-1 lg:hidden">
           {SPECIALTIES.map((item) => {
             const active = item.key === specialty;
             const count = ENRICHED_TOPICS.filter(item.matches).length;
@@ -289,7 +299,7 @@ function TopicWorkspace({
                 onClick={() => onSpecialtyChange(item.key)}
                 aria-pressed={active}
                 className={cn(
-                  "flex h-10 shrink-0 items-center gap-2 rounded-full border px-4 text-[12.5px] transition-colors",
+                  "flex h-8 shrink-0 items-center gap-2 rounded-full border px-3 text-[12px] transition-colors",
                   active
                     ? "border-primary bg-primary text-white"
                     : "border-kb-border bg-white text-kb-body",
@@ -303,24 +313,24 @@ function TopicWorkspace({
             );
           })}
         </div>
-        <RecentTopicAccess state={state} limit={1} className="mb-4 lg:hidden" />
+        <RecentTopicAccess state={state} limit={1} className="mb-2 shrink-0 lg:hidden" />
 
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-[18px] font-medium text-kb-heading">{activeSpecialty.label}</h2>
-            <p className="mt-1 text-[12px] text-kb-muted">
+        <div className="mb-2.5 flex shrink-0 flex-wrap items-center justify-between gap-2">
+          <h2 className="text-[15px] font-medium text-kb-heading">
+            {activeSpecialty.label}
+            <span className="ml-2 text-[12px] font-normal text-kb-muted">
               共 {filteredTopics.length} 个可学习专题
-            </p>
-          </div>
+            </span>
+          </h2>
           <div className="flex w-full items-center gap-2 sm:w-auto">
-            <label className="relative block min-w-0 flex-1 sm:w-[300px] sm:flex-none">
+            <label className="relative block min-w-0 flex-1 sm:w-[280px] sm:flex-none">
               <span className="sr-only">搜索专题</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-kb-muted" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-kb-muted" />
               <input
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
                 placeholder="搜索专题或专业关键词"
-                className="h-10 w-full rounded-md border border-kb-border bg-white pl-10 pr-3 text-[13px] text-kb-heading outline-none placeholder:text-kb-muted focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+                className="h-8 w-full rounded-md border border-kb-border bg-white pl-9 pr-3 text-[13px] text-kb-heading outline-none placeholder:text-kb-muted focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
               />
             </label>
             <TopicViewToggle value={viewMode} onChange={setViewMode} />
@@ -330,34 +340,38 @@ function TopicWorkspace({
         {filteredTopics.length ? (
           viewMode === "card" ? (
             <>
-              <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
-                {pageTopics.map((topic) => (
-                  <TopicCard key={topic.id} topic={topic} state={state} />
-                ))}
+              <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto pr-0.5">
+                <div className="grid min-h-full content-start gap-2.5 p-0.5 md:grid-cols-2 xl:h-full xl:grid-cols-4 xl:auto-rows-[minmax(8rem,15rem)]">
+                  {pageTopics.map((topic) => (
+                    <TopicCard key={topic.id} topic={topic} state={state} />
+                  ))}
+                </div>
               </div>
-              <CardBatchPager
-                page={safePage}
-                totalPages={totalPages}
-                totalItems={filteredTopics.length}
-                pageSize={TOPIC_CARD_PAGE_SIZE}
-                unitLabel="个专题"
-                onPageChange={setPage}
-                compact
-                className="mt-3 rounded-lg border border-kb-border bg-white px-4 py-1.5"
-              />
+              {totalPages > 1 && (
+                <CardBatchPager
+                  page={safePage}
+                  totalPages={totalPages}
+                  totalItems={filteredTopics.length}
+                  pageSize={TOPIC_CARD_PAGE_SIZE}
+                  unitLabel="个专题"
+                  onPageChange={setPage}
+                  compact
+                  className="mt-2 shrink-0 rounded-lg border border-kb-border bg-white px-3 py-1"
+                />
+              )}
             </>
           ) : (
             <section
-              className="overflow-hidden rounded-lg border border-kb-border bg-white shadow-[var(--shadow-card)]"
+              className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-kb-border bg-white shadow-[var(--shadow-card)]"
               aria-label="专题列表"
             >
-              <div className="hidden min-h-10 grid-cols-[minmax(0,1fr)_88px_132px_108px] items-center gap-4 border-b border-kb-border bg-kb-surface/55 px-4 text-[11px] font-medium text-kb-muted lg:grid">
+              <div className="hidden min-h-8 shrink-0 grid-cols-[minmax(0,1fr)_88px_132px_108px] items-center gap-4 border-b border-kb-border bg-kb-surface/55 px-4 text-[11px] font-medium text-kb-muted lg:grid">
                 <span>专题信息</span>
                 <span>学习进度</span>
                 <span>学习内容</span>
                 <span className="text-right">操作</span>
               </div>
-              <div className="divide-y divide-kb-border/80">
+              <div className="scrollbar-thin min-h-0 flex-1 divide-y divide-kb-border/80 overflow-y-auto">
                 {pageTopics.map((topic) => (
                   <TopicListRow key={topic.id} topic={topic} state={state} />
                 ))}
@@ -416,7 +430,7 @@ function TopicViewToggle({
             aria-pressed={active}
             aria-label={`${option.label}模式`}
             className={cn(
-              "inline-flex h-[34px] min-w-[38px] items-center justify-center gap-1.5 rounded px-2 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 sm:min-w-[68px]",
+              "inline-flex h-8 min-w-[34px] items-center justify-center gap-1.5 rounded px-2 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 sm:min-w-[64px]",
               active ? "bg-primary-soft text-primary" : "text-kb-muted hover:text-kb-heading",
             )}
           >
@@ -439,44 +453,32 @@ function TopicCard({ topic, state }: { topic: EnrichedTopic; state: MockState })
     <Link
       to="/learn/topic/$id"
       params={{ id: topic.id }}
-      className="group relative flex min-h-[158px] flex-col overflow-hidden rounded-lg border border-kb-border bg-white p-3 shadow-[var(--shadow-card)] transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[var(--shadow-card-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+      className="group relative flex h-full min-h-32 min-w-0 flex-col overflow-hidden rounded-lg border border-kb-border bg-white px-3 py-2.5 shadow-[var(--shadow-card)] transition-[transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-[var(--shadow-card-hover)] motion-reduce:hover:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
     >
-      <span className={cn("absolute left-0 top-0 h-1 w-12 rounded-br-full", visual.accent)} />
-      <div className="flex items-start gap-2.5">
-        <span
-          className={cn(
-            "mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md",
-            visual.icon,
-          )}
-        >
-          <BookOpenCheck className="h-[18px] w-[18px]" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap gap-1.5">
-            {topic.roleTags.slice(0, 2).map((tag) => (
-              <span
-                key={tag}
-                className="rounded border border-primary/20 bg-primary-soft/60 px-1.5 py-0.5 text-[10.5px] text-primary"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-          <h3 className="mt-1.5 line-clamp-1 text-[15px] font-semibold tracking-[-0.01em] text-kb-heading">
-            {topic.title}
-          </h3>
-          <p className="mt-1.5 line-clamp-1 text-[11.5px] leading-5 text-kb-muted">{topic.desc}</p>
-        </div>
-        <TopicProgressCircle progress={progress} />
+      <span className={cn("absolute left-0 top-0 h-0.5 w-8 rounded-br-full", visual.accent)} />
+      <div className="flex min-w-0 flex-wrap gap-1">
+        {topic.roleTags.slice(0, 2).map((tag) => (
+          <span
+            key={tag}
+            className="rounded border border-primary/20 bg-primary-soft/60 px-1.5 py-px text-[10px] text-primary"
+          >
+            {tag}
+          </span>
+        ))}
+        <TopicLearningStatusTag status={status} />
       </div>
-      <div className="mt-auto flex items-center justify-between gap-3 border-t border-kb-border/75 pt-2">
-        <div className="flex items-center gap-3 text-[11.5px] text-kb-muted">
-          <span className="inline-flex items-center gap-1.5">
+      <h3 className="mt-1.5 text-[14px] font-normal leading-5 tracking-[-0.01em] text-kb-heading">
+        {topic.title}
+      </h3>
+      <p className="mt-1 text-[12px] leading-5 text-kb-muted">{topic.desc}</p>
+      <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+        <div className="flex items-center gap-2.5 text-[11px] text-kb-muted">
+          <span className="inline-flex items-center gap-1">
             <BookOpen className="h-3.5 w-3.5" />
             资料{" "}
             <strong className="font-medium tabular-nums text-kb-heading">{topic.docCount}</strong>
           </span>
-          <span className="inline-flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1">
             <ListChecks className="h-3.5 w-3.5" />
             练习{" "}
             <strong className="font-medium tabular-nums text-kb-heading">
@@ -484,7 +486,7 @@ function TopicCard({ topic, state }: { topic: EnrichedTopic; state: MockState })
             </strong>
           </span>
         </div>
-        <span className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md bg-primary px-3 text-[12px] font-medium text-white shadow-sm">
+        <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-primary">
           {actionLabel}
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
         </span>
@@ -502,13 +504,13 @@ function TopicListRow({ topic, state }: { topic: EnrichedTopic; state: MockState
     <Link
       to="/learn/topic/$id"
       params={{ id: topic.id }}
-      className="group relative grid min-h-[112px] gap-3 px-4 py-3 transition-colors hover:bg-kb-surface/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/25 lg:grid-cols-[minmax(0,1fr)_88px_132px_108px] lg:items-center lg:gap-4"
+      className="group relative grid min-h-[76px] gap-3 px-4 py-2.5 transition-colors hover:bg-kb-surface/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/25 lg:grid-cols-[minmax(0,1fr)_88px_132px_108px] lg:items-center lg:gap-4"
     >
       <span className={cn("absolute bottom-3 left-0 top-3 w-0.5 rounded-r-full", visual.accent)} />
       <div className="flex min-w-0 items-start gap-3">
         <span
           className={cn(
-            "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md",
+            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md",
             visual.icon,
           )}
         >
@@ -571,7 +573,7 @@ function TopicProgressCircle({
       <span
         className={cn(
           "inline-flex items-center justify-center rounded-full p-1",
-          compact ? "h-12 w-12" : "h-16 w-16",
+          compact ? "h-11 w-11" : "h-14 w-14",
         )}
         style={{
           background: `conic-gradient(var(--primary) ${progress * 3.6}deg, var(--kb-preview-bg) 0deg)`,
@@ -581,7 +583,7 @@ function TopicProgressCircle({
       >
         <span
           className={cn(
-            "inline-flex h-full w-full items-center justify-center rounded-full bg-white text-center font-medium tabular-nums text-kb-body",
+            "inline-flex h-full w-full items-center justify-center rounded-full bg-white text-center font-medium tabular-nums whitespace-nowrap text-kb-body",
             compact ? "text-[9px]" : "text-[11px]",
           )}
         >
@@ -589,6 +591,21 @@ function TopicProgressCircle({
         </span>
       </span>
       {!compact && <span className="text-[10px] leading-none text-kb-muted">学习进度</span>}
+    </span>
+  );
+}
+
+function TopicLearningStatusTag({ status }: { status: DocReadStatus }) {
+  const styles =
+    status === "已学"
+      ? "border-success/20 bg-success-soft text-success"
+      : status === "学习中"
+        ? "border-primary/20 bg-primary-soft text-primary"
+        : "border-kb-border bg-kb-surface text-kb-muted";
+
+  return (
+    <span className={cn("rounded border px-1.5 py-px text-[10px]", styles)}>
+      {getTopicStatusLabel(status)}
     </span>
   );
 }
@@ -671,28 +688,28 @@ function MaterialWorkspace({
   };
 
   return (
-    <section>
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-divider pb-4">
-        <div>
-          <h2 className="text-[18px] font-medium text-kb-heading">学习资料</h2>
-          <p className="mt-1 max-w-[560px] text-[12px] leading-5 text-kb-muted">
-            按关键词、资料类型和学习状态查找资料。状态由有效阅读、练习结果或手动标记更新。
-          </p>
-        </div>
+    <section className="flex h-full min-h-0 flex-col">
+      <div className="mb-2.5 flex shrink-0 flex-wrap items-center justify-between gap-2">
+        <h2 className="text-[15px] font-medium text-kb-heading">
+          学习资料
+          <span className="ml-2 text-[12px] font-normal text-kb-muted">
+            按关键词、类型和学习状态查找
+          </span>
+        </h2>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <label className="relative min-w-0 flex-1 sm:w-[310px] sm:flex-none">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-kb-muted" />
+          <label className="relative min-w-0 flex-1 sm:w-[280px] sm:flex-none">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-kb-muted" />
             <input
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
               placeholder="搜索资料、设备或知识点"
-              className="h-10 w-full rounded-md border border-kb-border bg-white pl-10 pr-3 text-[13px] outline-none placeholder:text-kb-muted focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+              className="h-8 w-full rounded-md border border-kb-border bg-white pl-9 pr-3 text-[13px] outline-none placeholder:text-kb-muted focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
             />
           </label>
           <select
             value={docType}
             onChange={(event) => onDocTypeChange(event.target.value)}
-            className="h-10 rounded-md border border-kb-border bg-white px-3 text-[13px] text-kb-body outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+            className="h-8 rounded-md border border-kb-border bg-white px-3 text-[13px] text-kb-body outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
             aria-label="资料类型"
           >
             <option value="all">全部类型</option>
@@ -705,7 +722,7 @@ function MaterialWorkspace({
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as DocReadStatus | "all")}
-            className="h-10 rounded-md border border-kb-border bg-white px-3 text-[13px] text-kb-body outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
+            className="h-8 rounded-md border border-kb-border bg-white px-3 text-[13px] text-kb-body outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
             aria-label="学习状态"
           >
             <option value="all">全部状态</option>
@@ -716,8 +733,8 @@ function MaterialWorkspace({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-kb-border bg-white">
-        <div className="sticky top-0 z-10 grid min-h-10 grid-cols-[minmax(0,1fr)_140px_130px_150px] items-center border-b border-divider bg-kb-table-head/80 px-5 text-[11px] text-kb-muted max-lg:hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-kb-border bg-white">
+        <div className="sticky top-0 z-10 hidden min-h-8 shrink-0 grid-cols-[minmax(0,1fr)_140px_130px_150px] items-center border-b border-divider bg-kb-table-head/80 px-5 text-[11px] text-kb-muted lg:grid">
           <span>资料名称</span>
           <span>类型</span>
           <span>来源</span>
@@ -725,9 +742,11 @@ function MaterialWorkspace({
         </div>
         {docs.length ? (
           <>
-            {pageDocs.map(({ doc, status }) => (
-              <MaterialRow key={doc.id} doc={doc} status={status} />
-            ))}
+            <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+              {pageDocs.map(({ doc, status }) => (
+                <MaterialRow key={doc.id} doc={doc} status={status} />
+              ))}
+            </div>
             <TableListPager
               page={safePage}
               totalPages={totalPages}
@@ -758,10 +777,10 @@ function MaterialRow({ doc, status }: { doc: Doc; status: DocReadStatus }) {
     <Link
       to="/learn/doc/$id"
       params={{ id: doc.id }}
-      className="group grid min-h-[80px] grid-cols-1 gap-3 border-b border-divider px-5 py-3 transition-colors last:border-b-0 hover:bg-primary-soft/15 lg:grid-cols-[minmax(0,1fr)_140px_130px_150px] lg:items-center"
+      className="group grid min-h-[64px] grid-cols-1 gap-3 border-b border-divider px-5 py-2.5 transition-colors last:border-b-0 hover:bg-primary-soft/15 lg:grid-cols-[minmax(0,1fr)_140px_130px_150px] lg:items-center"
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
           <FileText className="h-4 w-4" />
         </span>
         <span className="min-w-0">
@@ -807,7 +826,7 @@ function EmptyResult({
   onAction?: () => void;
 }) {
   return (
-    <div className="grid min-h-[220px] place-items-center px-6 text-center">
+    <div className="grid min-h-0 flex-1 place-items-center px-6 text-center">
       <div>
         <div className="text-[14px] font-medium text-kb-heading">{title}</div>
         <div className="mt-1 text-[12px] text-kb-muted">{description}</div>

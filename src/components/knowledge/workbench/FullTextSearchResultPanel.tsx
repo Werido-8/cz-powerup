@@ -189,7 +189,14 @@ export function FullTextSearchResultPanel({
                   {chunks.map((chunk) => (
                     <article
                       key={chunk.id}
-                      className="rounded-[8px] border border-divider bg-card px-3 py-2.5"
+                      role="button"
+                      tabIndex={0}
+                      title="点击在新标签页中预览并定位到该片段"
+                      onClick={() => selectedFile && openFile(selectedFile)}
+                      onKeyDown={(e) => {
+                        if ((e.key === "Enter" || e.key === " ") && selectedFile) openFile(selectedFile);
+                      }}
+                      className="cursor-pointer rounded-[8px] border border-divider bg-card px-3 py-2.5 transition-colors hover:border-primary/30 hover:bg-primary-soft/40"
                     >
                       <p className="line-clamp-2 text-[12.5px] leading-[1.5] text-kb-body">
                         <KbHighlightText text={chunk.text} keyword={chunk.keyword} />
@@ -234,11 +241,13 @@ function FullTextFileRow({
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onOpen(file)}
-      onMouseEnter={onSelect}
+      onClick={onSelect}
+      onDoubleClick={() => onOpen(file)}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") onOpen(file);
+        if (event.key === "Enter") onOpen(file);
+        if (event.key === " ") onSelect();
       }}
+      title="单击查看命中片段，双击在新标签页中预览文件"
       className={cn(
         "group relative flex cursor-pointer flex-col gap-1.5 border-b border-divider/70 px-4 py-3 text-left transition-colors",
         selected ? "bg-primary-soft" : "hover:bg-muted/50",

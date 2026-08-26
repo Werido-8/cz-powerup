@@ -152,10 +152,10 @@ function PracticeRecordsPage() {
                 ))}
               </ListCard>
               <TableListPager
-                className="mt-4"
                 page={safePage}
+                totalPages={totalPages}
                 pageSize={pageSize}
-                total={filtered.length}
+                totalItems={filtered.length}
                 onPageChange={setPage}
                 onPageSizeChange={(size) => {
                   setPageSize(size);

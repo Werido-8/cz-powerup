@@ -5,7 +5,7 @@ import type { UploadView } from "@/lib/knowledge/uploadTracking";
 
 const mineSearchSchema = z.object({
   panel: z.enum(["recent", "uploads", "favorites", "personal"]).optional(),
-  view: z.enum(["all", "review", "parse", "publish", "confirm"]).optional(),
+  view: z.enum(["all", "review", "parse", "publish"]).optional(),
   status: z.string().optional(),
   q: z.string().optional(),
 });

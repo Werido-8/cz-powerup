@@ -45,6 +45,7 @@ import {
 import {
   getDemoRoleKey,
   getDemoRoleServerSnapshot,
+  getCurrentKnowledgeUser,
   subscribeDemoRole,
 } from "@/lib/knowledge/demoRole";
 import {
@@ -63,6 +64,7 @@ import {
   removeStorePersonalDirectory,
   subscribeKnowledgeStore,
   submitStoreFileMove,
+  submitStorePermissionRequest,
   updateStoreBase,
   updateStoreCategory,
   updateStoreFile,
@@ -111,6 +113,8 @@ import { KnowledgeEmptyFilesState } from "./KnowledgeEmptyFilesState";
 import { PinnedQuickAccessSection } from "./PinnedQuickAccessSection";
 import { useFileSelection } from "./useFileSelection";
 import { useFileViewMode } from "./useFileViewMode";
+import { MyPendingReviewWidget } from "./MyPendingReviewWidget";
+import { UploadSimilarityFlowDialog } from "./UploadSimilarityFlowDialog";
 
 const CARD_PAGE_SIZE = 8;
 const HIGHLIGHT_MS = 2400;
@@ -194,6 +198,10 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     null,
   );
   const [renamePersonalDirectoryLoading, setRenamePersonalDirectoryLoading] = useState(false);
+  const [uploadFlow, setUploadFlow] = useState<{
+    base: KnowledgeBase;
+    files?: File[];
+  } | null>(null);
 
   const showCategoryManageActions = canSeeCategoryManager();
   const showPersonalManageActions = !employee;
@@ -309,7 +317,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
   };
 
-  const handleConfirmMove = (files: KnowledgeFile[], targetBaseId: string) => {
+  const handleConfirmMove = (files: KnowledgeFile[], targetBaseId: string, keepSource: boolean) => {
     const targetBase = getBaseById(targetBaseId);
     if (!targetBase) {
       toast.error("目标知识库不存在");
@@ -323,21 +331,29 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     );
     setMoveLoading(true);
     for (const file of toSubmit) {
-      submitStoreFileMove(file, targetBase);
+      submitStoreFileMove(file, targetBase, keepSource);
     }
     for (const file of movable) {
-      updateStoreFile(file.id, {
-        knowledgeBaseId: targetBaseId,
-        knowledgeBaseName: targetBase.name,
-      });
+      if (keepSource) {
+        updateStoreFile(file.id, {});
+      } else {
+        updateStoreFile(file.id, {
+          knowledgeBaseId: targetBaseId,
+          knowledgeBaseName: targetBase.name,
+        });
+      }
     }
     window.setTimeout(() => {
       if (toSubmit.length > 0) {
         toast.success(
-          `已提交「${toSubmit[0]?.name}」移入「${targetBase.name}」的申请，请等待管理员审批`,
+          `已提交「${toSubmit[0]?.name}」${keepSource ? "复制" : "移入"}「${targetBase.name}」的申请，请等待管理员审批`,
         );
       } else {
-        toast.success(`已将「${movable[0]?.name}」移动到「${targetBase.name}」`);
+        toast.success(
+          keepSource
+            ? `已在「${targetBase.name}」创建「${movable[0]?.name}」的副本`
+            : `已将「${movable[0]?.name}」移动到「${targetBase.name}」`,
+        );
       }
       setMoveLoading(false);
       setMoveFiles([]);
@@ -494,7 +510,13 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   };
 
   const handleUploadFiles = (files: FileList) => {
-    toast.success(`已选择 ${files.length} 个文件，上传面板即将打开`);
+    if (!selectedBase) return;
+    setUploadFlow({ base: selectedBase, files: Array.from(files) });
+  };
+
+  const openUploadFlow = () => {
+    if (!selectedBase) return;
+    setUploadFlow({ base: selectedBase });
   };
 
   const handleRefresh = () => {
@@ -509,7 +531,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
       canUpload={selectedBase ? canUploadToBase(selectedBase) : false}
       onUpload={
         selectedBase && canUploadToBase(selectedBase)
-          ? () => toast.message("打开上传面板")
+          ? openUploadFlow
           : undefined
       }
     />
@@ -688,6 +710,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             cardSelection={cardSelection}
             batchToolbarProps={batchToolbarProps}
             fileRowActions={fileRowActions}
+            processingBaseId={selectedBaseId}
           />
         ) : !selectedBase ? (
           <div className="flex flex-1 items-center justify-center p-8">
@@ -706,7 +729,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             <NoPermissionState onApply={() => setPermissionBase(selectedBase)} />
           </div>
         ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col">
             <KnowledgeBaseDetailHeader
               base={selectedBase}
               fileCount={selectedBase.fileCount ?? selectedFiles.length}
@@ -746,7 +769,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                     showViewModeToggle={!isFullTextSearchActive}
                     onUpload={
                       canUploadToBase(selectedBase)
-                        ? () => toast.message("打开上传面板")
+                        ? openUploadFlow
                         : undefined
                     }
                   />
@@ -786,8 +809,8 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                     )}
                   </div>
 
-                  {selectedFiles.length > 0 &&
-                    (viewMode === "list" ? (
+                  {selectedFiles.length > 0 ? (
+                    viewMode === "list" ? (
                       <TableListPager
                         page={safePage}
                         totalPages={totalPages}
@@ -798,6 +821,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                           setPageSize(size);
                           setPage(1);
                         }}
+                        leading={<MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />}
                       />
                     ) : (
                       <div className="border-t border-divider px-4 py-2">
@@ -809,9 +833,15 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
                           unitLabel="个文件"
                           onPageChange={setPage}
                           compact
+                          leading={<MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />}
                         />
                       </div>
-                    ))}
+                    )
+                  ) : (
+                    <div className="flex items-center border-t border-divider px-5 py-2.5 empty:hidden">
+                      <MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />
+                    </div>
+                  )}
                 </>
               )}
             </KbDragUploadOverlay>
@@ -822,6 +852,12 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
       {permissionBase && (
         <PermissionApplyModal base={permissionBase} onClose={() => setPermissionBase(null)} />
       )}
+
+      <UploadSimilarityFlowDialog
+        base={uploadFlow?.base ?? null}
+        initialFiles={uploadFlow?.files}
+        onClose={() => setUploadFlow(null)}
+      />
 
       <DirectoryForm
         open={directoryForm.open}
@@ -1044,6 +1080,7 @@ function TreeAggregatePanel({
   cardSelection,
   batchToolbarProps,
   fileRowActions,
+  processingBaseId,
 }: {
   scopeLabel: string;
   description: string;
@@ -1083,6 +1120,7 @@ function TreeAggregatePanel({
     onTogglePin: (file: KnowledgeFile) => void;
     onViewHistory: (file: KnowledgeFile) => void;
   };
+  processingBaseId: string;
 }) {
   const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
   const totalPages = Math.max(1, Math.ceil(files.length / effectivePageSize) || 1);
@@ -1166,8 +1204,8 @@ function TreeAggregatePanel({
             )}
           </div>
 
-          {files.length > 0 &&
-            (viewMode === "list" ? (
+          {files.length > 0 ? (
+            viewMode === "list" ? (
               <TableListPager
                 page={safePage}
                 totalPages={totalPages}
@@ -1178,6 +1216,7 @@ function TreeAggregatePanel({
                   onPageSizeChange(size);
                   onPageChange(1);
                 }}
+                leading={<MyPendingReviewWidget knowledgeBaseId={processingBaseId} />}
               />
             ) : (
               <div className="border-t border-divider px-4 py-2">
@@ -1189,9 +1228,15 @@ function TreeAggregatePanel({
                   unitLabel="个文件"
                   onPageChange={onPageChange}
                   compact
+                  leading={<MyPendingReviewWidget knowledgeBaseId={processingBaseId} />}
                 />
               </div>
-            ))}
+            )
+          ) : (
+            <div className="flex items-center border-t border-divider px-5 py-2.5 empty:hidden">
+              <MyPendingReviewWidget knowledgeBaseId={processingBaseId} />
+            </div>
+          )}
         </>
       )}
     </div>
@@ -1249,7 +1294,26 @@ function PermissionApplyModal({ base, onClose }: { base: KnowledgeBase; onClose:
           <AppDialogButton
             variant="primary"
             onClick={() => {
-              toast.success(group === "view" ? "已提交浏览权限申请" : "已提交上传权限申请");
+              if (!reason.trim()) {
+                toast.error("请填写申请理由");
+                return;
+              }
+              submitStorePermissionRequest({
+                applicantId: getCurrentKnowledgeUser().id,
+                applicantName: getCurrentKnowledgeUser().name,
+                knowledgeBaseId: base.id,
+                knowledgeBaseName: base.name,
+                group: group as import("@/lib/knowledge/types").KnowledgePermissionGroup,
+                reason: reason.trim(),
+                submittedAt: new Date().toLocaleString("zh-CN", {
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              });
+              toast.success("权限申请已提交，等待管理员审批");
               onClose();
             }}
           >

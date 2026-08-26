@@ -28,7 +28,7 @@ export function DiffMinimap({
           <button
             key={diff.id}
             type="button"
-            title={`${DIFF_TYPE_META[diff.type].label} · ${diff.title}`}
+            title={`${DIFF_TYPE_META[diff.type].label} ${diff.title}`}
             aria-label={`跳转到第 ${diff.seq} 处差异：${diff.title}`}
             onClick={() => onSelect(diff)}
             style={{

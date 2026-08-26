@@ -7,10 +7,8 @@ import {
   Circle,
   CircleDashed,
   ClipboardList,
-  FileCheck2,
   FileStack,
   Info,
-  Library,
   ListChecks,
   Loader2,
   MoreHorizontal,
@@ -41,9 +39,6 @@ import {
   KbTableCellFile,
   KbUploadCard,
 } from "@/components/knowledge/ui";
-import { ConfirmListToolbar } from "@/components/knowledge/workbench/ConfirmListToolbar";
-import { FileListCheckbox } from "@/components/knowledge/workbench/FileListCheckbox";
-import { useFileSelection } from "@/components/knowledge/workbench/useFileSelection";
 import {
   getBaseById,
   getFileById,
@@ -52,10 +47,8 @@ import {
 import { pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
 import { openFileDetailInNewTab } from "@/lib/knowledge/searchNav";
 import {
-  batchConfirmStoreFiles,
   getKnowledgeStoreServerSnapshot,
   getKnowledgeStoreVersion,
-  getStoreFileConfirms,
   getStoreUploadRecords,
   removeStoreUploadRecord,
   subscribeKnowledgeStore,
@@ -66,12 +59,9 @@ import type { KnowledgeBase, UploadRecord } from "@/lib/knowledge/types";
 import {
   UPLOAD_VIEW_META,
   belongsToView,
-  confirmStatusLabel,
-  confirmStatusTone,
   currentStatusOf,
   enabledStateOf,
   fileStatusOf,
-  getConfirmStatus,
   getCurrentStage,
   getParseStage,
   getPublishStage,
@@ -95,6 +85,7 @@ import {
 import { cn } from "@/lib/utils";
 import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
 import { UploadBasePickerDialog } from "./UploadBasePickerDialog";
+import { UploadSimilarityFlowDialog } from "./UploadSimilarityFlowDialog";
 
 export type UploadSearch = {
   panel?: string;
@@ -107,8 +98,6 @@ export type UploadSearch = {
 
 const VIEW_GRIDS: Record<UploadView, string> = {
   all: "grid-cols-[minmax(200px,1.4fr)_minmax(110px,0.85fr)_76px_88px_80px_104px_104px_minmax(196px,1fr)] min-w-[1100px]",
-  confirm:
-    "grid-cols-[36px_minmax(200px,1.4fr)_minmax(130px,1fr)_96px_150px_150px_minmax(120px,1fr)] min-w-[920px]",
   review:
     "grid-cols-[minmax(200px,1.4fr)_minmax(130px,1fr)_96px_150px_150px_minmax(200px,1fr)] min-w-[960px]",
   parse:
@@ -127,17 +116,6 @@ const VIEW_HEADERS: Record<UploadView, ReactNode> = {
       <span>启用状态</span>
       <span>提交时间</span>
       <span>最近更新</span>
-      <span className="text-right">操作</span>
-    </>
-  ),
-  confirm: (
-    <>
-      <span />
-      <span>文件信息</span>
-      <span>目标知识库</span>
-      <span>确认状态</span>
-      <span>提交时间</span>
-      <span>解析完成</span>
       <span className="text-right">操作</span>
     </>
   ),
@@ -209,7 +187,6 @@ export function UploadTrackingPanel({
   const [actionDialog, setActionDialog] = useState<ActionDialog>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
-  const confirmSelection = useFileSelection();
 
   const historyFile = historyFileId ? (getFileById(historyFileId) ?? null) : null;
   const meta = UPLOAD_VIEW_META[currentView];
@@ -217,11 +194,6 @@ export function UploadTrackingPanel({
     subscribeKnowledgeStore,
     getStoreUploadRecords,
     getStoreUploadRecords,
-  );
-  const fileConfirms = useSyncExternalStore(
-    subscribeKnowledgeStore,
-    getStoreFileConfirms,
-    getStoreFileConfirms,
   );
   const counts = useMemo(() => getUploadCounts(uploadRecords), [uploadRecords, storeVersion]);
 
@@ -247,7 +219,6 @@ export function UploadTrackingPanel({
 
   useEffect(() => {
     setPage(1);
-    confirmSelection.clear();
   }, [currentView, statusFilter, categoryFilter, searchQuery, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(records.length / pageSize) || 1);
@@ -256,42 +227,6 @@ export function UploadTrackingPanel({
     const start = (safePage - 1) * pageSize;
     return records.slice(start, start + pageSize);
   }, [records, pageSize, safePage]);
-
-  const pendingConfirmRecords = useMemo(
-    () => records.filter((r) => getConfirmStatus(r) === "PENDING"),
-    [records],
-  );
-  const pageConfirmIds = useMemo(
-    () => pagedRecords.filter((r) => getConfirmStatus(r) === "PENDING").map((r) => r.id),
-    [pagedRecords],
-  );
-
-  const resolveConfirmId = (record: UploadRecord) => {
-    const byName = fileConfirms.find(
-      (item) =>
-        item.fileName === record.fileName &&
-        (item.status === "pendingApproval" || !item.status),
-    );
-    return byName?.id ?? `confirm-${record.fileId.replace(/^file-/, "")}`;
-  };
-
-  const openConfirmWorkbench = (record: UploadRecord) => {
-    const confirmId = resolveConfirmId(record);
-    router.navigate({ to: "/knowledge/confirm/$confirmId", params: { confirmId } });
-  };
-
-  const handleBatchConfirm = () => {
-    const selected = pendingConfirmRecords.filter((r) => confirmSelection.isSelected(r.id));
-    if (!selected.length) {
-      toast.message("请先勾选待确认文件");
-      return;
-    }
-    const ids = selected.map(resolveConfirmId);
-    batchConfirmStoreFiles(ids);
-    confirmSelection.clear();
-    toast.success(`已批量确认 ${selected.length} 个文件并发布到个人库`);
-    setRefreshSeed((v) => v + 1);
-  };
 
   const setView = (view: UploadView, status = "all") => {
     onSearchChange({ ...search, view, status: status === "all" ? undefined : status });
@@ -320,7 +255,7 @@ export function UploadTrackingPanel({
       chunks: () => toast.message(`查看 ${record.fileName} 分块内容`),
       parseResult: () => setActionDialog({ kind: "parseResult", record }),
       approveRecord: () => setActionDialog({ kind: "approveRecord", record }),
-      confirmContent: () => openConfirmWorkbench(record),
+      confirmContent: () => toast.message("文件确认已移除，解析完成将自动发布"),
     };
     if (instant[kind]) {
       instant[kind]!();
@@ -374,12 +309,6 @@ export function UploadTrackingPanel({
                     { view: "all" as const, label: "全部上传", icon: ListChecks, count: counts.all },
                     { view: "parse" as const, label: "解析进度", icon: Loader2, count: counts.needParseError },
                     {
-                      view: "confirm" as const,
-                      label: "文件确认",
-                      icon: FileCheck2,
-                      count: counts.confirmInProgress,
-                    },
-                    {
                       view: "review" as const,
                       label: "审核进度",
                       icon: CircleDashed,
@@ -426,19 +355,7 @@ export function UploadTrackingPanel({
               
               </div>
 
-              {currentView === "confirm" && confirmSelection.selectedCount > 0 ? (
-                <ConfirmListToolbar
-                  selectedCount={confirmSelection.selectedCount}
-                  totalCount={pendingConfirmRecords.length}
-                  pageItemCount={pageConfirmIds.length}
-                  isAllResultsSelected={confirmSelection.isAllResultsSelected}
-                  onSelectAllResults={() =>
-                    confirmSelection.selectAllResults(pendingConfirmRecords.map((r) => r.id))
-                  }
-                  onBatchConfirm={handleBatchConfirm}
-                  onClearSelection={confirmSelection.clear}
-                />
-              ) : (
+              {(
                 <div className="flex flex-wrap items-center gap-3 border-b border-[#E8F0F2] px-4 py-3">
                   <SearchBar
                     value={searchInput}
@@ -487,34 +404,7 @@ export function UploadTrackingPanel({
                   variant="flat"
                   minWidth={VIEW_GRIDS[currentView]}
                   className="border-0 shadow-none"
-                  header={
-                    currentView === "confirm" ? (
-                      <>
-                        <FileListCheckbox
-                          checked={
-                            pageConfirmIds.length > 0 &&
-                            pageConfirmIds.every((id) => confirmSelection.isSelected(id))
-                          }
-                          indeterminate={
-                            pageConfirmIds.some((id) => confirmSelection.isSelected(id)) &&
-                            !pageConfirmIds.every((id) => confirmSelection.isSelected(id))
-                          }
-                          onCheckedChange={(checked) =>
-                            confirmSelection.toggleAll(pageConfirmIds, Boolean(checked))
-                          }
-                          aria-label="全选本页待确认"
-                        />
-                        <span>文件信息</span>
-                        <span>目标知识库</span>
-                        <span>确认状态</span>
-                        <span>提交时间</span>
-                        <span>解析完成</span>
-                        <span className="text-right">操作</span>
-                      </>
-                    ) : (
-                      VIEW_HEADERS[currentView]
-                    )
-                  }
+                  header={VIEW_HEADERS[currentView]}
                   empty={
                     <KbEmptyState
                       title={meta.emptyTitle}
@@ -541,8 +431,6 @@ export function UploadTrackingPanel({
                       record={record}
                       onAction={handleUploadAction}
                       onOpenFile={openRecordFile}
-                      selected={confirmSelection.isSelected(record.id)}
-                      onToggleSelect={() => confirmSelection.toggle(record.id)}
                     />
                   ))}
                 </KbDataTable>
@@ -572,7 +460,7 @@ export function UploadTrackingPanel({
         onClose={() => setBasePickerOpen(false)}
         onSelect={(base) => openUploadWithBase(base)}
       />
-      <UploadFlowDialog base={uploadBase} onClose={() => setUploadBase(null)} onChangeBase={() => { setUploadBase(null); setBasePickerOpen(true); }} />
+      <UploadSimilarityFlowDialog base={uploadBase} onClose={() => setUploadBase(null)} onChangeBase={() => { setUploadBase(null); setBasePickerOpen(true); }} />
       <FileVersionHistoryDialog file={historyFile} onClose={() => setHistoryFileId(null)} />
       <TrackingActionDialogs
         dialog={actionDialog}
@@ -610,56 +498,22 @@ function UploadTrackingRow({
 }) {
   const file = getFileById(record.fileId);
   const actions = getTrackingActions(view, record);
-  const canSelect = view === "confirm" && getConfirmStatus(record) === "PENDING";
-
   return (
     <KbDataTableRow
       variant="flat"
       className={VIEW_GRIDS[view]}
       onClick={() => onOpenFile(record)}
     >
-      {view === "confirm" && (
-        <span
-          className="flex items-center"
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
-        >
-          <FileListCheckbox
-            checked={Boolean(selected)}
-            disabled={!canSelect}
-            onCheckedChange={() => onToggleSelect?.()}
-            aria-label={`选择 ${record.fileName}`}
-          />
-        </span>
-      )}
       <KbTableCellFile name={record.fileName} type={file?.type ?? "pdf"} size="sm" nameWeight="normal" />
       <span className="truncate text-kb-muted">{record.targetKnowledgeBaseName}</span>
 
       {view === "all" && <AllViewCells record={record} />}
-      {view === "confirm" && <ConfirmViewCells record={record} />}
       {view === "review" && <ReviewViewCells record={record} />}
       {view === "parse" && <ParseViewCells record={record} />}
       {view === "publish" && <PublishViewCells record={record} />}
 
       <UploadActionCell actions={actions} record={record} onAction={onAction} />
     </KbDataTableRow>
-  );
-}
-
-function ConfirmViewCells({ record }: { record: UploadRecord }) {
-  const cs = getConfirmStatus(record);
-  return (
-    <>
-      <span>
-        <KbStatusTag tone={confirmStatusTone(cs)} variant="outline" dot>
-          {confirmStatusLabel(cs)}
-        </KbStatusTag>
-      </span>
-      <span className="truncate tabular-nums text-kb-muted">{record.submittedAt}</span>
-      <span className="truncate tabular-nums text-kb-muted">
-        {record.parseUpdatedAt ?? record.updatedAt ?? "—"}
-      </span>
-    </>
   );
 }
 
@@ -818,37 +672,6 @@ function UploadActionCell({
         </DropdownMenu>
       )}
     </span>
-  );
-}
-
-/* ─── 上传弹框 ─── */
-
-function UploadFlowDialog({ base, onClose, onChangeBase }: { base: KnowledgeBase | null; onClose: () => void; onChangeBase: () => void }) {
-  return (
-    <AppFormDialog open={Boolean(base)} size="small" title="上传文件" titleIcon={UploadCloud} onClose={onClose}>
-      {base && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 rounded-[8px] border border-[#DCEBED] bg-[#F8FAFB] px-3 py-2">
-            <Library className="h-4 w-4 shrink-0 text-primary stroke-[1.8]" />
-            <div className="min-w-0">
-              <div className="text-[11px] text-kb-muted">目标知识库</div>
-              <div className="truncate text-[13px] font-medium text-kb-heading">{base.name}</div>
-            </div>
-            <button type="button" onClick={onChangeBase} className="ml-auto shrink-0 text-[11.5px] text-primary hover:underline">更换</button>
-          </div>
-          <KbUploadCard
-            compact={false}
-            title="拖入文件或选择上传"
-            hint={base.scope === "personal" ? "个人库上传解析完成后，在「文件确认」核对 AI 内容后发布。" : "提交后将先解析，解析完成后进入审批台。"}
-            onUpload={() => {
-              pushRecentUploadBaseId(base.id);
-              toast.success(base.scope === "personal" ? "文件已进入解析队列，完成后请在文件确认中核对" : "文件已提交，解析完成后将进入审批台");
-              onClose();
-            }}
-          />
-        </div>
-      )}
-    </AppFormDialog>
   );
 }
 

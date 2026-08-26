@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -7,7 +7,6 @@ import {
   COMPARE_DIFFS,
   COMPARE_TASK,
   countByType,
-  diffMatchesChapter,
   getAffectedChapterCount,
   getChapterDensity,
   getCompareVersion,
@@ -15,31 +14,13 @@ import {
 } from "@/lib/file-compare/data";
 import type { CompareOverviewSearch } from "@/lib/file-compare/navigation";
 import type { DiffItem, DiffType } from "@/lib/file-compare/types";
-import { CompareBreadcrumb } from "./CompareBreadcrumb";
-import { CompareModuleTabs, type CompareTabKey } from "./CompareModuleTabs";
-import { CompareMetaTag, CompareStatusTag, CompareTaskHeader } from "./CompareTaskHeader";
-import { ALL_CHAPTERS, ChapterOutlinePanel } from "./ChapterOutlinePanel";
-import { ChangeListPanel } from "./ChangeListPanel";
 import { ChangeSummaryPanel } from "./ChangeSummaryPanel";
+import { CompareWorkspaceHeader } from "./CompareWorkspaceHeader";
 import { DiffAnalysisPanel } from "./DiffAnalysisPanel";
 import { DiffStatCards } from "./DiffStatCards";
 import { ExportReportMenu } from "./ExportReportMenu";
 import { FileInfoPanel } from "./FileInfoPanel";
 import { RecompareConfirmDialog } from "./RecompareConfirmDialog";
-
-type OverviewTabKey = Exclude<CompareTabKey, "reader">;
-
-const TAB_CRUMB_LABEL: Record<OverviewTabKey, string> = {
-  overview: "差异概览",
-  changes: "变更清单",
-  info: "文件信息",
-};
-
-const TAB_ROUTE = {
-  overview: "/file-compare/$taskId/overview",
-  changes: "/file-compare/$taskId/changes",
-  info: "/file-compare/$taskId/info",
-} as const;
 
 export function CompareOverviewPage({
   taskId,
@@ -47,38 +28,25 @@ export function CompareOverviewPage({
   search,
 }: {
   taskId: string;
-  tab: OverviewTabKey;
+  tab: "overview" | "info";
   search: CompareOverviewSearch;
 }) {
   const navigate = useNavigate();
   const task = COMPARE_TASK;
   const baseVersion = getCompareVersion(task.baseVersionId);
   const targetVersion = getCompareVersion(task.targetVersionId);
-
   const [recompareOpen, setRecompareOpen] = useState(false);
   const [recompareLoading, setRecompareLoading] = useState(false);
-
-  const chapterId = search.chapter ?? ALL_CHAPTERS;
   const activeType = search.type;
 
   const patchSearch = (patch: Partial<CompareOverviewSearch>) => {
     void navigate({
-      to: TAB_ROUTE[tab],
+      to: tab === "overview" ? "/file-compare/$taskId/overview" : "/file-compare/$taskId/info",
       params: { taskId },
       search: { ...search, ...patch },
       replace: true,
     });
   };
-
-  const typeFiltered = useMemo(
-    () => (activeType ? COMPARE_DIFFS.filter((diff) => diff.type === activeType) : COMPARE_DIFFS),
-    [activeType],
-  );
-
-  const filtered = useMemo(
-    () => typeFiltered.filter((diff) => diffMatchesChapter(diff, chapterId)),
-    [typeFiltered, chapterId],
-  );
 
   const counts = useMemo(
     () =>
@@ -91,14 +59,31 @@ export function CompareOverviewPage({
     [],
   );
 
-  const density = useMemo(() => getChapterDensity(typeFiltered), [typeFiltered]);
-  const summaryDiffs = useMemo(() => sortForSummaryList(filtered), [filtered]);
+  const visibleDiffs = useMemo(
+    () => (activeType ? COMPARE_DIFFS.filter((diff) => diff.type === activeType) : COMPARE_DIFFS),
+    [activeType],
+  );
+  const density = useMemo(() => getChapterDensity(visibleDiffs), [visibleDiffs]);
+  const primaryChapter = useMemo(
+    () => getChapterDensity(COMPARE_DIFFS, 1)[0]?.label ?? "暂无集中章节",
+    [],
+  );
+  const summaryDiffs = useMemo(() => sortForSummaryList(visibleDiffs), [visibleDiffs]);
 
   const openDiffInReader = (diff: DiffItem) => {
     void navigate({
       to: "/file-compare/$taskId/reader",
       params: { taskId },
-      search: { chapter: search.chapter, type: activeType, diff: diff.id },
+      search: { type: activeType, diff: diff.id },
+    });
+  };
+
+  const openChapterInReader = (chapterId: string) => {
+    const first = visibleDiffs.find((diff) => diff.chapterId === chapterId);
+    void navigate({
+      to: "/file-compare/$taskId/reader",
+      params: { taskId },
+      search: { chapter: chapterId, type: activeType, diff: first?.id },
     });
   };
 
@@ -113,92 +98,54 @@ export function CompareOverviewPage({
     }, 900);
   };
 
+  const headerActions = (
+    <>
+      <KbButton variant="outline" onClick={() => setRecompareOpen(true)}>
+        <RefreshCw className="h-3.5 w-3.5 stroke-[1.9]" aria-hidden />
+        重新比对
+      </KbButton>
+      <ExportReportMenu taskTitle={task.title} />
+    </>
+  );
+
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <CompareBreadcrumb
-        items={[
-          {
-            label: "文件比对",
-            link: (
-              <Link to="/file-compare/$taskId/overview" params={{ taskId }}>
-                文件比对
-              </Link>
-            ),
-          },
-          { label: TAB_CRUMB_LABEL[tab] },
-        ]}
-      />
+      <CompareWorkspaceHeader
+        taskId={taskId}
+        active={tab}
+        search={search}
+        baseVersion={baseVersion}
+        targetVersion={targetVersion}
+        actions={headerActions}
+      >
+        {tab === "overview" ? (
+          <div className="flex h-full min-h-0 flex-col">
+            <DiffStatCards
+              total={COMPARE_DIFFS.length}
+              affectedChapters={getAffectedChapterCount(COMPARE_DIFFS)}
+              counts={counts}
+              primaryChapter={primaryChapter}
+              activeType={activeType}
+              onSelectType={(type) => patchSearch({ type })}
+            />
 
-      <CompareTaskHeader
-        className="mt-2"
-        title={task.title}
-        tags={
-          <>
-            <CompareMetaTag>
-              {baseVersion.label} 基准 <span className="text-kb-muted/70">→</span>{" "}
-              {targetVersion.label} 更新
-            </CompareMetaTag>
-            <CompareStatusTag status={task.status} />
-          </>
-        }
-        actions={
-          <>
-            <KbButton variant="outline" onClick={() => setRecompareOpen(true)}>
-              <RefreshCw className="h-3.5 w-3.5 stroke-[1.9]" aria-hidden />
-              重新比对
-            </KbButton>
-            <ExportReportMenu taskTitle={task.title} />
-          </>
-        }
-      />
-
-      <div className="mt-3 shrink-0">
-        <DiffStatCards
-          total={COMPARE_DIFFS.length}
-          affectedChapters={getAffectedChapterCount(COMPARE_DIFFS)}
-          counts={counts}
-          activeType={activeType}
-          onSelectType={(type) => patchSearch({ type })}
-        />
-      </div>
-
-      <section className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-kb-border bg-white shadow-[0_1px_2px_0_rgba(31,52,64,0.03)]">
-        <CompareModuleTabs taskId={taskId} active={tab} search={search} />
-
-        {tab === "overview" && (
-          <div className="grid min-h-0 flex-1 grid-cols-[minmax(258px,21%)_minmax(0,1fr)_minmax(304px,25%)] divide-x divide-[#EDF3F5] overflow-hidden">
-            <div className="flex min-h-0 min-w-0 flex-col px-4 py-3.5">
-              <ChapterOutlinePanel
-                diffs={typeFiltered}
-                totalCount={typeFiltered.length}
-                selectedChapterId={chapterId}
-                onSelectChapter={(next) =>
-                  patchSearch({ chapter: next === ALL_CHAPTERS ? undefined : next })
-                }
-              />
-            </div>
-            <div className="flex min-h-0 min-w-0 flex-col px-5 py-3.5">
-              <ChangeSummaryPanel task={task} diffs={summaryDiffs} onOpenDiff={openDiffInReader} />
-            </div>
-            <div className="flex min-h-0 min-w-0 flex-col px-5 py-3.5">
-              <DiffAnalysisPanel
-                total={COMPARE_DIFFS.length}
-                counts={counts}
-                density={density}
-                activeType={activeType}
-                onSelectType={(type) => patchSearch({ type })}
-                onSelectChapter={(next) => patchSearch({ chapter: next })}
-              />
+            <div className="grid min-h-0 flex-1 grid-cols-1 divide-y divide-[#E7EFF1] overflow-y-auto xl:grid-cols-[minmax(300px,0.78fr)_minmax(0,1.72fr)] xl:divide-x xl:divide-y-0 xl:overflow-hidden">
+              <section className="min-h-[260px] overflow-hidden px-4 py-3.5">
+                <DiffAnalysisPanel density={density} onSelectChapter={openChapterInReader} />
+              </section>
+              <section className="min-h-[320px] overflow-hidden px-4 py-3.5">
+                <ChangeSummaryPanel
+                  task={task}
+                  diffs={summaryDiffs}
+                  onOpenDiff={openDiffInReader}
+                />
+              </section>
             </div>
           </div>
-        )}
-
-        {tab === "changes" && <ChangeListPanel diffs={filtered} onOpenDiff={openDiffInReader} />}
-
-        {tab === "info" && (
+        ) : (
           <FileInfoPanel task={task} baseVersion={baseVersion} targetVersion={targetVersion} />
         )}
-      </section>
+      </CompareWorkspaceHeader>
 
       <RecompareConfirmDialog
         open={recompareOpen}

@@ -108,13 +108,13 @@ export function RecentTopicAccess({
                   params={{ id: item.topic.id }}
                   aria-label={`打开专题：${item.topic.title}，${relativeTime}，${progressLabel}`}
                   title={`上次学习资料：${item.lastDocTitle}`}
-                  className="group flex min-h-14 items-center gap-2 rounded-md px-2.5 py-2 transition-colors duration-150 hover:bg-primary-soft/35 active:bg-primary-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                  className="group flex min-h-11 items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-primary-soft/35 active:bg-primary-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[12.5px] font-medium text-kb-heading group-hover:text-primary">
                       {item.topic.title}
                     </span>
-                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-kb-muted">
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-kb-muted">
                       <span>{relativeTime}</span>
                       <span>{progressLabel}</span>
                     </span>
@@ -129,10 +129,10 @@ export function RecentTopicAccess({
           })}
         </ul>
       ) : (
-        <div className="mx-1 mb-1 rounded-md border border-dashed border-kb-border bg-kb-surface/40 px-3 py-4 text-center">
-          <BookOpen className="mx-auto h-4 w-4 text-kb-muted" aria-hidden="true" />
-          <p className="mt-2 text-[12px] font-medium text-kb-heading">暂无学习记录</p>
-          <p className="mt-1 text-[10.5px] leading-4 text-kb-muted">开始学习专题后会显示在这里。</p>
+        <div className="mx-1 mb-1 rounded-md border border-dashed border-kb-border bg-kb-surface/40 px-3 py-3 text-center">
+          <BookOpen className="mx-auto h-3.5 w-3.5 text-kb-muted" aria-hidden="true" />
+          <p className="mt-1.5 text-[12px] font-medium text-kb-heading">暂无学习记录</p>
+          <p className="mt-0.5 text-[10.5px] leading-4 text-kb-muted">开始学习专题后会显示在这里。</p>
         </div>
       )}
     </section>

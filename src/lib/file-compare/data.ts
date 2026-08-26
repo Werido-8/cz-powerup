@@ -57,7 +57,7 @@ export const DEFAULT_COMPARE_TASK_ID = "cmp-2026-001";
 
 export const COMPARE_TASK: CompareTask = {
   id: DEFAULT_COMPARE_TASK_ID,
-  title: "涉网运行管理规定 2025—2026 版本比对",
+  title: "涉网运行管理规定版本比对",
   baseVersionId: "v5",
   targetVersionId: "v6",
   status: "done",

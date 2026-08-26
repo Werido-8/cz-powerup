@@ -4,6 +4,7 @@ import {
   KNOWLEDGE_BASES,
   KNOWLEDGE_CATEGORIES,
   KNOWLEDGE_FILES,
+  PERMISSION_REQUESTS,
   PERSONAL_DIRECTORIES,
   UPLOAD_APPROVALS,
   UPLOAD_RECORDS,
@@ -13,6 +14,7 @@ import type {
   KnowledgeBase,
   KnowledgeCategory,
   KnowledgeFile,
+  PermissionRequest,
   PersonalDirectory,
   UploadApproval,
   UploadRecord,
@@ -42,6 +44,7 @@ let uploadApprovals: UploadApproval[] = UPLOAD_APPROVALS.map((item) => ({
   })),
 }));
 let fileMoveApprovals: FileMoveApproval[] = FILE_MOVE_APPROVALS.map((item) => ({ ...item }));
+let permissionRequests: PermissionRequest[] = PERMISSION_REQUESTS.map((item) => ({ ...item }));
 let fileConfirms: UploadApproval[] = FILE_CONFIRMS.map((item) => ({
   ...item,
   aiMetadata: item.aiMetadata?.map((field) => ({ ...field })),
@@ -111,6 +114,164 @@ export function getStoreFileConfirms() {
   return fileConfirms;
 }
 
+export function getStorePermissionRequests() {
+  return permissionRequests;
+}
+
+/** 提交权限申请：写入 store，返回新建记录 */
+export function submitStorePermissionRequest(
+  request: Omit<PermissionRequest, "id" | "status" | "notifyStatus">,
+): PermissionRequest {
+  const newRequest: PermissionRequest = {
+    ...request,
+    id: `perm-${Date.now()}`,
+    status: "pendingApproval",
+    notifyStatus: "waiting",
+  };
+  permissionRequests = [newRequest, ...permissionRequests];
+  emit();
+  return newRequest;
+}
+
+/** 管理员审批通过权限申请 */
+export function approveStorePermissionRequest(id: string) {
+  permissionRequests = permissionRequests.map((item) =>
+    item.id === id
+      ? { ...item, status: "approved", reviewedAt: nowStamp(), notifyStatus: "sent" }
+      : item,
+  );
+  emit();
+}
+
+/** 管理员驳回权限申请 */
+export function rejectStorePermissionRequest(id: string, reason: string) {
+  permissionRequests = permissionRequests.map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          status: "rejected",
+          rejectReason: reason,
+          reviewedAt: nowStamp(),
+          notifyStatus: "sent",
+        }
+      : item,
+  );
+  emit();
+}
+
+/**
+ * 保存个人库文件解析结果的编辑内容（元数据/摘要/关键词/文件名）。
+ * 不改变文件 status，随时可调用。
+ */
+export function saveStoreFileEditedContent(
+  fileId: string,
+  patch: {
+    name?: string;
+    summary?: string;
+    aiKeywords?: string[];
+    metadata?: Record<string, string | string[]>;
+  },
+) {
+  files = files.map((item) => (item.id === fileId ? { ...item, ...patch, updatedAt: nowStamp() } : item));
+  emit();
+}
+
+/**
+ * 个人库上传：立即创建文件记录（uploading 态）并触发解析状态流转。
+ * 解析完成后文件直接置为 published，无需二次确认。
+ */
+export function createStorePersonalFile(opts: {
+  fileName: string;
+  knowledgeBaseId: string;
+  knowledgeBaseName: string;
+  fileSize?: string;
+}): KnowledgeFile {
+  const stamp = nowStamp();
+  const fileId = `file-upload-${Date.now()}`;
+  const recordId = `upload-personal-${Date.now()}`;
+
+  const newFile: KnowledgeFile = {
+    id: fileId,
+    name: opts.fileName,
+    knowledgeBaseId: opts.knowledgeBaseId,
+    knowledgeBaseName: opts.knowledgeBaseName,
+    status: "uploading",
+    parseStatus: "waiting",
+    size: opts.fileSize,
+    uploaderName: "当前用户",
+    uploaderId: "u-current",
+    createdAt: stamp,
+    updatedAt: stamp,
+    canPreview: false,
+    canDownload: true,
+    canEdit: true,
+  };
+  files = [newFile, ...files];
+
+  const newRecord: UploadRecord = {
+    id: recordId,
+    fileId,
+    fileName: opts.fileName,
+    targetKnowledgeBaseId: opts.knowledgeBaseId,
+    targetKnowledgeBaseName: opts.knowledgeBaseName,
+    submittedAt: stamp,
+    updatedAt: stamp,
+    status: "uploading",
+    parseStatus: "waiting",
+  };
+  uploadRecords = [newRecord, ...uploadRecords];
+  emit();
+
+  // 模拟上传完成 → 解析中
+  window.setTimeout(() => {
+    const s = nowStamp();
+    files = files.map((f) =>
+      f.id === fileId ? { ...f, status: "parsing", parseStatus: "parsing", updatedAt: s } : f,
+    );
+    uploadRecords = uploadRecords.map((r) =>
+      r.id === recordId ? { ...r, status: "parsing", parseStatus: "parsing", updatedAt: s } : r,
+    );
+    emit();
+
+    // 模拟解析完成 → 直接 published
+    window.setTimeout(() => {
+      const s2 = nowStamp();
+      files = files.map((f) =>
+        f.id === fileId
+          ? {
+              ...f,
+              status: "published",
+              parseStatus: "success",
+              docParseStatus: "success",
+              aiParseStatus: "success",
+              canPreview: true,
+              summary: `${opts.fileName}的 AI 摘要（自动生成）`,
+              aiKeywords: ["运行", "规程", "自动解析"],
+              updatedAt: s2,
+            }
+          : f,
+      );
+      uploadRecords = uploadRecords.map((r) =>
+        r.id === recordId
+          ? {
+              ...r,
+              status: "published",
+              parseStatus: "success",
+              docParseStatus: "success",
+              aiParseStatus: "success",
+              updatedAt: s2,
+              publishedAt: s2,
+              publisherName: "系统自动发布",
+            }
+          : r,
+      );
+      emit();
+    }, 3000);
+  }, 1500);
+
+  return newFile;
+}
+
 export function updateStoreUploadApproval(id: string, patch: Partial<UploadApproval>) {
   uploadApprovals = uploadApprovals.map((item) => {
     if (item.id !== id) return item;
@@ -123,6 +284,20 @@ export function updateStoreUploadApproval(id: string, patch: Partial<UploadAppro
 
   const updated = uploadApprovals.find((item) => item.id === id);
   if (updated?.status === "approved" || updated?.status === "rejected") {
+    // 移动类型审批通过：将文件切到目标库（finalizeStoreFileMove 处理）
+    if (updated.status === "approved" && updated.uploadType === "move" && updated.fileId) {
+      files = files.map((f) =>
+        f.id === updated.fileId
+          ? {
+              ...f,
+              knowledgeBaseId: updated.knowledgeBaseId ?? f.knowledgeBaseId,
+              knowledgeBaseName: updated.knowledgeBaseName ?? f.knowledgeBaseName,
+              status: "published" as const,
+              updatedAt: nowStamp(),
+            }
+          : f,
+      );
+    }
     const stamp = updated.reviewedAt ?? nowStamp();
     uploadRecords = uploadRecords.map((record) => {
       const matchedByFile = updated.fileId && record.fileId === updated.fileId;
@@ -164,6 +339,71 @@ export function updateStoreUploadApproval(id: string, patch: Partial<UploadAppro
 export function updateStoreUploadRecord(id: string, patch: Partial<UploadRecord>) {
   uploadRecords = uploadRecords.map((item) => (item.id === id ? { ...item, ...patch } : item));
   emit();
+}
+
+export function retryStoreUploadParse(recordId: string) {
+  const record = uploadRecords.find((item) => item.id === recordId);
+  if (!record) return false;
+  uploadRecords = uploadRecords.map((item) =>
+    item.id === recordId
+      ? {
+          ...item,
+          status: "parsing",
+          parseStatus: "parsing",
+          parseProgress: 8,
+          parseError: undefined,
+          parseStartedAt: nowStamp(),
+          parseUpdatedAt: nowStamp(),
+        }
+      : item,
+  );
+  if (record.fileId) {
+    files = files.map((item) =>
+      item.id === record.fileId
+        ? {
+            ...item,
+            status: "parsing",
+            parseStatus: "parsing",
+            parseError: undefined,
+          }
+        : item,
+    );
+  }
+  emit();
+  return true;
+}
+
+export const PAUSED_PARSE_ERROR = "已暂停解析";
+
+export function pauseStoreUploadParse(recordId: string) {
+  const record = uploadRecords.find((item) => item.id === recordId);
+  if (!record) return false;
+  uploadRecords = uploadRecords.map((item) =>
+    item.id === recordId
+      ? {
+          ...item,
+          status: "parsing",
+          parseStatus: "waiting" as const,
+          parseProgress: item.parseProgress ?? 0,
+          parseError: PAUSED_PARSE_ERROR,
+          parseUpdatedAt: nowStamp(),
+        }
+      : item,
+  );
+  if (record.fileId) {
+    files = files.map((item) =>
+      item.id === record.fileId
+        ? {
+            ...item,
+            status: "parsing",
+            parseStatus: "waiting" as const,
+            parseError: PAUSED_PARSE_ERROR,
+          }
+        : item,
+    );
+  }
+  emit();
+  return true;
 }
 
 export function updateStoreFileConfirm(id: string, patch: Partial<UploadApproval>) {
@@ -231,148 +471,143 @@ export function batchConfirmStoreFiles(ids: string[]) {
 }
 
 /**
- * 提交「移入公共/专业库」申请：文件保留原位置，进入审批台文件移动列表。
+ * 提交「移动文件到公共/专业库」申请（单次审批，直接进入重解析队列）。
+ * keepSource=true 时复制效果（源文件保留），false 时移动（通过后源文件移除）。
  */
-export function submitStoreFileMove(file: KnowledgeFile, targetBase: KnowledgeBase) {
+export function submitStoreFileMove(
+  file: KnowledgeFile,
+  targetBase: KnowledgeBase,
+  keepSource = false,
+) {
   const sourceBase = bases.find((base) => base.id === file.knowledgeBaseId);
   const stamp = nowStamp();
-  const existing = fileMoveApprovals.find(
-    (item) =>
-      item.fileId === file.id &&
-      item.targetKnowledgeBaseId === targetBase.id &&
-      item.status === "pendingMove",
-  );
-  if (existing) return existing;
+  const uploadType: import("./types").UploadSourceType = keepSource ? "copy" : "move";
+  const sourceNote = `自「${sourceBase?.name ?? file.knowledgeBaseName ?? "原知识库"}」${keepSource ? "复制" : "移动"}入`;
 
-  const request: FileMoveApproval = {
-    id: `move-${file.id}-${Date.now()}`,
-    fileId: file.id,
-    fileName: file.name,
-    sourceKnowledgeBaseId: file.knowledgeBaseId,
-    sourceKnowledgeBaseName: sourceBase?.name ?? file.knowledgeBaseName ?? "原知识库",
-    targetKnowledgeBaseId: targetBase.id,
-    targetKnowledgeBaseName: targetBase.name,
-    submitterName: file.uploaderName ?? "当前用户",
-    submittedAt: stamp,
-    fileSize: file.size,
-    status: "pendingMove",
-  };
-  fileMoveApprovals = [request, ...fileMoveApprovals];
-  emit();
-  return request;
-}
-
-/**
- * 批准移入：文件进入目标库并触发重解析；解析完成后进入文件入库审批。
- * 申请从移动列表移除。
- */
-export function approveStoreFileMove(id: string) {
-  const item = fileMoveApprovals.find((entry) => entry.id === id);
-  if (!item || item.status !== "pendingMove") return;
-
-  fileMoveApprovals = fileMoveApprovals.filter((entry) => entry.id !== id);
-
-  files = files.map((file) =>
-    file.id === item.fileId
-      ? {
-          ...file,
-          knowledgeBaseId: item.targetKnowledgeBaseId,
-          knowledgeBaseName: item.targetKnowledgeBaseName,
-          status: "parsing",
-          parseStatus: "parsing",
-          docParseStatus: "parsing",
-          aiParseStatus: "parsing",
-          updatedAt: nowStamp(),
-        }
-      : file,
-  );
-  emit();
-
-  window.setTimeout(() => {
-    const stamp = nowStamp();
-    const file = files.find((entry) => entry.id === item.fileId);
-    files = files.map((entry) =>
-      entry.id === item.fileId
+  // 立即在目标库创建一个解析中的副本文件
+  const newFileId = keepSource ? `file-copy-${file.id}-${Date.now()}` : file.id;
+  if (keepSource) {
+    const copyFile: KnowledgeFile = {
+      ...file,
+      id: newFileId,
+      knowledgeBaseId: targetBase.id,
+      knowledgeBaseName: targetBase.name,
+      status: "parsing",
+      parseStatus: "parsing",
+      docParseStatus: "parsing",
+      aiParseStatus: "parsing",
+      updatedAt: stamp,
+      canPreview: false,
+    };
+    files = [copyFile, ...files];
+  } else {
+    // 移动：源文件改为解析中状态（暂留原库位置，审批通过后再切库）
+    files = files.map((f) =>
+      f.id === file.id
         ? {
-            ...entry,
-            status: "pendingApproval",
-            parseStatus: "success",
-            docParseStatus: "success",
-            aiParseStatus: "success",
+            ...f,
+            status: "parsing" as const,
+            parseStatus: "parsing" as const,
+            docParseStatus: "parsing" as const,
+            aiParseStatus: "parsing" as const,
             updatedAt: stamp,
           }
-        : entry,
+        : f,
+    );
+  }
+  emit();
+
+  // 模拟重解析完成后进入文件入库审批台
+  window.setTimeout(() => {
+    const s = nowStamp();
+    files = files.map((f) =>
+      f.id === newFileId
+        ? {
+            ...f,
+            status: "pendingApproval" as const,
+            parseStatus: "success" as const,
+            docParseStatus: "success" as const,
+            aiParseStatus: "success" as const,
+            updatedAt: s,
+          }
+        : f,
     );
 
     const approval: UploadApproval = {
-      id: `approval-move-${item.fileId}-${Date.now()}`,
-      fileId: item.fileId,
-      fileName: item.fileName,
-      knowledgeBaseId: item.targetKnowledgeBaseId,
-      knowledgeBaseName: item.targetKnowledgeBaseName,
-      submitterName: item.submitterName,
-      submittedAt: stamp,
-      fileSize: item.fileSize ?? file?.size,
-      uploadNote: `自「${item.sourceKnowledgeBaseName}」移入，已批准移入并完成重解析`,
+      id: `approval-move-${newFileId}-${Date.now()}`,
+      fileId: newFileId,
+      fileName: file.name,
+      knowledgeBaseId: targetBase.id,
+      knowledgeBaseName: targetBase.name,
+      submitterName: file.uploaderName ?? "当前用户",
+      submittedAt: s,
+      fileSize: file.size,
+      uploadNote: sourceNote,
       status: "pendingApproval",
       parseStatus: "success",
-      uploadType: "move",
+      uploadType,
       contentConfirmStatus: "unconfirmed",
-      summary: file?.summary ?? `${item.fileName}（个人库移入后重解析）`,
-      aiKeywords: file?.aiKeywords ?? ["个人库移入", "待内容确认"],
+      summary: file.summary ?? `${file.name}（重解析后待审）`,
+      aiKeywords: file.aiKeywords ?? ["移动入库", "待内容确认"],
       aiMetadata: [
-        { id: "meta-move-source", label: "来源", value: "个人库移入" },
-        { id: "meta-move-from", label: "原知识库", value: item.sourceKnowledgeBaseName },
+        { id: "meta-move-type", label: "入库方式", value: keepSource ? "复制" : "移动" },
+        {
+          id: "meta-move-from",
+          label: "来源库",
+          value: sourceBase?.name ?? file.knowledgeBaseName ?? "原知识库",
+        },
       ],
-      aiQuestions: ["移入后请核对该文件的 AI 解析内容是否准确？"],
-      aiAnswers: ["请在审批工作台核对摘要、关键词与题目后确认入库。"],
       aiExercises: [],
     };
     uploadApprovals = [approval, ...uploadApprovals];
 
-    const hasRecord = uploadRecords.some((record) => record.fileId === item.fileId);
-    if (!hasRecord) {
-      uploadRecords = [
-        {
-          id: `upload-move-${item.fileId}`,
-          fileId: item.fileId,
-          fileName: item.fileName,
-          targetKnowledgeBaseId: item.targetKnowledgeBaseId,
-          targetKnowledgeBaseName: item.targetKnowledgeBaseName,
-          submittedAt: stamp,
-          updatedAt: stamp,
-          status: "pendingApproval",
-          parseStatus: "success",
-          docParseStatus: "success",
-          aiParseStatus: "success",
-        },
-        ...uploadRecords,
-      ];
-    } else {
-      uploadRecords = uploadRecords.map((record) =>
-        record.fileId === item.fileId
-          ? {
-              ...record,
-              targetKnowledgeBaseId: item.targetKnowledgeBaseId,
-              targetKnowledgeBaseName: item.targetKnowledgeBaseName,
-              status: "pendingApproval",
-              parseStatus: "success",
-              updatedAt: stamp,
-            }
-          : record,
-      );
-    }
+    uploadRecords = [
+      {
+        id: `upload-move-${newFileId}`,
+        fileId: newFileId,
+        fileName: file.name,
+        targetKnowledgeBaseId: targetBase.id,
+        targetKnowledgeBaseName: targetBase.name,
+        submittedAt: s,
+        updatedAt: s,
+        status: "pendingApproval",
+        parseStatus: "success",
+        docParseStatus: "success",
+        aiParseStatus: "success",
+      },
+      ...uploadRecords,
+    ];
     emit();
   }, 1200);
 }
 
-/** 驳回移入：文件保留原位置，申请从移动列表移除 */
-export function rejectStoreFileMove(id: string, reason: string) {
-  const item = fileMoveApprovals.find((entry) => entry.id === id);
-  if (!item || item.status !== "pendingMove") return;
-  fileMoveApprovals = fileMoveApprovals.filter((entry) => entry.id !== id);
+/** 审批台「文件入库」通过后，若来源是移动（非复制），将源文件从原库移除 */
+export function finalizeStoreFileMove(approvalId: string) {
+  const approval = uploadApprovals.find((a) => a.id === approvalId);
+  if (!approval || approval.uploadType !== "move" || !approval.fileId) return;
+  // 找原库文件（移动场景下 fileId 就是原文件 id，从 parsing/pendingApproval 状态切到目标库 published）
+  files = files.map((f) =>
+    f.id === approval.fileId
+      ? {
+          ...f,
+          knowledgeBaseId: approval.knowledgeBaseId ?? f.knowledgeBaseId,
+          knowledgeBaseName: approval.knowledgeBaseName ?? f.knowledgeBaseName,
+          status: "published" as const,
+          updatedAt: nowStamp(),
+        }
+      : f,
+  );
   emit();
-  return { ...item, status: "rejected" as const, rejectReason: reason };
+}
+
+/** @deprecated 旧版两步审批已废弃，保留以防其他地方引用报错 */
+export function approveStoreFileMove(_id: string) {
+  /* no-op */
+}
+
+/** @deprecated 旧版两步审批已废弃 */
+export function rejectStoreFileMove(_id: string, _reason: string) {
+  /* no-op */
 }
 
 /**

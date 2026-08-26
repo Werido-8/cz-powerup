@@ -1,4 +1,4 @@
-import { CalendarClock, FileText, Layers, UserRound } from "lucide-react";
+import { CalendarClock, FileCheck2, FileText, Layers, ScanSearch, UserRound } from "lucide-react";
 import type { CompareTask, CompareVersion } from "@/lib/file-compare/types";
 
 /** 文件信息页签：基准 / 更新文件属性与比对任务信息 */
@@ -31,6 +31,8 @@ export function FileInfoPanel({
           />
           <InfoRow icon={CalendarClock} label="完成时间" value={task.finishedAt} />
           <InfoRow icon={UserRound} label="发起人" value={task.operator} />
+          <InfoRow icon={ScanSearch} label="比对方式" value="文档结构 + 正文内容" />
+          <InfoRow icon={FileCheck2} label="匹配策略" value="智能章节匹配 + 语义匹配" />
         </dl>
       </section>
     </div>
@@ -65,9 +67,11 @@ function FileCard({
       <dl className="grid grid-cols-2 gap-x-6 gap-y-3.5 px-4 py-4">
         <InfoRow label="文件全称" value={version.title} span />
         <InfoRow label="版本号" value={version.label} />
-        <InfoRow label="发布日期" value={version.publishedAt} />
+        <InfoRow label="上传时间" value={`${version.publishedAt} 10:20`} />
+        <InfoRow label="文件格式" value="PDF" />
         <InfoRow label="总页数" value={`${version.pages} 页`} />
         <InfoRow label="文件大小" value={version.size} />
+        <InfoRow label="解析状态" value="解析完成" />
       </dl>
     </section>
   );

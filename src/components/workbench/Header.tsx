@@ -33,7 +33,12 @@ import {
 interface MenuItem {
   label: string;
   to: string;
-  children?: { label: string; to: string; group?: string }[];
+  children?: {
+    label: string;
+    to: string;
+    group?: string;
+    search?: { tab: "topic" | "materials" };
+  }[];
 }
 
 const MENU: MenuItem[] = [
@@ -55,13 +60,18 @@ const MENU: MenuItem[] = [
     label: "能力提升",
     to: "/learn",
     children: [
-      { label: "知识学习", to: "/learn", group: "我的学习" },
+      { label: "学习首页", to: "/learn", group: "我的学习" },
+      { label: "知识学习", to: "/learn", search: { tab: "topic" }, group: "我的学习" },
+      { label: "题目提交记录", to: "/learn/submissions", group: "我的学习" },
+      { label: "最近更新", to: "/learn/updates", group: "我的学习" },
       { label: "个人学习成果", to: "/assets", group: "我的学习" },
       { label: "训练中心", to: "/training", group: "训练与测评" },
       { label: "专项练习", to: "/training/practice", group: "训练与测评" },
       { label: "自主组卷", to: "/training/custom-exam", group: "训练与测评" },
       { label: "正式考试", to: "/training/exam", group: "训练与测评" },
       { label: "错题本", to: "/training/wrong", group: "训练与测评" },
+      { label: "训练记录", to: "/training/records", group: "训练与测评" },
+      { label: "成长反馈", to: "/training/growth", group: "训练与测评" },
       { label: "专题维护", to: "/learn-admin", group: "内容管理" },
       { label: "题库管理", to: "/question-bank", group: "内容管理" },
       { label: "考试任务", to: "/exam-admin", group: "内容管理" },
@@ -79,7 +89,22 @@ function isItemActive(pathname: string, to: string) {
   return pathname === to || pathname.startsWith(to + "/");
 }
 
-function isChildActive(pathname: string, to: string) {
+function isChildActive(
+  pathname: string,
+  to: string,
+  childSearch?: { tab: "topic" | "materials" },
+  currentSearch?: Record<string, unknown>,
+) {
+  if (to === "/learn" && childSearch?.tab) {
+    const knowledgeTabs = ["topic", "materials", "all", "mine"];
+    return (
+      (pathname === "/learn" || pathname === "/learn/") &&
+      knowledgeTabs.includes(String(currentSearch?.tab))
+    );
+  }
+  if (to === "/learn") {
+    return (pathname === "/learn" || pathname === "/learn/") && !currentSearch?.tab;
+  }
   if (to === "/training") return pathname === "/training" || pathname === "/training/";
   if (to === "/exam-admin") {
     return (
@@ -91,7 +116,15 @@ function isChildActive(pathname: string, to: string) {
   return isItemActive(pathname, to);
 }
 
-function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
+function NavLink({
+  m,
+  pathname,
+  currentSearch,
+}: {
+  m: MenuItem;
+  pathname: string;
+  currentSearch: Record<string, unknown>;
+}) {
   const [open, setOpen] = useState(false);
   const active = isItemActive(pathname, m.to);
   const hasChildren = m.children && m.children.length > 0;
@@ -113,7 +146,9 @@ function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
     );
   }
 
-  const childActive = m.children?.some((c) => isItemActive(pathname, c.to));
+  const childActive = m.children?.some((c) =>
+    isChildActive(pathname, c.to, c.search, currentSearch),
+  );
   const childGroups = Array.from(
     new Set(m.children?.map((child) => child.group).filter((group): group is string => !!group)),
   );
@@ -128,11 +163,12 @@ function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
           pathname.startsWith("/knowledge/dept/") ||
           pathname.startsWith("/knowledge/space/") ||
           pathname.startsWith("/knowledge/file/")
-        : isChildActive(pathname, c.to);
+        : isChildActive(pathname, c.to, c.search, currentSearch);
     return (
       <Link
-        key={c.to}
+        key={`${c.to}-${c.label}`}
         to={c.to}
+        search={c.search}
         className={`whitespace-nowrap rounded-md px-3 py-2 text-[13px] transition-colors ${
           cActive
             ? "bg-primary-soft font-medium text-primary"
@@ -154,7 +190,7 @@ function NavLink({ m, pathname }: { m: MenuItem; pathname: string }) {
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen(true)}
         onFocus={() => setOpen(true)}
         className={`relative flex items-center gap-0.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13.5px] font-medium transition-all duration-200 ${
           childActive || active
@@ -259,6 +295,9 @@ function DemoRoleSwitcher() {
 
 export function Header({ wide = false }: { wide?: boolean }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const currentSearch = useRouterState({
+    select: (s) => s.location.search as Record<string, unknown>,
+  });
   useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const showKnowledgeAdmin = canViewKnowledgeAdmin();
 
@@ -349,10 +388,20 @@ export function Header({ wide = false }: { wide?: boolean }) {
                                 {item.children
                                   ?.filter((child) => child.group === group)
                                   .map((child) => (
-                                    <SheetClose asChild key={child.to}>
+                                    <SheetClose asChild key={`${child.to}-${child.label}`}>
                                       <Link
                                         to={child.to}
-                                        className="flex min-h-10 items-center rounded-lg px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        search={child.search}
+                                        className={`flex min-h-10 items-center rounded-lg px-3 text-[13px] ${
+                                          isChildActive(
+                                            pathname,
+                                            child.to,
+                                            child.search,
+                                            currentSearch,
+                                          )
+                                            ? "bg-primary-soft font-medium text-primary"
+                                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                                        }`}
                                       >
                                         {child.label}
                                       </Link>
@@ -361,9 +410,10 @@ export function Header({ wide = false }: { wide?: boolean }) {
                               </div>
                             ))
                           : item.children.map((child) => (
-                              <SheetClose asChild key={child.to}>
+                              <SheetClose asChild key={`${child.to}-${child.label}`}>
                                 <Link
                                   to={child.to}
+                                  search={child.search}
                                   className="flex min-h-10 items-center rounded-lg px-3 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
                                 >
                                   {child.label}
@@ -398,7 +448,7 @@ export function Header({ wide = false }: { wide?: boolean }) {
           className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 xl:flex"
         >
           {menu.map((m) => (
-            <NavLink key={m.to} m={m} pathname={pathname} />
+            <NavLink key={m.to} m={m} pathname={pathname} currentSearch={currentSearch} />
           ))}
         </nav>
 

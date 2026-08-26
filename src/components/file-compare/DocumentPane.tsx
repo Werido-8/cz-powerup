@@ -11,6 +11,10 @@ export function DocumentPane({
   blocks,
   scrollRef,
   onScroll,
+  onDiffHover,
+  onDiffClick,
+  hoveredDiffId,
+  selectedDiffId,
   className,
 }: {
   doc: CompareDocument;
@@ -20,18 +24,29 @@ export function DocumentPane({
   blocks: DocBlock[];
   scrollRef: Ref<HTMLDivElement>;
   onScroll: (event: UIEvent<HTMLDivElement>) => void;
+  onDiffHover?: (diffId: string | null) => void;
+  onDiffClick?: (diffId: string | null) => void;
+  hoveredDiffId?: string | null;
+  selectedDiffId?: string | null;
   className?: string;
 }) {
   const isBase = doc.side === "base";
 
   return (
     <section className={cn("flex min-h-0 min-w-0 flex-col", className)}>
-      <header className="flex h-9 shrink-0 items-center justify-between gap-3 border-b border-kb-border bg-[#FAFCFC] px-4">
-        <span className="flex min-w-0 items-baseline gap-2">
-          <span className="shrink-0 text-[12.5px] font-semibold text-kb-heading">
-            {isBase ? "基准文件" : "更新文件"}
+      <header className="flex h-10 shrink-0 items-center justify-between gap-3 border-b border-kb-border bg-[#FCFDFD] px-4">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-[13px] font-semibold text-kb-heading">
+            {doc.label} {doc.fileName.replace(".pdf", "")}
           </span>
-          <span className="min-w-0 truncate text-[12px] text-kb-muted">{doc.fileName}</span>
+          <span
+            className={cn(
+              "rounded-[4px] px-1.5 py-0.5 text-[10.5px] font-medium",
+              isBase ? "bg-[#EFF4F5] text-kb-muted" : "bg-primary-soft text-primary",
+            )}
+          >
+            {isBase ? "基准版本" : "更新版本"}
+          </span>
         </span>
         <span className="shrink-0 text-[11.5px] tabular-nums text-kb-muted">
           第 {currentPage} / {doc.totalPages} 页
@@ -40,12 +55,20 @@ export function DocumentPane({
 
       <div
         ref={scrollRef}
+        data-document-scroll={doc.side}
         onScroll={onScroll}
         className="scrollbar-thin relative min-h-0 flex-1 overflow-y-auto px-5 py-4"
         style={{ fontSize: `${(13 * zoom) / 100}px` }}
       >
         {blocks.map((block) => (
-          <DocumentBlock key={block.id} block={block} />
+          <DocumentBlock
+            key={block.id}
+            block={block}
+            onDiffHover={onDiffHover}
+            onDiffClick={onDiffClick}
+            isHovered={block.diffId === hoveredDiffId}
+            isSelected={block.diffId === selectedDiffId}
+          />
         ))}
         <div className="h-16" aria-hidden />
       </div>
@@ -53,7 +76,26 @@ export function DocumentPane({
   );
 }
 
-function DocumentBlock({ block }: { block: DocBlock }) {
+function DocumentBlock({
+  block,
+  onDiffHover,
+  onDiffClick,
+  isHovered,
+  isSelected,
+}: {
+  block: DocBlock;
+  onDiffHover?: (diffId: string | null) => void;
+  onDiffClick?: (diffId: string | null) => void;
+  isHovered?: boolean;
+  isSelected?: boolean;
+}) {
+  const hasDiff = Boolean(block.diffId);
+  const ringClass = isSelected
+    ? "ring-2 ring-primary/40 ring-offset-2"
+    : isHovered
+      ? "ring-2 ring-primary/25 ring-offset-1"
+      : "";
+
   if (block.kind === "heading") {
     return (
       <div
@@ -70,7 +112,17 @@ function DocumentBlock({ block }: { block: DocBlock }) {
 
   if (block.kind === "table") {
     return (
-      <div data-anchor={block.anchor} className="my-3 scroll-mt-4 overflow-hidden">
+      <div
+        data-anchor={block.anchor}
+        data-diff-id={block.diffId}
+        className={cn(
+          "my-3 scroll-mt-4 overflow-hidden rounded-[5px] transition-all",
+          hasDiff && ringClass,
+        )}
+        onMouseEnter={() => block.diffId && onDiffHover?.(block.diffId)}
+        onMouseLeave={() => block.diffId && onDiffHover?.(null)}
+        onClick={() => block.diffId && onDiffClick?.(block.diffId)}
+      >
         <table className="w-full table-fixed border-collapse text-[0.94em]">
           <thead>
             <tr>
@@ -106,7 +158,15 @@ function DocumentBlock({ block }: { block: DocBlock }) {
   return (
     <p
       data-anchor={block.anchor}
-      className="my-2.5 scroll-mt-4 text-[1em] leading-[1.85] text-kb-body"
+      data-diff-id={block.diffId}
+      className={cn(
+        "my-2.5 scroll-mt-4 text-[1em] leading-[1.85] text-kb-body transition-all",
+        hasDiff && "rounded-[4px] px-2 py-1 -mx-2",
+        hasDiff && ringClass,
+      )}
+      onMouseEnter={() => block.diffId && onDiffHover?.(block.diffId)}
+      onMouseLeave={() => block.diffId && onDiffHover?.(null)}
+      onClick={() => block.diffId && onDiffClick?.(block.diffId)}
     >
       <SpanList spans={block.spans} />
     </p>

@@ -281,6 +281,7 @@ function AssetsPage() {
       <PageHeader
         title="个人学习成果"
         subtitle="把零散收藏、问答和笔记整理为可复用的个人知识成果。"
+        className="mb-4"
       />
 
       <PersonalDepositionOverview

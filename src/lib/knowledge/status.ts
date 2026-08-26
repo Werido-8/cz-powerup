@@ -10,8 +10,8 @@ export type KnowledgeStatusTone = "neutral" | "accent" | "success" | "warning" |
 
 export function publishStatusLabel(status: FilePublishStatus) {
   const labels: Record<FilePublishStatus, string> = {
+    uploading: "上传中",
     pendingApproval: "待审批",
-    pendingConfirm: "待确认",
     rejected: "审批驳回",
     parsing: "解析中",
     parseFailed: "解析失败",
@@ -24,7 +24,7 @@ export function publishStatusLabel(status: FilePublishStatus) {
 
 export function publishStatusTone(status: FilePublishStatus): KnowledgeStatusTone {
   if (status === "published") return "success";
-  if (status === "pendingApproval" || status === "pendingConfirm" || status === "parsing") {
+  if (status === "pendingApproval" || status === "uploading" || status === "parsing") {
     return "warning";
   }
   if (status === "rejected" || status === "parseFailed" || status === "disabled") {
@@ -39,8 +39,8 @@ export function publishStatusTone(status: FilePublishStatus): KnowledgeStatusTon
  */
 export function approvalStatusLabel(status: FilePublishStatus) {
   const labels: Record<FilePublishStatus, string> = {
+    uploading: "上传中",
     pendingApproval: "待审批",
-    pendingConfirm: "待确认",
     rejected: "已驳回",
     parsing: "已通过",
     parseFailed: "已通过",
@@ -52,7 +52,7 @@ export function approvalStatusLabel(status: FilePublishStatus) {
 }
 
 export function approvalStatusTone(status: FilePublishStatus): KnowledgeStatusTone {
-  if (status === "pendingApproval" || status === "pendingConfirm") return "warning";
+  if (status === "pendingApproval" || status === "uploading") return "warning";
   if (status === "rejected") return "danger";
   if (status === "published") return "success";
   if (status === "parsing" || status === "parseFailed") return "accent";
@@ -81,7 +81,9 @@ export function uploadApprovalReviewTone(
 }
 
 export function uploadSourceTypeLabel(type?: UploadSourceType) {
-  return type === "move" ? "文件移动" : "文件直传";
+  if (type === "move") return "移动入库";
+  if (type === "copy") return "复制入库";
+  return "文件上传";
 }
 
 export function contentConfirmStatusLabel(status?: ContentConfirmStatus) {

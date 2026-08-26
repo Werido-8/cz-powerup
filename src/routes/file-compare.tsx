@@ -8,7 +8,12 @@ export const Route = createFileRoute("/file-compare")({
 
 function FileCompareLayout() {
   return (
-    <PageShell compact wide subBar={<CompareTabStrip />} mainClassName="bg-[#F4F7F8] px-5 py-3">
+    <PageShell
+      compact
+      wide
+      subBar={<CompareTabStrip />}
+      mainClassName="bg-[#F4F7F8] px-3 py-2.5 xl:px-5 xl:py-3"
+    >
       <Outlet />
     </PageShell>
   );

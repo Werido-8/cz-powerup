@@ -3,8 +3,6 @@ import type { DiffTone, DiffType } from "./types";
 
 export interface DiffTypeMeta {
   label: string;
-  /** 变化摘要条目前缀字母：A 新增 / D 删除 / M 修改 / R 移动 */
-  letter: string;
   icon: LucideIcon;
   /** 统计卡片图标底色 */
   cardIcon: string;
@@ -21,7 +19,6 @@ export interface DiffTypeMeta {
 export const DIFF_TYPE_META: Record<DiffType, DiffTypeMeta> = {
   added: {
     label: "新增",
-    letter: "A",
     icon: CirclePlus,
     cardIcon: "bg-[#19A974] text-white",
     listIcon: "bg-[#E8F8EF] text-[#19A974]",
@@ -31,7 +28,6 @@ export const DIFF_TYPE_META: Record<DiffType, DiffTypeMeta> = {
   },
   removed: {
     label: "删除",
-    letter: "D",
     icon: CircleMinus,
     cardIcon: "bg-[#E45B5B] text-white",
     listIcon: "bg-[#FDECEC] text-[#D34F4F]",
@@ -41,7 +37,6 @@ export const DIFF_TYPE_META: Record<DiffType, DiffTypeMeta> = {
   },
   modified: {
     label: "修改",
-    letter: "M",
     icon: PencilLine,
     cardIcon: "bg-[#FDF1DC] text-[#C7841B]",
     listIcon: "bg-[#FDF1DC] text-[#C7841B]",
@@ -51,7 +46,6 @@ export const DIFF_TYPE_META: Record<DiffType, DiffTypeMeta> = {
   },
   moved: {
     label: "移动",
-    letter: "R",
     icon: Shuffle,
     cardIcon: "bg-[#EFEBFB] text-[#7B6BC7]",
     listIcon: "bg-[#EFEBFB] text-[#7B6BC7]",
@@ -66,7 +60,7 @@ export const DIFF_TONE_CLASSES: Record<DiffTone, string> = {
   add: "bg-[#DFF5E7] text-[#166F49]",
   remove: "bg-[#FDE3E4] text-[#B2413F] line-through decoration-[#C9615F]",
   modifyOld: "bg-[#FCEBD2] text-[#9C6512]",
-  modifyNew: "bg-[#DCEEFB] text-[#1B6699]",
+  modifyNew: "bg-[#FFF0C9] text-[#8B5B11]",
 };
 
 /** 缩略条颜色（按差异类型） */

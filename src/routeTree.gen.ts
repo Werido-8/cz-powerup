@@ -35,6 +35,8 @@ import { Route as TrainingExamRouteImport } from './routes/training.exam'
 import { Route as TrainingCustomExamRouteImport } from './routes/training.custom-exam'
 import { Route as ScenarioPeakRouteImport } from './routes/scenario.peak'
 import { Route as ScenarioFaultRouteImport } from './routes/scenario.fault'
+import { Route as LearnUpdatesRouteImport } from './routes/learn.updates'
+import { Route as LearnSubmissionsRouteImport } from './routes/learn.submissions'
 import { Route as KnowledgeUploadsRouteImport } from './routes/knowledge.uploads'
 import { Route as KnowledgeMineRouteImport } from './routes/knowledge.mine'
 import { Route as KnowledgeAllRouteImport } from './routes/knowledge.all'
@@ -52,6 +54,7 @@ import { Route as KnowledgeSpacePublicRouteImport } from './routes/knowledge.spa
 import { Route as KnowledgeLibLibIdRouteImport } from './routes/knowledge.lib.$libId'
 import { Route as KnowledgeKbKbIdRouteImport } from './routes/knowledge.kb.$kbId'
 import { Route as KnowledgeFileFileIdRouteImport } from './routes/knowledge.file.$fileId'
+import { Route as KnowledgeEditFileIdRouteImport } from './routes/knowledge.edit.$fileId'
 import { Route as KnowledgeDeptDeptIdRouteImport } from './routes/knowledge.dept.$deptId'
 import { Route as KnowledgeConfirmConfirmIdRouteImport } from './routes/knowledge.confirm.$confirmId'
 import { Route as KnowledgeApprovalApprovalIdRouteImport } from './routes/knowledge.approval.$approvalId'
@@ -204,6 +207,16 @@ const ScenarioFaultRoute = ScenarioFaultRouteImport.update({
   path: '/scenario/fault',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LearnUpdatesRoute = LearnUpdatesRouteImport.update({
+  id: '/learn/updates',
+  path: '/learn/updates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LearnSubmissionsRoute = LearnSubmissionsRouteImport.update({
+  id: '/learn/submissions',
+  path: '/learn/submissions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KnowledgeUploadsRoute = KnowledgeUploadsRouteImport.update({
   id: '/uploads',
   path: '/uploads',
@@ -287,6 +300,11 @@ const KnowledgeKbKbIdRoute = KnowledgeKbKbIdRouteImport.update({
 const KnowledgeFileFileIdRoute = KnowledgeFileFileIdRouteImport.update({
   id: '/file/$fileId',
   path: '/file/$fileId',
+  getParentRoute: () => KnowledgeRoute,
+} as any)
+const KnowledgeEditFileIdRoute = KnowledgeEditFileIdRouteImport.update({
+  id: '/edit/$fileId',
+  path: '/edit/$fileId',
   getParentRoute: () => KnowledgeRoute,
 } as any)
 const KnowledgeDeptDeptIdRoute = KnowledgeDeptDeptIdRouteImport.update({
@@ -424,6 +442,8 @@ export interface FileRoutesByFullPath {
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
   '/knowledge/uploads': typeof KnowledgeUploadsRoute
+  '/learn/submissions': typeof LearnSubmissionsRoute
+  '/learn/updates': typeof LearnUpdatesRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/custom-exam': typeof TrainingCustomExamRoute
@@ -449,6 +469,7 @@ export interface FileRoutesByFullPath {
   '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/confirm/$confirmId': typeof KnowledgeConfirmConfirmIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
+  '/knowledge/edit/$fileId': typeof KnowledgeEditFileIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
   '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
   '/knowledge/lib/$libId': typeof KnowledgeLibLibIdRoute
@@ -486,6 +507,8 @@ export interface FileRoutesByTo {
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
   '/knowledge/uploads': typeof KnowledgeUploadsRoute
+  '/learn/submissions': typeof LearnSubmissionsRoute
+  '/learn/updates': typeof LearnUpdatesRoute
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/custom-exam': typeof TrainingCustomExamRoute
   '/training/exam': typeof TrainingExamRoute
@@ -510,6 +533,7 @@ export interface FileRoutesByTo {
   '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/confirm/$confirmId': typeof KnowledgeConfirmConfirmIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
+  '/knowledge/edit/$fileId': typeof KnowledgeEditFileIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
   '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
   '/knowledge/lib/$libId': typeof KnowledgeLibLibIdRoute
@@ -552,6 +576,8 @@ export interface FileRoutesById {
   '/knowledge/all': typeof KnowledgeAllRoute
   '/knowledge/mine': typeof KnowledgeMineRoute
   '/knowledge/uploads': typeof KnowledgeUploadsRoute
+  '/learn/submissions': typeof LearnSubmissionsRoute
+  '/learn/updates': typeof LearnUpdatesRoute
   '/scenario/fault': typeof ScenarioFaultRouteWithChildren
   '/scenario/peak': typeof ScenarioPeakRouteWithChildren
   '/training/custom-exam': typeof TrainingCustomExamRoute
@@ -577,6 +603,7 @@ export interface FileRoutesById {
   '/knowledge/approval/$approvalId': typeof KnowledgeApprovalApprovalIdRoute
   '/knowledge/confirm/$confirmId': typeof KnowledgeConfirmConfirmIdRoute
   '/knowledge/dept/$deptId': typeof KnowledgeDeptDeptIdRoute
+  '/knowledge/edit/$fileId': typeof KnowledgeEditFileIdRoute
   '/knowledge/file/$fileId': typeof KnowledgeFileFileIdRoute
   '/knowledge/kb/$kbId': typeof KnowledgeKbKbIdRouteWithChildren
   '/knowledge/lib/$libId': typeof KnowledgeLibLibIdRoute
@@ -620,6 +647,8 @@ export interface FileRouteTypes {
     | '/knowledge/all'
     | '/knowledge/mine'
     | '/knowledge/uploads'
+    | '/learn/submissions'
+    | '/learn/updates'
     | '/scenario/fault'
     | '/scenario/peak'
     | '/training/custom-exam'
@@ -645,6 +674,7 @@ export interface FileRouteTypes {
     | '/knowledge/approval/$approvalId'
     | '/knowledge/confirm/$confirmId'
     | '/knowledge/dept/$deptId'
+    | '/knowledge/edit/$fileId'
     | '/knowledge/file/$fileId'
     | '/knowledge/kb/$kbId'
     | '/knowledge/lib/$libId'
@@ -682,6 +712,8 @@ export interface FileRouteTypes {
     | '/knowledge/all'
     | '/knowledge/mine'
     | '/knowledge/uploads'
+    | '/learn/submissions'
+    | '/learn/updates'
     | '/scenario/peak'
     | '/training/custom-exam'
     | '/training/exam'
@@ -706,6 +738,7 @@ export interface FileRouteTypes {
     | '/knowledge/approval/$approvalId'
     | '/knowledge/confirm/$confirmId'
     | '/knowledge/dept/$deptId'
+    | '/knowledge/edit/$fileId'
     | '/knowledge/file/$fileId'
     | '/knowledge/kb/$kbId'
     | '/knowledge/lib/$libId'
@@ -747,6 +780,8 @@ export interface FileRouteTypes {
     | '/knowledge/all'
     | '/knowledge/mine'
     | '/knowledge/uploads'
+    | '/learn/submissions'
+    | '/learn/updates'
     | '/scenario/fault'
     | '/scenario/peak'
     | '/training/custom-exam'
@@ -772,6 +807,7 @@ export interface FileRouteTypes {
     | '/knowledge/approval/$approvalId'
     | '/knowledge/confirm/$confirmId'
     | '/knowledge/dept/$deptId'
+    | '/knowledge/edit/$fileId'
     | '/knowledge/file/$fileId'
     | '/knowledge/kb/$kbId'
     | '/knowledge/lib/$libId'
@@ -809,6 +845,8 @@ export interface RootRouteChildren {
   SceneRoute: typeof SceneRoute
   SearchRoute: typeof SearchRoute
   KnowledgePracticeFileIdRoute: typeof KnowledgePracticeFileIdRoute
+  LearnSubmissionsRoute: typeof LearnSubmissionsRoute
+  LearnUpdatesRoute: typeof LearnUpdatesRoute
   ScenarioFaultRoute: typeof ScenarioFaultRouteWithChildren
   ScenarioPeakRoute: typeof ScenarioPeakRouteWithChildren
   TrainingCustomExamRoute: typeof TrainingCustomExamRoute
@@ -1013,6 +1051,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ScenarioFaultRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/learn/updates': {
+      id: '/learn/updates'
+      path: '/learn/updates'
+      fullPath: '/learn/updates'
+      preLoaderRoute: typeof LearnUpdatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/learn/submissions': {
+      id: '/learn/submissions'
+      path: '/learn/submissions'
+      fullPath: '/learn/submissions'
+      preLoaderRoute: typeof LearnSubmissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/knowledge/uploads': {
       id: '/knowledge/uploads'
       path: '/uploads'
@@ -1130,6 +1182,13 @@ declare module '@tanstack/react-router' {
       path: '/file/$fileId'
       fullPath: '/knowledge/file/$fileId'
       preLoaderRoute: typeof KnowledgeFileFileIdRouteImport
+      parentRoute: typeof KnowledgeRoute
+    }
+    '/knowledge/edit/$fileId': {
+      id: '/knowledge/edit/$fileId'
+      path: '/edit/$fileId'
+      fullPath: '/knowledge/edit/$fileId'
+      preLoaderRoute: typeof KnowledgeEditFileIdRouteImport
       parentRoute: typeof KnowledgeRoute
     }
     '/knowledge/dept/$deptId': {
@@ -1361,6 +1420,7 @@ interface KnowledgeRouteChildren {
   KnowledgeApprovalApprovalIdRoute: typeof KnowledgeApprovalApprovalIdRoute
   KnowledgeConfirmConfirmIdRoute: typeof KnowledgeConfirmConfirmIdRoute
   KnowledgeDeptDeptIdRoute: typeof KnowledgeDeptDeptIdRoute
+  KnowledgeEditFileIdRoute: typeof KnowledgeEditFileIdRoute
   KnowledgeFileFileIdRoute: typeof KnowledgeFileFileIdRoute
   KnowledgeKbKbIdRoute: typeof KnowledgeKbKbIdRouteWithChildren
   KnowledgeLibLibIdRoute: typeof KnowledgeLibLibIdRoute
@@ -1377,6 +1437,7 @@ const KnowledgeRouteChildren: KnowledgeRouteChildren = {
   KnowledgeApprovalApprovalIdRoute: KnowledgeApprovalApprovalIdRoute,
   KnowledgeConfirmConfirmIdRoute: KnowledgeConfirmConfirmIdRoute,
   KnowledgeDeptDeptIdRoute: KnowledgeDeptDeptIdRoute,
+  KnowledgeEditFileIdRoute: KnowledgeEditFileIdRoute,
   KnowledgeFileFileIdRoute: KnowledgeFileFileIdRoute,
   KnowledgeKbKbIdRoute: KnowledgeKbKbIdRouteWithChildren,
   KnowledgeLibLibIdRoute: KnowledgeLibLibIdRoute,
@@ -1444,6 +1505,8 @@ const rootRouteChildren: RootRouteChildren = {
   SceneRoute: SceneRoute,
   SearchRoute: SearchRoute,
   KnowledgePracticeFileIdRoute: KnowledgePracticeFileIdRoute,
+  LearnSubmissionsRoute: LearnSubmissionsRoute,
+  LearnUpdatesRoute: LearnUpdatesRoute,
   ScenarioFaultRoute: ScenarioFaultRouteWithChildren,
   ScenarioPeakRoute: ScenarioPeakRouteWithChildren,
   TrainingCustomExamRoute: TrainingCustomExamRoute,

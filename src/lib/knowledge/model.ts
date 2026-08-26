@@ -64,10 +64,6 @@ function effectiveLevelForBase(
   if (base.scope === "personal") return "manage";
   if (isEmployee(user)) return "view";
   if (isSuperAdmin(user) || isKnowledgeAdmin(user)) return "manage";
-  if (base.scope === "personal") {
-    if (base.ownerName === user.name || user.role === "employee") return "manage";
-    return "manage";
-  }
   const fromGrants = getEffectiveLevelForUser(base.id, user.id);
   if (fromGrants) return fromGrants;
   if (base.permission.canManage) return "manage";
@@ -84,7 +80,6 @@ export function canManageBase(
   if (isEmployee(user)) return false;
   if (isSuperAdmin(user)) return true;
   if (isKnowledgeAdmin(user)) return true;
-  if (base.scope === "personal") return true;
   return effectiveLevelForBase(base, user) === "manage";
 }
 
@@ -155,7 +150,7 @@ export function canMoveCrossLibrary(
   if (source.scope !== "personal" && target.scope !== "personal") {
     return canManageBase(source, user) && canManageBase(target, user);
   }
-  if (source.scope !== "personal" && target.scope === "personal") return false;
+  if (source.scope !== "personal") return false;
   return canManageFileList(source, user) && canManageFileList(target, user);
 }
 
@@ -176,7 +171,9 @@ export function getCategoryById(id: string) {
 }
 
 export function getBrowsableBases() {
-  return getStoreBases().filter((base) => base.scope !== "personal");
+  return getStoreBases()
+    .filter((base) => base.scope !== "personal")
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
 export function getPinnedBases() {
@@ -184,7 +181,9 @@ export function getPinnedBases() {
 }
 
 export function getPersonalBases() {
-  return getStoreBases().filter((base) => base.scope === "personal");
+  return getStoreBases()
+    .filter((base) => base.scope === "personal")
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
 export const PERSONAL_DIRECTORY_ROOT_ID = "personal-root";
@@ -212,9 +211,9 @@ export function getPersonalBasesForDirectoryTree(
 }
 
 export function getPersonalDirectoryChildren(parentId?: string): PersonalDirectory[] {
-  return getStorePersonalDirectories().filter((directory) =>
-    parentId ? directory.parentId === parentId : !directory.parentId,
-  );
+  return getStorePersonalDirectories()
+    .filter((directory) => (parentId ? directory.parentId === parentId : !directory.parentId))
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
 export function getPersonalDirectoryById(id: string) {
@@ -301,18 +300,17 @@ export function getAllPublishedFiles(user: KnowledgeUser = getCurrentKnowledgeUs
   });
 }
 
-export function getRecentFiles() {
+export function getRecentFiles(): KnowledgeFile[] {
   const now = new Date();
-  return RECENT_FILE_IDS.map((id, index) => {
+  const result: KnowledgeFile[] = [];
+  RECENT_FILE_IDS.forEach((id, index) => {
     const file = getFileById(id);
-    if (!file) return null;
-    return {
-      ...file,
-      lastAccessedAt: buildDemoRecentAccessTime(now, index),
-    };
-  })
-    .filter((file): file is KnowledgeFile => Boolean(file))
-    .sort((a, b) => (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? ""));
+    if (!file) return;
+    result.push({ ...file, lastAccessedAt: buildDemoRecentAccessTime(now, index) });
+  });
+  return result.sort((a, b) =>
+    (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? ""),
+  );
 }
 
 /** 演示用访问时间：前若干条落在今天，其次本周，其余更早 */
@@ -377,7 +375,7 @@ export function getMoveTargetBases(
       if (isEmployee(user)) {
         return (
           sourceIsPersonal &&
-          (base.scope === "personal" || (base.scope !== "personal" && canViewBaseFiles(base, user)))
+          (base.scope === "personal" || canViewBaseFiles(base, user))
         );
       }
       if (sourceIsPersonal && base.scope === "personal") {
@@ -528,9 +526,9 @@ export function countActiveMetadataFilters(filters: Record<string, string>) {
 }
 
 export function getCategoryChildren(parentId?: string): KnowledgeCategory[] {
-  return getStoreCategories().filter((category) =>
-    parentId ? category.parentId === parentId : !category.parentId,
-  );
+  return getStoreCategories()
+    .filter((category) => (parentId ? category.parentId === parentId : !category.parentId))
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
 export function getBasesForCategory(categoryId: string) {
@@ -539,9 +537,9 @@ export function getBasesForCategory(categoryId: string) {
 
 /** 侧栏树：知识库全员可见（无权限时展示锁） */
 export function getBasesForCategoryTree(categoryId: string) {
-  return getStoreBases().filter(
-    (base) => base.scope !== "personal" && base.categoryId === categoryId,
-  );
+  return getStoreBases()
+    .filter((base) => base.scope !== "personal" && base.categoryId === categoryId)
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
 export function countAllBasesInCategorySubtree(categoryId: string): number {

@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpenCheck,
   Check,
@@ -30,17 +31,25 @@ import { KbEmptyState } from "@/components/knowledge/ui/KbEmptyState";
 import { FileTreeSidebar } from "@/components/knowledge/workbench/preview/FileTreeSidebar";
 import { KbFormDialog, KbFormField } from "@/components/knowledge/ui/KbFormDialog";
 import { AppDialogButton } from "@/components/ui/app-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AppFormTextarea } from "@/components/ui/app-form";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  confirmStoreFile,
-  getStoreFileConfirms,
+  getStoreFiles,
   getStoreUploadApprovals,
+  saveStoreFileEditedContent,
   subscribeKnowledgeStore,
   updateStoreUploadApproval,
 } from "@/lib/knowledge/store";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeExercise, KnowledgeFile, UploadApproval } from "@/lib/knowledge/types";
+import { getFilesForBase, getMetadataFieldsForBase } from "@/lib/knowledge/model";
 import { cn } from "@/lib/utils";
 
 const stamp = (value?: string) => (value ? value.replace("T", " ").slice(0, 16) : "-");
@@ -128,19 +137,16 @@ function PanelSection({
 function Header({
   item,
   readOnly,
-  mode,
   back,
   reject,
   approve,
 }: {
   item: UploadApproval;
   readOnly: boolean;
-  mode: "approval" | "confirm";
   back: () => void;
   reject: () => void;
   approve: () => void;
 }) {
-  const isConfirm = mode === "confirm";
   return (
     <header className="flex min-h-[56px] shrink-0 items-center justify-between gap-5 border-b border-[#E0E9EB] bg-white px-5 py-3 2xl:px-7">
       <div className="flex min-w-0 items-center gap-5">
@@ -150,7 +156,7 @@ function Header({
           className="inline-flex shrink-0 items-center gap-2 text-[14px] font-medium text-[#44576A] hover:text-[#1496B4]"
         >
           <ArrowLeft className="size-4" />
-          {isConfirm ? "返回文件确认" : "返回审批台"}
+          返回审批台
         </button>
         <span className="hidden h-8 w-px bg-[#DCE7EF] sm:block" />
         <div className="flex min-w-0 items-center gap-3">
@@ -163,25 +169,33 @@ function Header({
             </p>
             <div className="mt-0.5 flex items-center gap-2">
               <h1 className="truncate text-[18px] font-semibold text-[#1F2D3D]">{item.fileName}</h1>
-              <span className="shrink-0 rounded-full bg-[#FFF3E7] px-2 py-0.5 text-[12px] font-medium text-[#E87B1B]">
-                {isConfirm ? "待确认" : "待审批"}
-              </span>
+              {item.status === "approved" ? (
+                <span className="shrink-0 rounded-full bg-[#E6F9F0] px-2 py-0.5 text-[12px] font-medium text-[#1AAF6A]">
+                  已通过
+                </span>
+              ) : item.status === "rejected" ? (
+                <span className="shrink-0 rounded-full bg-[#FFEFEF] px-2 py-0.5 text-[12px] font-medium text-[#F15454]">
+                  已驳回
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full bg-[#FFF3E7] px-2 py-0.5 text-[12px] font-medium text-[#E87B1B]">
+                  待审批
+                </span>
+              )}
             </div>
           </div>
         </div>
       </div>
       <div className="hidden shrink-0 items-center gap-2 xl:flex">
-        {!isConfirm && (
-          <button
-            type="button"
-            onClick={reject}
-            disabled={readOnly}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#FFB5B2] px-3 text-[13px] font-medium text-[#F15454] hover:bg-[#FFF7F7] disabled:opacity-45"
-          >
-            <X className="size-3.5" />
-            驳回
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={reject}
+          disabled={readOnly}
+          className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#FFB5B2] px-3 text-[13px] font-medium text-[#F15454] hover:bg-[#FFF7F7] disabled:opacity-45"
+        >
+          <X className="size-3.5" />
+          驳回
+        </button>
         <button
           type="button"
           onClick={approve}
@@ -189,7 +203,7 @@ function Header({
           className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#1496B4] px-3 text-[13px] font-medium text-white hover:bg-[#0C819D] disabled:opacity-45"
         >
           <Check className="size-3.5" />
-          {isConfirm ? "确认发布" : "通过审批"}
+          通过审批
         </button>
       </div>
     </header>
@@ -255,34 +269,109 @@ function BasicInfo({ item }: { item: UploadApproval }) {
   );
 }
 
+const METADATA_SIDEBAR_PREVIEW = 4;
+
 function Metadata({
   values,
-  editing,
-  change,
+  onExpand,
 }: {
   values: { id: string; label: string; value: string }[];
-  editing: boolean;
-  change: (id: string, value: string) => void;
+  onExpand: () => void;
 }) {
+  const preview = values.slice(0, METADATA_SIDEBAR_PREVIEW);
+  const hiddenCount = Math.max(0, values.length - preview.length);
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-      {values.map((value) => (
-        <div key={value.id}>
-          <p className="mb-1.5 text-[11px] text-kb-muted">{value.label}</p>
-          {editing ? (
-            <input
-              value={value.value}
-              onChange={(event) => change(value.id, event.target.value)}
-              className="h-9 w-full rounded-[7px] border border-kb-border bg-kb-surface px-3 text-[13px] text-kb-body outline-none focus:border-primary/45 focus:ring-2 focus:ring-primary/10"
-            />
-          ) : (
+    <div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {preview.map((value) => (
+          <div key={value.id} className="min-w-0">
+            <p className="mb-1.5 text-[11px] text-kb-muted">{value.label}</p>
             <p className="flex h-9 items-center truncate rounded-[7px] border border-divider bg-kb-surface px-3 text-[12.5px] text-kb-body">
               {value.value || <span className="text-kb-muted">未填写</span>}
             </p>
-          )}
-        </div>
-      ))}
+          </div>
+        ))}
+      </div>
+      {hiddenCount > 0 ? (
+        <button
+          type="button"
+          onClick={onExpand}
+          className="mt-3 text-[12px] font-medium text-primary hover:underline"
+        >
+          还有 {hiddenCount} 项，展开查看全部
+        </button>
+      ) : null}
     </div>
+  );
+}
+
+function MetadataExpandDialog({
+  open,
+  onClose,
+  values,
+  editing,
+  change,
+  onToggleEditing,
+  canEdit,
+}: {
+  open: boolean;
+  onClose: () => void;
+  values: { id: string; label: string; value: string }[];
+  editing: boolean;
+  change: (id: string, value: string) => void;
+  onToggleEditing: () => void;
+  canEdit: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="flex max-h-[88vh] w-[min(96vw,1120px)] max-w-5xl flex-col gap-5 overflow-hidden p-6 sm:max-w-5xl">
+        <DialogHeader className="shrink-0 pr-8">
+          <div className="flex items-center justify-between gap-3">
+            <DialogTitle className="inline-flex items-center gap-2 text-[16px]">
+              <Tag className="size-4 text-primary stroke-[1.8]" />
+              元数据详情
+              {values.length > 0 ? (
+                <span className="text-[12px] font-normal text-kb-muted">共 {values.length} 项</span>
+              ) : null}
+            </DialogTitle>
+            {canEdit ? (
+              <EditAction completed={editing} onClick={onToggleEditing}>
+                {editing ? "完成" : "编辑"}
+              </EditAction>
+            ) : null}
+          </div>
+        </DialogHeader>
+        {values.length === 0 ? (
+          <p className="py-10 text-center text-[13px] text-kb-muted">暂无元数据</p>
+        ) : (
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-5 lg:grid-cols-3">
+              {values.map((value) => (
+                <div key={value.id} className="min-w-0">
+                  <p className="mb-1.5 text-[12px] font-medium text-kb-muted">{value.label}</p>
+                  {editing ? (
+                    <input
+                      value={value.value}
+                      onChange={(event) => change(value.id, event.target.value)}
+                      className="h-10 w-full rounded-[7px] border border-kb-border bg-kb-surface px-3 text-[13px] text-kb-body outline-none focus:border-primary/45 focus:ring-2 focus:ring-primary/10"
+                    />
+                  ) : (
+                    <p className="flex min-h-10 items-start rounded-[7px] border border-divider bg-kb-surface px-3 py-2.5 text-[13px] leading-5 text-kb-body">
+                      {value.value || <span className="text-kb-muted">未填写</span>}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <DialogFooter className="shrink-0">
+          <AppDialogButton type="button" variant="outline" onClick={onClose}>
+            关闭
+          </AppDialogButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -893,17 +982,14 @@ function Reader({
 
 export function FileApprovalPage({
   approvalId,
-  mode = "approval",
 }: {
   approvalId: string;
-  mode?: "approval" | "confirm";
 }) {
   const navigate = useNavigate();
-  const isConfirm = mode === "confirm";
   const approvals = useSyncExternalStore(
     subscribeKnowledgeStore,
-    isConfirm ? getStoreFileConfirms : getStoreUploadApprovals,
-    isConfirm ? getStoreFileConfirms : getStoreUploadApprovals,
+    getStoreUploadApprovals,
+    getStoreUploadApprovals,
   );
   const current = approvals.find((item) => item.id === approvalId) ?? approvals[0];
   const pending = useMemo(
@@ -913,6 +999,7 @@ export function FileApprovalPage({
   const queue = pending.length ? pending : approvals;
   const [visible, setVisible] = useState(6),
     [metadataEditing, setMetadataEditing] = useState(false),
+    [metadataExpanded, setMetadataExpanded] = useState(false),
     [keywordsEditing, setKeywordsEditing] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
     [keywordText, setKeywordText] = useState(""),
@@ -930,6 +1017,7 @@ export function FileApprovalPage({
     setExercises(copyExercises(current.aiExercises));
     setSelected([]);
     setMetadataEditing(false);
+    setMetadataExpanded(false);
     setKeywordsEditing(false);
     setActiveTab("reader");
     setViewingExercise(null);
@@ -938,8 +1026,8 @@ export function FileApprovalPage({
   if (!current)
     return (
       <KbEmptyState
-        title={isConfirm ? "未找到待确认文件" : "未找到待审批文件"}
-        description={isConfirm ? "请返回文件确认重新选择文件。" : "请返回审批台重新选择文件。"}
+        title="未找到待审批文件"
+        description="请返回审批台重新选择文件。"
       />
     );
   const readOnly = current.status === "approved" || current.status === "rejected";
@@ -950,28 +1038,21 @@ export function FileApprovalPage({
     aiExercises: exercises,
   });
   const finish = (status: "approved" | "rejected") => {
-    if (isConfirm) {
-      confirmStoreFile(current.id, contentPatch());
-      toast.success("文件已确认并发布到个人库");
-    } else {
-      updateStoreUploadApproval(current.id, {
-        ...contentPatch(),
-        status,
-        contentConfirmStatus: status === "approved" ? "confirmed" : "unconfirmed",
-        reviewerName: "当前审批人",
-        reviewedAt: new Date().toISOString(),
-        reviewNote: status === "rejected" ? undefined : "内容已确认并批准入库",
-      });
-      toast.success(status === "approved" ? "文件已通过审批并正式入库" : "文件已驳回");
-    }
+    updateStoreUploadApproval(current.id, {
+      ...contentPatch(),
+      status,
+      contentConfirmStatus: status === "approved" ? "confirmed" : "unconfirmed",
+      reviewerName: "当前审批人",
+      reviewedAt: new Date().toISOString(),
+      reviewNote: status === "rejected" ? undefined : "内容已确认并批准入库",
+    });
+    toast.success(status === "approved" ? "文件已通过审批并正式入库" : "文件已驳回");
     const next = queue.find((item) => item.id !== current.id);
     if (next) {
       navigate({
-        to: isConfirm ? "/knowledge/confirm/$confirmId" : "/knowledge/approval/$approvalId",
-        params: isConfirm ? { confirmId: next.id } : { approvalId: next.id },
+        to: "/knowledge/approval/$approvalId",
+        params: { approvalId: next.id },
       });
-    } else if (isConfirm) {
-      navigate({ to: "/knowledge/mine", search: { panel: "uploads", view: "confirm" } });
     } else {
       navigate({ to: "/knowledge/admin", search: { section: "approvals" } });
     }
@@ -1005,12 +1086,7 @@ export function FileApprovalPage({
       <Header
         item={current}
         readOnly={readOnly}
-        mode={mode}
-        back={() =>
-          isConfirm
-            ? navigate({ to: "/knowledge/mine", search: { panel: "uploads", view: "confirm" } })
-            : navigate({ to: "/knowledge/admin", search: { section: "approvals" } })
-        }
+        back={() => navigate({ to: "/knowledge/admin", search: { section: "approvals" } })}
         reject={() => {
           const reason =
             typeof window !== "undefined" ? window.prompt("请输入驳回原因") : "";
@@ -1038,13 +1114,13 @@ export function FileApprovalPage({
       />
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <FileTreeSidebar
-          title={isConfirm ? "待确认文件" : "待审批文件"}
+          title="待审批文件"
           files={queueFiles}
           currentFileId={current.id}
           onSelect={(file) =>
             navigate({
-              to: isConfirm ? "/knowledge/confirm/$confirmId" : "/knowledge/approval/$approvalId",
-              params: isConfirm ? { confirmId: file.id } : { approvalId: file.id },
+              to: "/knowledge/approval/$approvalId",
+              params: { approvalId: file.id },
             })
           }
           footer={
@@ -1111,7 +1187,7 @@ export function FileApprovalPage({
           </ModulePanel>
         </section>
         <aside className="flex w-[390px] shrink-0 flex-col border-l border-[#E0E9EB] bg-white 2xl:w-[420px]">
-          <SidebarHeader title={isConfirm ? "确认信息" : "审核信息"} />
+          <SidebarHeader title="审核信息" />
           <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
             <PanelSection title="文件基本信息" icon={FileText}>
               <BasicInfo item={current} />
@@ -1141,28 +1217,52 @@ export function FileApprovalPage({
               title="元数据"
               icon={Tag}
               action={
-                <EditAction
-                  completed={metadataEditing}
-                  disabled={readOnly}
-                  onClick={() => setMetadataEditing((value) => !value)}
-                >
-                  {metadataEditing ? "完成" : "编辑"}
-                </EditAction>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMetadataExpanded(true)}
+                    className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:text-primary/75"
+                    title="展开查看全部元数据"
+                  >
+                    <Maximize2 className="size-3.5" />
+                    展开
+                  </button>
+                  <EditAction
+                    disabled={readOnly}
+                    onClick={() => {
+                      setMetadataEditing(true);
+                      setMetadataExpanded(true);
+                    }}
+                  >
+                    编辑
+                  </EditAction>
+                </div>
               }
             >
               <Metadata
                 values={metadata}
-                editing={metadataEditing}
-                change={(id, value) =>
-                  setMetadata((items) =>
-                    items.map((item) => (item.id === id ? { ...item, value } : item)),
-                  )
-                }
+                onExpand={() => setMetadataExpanded(true)}
               />
             </PanelSection>
           </div>
         </aside>
       </div>
+      <MetadataExpandDialog
+        open={metadataExpanded}
+        onClose={() => {
+          setMetadataExpanded(false);
+          setMetadataEditing(false);
+        }}
+        values={metadata}
+        editing={metadataEditing}
+        canEdit={!readOnly}
+        onToggleEditing={() => setMetadataEditing((value) => !value)}
+        change={(id, value) =>
+          setMetadata((items) =>
+            items.map((item) => (item.id === id ? { ...item, value } : item)),
+          )
+        }
+      />
       <ExerciseDetailDialog
         item={viewingExercise}
         readOnly={readOnly}
@@ -1180,6 +1280,478 @@ export function FileApprovalPage({
         }}
         onSaveAndSubmit={(item) => {
           setExercises((items) => items.map((entry) => (entry.id === item.id ? item : entry)));
+          setViewingExercise(null);
+          setDetailEditing(false);
+          toast.success("已保存并提交至题库");
+        }}
+      />
+    </main>
+  );
+}
+
+function metadataItemsFromFile(file: KnowledgeFile) {
+  const fields = getMetadataFieldsForBase(file.knowledgeBaseId);
+  if (fields.length) {
+    return fields.map((field) => {
+      const raw = file.metadata?.[field.id];
+      return {
+        id: field.id,
+        label: field.label,
+        value: Array.isArray(raw) ? raw.join("、") : (raw ?? ""),
+      };
+    });
+  }
+  return Object.entries(file.metadata ?? {}).map(([id, value]) => ({
+    id,
+    label: id,
+    value: Array.isArray(value) ? value.join("、") : value,
+  }));
+}
+
+function fileToFakeApproval(file: KnowledgeFile): UploadApproval {
+  return {
+    id: file.id,
+    fileName: file.name,
+    knowledgeBaseName: file.knowledgeBaseName ?? "个人知识库",
+    knowledgeBaseId: file.knowledgeBaseId,
+    submitterName: file.uploaderName ?? "-",
+    submittedAt: file.updatedAt ?? file.createdAt ?? "",
+    fileSize: file.size,
+    status: "approved",
+    parseStatus: file.parseStatus ?? "success",
+    summary: file.summary,
+    aiKeywords: file.aiKeywords,
+    aiMetadata: [],
+    aiExercises: [],
+  };
+}
+
+function isParseEditDirty(
+  file: KnowledgeFile,
+  fileName: string,
+  keywordText: string,
+  summary: string,
+  metadata: { id: string; label: string; value: string }[],
+) {
+  const originalMetadata = metadataItemsFromFile(file);
+  if (fileName.trim() !== file.name) return true;
+  if (normalizeKeywords(tags(keywordText)) !== normalizeKeywords(file.aiKeywords)) return true;
+  if ((summary ?? "") !== (file.summary ?? "")) return true;
+  if (metadata.length !== originalMetadata.length) return true;
+  return metadata.some(
+    (item, index) =>
+      item.id !== originalMetadata[index]?.id || item.value !== originalMetadata[index]?.value,
+  );
+}
+
+function UnsavedLeaveDialog({
+  open,
+  onCancel,
+  onDiscard,
+  onSave,
+}: {
+  open: boolean;
+  onCancel: () => void;
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <KbFormDialog
+      open={open}
+      size="small"
+      variant="confirm"
+      title="有未保存的修改"
+      titleIcon={AlertTriangle}
+      onClose={onCancel}
+      footer={
+        <>
+          <AppDialogButton variant="outline" onClick={onCancel}>
+            取消
+          </AppDialogButton>
+          <AppDialogButton variant="outline" onClick={onDiscard}>
+            放弃修改
+          </AppDialogButton>
+          <AppDialogButton variant="primary" onClick={onSave}>
+            保存并继续
+          </AppDialogButton>
+        </>
+      }
+    >
+      <p className="px-8 py-5 text-[13.5px] leading-relaxed text-[#526670]">
+        当前文件的解析结果已修改但尚未保存。继续操作将丢失这些修改，也可先保存再继续。
+      </p>
+    </KbFormDialog>
+  );
+}
+
+export function FileEditPage({ fileId }: { fileId: string }) {
+  const navigate = useNavigate();
+  const storeFiles = useSyncExternalStore(
+    subscribeKnowledgeStore,
+    getStoreFiles,
+    getStoreFiles,
+  );
+  const file = storeFiles.find((f) => f.id === fileId);
+  const [fileName, setFileName] = useState(file?.name ?? "");
+  const [fileNameEditing, setFileNameEditing] = useState(false);
+  const [keywordText, setKeywordText] = useState(normalizeKeywords(file?.aiKeywords));
+  const [summary, setSummary] = useState(file?.summary ?? "");
+  const [metadata, setMetadata] = useState<{ id: string; label: string; value: string }[]>(
+    file ? metadataItemsFromFile(file) : [],
+  );
+  const [exercises, setExercises] = useState<KnowledgeExercise[]>([]);
+  const [viewingExercise, setViewingExercise] = useState<KnowledgeExercise | null>(null);
+  const [detailEditing, setDetailEditing] = useState(false);
+  const [activeTab, setActiveTab] = useState<ApprovalTab>("reader");
+  const [selected, setSelected] = useState<string[]>([]);
+  const [metadataEditing, setMetadataEditing] = useState(false);
+  const [metadataExpanded, setMetadataExpanded] = useState(false);
+  const [keywordsEditing, setKeywordsEditing] = useState(false);
+  const [unsavedOpen, setUnsavedOpen] = useState(false);
+  const pendingLeaveAction = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!file) return;
+    setFileName(file.name);
+    setKeywordText(normalizeKeywords(file.aiKeywords));
+    setSummary(file.summary ?? "");
+    setMetadata(metadataItemsFromFile(file));
+    setExercises([]);
+    setSelected([]);
+    setMetadataEditing(false);
+    setMetadataExpanded(false);
+    setKeywordsEditing(false);
+    setFileNameEditing(false);
+    setActiveTab("reader");
+    setViewingExercise(null);
+    setDetailEditing(false);
+    setUnsavedOpen(false);
+    pendingLeaveAction.current = null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileId]);
+
+  const libraryFiles = useMemo(() => {
+    if (!file) return [];
+    const files = getFilesForBase(file.knowledgeBaseId);
+    return files.some((item) => item.id === file.id) ? files : [file, ...files];
+  }, [file, storeFiles]);
+
+  const isDirty = file
+    ? isParseEditDirty(file, fileName, keywordText, summary, metadata)
+    : false;
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
+
+  if (!file)
+    return (
+      <KbEmptyState title="未找到文件" description="请返回文件列表重新选择。" />
+    );
+
+  const fakeApproval = fileToFakeApproval(file);
+  const effectiveApproval: UploadApproval = {
+    ...fakeApproval,
+    fileName,
+    summary,
+    aiKeywords: tags(keywordText),
+    aiMetadata: metadata,
+    aiExercises: exercises,
+  };
+
+  const handleSave = () => {
+    saveStoreFileEditedContent(fileId, {
+      name: fileName.trim() || file.name,
+      summary,
+      aiKeywords: tags(keywordText),
+      metadata: Object.fromEntries(metadata.map((item) => [item.id, item.value])),
+    });
+    toast.success("解析结果已保存");
+  };
+
+  const requestLeave = (action: () => void) => {
+    if (!isDirty) {
+      action();
+      return;
+    }
+    pendingLeaveAction.current = action;
+    setUnsavedOpen(true);
+  };
+
+  const closeUnsaved = () => {
+    pendingLeaveAction.current = null;
+    setUnsavedOpen(false);
+  };
+
+  const runPendingLeave = () => {
+    const action = pendingLeaveAction.current;
+    pendingLeaveAction.current = null;
+    setUnsavedOpen(false);
+    action?.();
+  };
+
+  const goBack = () => navigate({ to: "/knowledge/mine", search: { panel: "personal" } });
+
+  const switchToFile = (next: KnowledgeFile) => {
+    if (next.id === file.id) return;
+    requestLeave(() =>
+      navigate({ to: "/knowledge/edit/$fileId", params: { fileId: next.id } }),
+    );
+  };
+
+  const tabs = [
+    {
+      key: "reader" as const,
+      label: "文件浏览",
+      desc: "阅读文档正文",
+      icon: <FileText className="h-4 w-4" />,
+    },
+    {
+      key: "exercises" as const,
+      label: "练习题",
+      desc: `共 ${exercises.length} 道题`,
+      icon: <ListChecks className="h-4 w-4" />,
+    },
+    {
+      key: "mindMap" as const,
+      label: "脑图",
+      desc: "知识结构梳理",
+      icon: <GitFork className="h-4 w-4" />,
+    },
+  ];
+
+  return (
+    <main className={cn(kbMainPanel, "bg-[#F5F8FA] text-kb-heading")}>
+      <header className="flex min-h-[56px] shrink-0 items-center justify-between gap-5 border-b border-[#E0E9EB] bg-white px-5 py-3 2xl:px-7">
+        <div className="flex min-w-0 items-center gap-5">
+          <button
+            type="button"
+            onClick={() => requestLeave(goBack)}
+            className="inline-flex shrink-0 items-center gap-2 text-[14px] font-medium text-[#44576A] hover:text-[#1496B4]"
+          >
+            <ArrowLeft className="size-4" />
+            返回
+          </button>
+          <span className="hidden h-8 w-px bg-[#DCE7EF] sm:block" />
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-[#D8EAF1] bg-[#F1FBFD]">
+              <img src={knowledgeIcon} alt="知识库" className="size-8 object-contain" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-[13px] text-[#65788B]">
+                个人知识库 / {file.knowledgeBaseName}
+              </p>
+              {fileNameEditing ? (
+                <input
+                  type="text"
+                  value={fileName}
+                  onChange={(e) => setFileName(e.target.value)}
+                  onBlur={() => setFileNameEditing(false)}
+                  autoFocus
+                  className="mt-0.5 w-full rounded border border-primary/30 bg-white px-2 py-0.5 text-[16px] font-semibold text-[#1F2D3D] focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
+              ) : (
+                <div className="mt-0.5 flex items-center gap-2">
+                  <h1 className="truncate text-[18px] font-semibold text-[#1F2D3D]">{fileName}</h1>
+                  <button
+                    type="button"
+                    onClick={() => setFileNameEditing(true)}
+                    className="shrink-0 rounded p-0.5 text-[#65788B] hover:text-primary"
+                  >
+                    <Pencil className="size-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {isDirty ? (
+            <span className="hidden text-[12px] text-[#C47B16] xl:inline">未保存</span>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleSave}
+            className="hidden xl:inline-flex h-8 items-center gap-1.5 rounded-md bg-[#1496B4] px-3 text-[13px] font-medium text-white hover:bg-[#0C819D]"
+          >
+            <Check className="size-3.5" />
+            保存
+          </button>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <FileTreeSidebar
+          title="当前库文件"
+          files={libraryFiles}
+          currentFileId={file.id}
+          onSelect={switchToFile}
+        />
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F5F8FA] p-3">
+          <ModulePanel className="flex min-h-0 flex-1 flex-col">
+            <ModuleTabs compact tabs={tabs} value={activeTab} onChange={setActiveTab} />
+            <div className="min-h-0 flex-1 overflow-hidden">
+              {activeTab === "reader" && (
+                <Reader item={effectiveApproval} keywordText={keywordText} summary={summary} />
+              )}
+              {activeTab === "exercises" && (
+                <Exercises
+                  items={exercises}
+                  selected={selected}
+                  readOnly={false}
+                  toggleSelected={(id) =>
+                    setSelected((items) =>
+                      items.includes(id) ? items.filter((item) => item !== id) : [...items, id],
+                    )
+                  }
+                  toggleSelectAll={() =>
+                    setSelected((current) =>
+                      current.length === exercises.length ? [] : exercises.map((item) => item.id),
+                    )
+                  }
+                  openDetail={(item) => {
+                    setViewingExercise(item);
+                    setDetailEditing(false);
+                  }}
+                  openEdit={(item) => {
+                    setViewingExercise(item);
+                    setDetailEditing(true);
+                  }}
+                  remove={(id) => {
+                    setExercises((items) => items.filter((item) => item.id !== id));
+                    setSelected((items) => items.filter((item) => item !== id));
+                  }}
+                  upload={() => {
+                    toast.success(`已将 ${selected.length} 道题加入题库`);
+                    setSelected([]);
+                  }}
+                />
+              )}
+              {activeTab === "mindMap" && (
+                <MindMap item={effectiveApproval} keywordText={keywordText} />
+              )}
+            </div>
+          </ModulePanel>
+        </section>
+
+        <aside className="flex w-[390px] shrink-0 flex-col border-l border-[#E0E9EB] bg-white 2xl:w-[420px]">
+          <SidebarHeader title="编辑信息" />
+          <div className="scrollbar-thin min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+            <PanelSection title="文件基本信息" icon={FileText}>
+              <BasicInfo item={fakeApproval} />
+            </PanelSection>
+            <PanelSection
+              title="关键词与摘要"
+              icon={Hash}
+              action={
+                <EditAction
+                  completed={keywordsEditing}
+                  onClick={() => setKeywordsEditing((v) => !v)}
+                >
+                  {keywordsEditing ? "完成" : "编辑"}
+                </EditAction>
+              }
+            >
+              <Keywords
+                keywordText={keywordText}
+                summary={summary}
+                editing={keywordsEditing}
+                setKeywordText={setKeywordText}
+                setSummary={setSummary}
+              />
+            </PanelSection>
+            <PanelSection
+              title="元数据"
+              icon={Tag}
+              action={
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setMetadataExpanded(true)}
+                    className="inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:text-primary/75"
+                    title="展开查看全部元数据"
+                  >
+                    <Maximize2 className="size-3.5" />
+                    展开
+                  </button>
+                  <EditAction
+                    onClick={() => {
+                      setMetadataEditing(true);
+                      setMetadataExpanded(true);
+                    }}
+                  >
+                    编辑
+                  </EditAction>
+                </div>
+              }
+            >
+              <Metadata
+                values={metadata}
+                onExpand={() => setMetadataExpanded(true)}
+              />
+            </PanelSection>
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleSave}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-[#1496B4] px-3 text-[13px] font-medium text-white hover:bg-[#0C819D]"
+              >
+                <Check className="size-3.5" />
+                保存更改
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <UnsavedLeaveDialog
+        open={unsavedOpen}
+        onCancel={closeUnsaved}
+        onDiscard={runPendingLeave}
+        onSave={() => {
+          handleSave();
+          runPendingLeave();
+        }}
+      />
+      <MetadataExpandDialog
+        open={metadataExpanded}
+        onClose={() => {
+          setMetadataExpanded(false);
+          setMetadataEditing(false);
+        }}
+        values={metadata}
+        editing={metadataEditing}
+        canEdit
+        onToggleEditing={() => setMetadataEditing((value) => !value)}
+        change={(id, value) =>
+          setMetadata((items) =>
+            items.map((item) => (item.id === id ? { ...item, value } : item)),
+          )
+        }
+      />
+      <ExerciseDetailDialog
+        item={viewingExercise}
+        readOnly={false}
+        editing={detailEditing}
+        onClose={() => {
+          setViewingExercise(null);
+          setDetailEditing(false);
+        }}
+        onEditingChange={setDetailEditing}
+        onSave={(item) => {
+          setExercises((prev) => prev.map((e) => (e.id === item.id ? item : e)));
+          setViewingExercise(item);
+          setDetailEditing(false);
+          toast.success("练习题已更新");
+        }}
+        onSaveAndSubmit={(item) => {
+          setExercises((prev) => prev.map((e) => (e.id === item.id ? item : e)));
           setViewingExercise(null);
           setDetailEditing(false);
           toast.success("已保存并提交至题库");

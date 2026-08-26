@@ -31,7 +31,7 @@ export function FileMoveDialog({
   currentBaseId?: string;
   loading?: boolean;
   onClose: () => void;
-  onConfirm: (files: KnowledgeFile[], targetBaseId: string) => void;
+  onConfirm: (files: KnowledgeFile[], targetBaseId: string, keepSource: boolean) => void;
 }) {
   const open = files.length === 1;
   const rejectedBatch = files.length > 1;
@@ -50,9 +50,13 @@ export function FileMoveDialog({
   );
   const [target, setTarget] = useState("");
   const [treeOpen, setTreeOpen] = useState(false);
+  const [keepSource, setKeepSource] = useState(false);
 
   useEffect(() => {
-    if (open) setTarget("");
+    if (open) {
+      setTarget("");
+      setKeepSource(false);
+    }
   }, [open, files]);
 
   // 未显式传入当前库时（如全库页面），以文件所属库推断源作用域
@@ -73,18 +77,19 @@ export function FileMoveDialog({
 
   const selectedBase = target ? targetById.get(target) : undefined;
   const isSubmitApproval = isSubmitToPublicMove(effectiveBaseId, target);
+  const isCopy = keepSource;
 
   const handleConfirm = () => {
     if (!target || files.length !== 1) return;
     pushRecentMoveId(target);
-    onConfirm(files, target);
+    onConfirm(files, target, keepSource);
   };
 
   return (
     <AppFormDialog
       open={open}
       size="small"
-      title={isSubmitApproval ? "提交到专业/公共知识库" : "移动文件"}
+      title={isCopy ? "复制文件" : isSubmitApproval ? "提交到专业/公共知识库" : "移动文件"}
       titleIcon={FolderInput}
       onClose={onClose}
       footer={
@@ -98,18 +103,25 @@ export function FileMoveDialog({
             disabled={!target}
             onClick={handleConfirm}
           >
-            {isSubmitApproval ? "提交移入申请" : "确认移动"}
+            {isCopy ? "确认复制" : isSubmitApproval ? "提交移入申请" : "确认移动"}
           </AppDialogButton>
         </>
       }
     >
       <div className="space-y-3.5">
         <p className="text-[13px] leading-relaxed text-[#526670]">
-          {isSubmitApproval ? (
+          {isCopy ? (
             <>
               将
               <strong className="mx-1 font-semibold text-foreground">{files[0]?.name}</strong>
-              申请移入专业/公共知识库。管理员先审批是否允许移入；批准后文件进入目标库并重新解析，解析完成后再进行内容确认。
+              复制到目标知识库，原库文件保留不变。
+              {isSubmitApproval && "需管理员审批后生效。"}
+            </>
+          ) : isSubmitApproval ? (
+            <>
+              将
+              <strong className="mx-1 font-semibold text-foreground">{files[0]?.name}</strong>
+              申请移入专业/公共知识库。批准后文件进入目标库并重新解析；若不保留源文件，原库文件在目标库发布后移除。
             </>
           ) : (
             <>
@@ -134,6 +146,23 @@ export function FileMoveDialog({
             }}
           />
         </div>
+
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-[8px] border border-[#E0EAED] bg-[#F8FBFC] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-[#F2F8FA]">
+          <input
+            type="checkbox"
+            checked={keepSource}
+            onChange={(e) => setKeepSource(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+          />
+          <div className="min-w-0">
+            <p className="text-[12.5px] font-medium text-[#334E59]">保留源文件</p>
+            <p className="mt-0.5 text-[11.5px] text-[#6B7F88]">
+              {keepSource
+                ? "目标库发布后，原库文件保留（复制效果）"
+                : "目标库发布后，原库文件将移除（移动效果）"}
+            </p>
+          </div>
+        </label>
 
         {recentBases.length > 0 && (
           <div className="space-y-1.5">

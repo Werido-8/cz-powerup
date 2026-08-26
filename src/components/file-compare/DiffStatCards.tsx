@@ -1,6 +1,4 @@
-import { FileDiff } from "lucide-react";
 import { DIFF_TYPE_META } from "@/lib/file-compare/meta";
-import { DIFF_TYPE_ORDER } from "@/lib/file-compare/data";
 import type { DiffType } from "@/lib/file-compare/types";
 import { cn } from "@/lib/utils";
 
@@ -8,85 +6,90 @@ export interface DiffStatCardsProps {
   total: number;
   affectedChapters: number;
   counts: Record<DiffType, number>;
-  /** 当前生效的类型筛选，undefined 表示全部 */
+  primaryChapter: string;
   activeType?: DiffType;
   onSelectType: (type?: DiffType) => void;
 }
 
-const CARD_SHELL =
-  "flex h-[76px] items-center gap-3 rounded-[8px] border bg-white px-4 text-left transition-colors " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25";
+const TYPE_ORDER: DiffType[] = ["added", "modified", "removed"];
 
+/** 文档式变化摘要：总量主导，类型与影响范围作为辅助阅读线索。 */
 export function DiffStatCards({
   total,
   affectedChapters,
   counts,
+  primaryChapter,
   activeType,
   onSelectType,
 }: DiffStatCardsProps) {
-  return (
-    <div className="grid shrink-0 grid-cols-[1.34fr_1fr_1fr_1fr_1fr] gap-3">
-      <button
-        type="button"
-        aria-pressed={!activeType}
-        onClick={() => onSelectType(undefined)}
-        title={activeType ? "查看全部差异" : undefined}
-        className={cn(CARD_SHELL, "border-kb-border hover:border-primary/35")}
-      >
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[8px] bg-primary text-white">
-          <FileDiff className="h-[18px] w-[18px] stroke-[1.8]" aria-hidden />
-        </span>
-        <span className="min-w-0">
-          <span className="block text-[11.5px] font-medium text-kb-muted">共识别差异</span>
-          <span className="mt-0.5 flex items-baseline gap-1 whitespace-nowrap">
-            <span className="text-[22px] font-bold leading-none tabular-nums text-kb-heading">
-              {total}
-            </span>
-            <span className="text-[12px] text-kb-body">处，涉及 {affectedChapters} 个章节</span>
-          </span>
-        </span>
-      </button>
+  const changeLevel = total <= 10 ? "较低" : total <= 30 ? "中等" : "较高";
 
-      {DIFF_TYPE_ORDER.map((type) => {
-        const meta = DIFF_TYPE_META[type];
-        const Icon = meta.icon;
-        const active = activeType === type;
-        return (
+  return (
+    <section className="shrink-0 border-b border-kb-border bg-white px-5 py-3.5">
+      <div className="grid gap-3 lg:grid-cols-[minmax(260px,0.82fr)_minmax(500px,1.18fr)] lg:items-center">
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-semibold text-kb-heading">版本变化概览</h2>
           <button
-            key={type}
             type="button"
-            aria-pressed={active}
-            onClick={() => onSelectType(active ? undefined : type)}
+            aria-pressed={!activeType}
+            onClick={() => onSelectType(undefined)}
             className={cn(
-              CARD_SHELL,
-              active
-                ? "border-primary/45 shadow-[0_0_0_1px_rgba(52,155,172,0.18)]"
-                : "border-kb-border hover:border-primary/35",
+              "mt-1 text-left text-[15px] leading-6 text-kb-heading transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+              !activeType && "text-primary",
             )}
           >
-            <span
-              className={cn(
-                "grid h-9 w-9 shrink-0 place-items-center",
-                type === "added" || type === "removed" ? "rounded-full" : "rounded-[8px]",
-                meta.cardIcon,
-              )}
-            >
-              <Icon className="h-[18px] w-[18px] stroke-[1.9]" aria-hidden />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11.5px] font-medium text-kb-muted">{meta.label}</span>
-              <span
-                className={cn(
-                  "mt-0.5 block text-[22px] font-bold leading-none tabular-nums",
-                  meta.valueText,
-                )}
-              >
-                {counts[type]}
-              </span>
-            </span>
+            本次版本共识别{" "}
+            <strong className="mx-0.5 text-[26px] font-semibold leading-none tabular-nums">
+              {total}
+            </strong>{" "}
+            项内容变化
           </button>
-        );
-      })}
-    </div>
+        </div>
+
+        <div className="min-w-0 lg:border-l lg:border-[#E5EDEF] lg:pl-5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {TYPE_ORDER.map((type) => {
+              const meta = DIFF_TYPE_META[type];
+              const active = activeType === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onSelectType(active ? undefined : type)}
+                  className={cn(
+                    "group inline-flex items-baseline gap-1.5 rounded-[4px] text-[12px] text-kb-muted transition-colors hover:text-kb-heading focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+                    active && "text-kb-heading",
+                  )}
+                >
+                  <span>{meta.label}</span>
+                  <strong className={cn("text-[17px] font-semibold tabular-nums", meta.valueText)}>
+                    {counts[type]}
+                  </strong>
+                  <span>项</span>
+                </button>
+              );
+            })}
+            <span className="h-4 w-px bg-[#DDE7E9]" aria-hidden />
+            <span className="text-[12px] text-kb-muted">
+              影响{" "}
+              <strong className="mx-0.5 text-[17px] font-semibold tabular-nums text-kb-heading">
+                {affectedChapters}
+              </strong>{" "}
+              个章节
+            </span>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[12px] text-kb-muted">
+            <span>
+              变化程度：<strong className="font-medium text-kb-heading">{changeLevel}</strong>
+            </span>
+            <span>
+              主要集中：<strong className="font-medium text-kb-heading">{primaryChapter}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

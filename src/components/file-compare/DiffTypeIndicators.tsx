@@ -20,28 +20,20 @@ export function DiffTypeDot({ type, className }: { type: DiffType; className?: s
   );
 }
 
-/** 变化摘要条目前的方形序号标记，如 M1 / A2 */
-export function DiffSeqBadge({
-  type,
-  index,
-  className,
-}: {
-  type: DiffType;
-  index: number;
-  className?: string;
-}) {
+/** 中文差异类型标签，必须与颜色同时出现 */
+export function DiffTypeTag({ type, className }: { type: DiffType; className?: string }) {
   const meta = DIFF_TYPE_META[type];
+  const Icon = meta.icon;
   return (
     <span
       className={cn(
-        "grid h-[26px] w-[26px] shrink-0 place-items-center rounded-[7px] text-[11.5px] font-semibold tabular-nums",
+        "inline-flex h-[20px] shrink-0 items-center gap-1 rounded-[4px] px-1.5 text-[11px] font-medium",
         meta.listIcon,
         className,
       )}
-      aria-label={`${meta.label}第 ${index} 项`}
     >
-      {meta.letter}
-      {index}
+      <Icon className="h-3 w-3 stroke-[2.2]" aria-hidden />
+      {meta.label}
     </span>
   );
 }

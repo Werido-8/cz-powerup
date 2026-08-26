@@ -121,5 +121,23 @@ export function useAnchoredSync() {
     [getPane],
   );
 
-  return { baseRef, targetRef, align, scrollToAnchor };
+  /** 返回当前阅读探测线附近的差异，用于同步左侧导航高亮。 */
+  const getCurrentDiff = useCallback(
+    (side: CompareSide) => {
+      const pane = getPane(side);
+      if (!pane) return undefined;
+      const blocks = Array.from(pane.querySelectorAll<HTMLElement>("[data-diff-id]"));
+      if (blocks.length === 0) return undefined;
+      const probe = pane.scrollTop + Math.min(150, pane.clientHeight * 0.28);
+      let current = blocks[0];
+      for (const block of blocks) {
+        if (relativeTop(block, pane) <= probe) current = block;
+        else break;
+      }
+      return current.dataset.diffId || undefined;
+    },
+    [getPane],
+  );
+
+  return { baseRef, targetRef, align, scrollToAnchor, getCurrentDiff };
 }

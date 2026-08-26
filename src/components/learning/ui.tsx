@@ -271,6 +271,7 @@ export function TableListPager({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  leading,
 }: {
   page: number;
   totalPages: number;
@@ -278,6 +279,7 @@ export function TableListPager({
   pageSize: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  leading?: ReactNode;
 }) {
   const visiblePages = useMemo(() => buildTablePageRange(page, totalPages), [page, totalPages]);
   const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -290,6 +292,7 @@ export function TableListPager({
       </span>
 
       <div className="flex items-center gap-4">
+        {leading}
         <div className="flex items-center gap-0.5 rounded-sm bg-muted/60 p-0.5">
           {TABLE_PAGE_SIZE_OPTIONS.map((size) => (
             <button
@@ -371,6 +374,7 @@ export function CardBatchPager({
   onPageChange,
   className,
   compact = false,
+  leading,
 }: {
   page: number;
   totalPages: number;
@@ -380,6 +384,7 @@ export function CardBatchPager({
   onPageChange: (page: number) => void;
   className?: string;
   compact?: boolean;
+  leading?: ReactNode;
 }) {
   const start = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, totalItems);
@@ -414,6 +419,7 @@ export function CardBatchPager({
         </p>
 
         <div className="flex items-center justify-center gap-2 sm:justify-end">
+          {leading}
           <button
             type="button"
             onClick={() => onPageChange(page - 1)}
@@ -547,14 +553,16 @@ export function PageHeader({
   subtitle,
   action,
   size = "lg",
+  className,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
   size?: "lg" | "md";
+  className?: string;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div className={cn("mb-6 flex flex-wrap items-start justify-between gap-4", className)}>
       <div className="flex min-w-0 items-start gap-3">
         <PageTitleMark />
         <div className="min-w-0">
@@ -566,7 +574,16 @@ export function PageHeader({
           >
             {title}
           </h1>
-          {subtitle && <p className="mt-1.5 text-[14px] text-muted-foreground">{subtitle}</p>}
+          {subtitle && (
+            <p
+              className={cn(
+                "text-muted-foreground",
+                size === "lg" ? "mt-1.5 text-[14px]" : "mt-1 text-[13px]",
+              )}
+            >
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
       {action}

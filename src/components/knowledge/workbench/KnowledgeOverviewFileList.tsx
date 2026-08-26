@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Trash2,
   CircleOff,
+  FileEdit,
   FolderInput,
   History,
   Pin,
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -478,9 +480,9 @@ function FileDataRow({
         type={file.type ?? "other"}
         size="sm"
         nameWeight="normal"
-        badge={
+          badge={
           <>
-            <FileParseInlineIcon parseStatus={file.parseStatus} parseError={file.parseError} />
+            <FileParseInlineIcon fileStatus={file.status} parseStatus={file.parseStatus} parseError={file.parseError} />
             {(file.versions?.length ?? 0) > 1 && fileListParseStatus(file) === "success" ? (
               <FileHistoryBadge
                 count={file.versions?.length ?? 0}
@@ -553,13 +555,37 @@ export function FileHistoryBadge({ count, onClick }: { count: number; onClick?: 
 }
 
 export function FileParseInlineIcon({
+  fileStatus,
   parseStatus,
   parseError,
 }: {
+  fileStatus?: import("@/lib/knowledge/types").FilePublishStatus;
   parseStatus?: KnowledgeParseStatus;
   parseError?: string;
 }) {
-  if (parseStatus === "parsing") {
+  if (fileStatus === "uploading") {
+    return (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              role="status"
+              aria-label="文件上传中"
+              onClick={(event) => event.stopPropagation()}
+              className="grid h-5 w-5 shrink-0 place-items-center rounded-[5px] text-primary"
+            >
+              <Loader2 className="h-3.5 w-3.5 animate-spin stroke-[2]" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="bg-[#2f424d] text-[12px] leading-relaxed">
+            文件上传中
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
+  if (parseStatus === "parsing" || fileStatus === "parsing") {
     return (
       <TooltipProvider delayDuration={200}>
         <Tooltip>
@@ -647,12 +673,15 @@ function FileActions({
   onTogglePin?: (file: KnowledgeFile) => void;
   onViewHistory?: (file: KnowledgeFile) => void;
 }) {
+  const navigate = useNavigate();
   const enabled = isFileEnabled(file);
   const employee = isEmployee();
-  const canManageFile = !employee || getBaseById(file.knowledgeBaseId)?.scope === "personal";
+  const isPersonal = getBaseById(file.knowledgeBaseId)?.scope === "personal";
+  const canManageFile = !employee || isPersonal;
   const pinned = Boolean(file.pinned);
   const hasHistory = (file.versions?.length ?? 0) > 1;
   const parseFailed = fileListParseStatus(file) === "failed";
+  const canEditParse = isPersonal && file.status === "published";
   const { open, setOpen, hoverProps } = useHoverMenu();
 
   const handleRetryParse = () => {
@@ -702,7 +731,16 @@ function FileActions({
           onCloseAutoFocus={(e) => e.preventDefault()}
           {...hoverProps}
         >
-          {canManageFile && file.canEdit !== false && (
+          {canEditParse && (
+            <DropdownMenuItem
+              className="text-[12.5px]"
+              onClick={() => navigate({ to: "/knowledge/edit/$fileId", params: { fileId: file.id } })}
+            >
+              <FileEdit className="h-3.5 w-3.5 stroke-[1.8]" />
+              编辑解析结果
+            </DropdownMenuItem>
+          )}
+          {canManageFile && !isPersonal && file.canEdit !== false && (
             <DropdownMenuItem className="text-[12.5px]" onClick={() => toast.message("打开编辑")}>
               <Pencil className="h-3.5 w-3.5 stroke-[1.8]" />
               编辑

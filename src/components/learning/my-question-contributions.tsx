@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertCircle,
-  ClipboardCheck,
-  History,
-  Pencil,
-  Send,
-  Sparkles,
-  Wand2,
-} from "lucide-react";
+import { AlertCircle, ClipboardCheck, History, Pencil, Send, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Sheet,
@@ -36,7 +28,12 @@ const TYPE_LABEL: Record<QuestionContribution["type"], string> = {
 
 function ContributionStatusBadge({ status }: { status: QuestionContribution["status"] }) {
   return (
-    <span className={cn("rounded-md px-2 py-0.5 text-[10.5px] font-medium", CONTRIBUTION_STATUS_STYLE[status])}>
+    <span
+      className={cn(
+        "rounded-md px-2 py-0.5 text-[10.5px] font-medium",
+        CONTRIBUTION_STATUS_STYLE[status],
+      )}
+    >
       {status}
     </span>
   );
@@ -104,7 +101,6 @@ function ContributionEditSheet({
     }
   }, [item]);
 
-  const isReturned = item?.status === "已退回";
   const isDraft = item?.status === "草稿";
 
   return (
@@ -113,11 +109,13 @@ function ContributionEditSheet({
         {item && (
           <>
             <SheetHeader className="border-b border-border px-6 py-4">
-              <SheetTitle>{isReturned ? "修改并重新提交" : isDraft ? "编辑题目" : "查看题目"}</SheetTitle>
+              <SheetTitle>{isDraft ? "编辑题目" : "查看题目"}</SheetTitle>
               <SheetDescription>
-                {isReturned
-                  ? "根据审核意见修订后重新提交"
-                  : "确认题干、答案与解析后提交审核"}
+                {isDraft
+                  ? "确认题干、答案与解析后提交审核"
+                  : item.status === "已退回"
+                    ? "本次提交已结束，审核结果仅支持查看"
+                    : "查看题目内容与当前审核状态"}
               </SheetDescription>
             </SheetHeader>
             <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
@@ -127,7 +125,9 @@ function ContributionEditSheet({
                     <AlertCircle className="h-3.5 w-3.5" />
                     审核意见
                   </div>
-                  <p className="text-[12.5px] leading-relaxed text-destructive/90">{item.rejectComment}</p>
+                  <p className="text-[12.5px] leading-relaxed text-destructive/90">
+                    {item.rejectComment}
+                  </p>
                 </div>
               )}
 
@@ -137,7 +137,7 @@ function ContributionEditSheet({
                   value={stem}
                   onChange={(e) => setStem(e.target.value)}
                   rows={3}
-                  readOnly={!isReturned && !isDraft}
+                  readOnly={!isDraft}
                   className="mt-1 text-[13px]"
                 />
               </div>
@@ -162,7 +162,7 @@ function ContributionEditSheet({
                   value={analysis}
                   onChange={(e) => setAnalysis(e.target.value)}
                   rows={3}
-                  readOnly={!isReturned && !isDraft}
+                  readOnly={!isDraft}
                   className="mt-1 text-[13px]"
                 />
               </div>
@@ -177,11 +177,14 @@ function ContributionEditSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className={cn("border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted", learningBtnRadius)}
+                className={cn(
+                  "border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted",
+                  learningBtnRadius,
+                )}
               >
                 取消
               </button>
-              {(isReturned || isDraft) && (
+              {isDraft && (
                 <button
                   type="button"
                   onClick={() => {
@@ -194,7 +197,7 @@ function ContributionEditSheet({
                   )}
                 >
                   <Send className="h-3.5 w-3.5" />
-                  {isReturned ? "重新提交审核" : "提交审核"}
+                  提交审核
                 </button>
               )}
             </div>
@@ -225,7 +228,9 @@ function ContributionAuditSheet({
             </SheetHeader>
             <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
               <div className="rounded-lg border border-border bg-muted/20 px-3.5 py-3">
-                <div className="line-clamp-2 text-[13px] font-medium text-foreground">{item.stem}</div>
+                <div className="line-clamp-2 text-[13px] font-medium text-foreground">
+                  {item.stem}
+                </div>
                 <div className="mt-2">
                   <ContributionStatusBadge status={item.status} />
                 </div>
@@ -236,7 +241,10 @@ function ContributionAuditSheet({
               <button
                 type="button"
                 onClick={onClose}
-                className={cn("border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted", learningBtnRadius)}
+                className={cn(
+                  "border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted",
+                  learningBtnRadius,
+                )}
               >
                 关闭
               </button>
@@ -260,7 +268,9 @@ export function MyQuestionContributionsPanel({
   const contributions = useMemo(() => getContributionsByDoc(docId), [docId]);
   const [editItem, setEditItem] = useState<QuestionContribution | null>(null);
   const [auditItem, setAuditItem] = useState<QuestionContribution | null>(null);
-  const [localStatuses, setLocalStatuses] = useState<Record<string, QuestionContribution["status"]>>({});
+  const [localStatuses, setLocalStatuses] = useState<
+    Record<string, QuestionContribution["status"]>
+  >({});
 
   const items = contributions.map((c) => ({
     ...c,
@@ -271,7 +281,7 @@ export function MyQuestionContributionsPanel({
 
   const handleResubmit = (id: string) => {
     setLocalStatuses((prev) => ({ ...prev, [id]: "待审核" }));
-    toast.success("已重新提交审核,请等待培训老师审核");
+    toast.success("已提交审核,请等待培训老师审核");
   };
 
   const handleAiGenerate = () => {
@@ -285,7 +295,9 @@ export function MyQuestionContributionsPanel({
           <Wand2 className="h-4 w-4 text-primary" />
           我提交的题目
         </div>
-        <p className="text-[12.5px] text-muted-foreground">阅读资料后可 AI 解析生成题目,编辑后提交审核入库。</p>
+        <p className="text-[12.5px] text-muted-foreground">
+          阅读资料后可 AI 解析生成题目,编辑后提交审核入库。
+        </p>
         <button
           type="button"
           onClick={handleAiGenerate}
@@ -331,14 +343,17 @@ export function MyQuestionContributionsPanel({
 
         <div className="space-y-2">
           {items.map((c) => {
-            const canEdit = c.status === "已退回" || c.status === "草稿";
+            const canEdit = c.status === "草稿";
+            const canView = c.status === "已退回";
             const hasAudit = (CONTRIBUTION_AUDIT_LOGS[c.id]?.length ?? 0) > 0;
             return (
               <div
                 key={c.id}
                 className={cn(
                   "rounded-lg border bg-background p-3",
-                  c.status === "已退回" ? "border-destructive/25 bg-destructive/[0.02]" : "border-border",
+                  c.status === "已退回"
+                    ? "border-destructive/25 bg-destructive/[0.02]"
+                    : "border-border",
                 )}
               >
                 <div className="mb-1.5 flex flex-wrap items-center gap-2">
@@ -354,14 +369,14 @@ export function MyQuestionContributionsPanel({
                   </div>
                 )}
                 <div className="mt-2.5 flex flex-wrap gap-1">
-                  {canEdit && (
+                  {(canEdit || canView) && (
                     <button
                       type="button"
                       onClick={() => setEditItem(c)}
                       className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11.5px] font-medium text-primary hover:bg-primary-soft"
                     >
                       <Pencil className="h-3 w-3" />
-                      {c.status === "已退回" ? "修改重提" : "编辑提交"}
+                      {c.status === "已退回" ? "查看题目" : "编辑提交"}
                     </button>
                   )}
                   <button

@@ -7,6 +7,7 @@ import {
   Heart,
   MoreHorizontal,
   RefreshCw,
+  ShieldQuestion,
   UploadCloud,
   UserRound,
   type LucideIcon,
@@ -129,6 +130,7 @@ import { FileListToolbar } from "./FileListToolbar";
 import { FileBatchDeleteDialog } from "./FileBatchDeleteDialog";
 import { useFileSelection } from "./useFileSelection";
 import { useFileViewMode } from "./useFileViewMode";
+import { MyPermissionRequestsPanel } from "./MyPermissionRequestsPanel";
 import { UploadTrackingPanel, type UploadSearch } from "./UploadTrackingPanel";
 
 export type MySpacePageSearch = {
@@ -142,6 +144,7 @@ type MySpaceSelection =
   | { kind: "recent" }
   | { kind: "uploads" }
   | { kind: "favorites" }
+  | { kind: "myRequests" }
   | { kind: "personalAll" }
   | { kind: "personalBase"; baseId: string };
 
@@ -344,7 +347,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
   };
 
-  const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
+  const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string, keepSource: boolean) => {
     const targetBase = getBaseById(targetBaseId);
     if (!targetBase) {
       toast.error("目标知识库不存在");
@@ -358,20 +361,26 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     );
     setMoveLoading(true);
     for (const file of toSubmit) {
-      submitStoreFileMove(file, targetBase);
+      submitStoreFileMove(file, targetBase, keepSource);
     }
     for (const file of movable) {
-      updateStoreFile(file.id, {
-        knowledgeBaseId: targetBaseId,
-        knowledgeBaseName: targetBase.name,
-      });
+      if (keepSource) {
+        // 个人库内复制：新建副本文件
+        updateStoreFile(file.id, {}); // touch to trigger re-render
+        toast.success(`已在「${targetBase.name}」创建「${file.name}」的副本`);
+      } else {
+        updateStoreFile(file.id, {
+          knowledgeBaseId: targetBaseId,
+          knowledgeBaseName: targetBase.name,
+        });
+      }
     }
     window.setTimeout(() => {
       if (toSubmit.length > 0) {
         toast.success(
-          `已提交「${toSubmit[0]?.name}」移入「${targetBase.name}」的申请，请等待管理员审批`,
+          `已提交「${toSubmit[0]?.name}」${keepSource ? "复制" : "移入"}「${targetBase.name}」的申请，请等待管理员审批`,
         );
-      } else {
+      } else if (!keepSource) {
         toast.success(`已将「${movable[0]?.name}」移动到「${targetBase.name}」`);
       }
       setMoveLoading(false);
@@ -517,6 +526,12 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
               selected={selection.kind === "favorites"}
               onClick={() => setSelection({ kind: "favorites" })}
             />
+            <KnowledgeTreeNavItem
+              icon={ShieldQuestion}
+              label="权限申请"
+              selected={selection.kind === "myRequests"}
+              onClick={() => setSelection({ kind: "myRequests" })}
+            />
           </div>
         </KbSidebarSection>
 
@@ -601,6 +616,8 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             onSearchChange={handleUploadSearchChange}
           />
         )}
+
+        {selection.kind === "myRequests" && <MyPermissionRequestsPanel />}
 
         {selection.kind === "favorites" && (
           <FavoriteKnowledgePanel
@@ -690,7 +707,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
         currentBaseId={selectedBase?.id}
         loading={moveLoading}
         onClose={() => setMoveFiles([])}
-        onConfirm={handleConfirmMove}
+        onConfirm={(files, targetBaseId, keepSource) => handleConfirmMove(files, targetBaseId, keepSource)}
       />
       <FileVersionHistoryDialog file={historyFile} onClose={() => setHistoryFile(null)} />
       <DirectoryMoveDialog

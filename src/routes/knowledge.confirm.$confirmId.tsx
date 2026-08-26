@@ -8,5 +8,5 @@ export const Route = createFileRoute("/knowledge/confirm/$confirmId")({
 
 function KnowledgeConfirmRoute() {
   const { confirmId } = Route.useParams();
-  return <FileApprovalPage approvalId={confirmId} mode="confirm" />;
+  return <FileApprovalPage approvalId={confirmId} />;
 }

@@ -3,8 +3,8 @@ export type KnowledgeUserRole = "employee" | "knowledgeAdmin" | "superAdmin";
 export type KnowledgeBaseScope = "public" | "professional" | "personal";
 
 export type FilePublishStatus =
+  | "uploading"
   | "pendingApproval"
-  | "pendingConfirm"
   | "rejected"
   | "parsing"
   | "parseFailed"
@@ -179,8 +179,11 @@ export interface UploadRecord {
   disabledReason?: string;
 }
 
+export type PermissionRequestStatus = "pendingApproval" | "approved" | "rejected";
+
 export interface PermissionRequest {
   id: string;
+  applicantId?: string;
   applicantName: string;
   knowledgeBaseId: string;
   knowledgeBaseName: string;
@@ -188,12 +191,15 @@ export interface PermissionRequest {
   reason: string;
   submittedAt: string;
   notifyStatus: "waiting" | "sent";
+  status: PermissionRequestStatus;
+  reviewedAt?: string;
+  rejectReason?: string;
 }
 
 export type ApprovalStatus = "pendingApproval" | "approved" | "rejected" | "parsing";
 
-/** 审批台入库来源：直传 / 个人库移入 */
-export type UploadSourceType = "direct" | "move";
+/** 审批台入库来源：直传 / 移动 / 复制（保留源文件） */
+export type UploadSourceType = "direct" | "move" | "copy";
 
 /** 审批台内容复核状态 */
 export type ContentConfirmStatus = "confirmed" | "unconfirmed";

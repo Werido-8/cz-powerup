@@ -1,5 +1,5 @@
 import { Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import {
   KbButton,
@@ -18,7 +18,14 @@ import {
   type PermissionGrants,
   type PermissionLevel,
 } from "@/lib/knowledge/permission";
-import { getPermissionRequestsForBase } from "@/lib/knowledge/model";
+import {
+  approveStorePermissionRequest,
+  getKnowledgeStoreServerSnapshot,
+  getKnowledgeStoreVersion,
+  getStorePermissionRequests,
+  rejectStorePermissionRequest,
+  subscribeKnowledgeStore,
+} from "@/lib/knowledge/store";
 import type { PermissionRequest } from "@/lib/knowledge/types";
 import { kbCardShell, kbRadius } from "@/lib/knowledge/tokens";
 import { cn } from "@/lib/utils";
@@ -53,17 +60,19 @@ export function PermissionEditor({
   showSummary?: boolean;
   className?: string;
 }) {
+  useSyncExternalStore(subscribeKnowledgeStore, getKnowledgeStoreVersion, getKnowledgeStoreServerSnapshot);
   const [tab, setTab] = useState<EditorTab>("roles");
   const [addRoleOpen, setAddRoleOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [memberQuery, setMemberQuery] = useState("");
   const [approveRequest, setApproveRequest] = useState<PermissionRequest | null>(null);
-  const [processedRequestIds, setProcessedRequestIds] = useState<Set<string>>(new Set());
 
   const requests = useMemo(() => {
-    const fromData = baseId ? getPermissionRequestsForBase(baseId) : [];
-    return fromData.filter((item) => !processedRequestIds.has(item.id));
-  }, [baseId, processedRequestIds]);
+    if (!baseId) return [];
+    return getStorePermissionRequests().filter(
+      (item) => item.knowledgeBaseId === baseId && item.status === "pendingApproval",
+    );
+  }, [baseId, getStorePermissionRequests()]);
 
   const summary = summarizeGrants(grants);
 
@@ -161,7 +170,7 @@ export function PermissionEditor({
         });
       }
     }
-    setProcessedRequestIds((prev) => new Set([...prev, approveRequest.id]));
+    approveStorePermissionRequest(approveRequest.id);
     setApproveRequest(null);
     toast.success("权限申请已通过");
   };
@@ -387,7 +396,12 @@ export function PermissionEditor({
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setProcessedRequestIds((prev) => new Set([...prev, request.id]));
+                              const reason =
+                                typeof window !== "undefined"
+                                  ? window.prompt("请输入驳回原因")
+                                  : "";
+                              if (!reason) return;
+                              rejectStorePermissionRequest(request.id, reason);
                               toast.success("权限申请已驳回");
                             }}
                           >
