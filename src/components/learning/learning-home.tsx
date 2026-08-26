@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
-  ArrowRight,
+  ArrowUp,
   BookOpen,
   Check,
   ChevronRight,
@@ -8,13 +8,17 @@ import {
   Clock3,
   FileQuestion,
   FileText,
+  FolderOpen,
   Grid2X2,
   History,
   Layers3,
   MessageSquareText,
+  Play,
   RefreshCcw,
+  Sparkles,
   Star,
 } from "lucide-react";
+import learningGridLandscape from "@/assets/learning-grid-landscape.png";
 import { LearningPageShell } from "@/components/learning/learning-breadcrumb";
 import { PageHeader } from "@/components/learning/ui";
 import { DOCS } from "@/lib/mock/data";
@@ -76,7 +80,34 @@ const entryItems = [
   },
 ] as const;
 
-const recommendedDocIds = ["d1", "d2", "d5"] as const;
+const recommendedDocIds = ["d1", "d2", "d5", "d6", "d8"] as const;
+
+const learningMetrics = [
+  {
+    label: "可学专题",
+    value: "18",
+    delta: "2",
+    icon: Layers3,
+    tone: "teal" as const,
+  },
+  {
+    label: "可学资料",
+    value: "136",
+    delta: "12",
+    icon: FileText,
+    tone: "blue" as const,
+  },
+  {
+    label: "本周学习时长",
+    value: "2.6",
+    suffix: "h",
+    delta: "0.6h",
+    icon: History,
+    tone: "violet" as const,
+  },
+] as const;
+
+const PENDING_REVIEW_COUNT = QUESTION_CONTRIBUTIONS.filter((item) => item.status === "待审核").length;
 
 const updates = [
   {
@@ -182,14 +213,14 @@ function CardHeading({
 }
 
 function LearningEntry() {
-  const rowClass =
-    "group grid min-h-0 grid-cols-[36px_minmax(0,1fr)_20px] items-center gap-2.5 rounded-[10px] px-2 transition-colors hover:bg-[#f4f9fa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35";
+  const cardClass =
+    "group grid min-h-[88px] min-w-0 grid-cols-[36px_minmax(0,1fr)_16px] items-center gap-x-2.5 rounded-[12px] border border-[#e8eef0] bg-[#fafcfd] p-2.5 transition-colors hover:border-primary/25 hover:bg-[#f4f9fa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35";
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-[16px] border border-kb-border bg-white p-3.5 shadow-[0_10px_30px_rgba(24,76,86,0.035)]">
-      <CardHeading icon={Grid2X2} title="学习入口" />
+    <section className="flex h-full min-h-0 flex-col rounded-[16px] border border-kb-border bg-white p-3.5 shadow-[0_8px_24px_rgba(24,76,86,0.035)]">
+      <CardHeading icon={Grid2X2} title="学习入口" subtitle="常用功能快捷入口" />
       <nav
-        className="mt-1 grid min-h-0 flex-1 grid-rows-4 overflow-hidden"
+        className="mt-2 grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-2"
         aria-label="学习功能入口"
       >
         {entryItems.map((item) => {
@@ -198,7 +229,7 @@ function LearningEntry() {
             <>
               <span
                 className={cn(
-                  "grid h-8 w-8 place-items-center rounded-[10px]",
+                  "grid h-8 w-8 shrink-0 place-items-center rounded-[9px]",
                   item.tone === "teal"
                     ? "bg-[#e4f5f7] text-primary"
                     : "bg-[#edf2f4] text-[#5b7480]",
@@ -206,36 +237,36 @@ function LearningEntry() {
               >
                 <Icon className="h-[18px] w-[18px]" aria-hidden />
               </span>
-              <span className="min-w-0">
-                <strong className="block truncate text-[13px] font-semibold leading-5 text-kb-heading">
+              <span className="min-w-0 overflow-hidden">
+                <span className="block text-[13px] font-semibold leading-5 text-kb-heading group-hover:text-primary">
                   {item.title}
-                </strong>
-                <span className="mt-px block truncate text-[11px] leading-4 text-kb-muted">
+                </span>
+                <span className="mt-0.5 block text-[11px] leading-4 text-kb-muted line-clamp-2">
                   {item.description}
                 </span>
               </span>
               <ChevronRight
-                className="h-4 w-4 text-kb-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+                className="h-4 w-4 shrink-0 self-center text-kb-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
                 aria-hidden
               />
             </>
           );
           if (item.to === "/learn") {
             return (
-              <Link key={item.title} to="/learn" search={item.search} className={rowClass}>
+              <Link key={item.title} to="/learn" search={item.search} className={cardClass}>
                 {body}
               </Link>
             );
           }
           if (item.to === "/learn/updates") {
             return (
-              <Link key={item.title} to="/learn/updates" className={rowClass}>
+              <Link key={item.title} to="/learn/updates" className={cardClass}>
                 {body}
               </Link>
             );
           }
           return (
-            <Link key={item.title} to="/assets" className={rowClass}>
+            <Link key={item.title} to="/assets" className={cardClass}>
               {body}
             </Link>
           );
@@ -245,69 +276,114 @@ function LearningEntry() {
   );
 }
 
-function RecentHero({ hasRecentBrowse }: { hasRecentBrowse: boolean }) {
+function LearningOverview() {
   return (
-    <article className="relative flex h-full min-h-[220px] overflow-hidden rounded-[16px] border border-[#cfe4e8] bg-white p-5 shadow-[0_14px_40px_rgba(24,77,87,0.045)] xl:min-h-0">
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-[42%] bg-[radial-gradient(circle_at_70%_40%,rgba(52,155,172,.10),transparent_66%)]" />
-      <div className="pointer-events-none absolute -right-10 -top-20 h-52 w-52 rounded-full border-[30px] border-primary/[0.055]" />
-      <div
-        className="pointer-events-none absolute bottom-3 right-16 hidden h-24 w-40 opacity-50 lg:block"
-        aria-hidden
-      >
-        <span className="absolute left-0 top-12 h-2.5 w-2.5 rounded-full bg-primary/25" />
-        <span className="absolute left-[70px] top-1 h-2.5 w-2.5 rounded-full bg-primary/20" />
-        <span className="absolute right-1 top-[70px] h-2.5 w-2.5 rounded-full bg-primary/25" />
-        <span className="absolute left-2 top-[51px] h-px w-[72px] -rotate-[32deg] bg-primary/20" />
-        <span className="absolute left-[76px] top-[27px] h-px w-[88px] rotate-[27deg] bg-primary/20" />
+    <section className="relative flex h-full min-h-[260px] flex-col overflow-hidden rounded-[16px] border border-kb-border bg-white p-4 shadow-[0_8px_24px_rgba(24,76,86,0.035)] xl:min-h-0">
+      <CardHeading icon={Grid2X2} title="学习总览" />
+
+      <div className="relative mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+        {learningMetrics.map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <article
+              key={metric.label}
+              className="flex min-h-[104px] items-start gap-3 rounded-[13px] border border-[#e4eef0] bg-white/92 p-3 shadow-[0_5px_18px_rgba(33,83,93,0.025)]"
+            >
+              <span
+                className={cn(
+                  "grid h-9 w-9 shrink-0 place-items-center rounded-[11px]",
+                  metric.tone === "teal"
+                    ? "bg-[#e5f6f7] text-primary"
+                    : metric.tone === "blue"
+                      ? "bg-[#eaf3ff] text-[#3689e8]"
+                      : "bg-[#efefff] text-[#7770ef]",
+                )}
+              >
+                <Icon className="h-[18px] w-[18px]" aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[11.5px] text-kb-muted">{metric.label}</p>
+                <p className="mt-1 flex items-baseline gap-1 text-[26px] font-bold leading-none tracking-[-0.04em] text-kb-heading">
+                  <span>{metric.value}</span>
+                  {"suffix" in metric && metric.suffix ? (
+                    <span className="text-[12px] font-medium tracking-normal text-kb-muted">
+                      {metric.suffix}
+                    </span>
+                  ) : null}
+                </p>
+                {metric.delta ? (
+                  <p className="mt-2 flex items-center gap-1 text-[10.5px] text-kb-muted">
+                    较上周
+                    <span className="inline-flex items-center font-semibold text-primary">
+                      <ArrowUp className="h-3 w-3" aria-hidden />
+                      {metric.delta}
+                    </span>
+                  </p>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
       </div>
 
-      <div className="relative flex w-full min-w-0 flex-col">
-        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/15 bg-white/85 px-3 py-1 text-[12px] font-semibold text-primary">
-          <Clock3 className="h-3.5 w-3.5" aria-hidden /> 最近浏览
+      <div className="relative mt-2.5 flex items-center gap-3 text-[11.5px] text-kb-muted">
+        <span className="h-px min-w-6 flex-1 bg-gradient-to-r from-transparent to-kb-border" />
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden />
+          持续学习是成长的阶梯，积累每一次进步，成就更专业的自己！
         </span>
-        {hasRecentBrowse ? (
-          <>
-            <h2 className="mt-3.5 text-[24px] font-bold tracking-[-0.035em] text-kb-heading xl:text-[26px]">
-              继电保护装置配置原则
-            </h2>
-            <p className="mt-1.5 text-[13px] text-kb-muted">· 2小时前浏览</p>
-            {/* <p className="mt-3 text-[13px] text-[#607782]">上次浏览至第 28 页</p> */}
-            <Link
-              to="/learn/doc/$id"
-              params={{ id: "d5" }}
-              className="mt-auto inline-flex min-h-11 w-fit items-center gap-2 rounded-[10px] bg-primary px-5 text-[13.5px] font-semibold text-white shadow-[0_9px_22px_rgba(52,155,172,.22)] transition hover:-translate-y-0.5 hover:bg-[#2c91a2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 motion-reduce:transform-none"
-            >
-              继续查看 <ArrowRight className="h-4 w-4" aria-hidden />
-            </Link>
-          </>
-        ) : (
-          <>
-            <h2 className="mt-3.5 text-[24px] font-bold tracking-[-0.035em] text-kb-heading xl:text-[26px]">
-              暂无最近浏览
-            </h2>
-            <p className="mt-2 max-w-xl text-[13px] leading-6 text-kb-muted">
-              选择一个专题或学习资料开始学习，浏览记录将在这里展示，方便下次继续查看。
-            </p>
-            <div className="mt-auto flex flex-wrap gap-3">
-              <Link
-                to="/learn"
-                search={{ tab: "topic" }}
-                className="inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-primary px-5 text-[13.5px] font-semibold text-white shadow-[0_9px_22px_rgba(52,155,172,.22)] transition hover:-translate-y-0.5 hover:bg-[#2c91a2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 motion-reduce:transform-none"
-              >
-                浏览专题 <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
-              <Link
-                to="/learn"
-                search={{ tab: "materials" }}
-                className="inline-flex min-h-11 items-center rounded-[10px] border border-kb-border bg-white px-5 text-[13.5px] font-medium text-kb-body transition hover:border-primary/35 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              >
-                查看全部资料
-              </Link>
-            </div>
-          </>
-        )}
+        <span className="h-px min-w-6 flex-1 bg-gradient-to-r from-kb-border to-transparent" />
       </div>
-    </article>
+
+      <div className="relative mt-auto flex flex-wrap items-end gap-2.5 pt-2.5">
+        <Link
+          to="/learn"
+          search={{ tab: "topic" }}
+          className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-[9px] bg-primary px-5 text-[13px] font-semibold text-white shadow-[0_8px_18px_rgba(52,155,172,.2)] transition hover:-translate-y-0.5 hover:bg-[#2c91a2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 active:translate-y-px motion-reduce:transform-none"
+        >
+          <Play className="h-4 w-4 fill-current" aria-hidden />
+          进入专题学习
+        </Link>
+        <Link
+          to="/learn"
+          search={{ tab: "materials" }}
+          className="inline-flex min-h-10 items-center gap-2 whitespace-nowrap rounded-[9px] border border-[#b7cbd0] bg-white px-5 text-[13px] font-medium text-kb-body transition hover:border-primary/45 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 active:translate-y-px"
+        >
+          <FolderOpen className="h-4 w-4 text-primary" aria-hidden />
+          浏览全部资料
+        </Link>
+      </div>
+
+      <img
+        src={learningGridLandscape}
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute bottom-0 right-0 hidden h-[104px] w-[45%] object-cover object-right-bottom opacity-55 lg:block"
+        style={{marginBottom: '-20px'}}
+      />
+    </section>
+  );
+}
+function HeaderActions() {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {PENDING_REVIEW_COUNT > 0 ? (
+        <Link
+          to="/learn/submissions"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[#f5d9b8] bg-[#fff8ee] px-4 text-[13px] font-medium text-[#c07a1a] transition hover:border-[#e8b56a] hover:bg-[#fff3e0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300/50"
+        >
+          <FileQuestion className="h-4 w-4" aria-hidden />
+          {PENDING_REVIEW_COUNT} 条题目待审核
+        </Link>
+      ) : null}
+      <Link
+        to="/training/records"
+        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-kb-border bg-white px-4 text-[13px] font-medium text-kb-body shadow-[0_4px_16px_rgba(22,65,74,.04)] transition hover:border-primary/35 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      >
+        <History className="h-4 w-4" aria-hidden />
+        学习记录
+      </Link>
+    </div>
   );
 }
 
@@ -445,7 +521,8 @@ function RecentUpdates() {
 }
 
 function RecommendedMaterials() {
-  const docs = recommendedDocIds
+  // 3条
+  const docs = recommendedDocIds.slice(0, 3)
     .map((id) => DOCS.find((doc) => doc.id === id))
     .filter((doc): doc is NonNullable<typeof doc> => Boolean(doc));
 
@@ -606,32 +683,23 @@ function RecentSubmissions() {
 }
 
 export function LearningHome() {
-  const { state } = useMockStore();
-
   return (
     <LearningPageShell className="[&_h1]:font-semibold">
       <PageHeader
         title="学习首页"
-        subtitle="聚合最近浏览、可学专题、推荐资料与个人沉淀，快速继续学习。"
+        subtitle="聚合电力行业学习资料与专题，助力知识提升与能力成长。"
         size="md"
         className="mb-2 shrink-0"
-        action={
-          <Link
-            to="/training/records"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-kb-border bg-white px-4 text-[13px] font-medium text-kb-body shadow-[0_4px_16px_rgba(22,65,74,.04)] transition hover:border-primary/35 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-          >
-            <History className="h-4 w-4" /> 学习记录
-          </Link>
-        }
+        action={<HeaderActions />}
       />
 
       <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto xl:overflow-hidden">
-        <section className="grid gap-3 xl:min-h-0 xl:flex-[1.08] xl:grid-cols-[minmax(0,1.58fr)_minmax(410px,.98fr)]">
-          <RecentHero hasRecentBrowse={state.recentDocs.length > 0} />
+        <section className="grid gap-3 xl:min-h-0 xl:flex-[1.08] xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,.92fr)]">
+          <LearningOverview />
           <LearningEntry />
         </section>
 
-        <section className="grid min-h-0 gap-3 xl:flex-[1.06] xl:grid-cols-[minmax(0,1.58fr)_minmax(410px,.98fr)]">
+        <section className="grid min-h-0 gap-3 xl:flex-[1.06] xl:grid-cols-[minmax(0,1.35fr)_minmax(420px,1fr)]">
           <TopicRecommendations />
           <RecentUpdates />
         </section>

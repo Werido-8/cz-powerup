@@ -8,6 +8,7 @@ import {
   CircleAlert,
   ClipboardList,
   Clock3,
+  Grid2X2,
   History,
   Play,
   Sparkles,
@@ -32,36 +33,35 @@ const trainingTools = [
   {
     title: "专项练习",
     description: "按知识点即时练习",
-    action: "选择范围",
     to: "/training/practice" as const,
     icon: Target,
-    tone: "teal",
+    tone: "teal" as const,
   },
   {
     title: "AI 自主组卷",
     description: "描述需求，快速生成自测卷",
-    action: "智能组卷",
     to: "/training/custom-exam" as const,
     icon: Sparkles,
-    tone: "blue",
+    tone: "blue" as const,
   },
   {
     title: "正式考试",
     description: "查看单位下发的考试",
-    action: "查看安排",
     to: "/training/exam" as const,
     icon: ClipboardList,
-    tone: "slate",
+    tone: "slate" as const,
   },
   {
     title: "错题本",
     description: "集中复习未掌握题目",
-    action: "复习错题",
     to: "/training/wrong" as const,
     icon: BookMarked,
-    tone: "amber",
+    tone: "amber" as const,
   },
 ] as const;
+
+const trainingToolCardClass =
+  "group grid min-h-[88px] min-w-0 grid-cols-[36px_minmax(0,1fr)_16px] items-center gap-x-2.5 rounded-[12px] border border-[#e8eef0] bg-[#fafcfd] p-2.5 transition-colors hover:border-primary/25 hover:bg-[#f4f9fa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35";
 
 function TrainingHome() {
   const { state } = useMockStore();
@@ -90,7 +90,7 @@ function TrainingHome() {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto xl:overflow-hidden">
-          <section className="grid shrink-0 gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.62fr)] xl:items-stretch">
+          <section className="grid shrink-0 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,.92fr)] xl:items-stretch">
             <article className="relative flex h-full overflow-hidden rounded-[20px] border border-[#cfe4e8] bg-white p-4 shadow-[0_18px_50px_rgba(28,88,99,0.07)] xl:p-5">
               <div className="pointer-events-none absolute inset-y-0 right-0 w-[42%] bg-[radial-gradient(circle_at_72%_38%,rgba(52,155,172,.11),transparent_64%)]" />
               <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full border-[32px] border-primary/[0.055]" />
@@ -131,51 +131,51 @@ function TrainingHome() {
               </div>
             </article>
 
-            <aside className="flex min-h-0 flex-col rounded-[20px] border border-kb-border bg-white p-4 shadow-[0_14px_42px_rgba(28,65,72,0.05)]">
-              <div className="flex shrink-0 items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-[16px] font-semibold text-kb-heading">训练工具</h2>
-                  <p className="mt-0.5 text-[12px] text-kb-muted">需要时再选择，不打断今日任务</p>
+            <aside className="flex min-h-0 flex-col rounded-[16px] border border-kb-border bg-white p-3.5 shadow-[0_8px_24px_rgba(24,76,86,0.035)]">
+              <div className="flex min-h-8 items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <Grid2X2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-primary" aria-hidden />
+                  <div className="min-w-0">
+                    <h2 className="text-[15px] font-semibold leading-5 text-kb-heading">训练工具</h2>
+                    <p className="mt-0.5 text-[11.5px] text-kb-muted">常用功能快捷入口</p>
+                  </div>
                 </div>
-                <span className="grid h-8 w-8 place-items-center rounded-full bg-primary-soft text-primary">
-                  <Sparkles className="h-4 w-4" />
-                </span>
               </div>
               <nav
-                className="mt-2 flex min-h-0 flex-1 flex-col justify-between"
+                className="mt-2 grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-2"
                 aria-label="训练功能入口"
               >
                 {trainingTools.map((tool) => {
                   const Icon = tool.icon;
+                  const description =
+                    tool.title === "错题本" && wrongCount > 0
+                      ? `待复习 ${wrongCount} 题`
+                      : tool.description;
                   return (
-                    <Link
-                      key={tool.title}
-                      to={tool.to}
-                      className="group grid min-h-11 flex-1 grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-3 rounded-[12px] px-2.5 transition hover:bg-[#f2f8f9]"
-                    >
+                    <Link key={tool.title} to={tool.to} className={trainingToolCardClass}>
                       <span
                         className={cn(
-                          "grid h-9 w-9 place-items-center rounded-[10px]",
-                          tool.tone === "teal" && "bg-[#e3f4f6] text-primary",
-                          tool.tone === "blue" && "bg-[#e8f1fb] text-[#3e77a9]",
-                          tool.tone === "slate" && "bg-[#eef2f3] text-[#597079]",
-                          tool.tone === "amber" && "bg-[#fff1e1] text-[#b3681d]",
+                          "grid h-8 w-8 shrink-0 place-items-center rounded-[9px]",
+                          tool.tone === "teal" && "bg-[#e4f5f7] text-primary",
+                          tool.tone === "blue" && "bg-[#eaf3ff] text-[#3689e8]",
+                          tool.tone === "slate" && "bg-[#edf2f4] text-[#5b7480]",
+                          tool.tone === "amber" && "bg-[#fff3e6] text-[#f2a11f]",
                         )}
                       >
-                        <Icon className="h-[18px] w-[18px]" />
+                        <Icon className="h-[18px] w-[18px]" aria-hidden />
                       </span>
-                      <span className="min-w-0">
-                        <strong className="block text-[13.5px] text-kb-heading">
+                      <span className="min-w-0 overflow-hidden">
+                        <span className="block text-[13px] font-semibold leading-5 text-kb-heading group-hover:text-primary">
                           {tool.title}
-                        </strong>
-                        <span className="mt-0.5 block truncate text-[12px] text-kb-muted">
-                          {tool.description}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-4 text-kb-muted line-clamp-2">
+                          {description}
                         </span>
                       </span>
-                      <span className="flex items-center gap-0.5 text-[12px] font-medium text-primary opacity-0 transition group-hover:opacity-100">
-                        {tool.action}
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </span>
+                      <ChevronRight
+                        className="h-4 w-4 shrink-0 self-center text-kb-muted transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+                        aria-hidden
+                      />
                     </Link>
                   );
                 })}
@@ -183,7 +183,7 @@ function TrainingHome() {
             </aside>
           </section>
 
-          <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1.28fr)_minmax(300px,.72fr)] xl:items-stretch">
+          <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(420px,1fr)] xl:items-stretch">
             <article className="flex h-full min-h-0 flex-col rounded-[18px] border border-kb-border bg-white p-4">
               <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2.5">

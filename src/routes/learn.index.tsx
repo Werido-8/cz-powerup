@@ -375,14 +375,21 @@ function TopicWorkspace({
                   className="h-8 w-full rounded-md border border-kb-border bg-white pl-9 pr-3 text-[13px] text-kb-heading outline-none placeholder:text-kb-muted focus:border-primary/60 focus:ring-2 focus:ring-primary/10"
                 />
               </label>
-              <FilterComboSelect
-                options={SPECIALTIES.map((item) => ({ value: item.key, label: item.label }))}
-                value={specialtyDraft}
-                onChange={(value) => setSpecialtyDraft(value as SpecialtyKey)}
-                placeholder="选择专业"
-                searchPlaceholder="筛选专业"
-                className="h-8 min-h-8 min-w-[132px] rounded-md"
-              />
+
+              {
+                specialtyDraft == "all" && (
+                  <FilterComboSelect
+                    options={SPECIALTIES.map((item) => ({ value: item.key, label: item.label }))}
+                    value={specialtyDraft}
+                    onChange={(value) => setSpecialtyDraft(value as SpecialtyKey)}
+                    placeholder="选择专业"
+                    searchPlaceholder="筛选专业"
+                    className="h-8 min-h-8 min-w-[132px] rounded-md"
+                  />
+                )
+              }
+
+              
               <ActionButton type="submit" className="h-8 rounded-md px-3.5">
                 <Search className="h-3.5 w-3.5" aria-hidden />
                 查询
@@ -518,7 +525,7 @@ function TopicCard({ topic, state }: { topic: EnrichedTopic; state: MockState })
             {topic.roleTags.slice(0, 2).map((tag) => (
               <span
                 key={tag}
-                className="rounded border border-primary/20 bg-primary-soft/60 px-1.5 py-px text-[10px] text-primary"
+                className="rounded border border-primary/20 bg-primary-soft/60 px-1.5 py-px text-[12px] text-primary"
               >
                 {tag}
               </span>
@@ -600,7 +607,7 @@ function TopicListRow({ topic, state }: { topic: EnrichedTopic; state: MockState
         {topic.roleTags.slice(0, 2).map((tag) => (
           <span
             key={tag}
-            className="rounded border border-primary/20 bg-primary-soft/60 px-1.5 py-px text-[10px] text-primary"
+            className="rounded border border-primary/20 bg-primary-soft/60 px-1.5 py-px text-[12px] text-primary"
           >
             {tag}
           </span>
@@ -631,7 +638,7 @@ function TopicListRow({ topic, state }: { topic: EnrichedTopic; state: MockState
 
 function TopicUpdatedTag() {
   return (
-    <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] text-amber-700">
+    <span className="rounded border border-amber-200 bg-amber-50 px-1.5 py-px text-[12px] text-amber-700">
       专题更新
     </span>
   );

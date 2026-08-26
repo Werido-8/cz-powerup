@@ -30,6 +30,7 @@ import { Route as ExamAdminIndexRouteImport } from './routes/exam-admin.index'
 import { Route as TrainingWrongRouteImport } from './routes/training.wrong'
 import { Route as TrainingRecordsRouteImport } from './routes/training.records'
 import { Route as TrainingPracticeRouteImport } from './routes/training.practice'
+import { Route as TrainingIndexcopyRouteImport } from './routes/training.index copy'
 import { Route as TrainingGrowthRouteImport } from './routes/training.growth'
 import { Route as TrainingExamRouteImport } from './routes/training.exam'
 import { Route as TrainingCustomExamRouteImport } from './routes/training.custom-exam'
@@ -180,6 +181,11 @@ const TrainingRecordsRoute = TrainingRecordsRouteImport.update({
 const TrainingPracticeRoute = TrainingPracticeRouteImport.update({
   id: '/training/practice',
   path: '/training/practice',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrainingIndexcopyRoute = TrainingIndexcopyRouteImport.update({
+  id: '/training/index copy',
+  path: '/training/index copy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrainingGrowthRoute = TrainingGrowthRouteImport.update({
@@ -449,6 +455,7 @@ export interface FileRoutesByFullPath {
   '/training/custom-exam': typeof TrainingCustomExamRoute
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
+  '/training/index copy': typeof TrainingIndexcopyRoute
   '/training/practice': typeof TrainingPracticeRoute
   '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
@@ -513,6 +520,7 @@ export interface FileRoutesByTo {
   '/training/custom-exam': typeof TrainingCustomExamRoute
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
+  '/training/index copy': typeof TrainingIndexcopyRoute
   '/training/practice': typeof TrainingPracticeRoute
   '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
@@ -583,6 +591,7 @@ export interface FileRoutesById {
   '/training/custom-exam': typeof TrainingCustomExamRoute
   '/training/exam': typeof TrainingExamRoute
   '/training/growth': typeof TrainingGrowthRoute
+  '/training/index copy': typeof TrainingIndexcopyRoute
   '/training/practice': typeof TrainingPracticeRoute
   '/training/records': typeof TrainingRecordsRoute
   '/training/wrong': typeof TrainingWrongRoute
@@ -654,6 +663,7 @@ export interface FileRouteTypes {
     | '/training/custom-exam'
     | '/training/exam'
     | '/training/growth'
+    | '/training/index copy'
     | '/training/practice'
     | '/training/records'
     | '/training/wrong'
@@ -718,6 +728,7 @@ export interface FileRouteTypes {
     | '/training/custom-exam'
     | '/training/exam'
     | '/training/growth'
+    | '/training/index copy'
     | '/training/practice'
     | '/training/records'
     | '/training/wrong'
@@ -787,6 +798,7 @@ export interface FileRouteTypes {
     | '/training/custom-exam'
     | '/training/exam'
     | '/training/growth'
+    | '/training/index copy'
     | '/training/practice'
     | '/training/records'
     | '/training/wrong'
@@ -852,6 +864,7 @@ export interface RootRouteChildren {
   TrainingCustomExamRoute: typeof TrainingCustomExamRoute
   TrainingExamRoute: typeof TrainingExamRoute
   TrainingGrowthRoute: typeof TrainingGrowthRoute
+  TrainingIndexcopyRoute: typeof TrainingIndexcopyRoute
   TrainingPracticeRoute: typeof TrainingPracticeRoute
   TrainingRecordsRoute: typeof TrainingRecordsRoute
   TrainingWrongRoute: typeof TrainingWrongRoute
@@ -1014,6 +1027,13 @@ declare module '@tanstack/react-router' {
       path: '/training/practice'
       fullPath: '/training/practice'
       preLoaderRoute: typeof TrainingPracticeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/training/index copy': {
+      id: '/training/index copy'
+      path: '/training/index copy'
+      fullPath: '/training/index copy'
+      preLoaderRoute: typeof TrainingIndexcopyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/training/growth': {
@@ -1512,6 +1532,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrainingCustomExamRoute: TrainingCustomExamRoute,
   TrainingExamRoute: TrainingExamRoute,
   TrainingGrowthRoute: TrainingGrowthRoute,
+  TrainingIndexcopyRoute: TrainingIndexcopyRoute,
   TrainingPracticeRoute: TrainingPracticeRoute,
   TrainingRecordsRoute: TrainingRecordsRoute,
   TrainingWrongRoute: TrainingWrongRoute,
