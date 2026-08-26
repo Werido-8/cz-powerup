@@ -1,8 +1,12 @@
 import { DIFF_TYPE_META } from "@/lib/file-compare/meta";
-import type { DiffItem } from "@/lib/file-compare/types";
+import type { DiffType } from "@/lib/file-compare/types";
 
-/** 双栏之间的关联轨道，颜色与当前差异类型保持一致。 */
-export function DiffConnectionRail({ diff }: { diff?: DiffItem }) {
+/** 双栏之间的关联轨道：竖线 + 横线圆点，颜色随当前差异类型变化。 */
+export function DiffConnectionRail({
+  diff,
+}: {
+  diff?: { type: DiffType; title: string } | null;
+}) {
   const color = diff ? DIFF_TYPE_META[diff.type].chartColor : "#B8C7CC";
   return (
     <div

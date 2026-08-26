@@ -1,230 +1,235 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { ChevronRight, TrendingUp, BookMarked, BookOpen, RefreshCw, Check, X } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { TrainingResultView } from "@/components/training/training-result-view";
 import { PageShell } from "@/components/workbench/PageShell";
-import { QUESTIONS } from "@/lib/mock/data";
+import { QUESTIONS, type Question } from "@/lib/mock/data";
+import { PRACTICE_RECORDS } from "@/lib/mock/learning-hub";
+import type { SavedTrainingResult, TrainingResultQuestion } from "@/lib/training/result";
+import { resolveTrainingResultUpstream, trainingResultStorageKey } from "@/lib/training/result";
 
 export const Route = createFileRoute("/training/result/$id")({
   component: ResultPage,
   head: () => ({ meta: [{ title: "答题结果 · 训练中心" }] }),
 });
 
-type Saved = {
-  wrongIds: string[];
-  total: number;
-  answers: Record<string, string | string[]>;
-  qids: string[];
-  elapsed: number;
-  mode: "practice" | "exam" | "review";
+const EXAM_RESULT_MOCKS: Record<
+  string,
+  { title: string; score: number; count: number; elapsed: number; submittedAt: string }
+> = {
+  "exam-复证巩固-20260601": {
+    title: "复证巩固与调频控制考试",
+    score: 80,
+    count: 18,
+    elapsed: 1420,
+    submittedAt: "2026-06-01T14:28:00+08:00",
+  },
+  "exam-复证巩固-20260510": {
+    title: "复证巩固与调频控制考试",
+    score: 70,
+    count: 18,
+    elapsed: 1680,
+    submittedAt: "2026-05-10T10:52:00+08:00",
+  },
+  "exam-AGC-20260605": {
+    title: "AGC / 两细则取证复习考试",
+    score: 72,
+    count: 20,
+    elapsed: 1560,
+    submittedAt: "2026-06-05T15:26:00+08:00",
+  },
+  "exam-AGC-20260528": {
+    title: "AGC / 两细则取证复习考试",
+    score: 65,
+    count: 20,
+    elapsed: 1740,
+    submittedAt: "2026-05-28T10:29:00+08:00",
+  },
+  "exam-PSS-20260608": {
+    title: "PSS 参数与运行要求考试",
+    score: 85,
+    count: 16,
+    elapsed: 1320,
+    submittedAt: "2026-06-08T16:22:00+08:00",
+  },
+  "exam-黑启动-20260606": {
+    title: "黑启动与事故处置考试",
+    score: 78,
+    count: 18,
+    elapsed: 1580,
+    submittedAt: "2026-06-06T11:16:00+08:00",
+  },
+  "exam-黑启动-20260520": {
+    title: "黑启动与事故处置考试",
+    score: 68,
+    count: 18,
+    elapsed: 1720,
+    submittedAt: "2026-05-20T14:42:00+08:00",
+  },
+  "exam-厂用电-20260603": {
+    title: "厂用电切换与运行监视考试",
+    score: 92,
+    count: 15,
+    elapsed: 980,
+    submittedAt: "2026-06-03T09:16:00+08:00",
+  },
 };
 
-/** 智能考试历史作答的演示数据（无 session 时回退） */
-const EXAM_RESULT_MOCKS: Record<string, { score: number; count: number; elapsed: number }> = {
-  "exam-复证巩固-20260601": { score: 80, count: 18, elapsed: 1420 },
-  "exam-复证巩固-20260510": { score: 70, count: 18, elapsed: 1680 },
-  "exam-AGC-20260605": { score: 72, count: 20, elapsed: 1560 },
-  "exam-AGC-20260528": { score: 65, count: 20, elapsed: 1740 },
-  "exam-PSS-20260608": { score: 85, count: 16, elapsed: 1320 },
-  "exam-黑启动-20260606": { score: 78, count: 18, elapsed: 1580 },
-  "exam-黑启动-20260520": { score: 68, count: 18, elapsed: 1720 },
-  "exam-厂用电-20260603": { score: 92, count: 15, elapsed: 980 },
-};
+function questionSnapshot(question: Question): TrainingResultQuestion {
+  return {
+    id: question.id,
+    type: { single: "单选题", multiple: "多选题", judge: "判断题", text: "简答题" }[question.type],
+    stem: question.stem,
+    options: question.options,
+    answer: question.answer,
+    analysis: question.analysis,
+    knowledge: question.knowledgePoints.join(" / "),
+  };
+}
 
-function buildExamResultMock(meta: { score: number; count: number; elapsed: number }): Saved {
-  const qids = QUESTIONS.slice(0, meta.count).map((q) => q.id);
-  const wrongCount = Math.max(0, Math.round(meta.count * (1 - meta.score / 100)));
-  const wrongIds = qids.slice(0, wrongCount);
+function mockQuestions(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const source = QUESTIONS[index % QUESTIONS.length];
+    return { ...questionSnapshot(source), id: `${source.id}-mock-${index}` };
+  });
+}
+
+function buildMockResult(
+  id: string,
+  meta: { title: string; score: number; count: number; elapsed: number; submittedAt?: string },
+  sourceLabel: string,
+  kind: SavedTrainingResult["kind"],
+): SavedTrainingResult & { questions: TrainingResultQuestion[] } {
+  const questions = mockQuestions(meta.count);
+  const correctCount = Math.round((meta.count * meta.score) / 100);
+  const wrongCount = Math.max(0, meta.count - correctCount);
+  const wrongIds = questions.slice(0, wrongCount).map((question) => question.id);
+  const answers = Object.fromEntries(
+    questions.map((question, index) => {
+      const isWrong = index < wrongCount;
+      if (!isWrong) return [question.id, question.answer];
+      const keys = question.options?.map((option) => option.key) ?? [];
+      const correctKeys = Array.isArray(question.answer) ? question.answer : [question.answer];
+      return [question.id, keys.find((key) => !correctKeys.includes(key)) ?? ""];
+    }),
+  );
   return {
     wrongIds,
     total: meta.count,
-    answers: {},
-    qids,
+    answers,
+    qids: questions.map((question) => question.id),
     elapsed: meta.elapsed,
-    mode: "exam",
+    mode: kind === "formal" || kind === "custom" ? "exam" : "practice",
+    kind,
+    title: meta.title || decodeURIComponent(id),
+    sourceLabel,
+    submittedAt: meta.submittedAt,
+    passScore: kind === "practice" || kind === "file" || kind === "review" ? null : 60,
+    durationLimit: kind === "formal" || kind === "custom" ? 30 : 0,
+    score: kind === "practice" || kind === "file" || kind === "review" ? undefined : meta.score,
+    scoreMode: kind === "formal" || kind === "custom" ? "fixed" : undefined,
+    totalScore: kind === "formal" || kind === "custom" ? 100 : undefined,
+    questions,
   };
+}
+
+function getFallbackResult(id: string) {
+  const exam = EXAM_RESULT_MOCKS[id];
+  if (exam) return buildMockResult(id, exam, "正式考试", "formal");
+
+  const record = PRACTICE_RECORDS.find((item) => item.id === id);
+  if (record) {
+    return buildMockResult(
+      id,
+      {
+        title: record.title,
+        score: record.accuracy,
+        count: record.questionCount,
+        elapsed: Number.parseInt(record.duration, 10) * 60 || 0,
+        submittedAt: record.completedAt,
+      },
+      record.source === "模拟考试" ? "自主组卷" : "专项练习",
+      record.source === "模拟考试" ? "custom" : "practice",
+    );
+  }
+
+  return buildMockResult(
+    id,
+    { title: decodeURIComponent(id), score: 80, count: 10, elapsed: 8 * 60 },
+    "专项练习",
+    "practice",
+  );
 }
 
 function ResultPage() {
   const { id } = Route.useParams();
-  const [data, setData] = useState<Saved>({
-    wrongIds: [],
-    total: 10,
-    answers: {},
-    qids: [],
-    elapsed: 0,
-    mode: "practice",
-  });
+  const navigate = useNavigate();
+  const [stored, setStored] = useState<SavedTrainingResult>();
 
   useEffect(() => {
-    const raw = sessionStorage.getItem(`result-${id}`);
-    if (raw) {
-      setData(JSON.parse(raw));
+    const raw = sessionStorage.getItem(trainingResultStorageKey(id));
+    if (!raw) {
+      setStored(undefined);
       return;
     }
-    const mock = EXAM_RESULT_MOCKS[id];
-    if (mock) setData(buildExamResultMock(mock));
+    try {
+      setStored(JSON.parse(raw) as SavedTrainingResult);
+    } catch {
+      sessionStorage.removeItem(trainingResultStorageKey(id));
+      setStored(undefined);
+    }
   }, [id]);
 
-  const correct = data.total - data.wrongIds.length;
-  const score = Math.round((correct / data.total) * 100);
-  const wrong = QUESTIONS.filter((q) => data.wrongIds.includes(q.id));
-  const all = data.qids.map((qid) => QUESTIONS.find((q) => q.id === qid)!).filter(Boolean);
+  const result = useMemo(() => {
+    if (!stored) return getFallbackResult(id);
+    const questions =
+      stored.questions ??
+      stored.qids
+        .map((qid) => QUESTIONS.find((question) => question.id === qid))
+        .filter((question): question is Question => Boolean(question))
+        .map(questionSnapshot);
+    return { ...stored, questions };
+  }, [id, stored]);
 
-  const fmt = (s: number) => {
-    const m = Math.floor(s / 60)
-      .toString()
-      .padStart(2, "0");
-    const sec = (s % 60).toString().padStart(2, "0");
-    return `${m}:${sec}`;
+  const goBack = () => {
+    const upstream = resolveTrainingResultUpstream(result);
+    switch (upstream.type) {
+      case "file":
+        navigate({
+          to: "/knowledge/file/$fileId",
+          params: { fileId: upstream.fileId },
+          search: { kbId: upstream.knowledgeBaseId },
+        });
+        return;
+      case "topic":
+        navigate({ to: "/learn/topic/$id", params: { id: upstream.topicId } });
+        return;
+      case "doc":
+        navigate({ to: "/learn/doc/$id", params: { id: upstream.docId } });
+        return;
+      case "exam":
+        navigate({ to: "/training/exam" });
+        return;
+      case "custom-exam":
+        navigate({ to: "/training/custom-exam" });
+        return;
+      case "wrong":
+        navigate({ to: "/training/wrong" });
+        return;
+      case "practice":
+        navigate({ to: "/training/practice" });
+        return;
+      case "records":
+        navigate({ to: "/training/records", search: { source: "all" } });
+    }
   };
 
-  const passed = score >= 60;
-  const ringColor = passed
-    ? "from-primary to-[oklch(0.5_0.13_205)]"
-    : "from-warning to-[oklch(0.65_0.18_45)]";
-
   return (
-    <PageShell>
-      <div className="mb-6 grid gap-6 rounded-lg border border-border bg-card p-8 shadow-[var(--shadow-card)] md:grid-cols-3">
-        <div className="grid place-items-center">
-          <div
-            className={`relative grid h-32 w-32 place-items-center rounded-full bg-gradient-to-br ${ringColor} text-white shadow-[var(--shadow-glow)]`}
-          >
-            <div className="text-[36px] font-bold leading-none">{score}</div>
-            <div className="absolute bottom-7 text-[10px] opacity-80">/ 100</div>
-          </div>
-          <div className="mt-3 text-[12px] text-muted-foreground">{decodeURIComponent(id)}</div>
-          <div
-            className={`mt-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-              passed ? "bg-success-soft text-success" : "bg-warning-soft text-warning-foreground"
-            }`}
-          >
-            {passed ? "已通过" : "未达及格"}
-          </div>
-        </div>
-        <div className="md:col-span-2">
-          <h1 className="text-[20px] font-semibold">本次答题结果</h1>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <Stat label="正确率" value={`${score}%`} />
-            <Stat label="正确 / 总数" value={`${correct} / ${data.total}`} />
-            <Stat label="用时" value={fmt(data.elapsed)} />
-          </div>
-          <div className="mt-4">
-            <div className="mb-2 text-[12px] font-medium">薄弱知识点</div>
-            <div className="flex flex-wrap gap-2">
-              {Array.from(new Set(wrong.flatMap((w) => w.knowledgePoints))).map((k) => (
-                <span
-                  key={k}
-                  className="rounded-full border border-warning/30 bg-warning-soft px-2.5 py-1 text-[11px] text-warning-foreground"
-                >
-                  {k}
-                </span>
-              ))}
-              {wrong.length === 0 && (
-                <span className="text-[12px] text-muted-foreground">无，表现优秀!</span>
-              )}
-            </div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link
-              to="/training/wrong"
-              className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              <BookMarked className="h-3.5 w-3.5" /> 查看错题本
-            </Link>
-            {wrong.length > 0 && (
-              <Link
-                to="/training/session/$id"
-                params={{ id: `错题再练-${id}` }}
-                search={{ mode: "practice", filter: "", count: wrong.length, limit: 0 }}
-                className="inline-flex items-center gap-1 rounded-lg border border-border bg-background px-3 py-2 text-[12.5px] hover:bg-muted"
-              >
-                <RefreshCw className="h-3.5 w-3.5" /> 针对错题再练
-              </Link>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <h2 className="mb-3 text-[15px] font-semibold">逐题解析</h2>
-      <div className="space-y-3">
-        {all.map((q, i) => {
-          const ua = data.answers[q.id];
-          const isWrong = data.wrongIds.includes(q.id);
-          const fmtAns = (v: string | string[] | undefined) =>
-            v == null || v === "" || (Array.isArray(v) && v.length === 0)
-              ? "未作答"
-              : Array.isArray(v)
-                ? v.join("、")
-                : v === "T"
-                  ? "正确"
-                  : v === "F"
-                    ? "错误"
-                    : v;
-          return (
-            <div
-              key={q.id}
-              className={`rounded-lg border bg-card p-5 ${isWrong ? "border-destructive/30" : "border-border"}`}
-            >
-              <div className="flex items-start gap-3">
-                <span
-                  className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white ${
-                    isWrong ? "bg-destructive" : "bg-success"
-                  }`}
-                >
-                  {isWrong ? <X className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}
-                </span>
-                <div className="flex-1">
-                  <div className="mb-1 text-[11px] text-muted-foreground">
-                    第 {i + 1} 题 ·{" "}
-                    {{ single: "单选", multiple: "多选", judge: "判断", text: "简答" }[q.type]}
-                  </div>
-                  <div className="text-[13.5px] font-medium leading-relaxed">{q.stem}</div>
-                  <div className="mt-3 grid gap-1.5 text-[12.5px]">
-                    <div className={isWrong ? "text-destructive" : "text-success"}>
-                      你的答案:{fmtAns(ua)}
-                    </div>
-                    {q.type !== "text" && (
-                      <div className="text-success">
-                        正确答案:
-                        {Array.isArray(q.answer)
-                          ? q.answer.join("、")
-                          : q.answer === "T"
-                            ? "正确"
-                            : q.answer === "F"
-                              ? "错误"
-                              : q.answer}
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-2 rounded-lg bg-muted/40 p-3 text-[12.5px] text-foreground/80">
-                    <span className="font-medium">解析:</span> {q.analysis}
-                  </div>
-                  {q.relatedDocId && (
-                    <Link
-                      to="/learn/doc/$id"
-                      params={{ id: q.relatedDocId }}
-                      className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-primary hover:underline"
-                    >
-                      <BookOpen className="h-3 w-3" /> 查看依据资料{" "}
-                      <ChevronRight className="h-3 w-3" />
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+    <PageShell compact mainClassName="py-2">
+      <TrainingResultView
+        result={result}
+        onBack={goBack}
+        onViewWrong={() => navigate({ to: "/training/wrong" })}
+      />
     </PageShell>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-background p-4">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
-      <div className="mt-1 text-[20px] font-semibold tabular-nums">{value}</div>
-    </div>
   );
 }

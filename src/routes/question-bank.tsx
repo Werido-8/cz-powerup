@@ -35,16 +35,17 @@ function QuestionBankPage() {
   const [tab, setTab] = useState<TabKey>("bank");
   return (
     <TooltipProvider delayDuration={200}>
-      <PageShell>
+      <PageShell mainClassName="py-3">
         <div className="w-full">
           <PageHeader
             title="题库管理"
             subtitle="维护题目分类、来源与状态；审核通过后进入正式题库。"
             size="md"
+            className="mb-3"
           />
 
           <nav
-            className="mb-4 flex min-h-12 gap-7 border-b border-kb-border"
+            className="mb-3 flex min-h-10 gap-7 border-b border-divider"
             aria-label="题库管理工作区"
           >
             {TABS.map((item) => {
@@ -55,7 +56,7 @@ function QuestionBankPage() {
                   type="button"
                   onClick={() => setTab(item.key)}
                   className={cn(
-                    "relative inline-flex min-h-12 items-center gap-2 text-[13.5px] font-medium transition-colors",
+                    "relative inline-flex min-h-10 items-center gap-2 text-[13.5px] font-medium transition-colors",
                     active ? "text-primary" : "text-kb-muted hover:text-kb-heading",
                   )}
                   aria-current={active ? "page" : undefined}
@@ -70,13 +71,15 @@ function QuestionBankPage() {
                   >
                     {item.count}
                   </span>
-                  {active && <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary" />}
+                  {active && (
+                    <span className="absolute inset-x-0 -bottom-px h-0.5 bg-primary" />
+                  )}
                 </button>
               );
             })}
           </nav>
 
-          <div className="pt-1">{tab === "review" ? <ReviewModule /> : <BankModule />}</div>
+          {tab === "review" ? <ReviewModule /> : <BankModule />}
         </div>
       </PageShell>
     </TooltipProvider>

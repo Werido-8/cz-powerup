@@ -1,12 +1,12 @@
-import { createFileRoute, Link, notFound, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, redirect, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import {
-  ChevronRight,
   CheckCircle2,
   NotebookPen,
   Star,
   ChevronLeft,
+  ChevronRight,
   X,
   Sparkles,
   Target,
@@ -15,6 +15,7 @@ import {
   ListTree,
 } from "lucide-react";
 import { PageShell } from "@/components/workbench/PageShell";
+import { LearningBreadcrumb } from "@/components/learning/learning-breadcrumb";
 import { DOCS, QUESTIONS, TOPICS, type Doc } from "@/lib/mock/data";
 import { useMockStore } from "@/lib/mock/store";
 import {
@@ -32,13 +33,34 @@ import { RichMindMap } from "@/components/learn/RichMindMap";
 import { learningBtnRadius } from "@/components/learning/ui";
 import { MyQuestionContributionsPanel } from "@/components/learning/my-question-contributions";
 import { cn } from "@/lib/utils";
+import {
+  getLearningMaterialFileByDocId,
+  getLearningMaterialFiles,
+} from "@/lib/learning/material-files";
+import { buildFileDetailSearch } from "@/lib/knowledge/searchNav";
 
 const docSearchSchema = z.object({
   focus: z.enum(["contributions"]).optional().catch(undefined),
+  from: z.enum(["materials", "topic"]).optional().catch(undefined),
 });
 
 export const Route = createFileRoute("/learn/doc/$id")({
   validateSearch: docSearchSchema,
+  beforeLoad: ({ params, search }) => {
+    if (search.from !== "materials") return;
+    const file = getLearningMaterialFileByDocId(params.id);
+    if (!file) return;
+    throw redirect({
+      to: "/knowledge/file/$fileId",
+      params: { fileId: file.id },
+      search: buildFileDetailSearch(file, {
+        resultFiles: getLearningMaterialFiles(),
+        context: "learning-materials",
+        from: "/learn?tab=materials",
+      }),
+      replace: true,
+    });
+  },
   loader: ({ params }) => {
     const doc = DOCS.find((d) => d.id === params.id);
     if (!doc) throw notFound();
@@ -127,14 +149,27 @@ function DocPage() {
   const [addToColl, setAddToColl] = useState<string>("");
 
   const fav = state.favorites.includes(doc.id);
+  const from = search.from;
   const topic = TOPICS.find((t) => t.id === doc.topicId);
   const topicDocs = topic
     ? (topic.docIds.map((id) => DOCS.find((d) => d.id === id)).filter(Boolean) as Doc[])
     : [];
   const topicIdx = topicDocs.findIndex((d) => d.id === doc.id);
-  const prev = topicIdx > 0 ? topicDocs[topicIdx - 1] : undefined;
+  const showTopicNav = from === "topic" && Boolean(topic);
+  const prev = showTopicNav && topicIdx > 0 ? topicDocs[topicIdx - 1] : undefined;
   const next =
-    topicIdx >= 0 && topicIdx < topicDocs.length - 1 ? topicDocs[topicIdx + 1] : undefined;
+    showTopicNav && topicIdx >= 0 && topicIdx < topicDocs.length - 1
+      ? topicDocs[topicIdx + 1]
+      : undefined;
+  const docLinkSearch = from ? { from } : undefined;
+  const breadcrumbTrail = [
+    ...(from === "materials"
+      ? [{ label: "学习资料", to: "/learn" as const, search: { tab: "materials" as const } }]
+      : from === "topic" && topic
+        ? [{ label: topic.title, to: "/learn/topic/$id" as const, params: { id: topic.id } }]
+        : []),
+    { label: doc.title },
+  ];
   const relatedIds = getQuestionIdsForDoc(doc.id);
   const related = QUESTIONS.filter((q) => relatedIds.includes(q.id));
   const autoGradableQuestionIds = getAutoGradableQuestionIdsForDoc(doc.id);
@@ -165,22 +200,7 @@ function DocPage() {
 
   return (
     <PageShell>
-      {/* Breadcrumb */}
-      <nav className="mb-4 flex items-center gap-1 text-[12px] text-muted-foreground">
-        <Link to="/learn" className="hover:text-primary">
-          知识学习
-        </Link>
-        <ChevronRight className="h-3 w-3" />
-        {topic ? (
-          <>
-            <Link to="/learn/topic/$id" params={{ id: topic.id }} className="hover:text-primary">
-              {topic.title}
-            </Link>
-            <ChevronRight className="h-3 w-3" />
-          </>
-        ) : null}
-        <span className="truncate text-foreground">{doc.title}</span>
-      </nav>
+      <LearningBreadcrumb current="knowledge" trail={breadcrumbTrail} />
 
       <div className="grid gap-6 lg:grid-cols-12">
         {/* Main: header + 原文 */}
@@ -297,6 +317,7 @@ function DocPage() {
               <Link
                 to="/learn/doc/$id"
                 params={{ id: prev.id }}
+                search={docLinkSearch}
                 className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] hover:border-primary"
               >
                 <ChevronLeft className="h-3.5 w-3.5" /> 上一篇
@@ -304,7 +325,15 @@ function DocPage() {
             ) : (
               <span />
             )}
-            {topic && (
+            {from === "materials" ? (
+              <Link
+                to="/learn"
+                search={{ tab: "materials" }}
+                className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] hover:border-primary"
+              >
+                返回学习资料
+              </Link>
+            ) : showTopicNav && topic ? (
               <Link
                 to="/learn/topic/$id"
                 params={{ id: topic.id }}
@@ -312,11 +341,12 @@ function DocPage() {
               >
                 返回专题《{topic.title}》
               </Link>
-            )}
+            ) : null}
             {next ? (
               <Link
                 to="/learn/doc/$id"
                 params={{ id: next.id }}
+                search={docLinkSearch}
                 className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-3 py-2 text-[12.5px] hover:border-primary"
               >
                 下一篇 <ChevronRight className="h-3.5 w-3.5" />

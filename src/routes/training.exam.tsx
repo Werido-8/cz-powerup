@@ -3,15 +3,9 @@ import { useMemo, useState, type ReactNode } from "react";
 import {
   ClipboardList,
   Clock,
-  ShieldCheck,
-  AlertTriangle,
   Award,
   ChevronRight,
-  ChevronLeft,
   Search,
-  History,
-  ChevronDown,
-  ChevronUp,
   Target,
   BarChart3,
   FileText,
@@ -20,8 +14,8 @@ import {
   ListChecks,
   type LucideIcon,
 } from "lucide-react";
-import { PageShell } from "@/components/workbench/PageShell";
-import { PageHeader, listActionClass, PillSelect } from "@/components/learning/ui";
+import { TrainingPageFrame } from "@/components/learning/training-breadcrumb";
+import { PageHeader, PillSelect } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/exam")({
@@ -382,7 +376,7 @@ const GOALS: (ExamGoal | "全部")[] = [
 const STATUSES: (ExamStatus | "全部")[] = ["全部", "未开始", "已提交"];
 
 /** 左右栏固定高度（非 min-h），内容超出在内部滚动 */
-const PANEL_H = "h-[560px] max-h-[560px] lg:h-[calc(100vh-15.5rem)] lg:max-h-[calc(100vh-15.5rem)]";
+const PANEL_H = "min-h-0 flex-1";
 
 const selectClass =
   "h-8 rounded-md border border-border bg-card px-2 text-[12px] outline-none focus:border-primary/50";
@@ -411,7 +405,6 @@ function ExamPage() {
   const [goal, setGoal] = useState<ExamGoal | "全部">("全部");
   const [status, setStatus] = useState<ExamStatus | "全部">("全部");
   const [from, setFrom] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   const officialPapers = useMemo(() => PAPERS.filter((p) => p.goal !== "个人组卷"), []);
   const filtered = useMemo(() => {
@@ -443,24 +436,14 @@ function ExamPage() {
   const hasFilter = kw || goal !== "全部" || status !== "全部" || from;
 
   return (
-    <PageShell>
-      <nav aria-label="页面导航" className="mb-2 flex items-center gap-1 text-[12px]">
-        <Link
-          to="/training"
-          className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          训练中心
-        </Link>
-        <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
-        <span className="text-foreground/70">正式考试</span>
-      </nav>
+    <TrainingPageFrame current="exam">
       <PageHeader
         title="正式考试"
         subtitle="查看单位下发的考试安排、参加考试并回顾已提交答卷"
         size="md"
+        className="mb-3 shrink-0"
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
+      <div className="grid min-h-0 flex-1 gap-4 overflow-hidden lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
         <section
           className={cn(
             "flex flex-col overflow-hidden rounded-lg border border-border bg-card",
@@ -537,129 +520,51 @@ function ExamPage() {
                 )}
                 {filtered.map((p) => {
                   const active = p.id === picked;
-                  const open = expanded === p.id;
                   return (
-                    <div key={p.id}>
-                      <button
-                        type="button"
-                        onClick={() => setPicked(p.id)}
-                        className={cn(
-                          "flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors",
-                          active
-                            ? "border-primary/50 bg-primary-soft/60"
-                            : "border-border/80 bg-background hover:border-primary/30 hover:bg-muted/30",
-                        )}
-                      >
-                        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
-                          <ClipboardList className="h-4 w-4" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-[13.5px] font-medium">{p.title}</span>
-                            <span
-                              className={cn(
-                                "rounded px-1.5 py-px text-[10px] font-medium",
-                                statusPill(p.status),
-                              )}
-                            >
-                              {p.status}
-                            </span>
-                          </div>
-                          <ExamCardMeta
-                            goal={p.goal}
-                            count={p.count}
-                            limit={p.limit}
-                            assignedAt={p.assignedAt}
-                            dateVerb="下发"
-                          />
-                          {p.history.length > 0 && (
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpanded(open ? null : p.id);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.stopPropagation();
-                                  setExpanded(open ? null : p.id);
-                                }
-                              }}
-                              className="mt-1.5 inline-flex items-center gap-1 rounded border border-border/80 bg-card px-1.5 py-px text-[10.5px] text-primary hover:bg-muted"
-                            >
-                              <History className="h-3 w-3" />
-                              历史作答 {p.history.length} 次
-                              {open ? (
-                                <ChevronUp className="h-3 w-3" />
-                              ) : (
-                                <ChevronDown className="h-3 w-3" />
-                              )}
-                            </span>
-                          )}
-                        </div>
-                        <ChevronRight
-                          className={cn(
-                            "h-3.5 w-3.5 shrink-0",
-                            active ? "text-primary" : "text-muted-foreground/60",
-                          )}
-                        />
-                      </button>
-
-                      {open && p.history.length > 0 && (
-                        <div className="ml-12 mt-1 overflow-hidden rounded-md border border-border/80">
-                          <table className="w-full text-[11.5px]">
-                            <thead className="bg-muted/40 text-[10.5px] text-muted-foreground">
-                              <tr>
-                                <th className="px-2.5 py-1.5 text-left font-normal">下发时间</th>
-                                <th className="px-2.5 py-1.5 text-left font-normal">提交时间</th>
-                                <th className="px-2.5 py-1.5 text-left font-normal">分数</th>
-                                <th className="px-2.5 py-1.5 text-right font-normal">操作</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {p.history.map((h) => (
-                                <tr key={h.resultId} className="border-t border-border/60">
-                                  <td className="px-2.5 py-1.5">{h.assignedAt}</td>
-                                  <td className="px-2.5 py-1.5">{h.submittedAt ?? "-"}</td>
-                                  <td className="px-2.5 py-1.5 font-medium tabular-nums">
-                                    {h.score ?? "-"}
-                                  </td>
-                                  <td className="px-2.5 py-1.5 text-right">
-                                    {h.status === "已提交" && (
-                                      <Link
-                                        to="/training/result/$id"
-                                        params={{ id: h.resultId }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        className={listActionClass("textPrimary")}
-                                      >
-                                        <FileSearch className="h-3 w-3" />
-                                        查看详情
-                                      </Link>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setPicked(p.id)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors",
+                        active
+                          ? "border-primary/50 bg-primary-soft/60"
+                          : "border-border/80 bg-background hover:border-primary/30 hover:bg-muted/30",
                       )}
-                    </div>
+                    >
+                      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-primary-soft text-primary">
+                        <ClipboardList className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-[13.5px] font-medium">{p.title}</span>
+                          <span
+                            className={cn(
+                              "rounded px-1.5 py-px text-[10px] font-medium",
+                              statusPill(p.status),
+                            )}
+                          >
+                            {p.status}
+                          </span>
+                        </div>
+                        <ExamCardMeta
+                          goal={p.goal}
+                          count={p.count}
+                          limit={p.limit}
+                          assignedAt={p.assignedAt}
+                          dateVerb="下发"
+                        />
+                      </div>
+                      <ChevronRight
+                        className={cn(
+                          "h-3.5 w-3.5 shrink-0",
+                          active ? "text-primary" : "text-muted-foreground/60",
+                        )}
+                      />
+                    </button>
                   );
                 })}
               </div>
-            </div>
-
-            <div className="mt-4 shrink-0 rounded-md border border-warning/25 bg-warning-soft/30 p-3.5">
-              <div className="mb-1.5 inline-flex items-center gap-1.5 text-[12px] font-medium text-warning-foreground">
-                <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-                正式考试须知
-              </div>
-              <ul className="space-y-0.5 pl-4 text-[11.5px] leading-relaxed text-warning-foreground/85 [&>li]:list-disc">
-                <li>正式考试由培训负责人下发，请在规定时间内完成。</li>
-                <li>试卷限时，超时自动提交，提交前可回看修改。</li>
-                <li>考试成绩与作答记录会保留在正式考试档案中。</li>
-              </ul>
             </div>
           </div>
         </section>
@@ -706,27 +611,6 @@ function ExamPage() {
             )}
           </div>
 
-          <div className="shrink-0 border-b border-border/60 px-4 py-3.5">
-            <div className="inline-flex items-center gap-1.5 text-[12px] font-medium">
-              <ShieldCheck className="h-3.5 w-3.5 text-success" />
-              评分规则
-            </div>
-            <ul className="mt-2 space-y-1 text-[11px] leading-relaxed text-foreground/75">
-              <li className="flex gap-1.5">
-                <span className="shrink-0 text-muted-foreground">·</span>
-                <span>单选 / 判断：对得满分，错得 0 分</span>
-              </li>
-              <li className="flex gap-1.5">
-                <span className="shrink-0 text-muted-foreground">·</span>
-                <span>多选：全对得分，漏选半分，错选 0 分</span>
-              </li>
-              <li className="flex gap-1.5">
-                <span className="shrink-0 text-muted-foreground">·</span>
-                <span>简答：按要点匹配率给分</span>
-              </li>
-            </ul>
-          </div>
-
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">
             <div className="mb-2 text-[11px] font-medium text-muted-foreground">题型构成</div>
             <div className="space-y-1.5">
@@ -743,19 +627,14 @@ function ExamPage() {
 
           <div className="mt-auto shrink-0 border-t border-border/60 p-4">
             {paper.status === "已提交" && latestResultId ? (
-              <>
-                <Link
-                  to="/training/result/$id"
-                  params={{ id: latestResultId }}
-                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                >
-                  <FileSearch className="h-3.5 w-3.5" />
-                  查看作答详情
-                </Link>
-                <p className="mt-2 text-center text-[10.5px] text-muted-foreground">
-                  含得分、逐题解析与薄弱知识点
-                </p>
-              </>
+              <Link
+                to="/training/result/$id"
+                params={{ id: latestResultId }}
+                className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2.5 text-[13px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                <FileSearch className="h-3.5 w-3.5" />
+                查看作答详情
+              </Link>
             ) : (
               <button
                 type="button"
@@ -769,7 +648,7 @@ function ExamPage() {
           </div>
         </aside>
       </div>
-    </PageShell>
+    </TrainingPageFrame>
   );
 }
 

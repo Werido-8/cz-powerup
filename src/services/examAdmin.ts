@@ -11,7 +11,6 @@ import {
   EXAM_TEAMS,
   MOCK_ANALYTICS_EXAMS,
   MOCK_ANALYTICS_WEAKNESSES,
-  MOCK_DETAIL_NAMES,
   type MockAnalyticsSegment,
 } from "@/lib/mock/examAnalytics";
 import { safeRate } from "@/lib/exam-admin/format";
@@ -35,6 +34,21 @@ function round(value: number, digits = 1) {
   return Math.round(value * scale) / scale;
 }
 
+function specialtyForPaper(paper: Paper, specialtyIds: string[], teamIds: string[]) {
+  if (specialtyIds.includes("specialty-relay") || paper.category.includes("继电")) return "继电保护";
+  if (specialtyIds.includes("specialty-electrical") || teamIds.includes("team-maint")) {
+    return "电气专业";
+  }
+  if (specialtyIds.includes("specialty-grid") || paper.category.includes("调频") || paper.category.includes("调度")) {
+    return "涉网与调度";
+  }
+  if (specialtyIds.includes("specialty-safety")) return "安全管理";
+  if (specialtyIds.includes("specialty-operation")) return "运行专业";
+  return specialtyIds.length
+    ? (SPECIALTY_NAMES.get(specialtyIds[0]!) ?? "运行专业")
+    : "运行专业";
+}
+
 function mapPaperToTask(paper: Paper): ExamTask {
   const meta = EXAM_TASK_META[paper.id];
   const assignedCount = paper.assigned;
@@ -42,6 +56,9 @@ function mapPaperToTask(paper: Paper): ExamTask {
   const hasResult = submittedCount > 0;
   const scoreMode = meta?.scoreMode ?? "fixed";
   const hasComparableScore = scoreMode === "fixed";
+  const teamIds = meta?.teamIds ?? [];
+  const specialtyIds = meta?.specialtyIds ?? [];
+  const specialtyNames = specialtyIds.map((id) => SPECIALTY_NAMES.get(id) ?? "未归属");
 
   return {
     id: paper.id,
@@ -49,6 +66,9 @@ function mapPaperToTask(paper: Paper): ExamTask {
     name: paper.name,
     goal: paper.goal,
     category: paper.category,
+    specialty:
+      specialtyNames.filter((name) => name && name !== "未归属").join(" / ") ||
+      specialtyForPaper(paper, specialtyIds, teamIds),
     status:
       meta?.status ??
       (paper.status === "草稿" ? "draft" : paper.status === "已结束" ? "ended" : "inProgress"),
@@ -57,10 +77,10 @@ function mapPaperToTask(paper: Paper): ExamTask {
     scoreMode,
     totalScore: hasComparableScore ? (meta?.totalScore ?? 100) : null,
     scope: {
-      teamIds: meta?.teamIds ?? [],
-      teamNames: (meta?.teamIds ?? []).map((id) => TEAM_NAMES.get(id) ?? "未归属"),
-      specialtyIds: meta?.specialtyIds ?? [],
-      specialtyNames: (meta?.specialtyIds ?? []).map((id) => SPECIALTY_NAMES.get(id) ?? "未归属"),
+      teamIds,
+      teamNames: teamIds.map((id) => TEAM_NAMES.get(id) ?? "未归属"),
+      specialtyIds,
+      specialtyNames,
       assignedCount,
     },
     submittedCount,
@@ -85,6 +105,11 @@ export async function listExamTasks(query: ExamTaskQuery = {}): Promise<ExamTask
   const keyword = query.keyword?.trim().toLowerCase() ?? "";
   return ALL_TASKS.filter((task) => {
     if (query.status && query.status !== "all" && task.status !== query.status) return false;
+    if (query.goal && query.goal !== "all" && task.goal !== query.goal) return false;
+    if (query.specialty && query.specialty !== "all") {
+      const roleText = [task.specialty, ...task.scope.specialtyNames].join(" ");
+      if (!roleText.includes(query.specialty)) return false;
+    }
     if (query.teamId && !task.scope.teamIds.includes(query.teamId)) return false;
     if (query.specialtyId && !task.scope.specialtyIds.includes(query.specialtyId)) return false;
     if (!inTaskTimeRange(task, query.timeRange)) return false;
@@ -92,7 +117,7 @@ export async function listExamTasks(query: ExamTaskQuery = {}): Promise<ExamTask
     return [
       task.name,
       task.goal,
-      task.category,
+      task.specialty,
       ...task.scope.teamNames,
       ...task.scope.specialtyNames,
     ]
@@ -114,20 +139,19 @@ function mapRecordStatus(status: string): ExamPersonResult["status"] {
 }
 
 function specialtyForPerson(person: PersonAggregate) {
-  if (person.position.includes("继保")) return "继电保护";
-  if (person.position.includes("检修")) return "电气专业";
-  return "运行专业";
+  return person.specialty || "运行专业";
 }
 
 function mapAggregate(person: PersonAggregate): ExamPersonResult {
   const latest = person.records[0];
   const submitted = latest?.status === "已提交";
+  const specialtyName = specialtyForPerson(person);
   return {
     id: person.id,
     name: person.user,
     teamName: person.team || "未归属",
-    specialtyName: specialtyForPerson(person),
-    positionName: person.position,
+    specialtyName,
+    positionName: specialtyName,
     status: mapRecordStatus(latest?.status ?? "未开始"),
     submittedAt: latest?.submittedAt ?? null,
     score: submitted ? latest.score : null,
@@ -136,77 +160,24 @@ function mapAggregate(person: PersonAggregate): ExamPersonResult {
   };
 }
 
-function createFallbackPeople(task: ExamTask, existing: ExamPersonResult[]) {
-  const limit = Math.min(task.scope.assignedCount, MOCK_DETAIL_NAMES.length);
-  const submittedTarget = Math.min(task.submittedCount, limit);
-  const sortedExisting = [...existing]
-    .slice(0, limit)
-    .sort((a, b) => Number(b.status === "submitted") - Number(a.status === "submitted"));
-  const people = sortedExisting.map((person, index) => {
-    const shouldSubmit = index < submittedTarget;
-    if (!shouldSubmit) {
-      return person.status === "submitted"
-        ? {
-            ...person,
-            status: "notStarted" as const,
-            submittedAt: null,
-            score: null,
-            passed: null,
-            answerRoutePersonId: null,
-          }
-        : person;
-    }
-    if (person.status === "submitted") return person;
-    const score = Math.max(52, Math.min(96, (task.averageScore ?? 76) + ((index % 5) - 2) * 4));
-    return {
-      ...person,
-      status: "submitted" as const,
-      submittedAt: `${task.endsAt?.slice(0, 10) ?? task.updatedAt.slice(0, 10)} 16:${String(
-        10 + index,
-      ).padStart(2, "0")}`,
-      score,
-      passed: score >= 60,
-      answerRoutePersonId: null,
-    };
-  });
-  const existingNames = new Set(people.map((person) => person.name));
-  let submittedSeen = people.filter((person) => person.status === "submitted").length;
-
-  for (const [index, name] of MOCK_DETAIL_NAMES.entries()) {
-    if (people.length >= limit) break;
-    if (existingNames.has(name)) continue;
-    const shouldSubmit = submittedSeen < submittedTarget;
-    const score = shouldSubmit
-      ? Math.max(52, Math.min(96, (task.averageScore ?? 76) + ((index % 5) - 2) * 4))
-      : null;
-    if (shouldSubmit) submittedSeen += 1;
-    people.push({
-      id: `fixture-${task.id}-${index}`,
-      name,
-      teamName: task.scope.teamNames[index % Math.max(task.scope.teamNames.length, 1)] ?? "未归属",
-      specialtyName:
-        task.scope.specialtyNames[index % Math.max(task.scope.specialtyNames.length, 1)] ??
-        "未归属",
-      positionName: index % 4 === 0 ? "值班长" : "值班员",
-      status: shouldSubmit ? "submitted" : index % 2 === 0 ? "inProgress" : "notStarted",
-      submittedAt: shouldSubmit
-        ? `${task.endsAt?.slice(0, 10) ?? task.updatedAt.slice(0, 10)} 16:${String(10 + index).padStart(2, "0")}`
-        : null,
-      score,
-      passed: score == null ? null : score >= 60,
-      answerRoutePersonId: null,
-    });
-  }
-  return people;
-}
-
 export async function getExamDetail(examId: string): Promise<ExamDetail | null> {
   const task = await getExamTask(examId);
   if (!task) return null;
-  const aggregates = getAggregatesForPaper(task.paperId).map(mapAggregate);
-  const people = createFallbackPeople(task, aggregates).map((person) =>
-    task.scoreMode === "fixed" ? person : { ...person, score: null, passed: null },
-  );
+  const specialtyPool = task.scope.specialtyNames.filter((name) => name && name !== "未归属");
+  const people = getAggregatesForPaper(task.paperId)
+    .map(mapAggregate)
+    .map((person, index) => {
+      const withSpecialty =
+        specialtyPool.length > 0
+          ? {
+              ...person,
+              specialtyName: specialtyPool[index % specialtyPool.length]!,
+            }
+          : person;
+      return task.scoreMode === "fixed"
+        ? withSpecialty
+        : { ...withSpecialty, score: null, passed: null };
+    });
   const weaknessRows = MOCK_ANALYTICS_WEAKNESSES.filter((item) => item.examId === examId);
   const questionPerformance = (
     weaknessRows.length ? weaknessRows : MOCK_ANALYTICS_WEAKNESSES.slice(0, 4)
@@ -236,7 +207,7 @@ export async function getExamDetail(examId: string): Promise<ExamDetail | null> 
   return {
     task,
     people,
-    peopleTotal: task.scope.assignedCount,
+    peopleTotal: people.length || task.scope.assignedCount,
     questionPerformance,
     scoreDistribution,
   };

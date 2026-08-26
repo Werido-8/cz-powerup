@@ -13,6 +13,8 @@ type AssignPanelProps = {
   showDraft?: boolean;
   hideActions?: boolean;
   onSelectionChange?: (count: number) => void;
+  /** 填满父级剩余高度，表格在区域内滚动 */
+  fill?: boolean;
 };
 
 const SELECT_CLS =
@@ -25,20 +27,21 @@ export function AssignPanel({
   showDraft = true,
   hideActions = false,
   onSelectionChange,
+  fill = false,
 }: AssignPanelProps) {
   const [field, setField] = useState("");
   const [team, setTeam] = useState("");
-  const [position, setPosition] = useState("");
+  const [specialty, setSpecialty] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const teams = useMemo(() => Array.from(new Set(PERSONNEL.map((p) => p.team))), []);
-  const positions = useMemo(() => Array.from(new Set(PERSONNEL.map((p) => p.position))), []);
+  const specialties = useMemo(() => Array.from(new Set(PERSONNEL.map((p) => p.specialty))), []);
 
   const filtered = PERSONNEL.filter(
     (p) =>
       (!field || p.user.includes(field)) &&
       (!team || p.team === team) &&
-      (!position || p.position === position),
+      (!specialty || p.specialty === specialty),
   );
 
   const allFilteredSelected =
@@ -73,9 +76,9 @@ export function AssignPanel({
   }, [onSelectionChange, selected.size]);
 
   return (
-    <div className="space-y-4">
+    <div className={cn(fill ? "flex min-h-0 flex-1 flex-col gap-3" : "space-y-4")}>
       {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
         <div className="relative min-w-[180px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#9AAAB0]" />
           <Input
@@ -97,12 +100,12 @@ export function AssignPanel({
         </div>
         <div className="relative min-w-[140px]">
           <select
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
+            value={specialty}
+            onChange={(e) => setSpecialty(e.target.value)}
             className={SELECT_CLS}
           >
-            <option value="">全部岗位</option>
-            {positions.map((t) => (
+            <option value="">全部专业</option>
+            {specialties.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
@@ -130,9 +133,14 @@ export function AssignPanel({
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-[8px] border border-[#DCE8EA]">
+      <div
+        className={cn(
+          "overflow-hidden rounded-[8px] border border-[#DCE8EA]",
+          fill && "flex min-h-0 flex-1 flex-col",
+        )}
+      >
         {/* Table header */}
-        <div className="flex items-center border-b border-[#DCE8EA] bg-[#F5FAFB] px-4 py-2.5">
+        <div className="flex shrink-0 items-center border-b border-[#DCE8EA] bg-[#F5FAFB] px-4 py-2.5">
           <div className="mr-3 flex h-9 w-9 shrink-0 items-center justify-center">
             <input
               type="checkbox"
@@ -149,12 +157,17 @@ export function AssignPanel({
           <div className="grid flex-1 grid-cols-[minmax(80px,1fr)_minmax(100px,1.2fr)_minmax(100px,1fr)] gap-3">
             <span className="text-[12px] font-medium text-[#425B66]">姓名</span>
             <span className="text-[12px] font-medium text-[#425B66]">班组</span>
-            <span className="text-[12px] font-medium text-[#425B66]">岗位</span>
+            <span className="text-[12px] font-medium text-[#425B66]">专业</span>
           </div>
         </div>
 
         {/* Table body */}
-        <div className="max-h-[360px] overflow-y-auto">
+        <div
+          className={cn(
+            "overflow-y-auto",
+            fill ? "min-h-0 flex-1" : "max-h-[360px]",
+          )}
+        >
           {filtered.map((p) => {
             const isSelected = selected.has(p.id);
             return (
@@ -185,7 +198,7 @@ export function AssignPanel({
                   <span className="text-[13px] text-muted-foreground">{p.team}</span>
                   <span className="inline-flex">
                     <span className="rounded-full bg-[#F0F5F6] px-2 py-0.5 text-[11.5px] text-[#6B7F88]">
-                      {p.position}
+                      {p.specialty}
                     </span>
                   </span>
                 </div>
@@ -206,7 +219,7 @@ export function AssignPanel({
 
         {/* Table footer */}
         {filtered.length > 0 && (
-          <div className="flex items-center justify-between border-t border-[#EDF3F5] bg-[#F9FBFC] px-4 py-2">
+          <div className="flex shrink-0 items-center justify-between border-t border-[#EDF3F5] bg-[#F9FBFC] px-4 py-2">
             <span className="text-[12px] text-muted-foreground">
               共 {filtered.length} 人
               {filtered.length !== PERSONNEL.length && (

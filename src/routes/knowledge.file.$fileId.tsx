@@ -10,6 +10,7 @@ const fileSearchSchema = z.object({
   mode: z.enum(["fulltext", "filename"]).optional().catch(undefined),
   resultIds: z.array(z.string()).optional().catch(undefined),
   scope: z.enum(["personal-all", "professional-all"]).optional().catch(undefined),
+  context: z.enum(["learning-materials"]).optional().catch(undefined),
   from: z.string().optional().catch(undefined),
 });
 
@@ -42,6 +43,7 @@ function KnowledgeFileRoute() {
       searchMode={search.mode}
       searchResultIds={search.resultIds}
       searchScope={search.scope}
+      detailContext={search.context}
       returnFrom={search.from}
     />
   );

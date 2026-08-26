@@ -4,7 +4,6 @@ import {
   BookOpen,
   RotateCcw,
   ChevronRight,
-  ChevronLeft,
   ChevronDown,
   Trash2,
   Star,
@@ -13,7 +12,7 @@ import {
   Clock,
 } from "lucide-react";
 import { toast } from "sonner";
-import { PageShell } from "@/components/workbench/PageShell";
+import { TrainingPageFrame } from "@/components/learning/training-breadcrumb";
 import { DocDrawer } from "@/components/common/DocDrawer";
 import { DOCS, QUESTIONS, type Question } from "@/lib/mock/data";
 import { useMockStore } from "@/lib/mock/store";
@@ -151,23 +150,12 @@ function WrongPage() {
   );
 
   return (
-    <PageShell>
-      <nav aria-label="页面导航" className="mb-2 flex items-center gap-1 text-[12px]">
-        <Link
-          to="/training"
-          className="inline-flex items-center gap-0.5 text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" aria-hidden />
-          训练中心
-        </Link>
-        <ChevronRight className="h-3 w-3 text-muted-foreground/30" aria-hidden />
-        <span className="text-foreground/70">错题本</span>
-      </nav>
-
+    <TrainingPageFrame current="wrong">
       <PageHeader
         title="错题本"
         subtitle={`共 ${state.wrong.length} 题待巩固 · 支持按题型与知识点筛选复习`}
         size="md"
+        className="mb-3 shrink-0"
         action={
           state.wrong.length > 0 ? (
             <Link
@@ -187,8 +175,8 @@ function WrongPage() {
           ) : undefined
         }
       />
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <div className="flex flex-col gap-3 border-b border-border bg-muted/20 px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card">
+        <div className="flex shrink-0 flex-col gap-3 border-b border-border bg-muted/20 px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center">
           <PillSelect
             options={pillOptions}
             value={typeFilter}
@@ -211,7 +199,7 @@ function WrongPage() {
           </div>
         </div>
 
-        <div className="p-4">
+        <div className="scrollbar-thin min-h-0 flex-1 overflow-auto p-4">
           {filtered.length === 0 ? (
             <EmptyState description="当前筛选下没有错题，继续保持！" />
           ) : (
@@ -358,15 +346,6 @@ function WrongPage() {
                   </div>
                 );
               })}
-
-              <TableListPager
-                page={safePage}
-                totalPages={totalPages}
-                totalItems={filtered.length}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={setPageSize}
-              />
             </div>
           )}
 
@@ -382,9 +361,21 @@ function WrongPage() {
             。
           </p>
         </div>
+        {filtered.length > 0 && (
+          <div className="shrink-0">
+            <TableListPager
+              page={safePage}
+              totalPages={totalPages}
+              totalItems={filtered.length}
+              pageSize={pageSize}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+            />
+          </div>
+        )}
       </div>
 
       <DocDrawer doc={drawerDoc} onClose={() => setDrawerDocId(null)} />
-    </PageShell>
+    </TrainingPageFrame>
   );
 }

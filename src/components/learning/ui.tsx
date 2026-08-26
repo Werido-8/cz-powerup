@@ -1188,7 +1188,7 @@ export function SearchInput({
   );
 }
 
-/** 带「查询」按钮的搜索条，圆角较小，点击或回车触发 onSearch */
+/** 带「查询」按钮的搜索条，圆角较小，点击或回车触发 onSearch；extra 插在输入框与查询按钮之间 */
 export function SearchBar({
   value,
   onChange,
@@ -1196,6 +1196,7 @@ export function SearchBar({
   placeholder,
   className,
   buttonLabel = "查询",
+  extra,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -1203,9 +1204,10 @@ export function SearchBar({
   placeholder?: string;
   className?: string;
   buttonLabel?: string;
+  extra?: ReactNode;
 }) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-card px-3 transition-colors focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 sm:max-w-xs">
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         <input
@@ -1218,11 +1220,13 @@ export function SearchBar({
           className="min-w-0 flex-1 border-0 bg-transparent py-2 text-[13px] leading-normal outline-none placeholder:text-muted-foreground"
         />
       </div>
+      {extra}
       <button
         type="button"
         onClick={onSearch}
-        className="shrink-0 rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+        className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3.5 py-2 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90"
       >
+        <Search className="h-3.5 w-3.5" aria-hidden />
         {buttonLabel}
       </button>
     </div>
@@ -1659,7 +1663,7 @@ export function PillSelect({
   );
 }
 
-/** 选项较多时用可搜索下拉，视觉与 PillSelect 同系 */
+/** 选项较多时用可搜索下拉，视觉与 PillSelect 同系；searchable=false 时为普通下拉 */
 export function FilterComboSelect({
   options,
   value,
@@ -1667,6 +1671,7 @@ export function FilterComboSelect({
   className,
   placeholder = "全部分类",
   searchPlaceholder = "输入关键词筛选",
+  searchable = true,
 }: {
   options: { value: string; label: string }[];
   value: string;
@@ -1674,6 +1679,7 @@ export function FilterComboSelect({
   className?: string;
   placeholder?: string;
   searchPlaceholder?: string;
+  searchable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
@@ -1701,7 +1707,7 @@ export function FilterComboSelect({
       </PopoverTrigger>
       <PopoverContent className="w-[min(100vw-2rem,240px)] p-0" align="start">
         <Command>
-          <CommandInput placeholder={searchPlaceholder} className="h-9 text-[13px]" />
+          {searchable && <CommandInput placeholder={searchPlaceholder} className="h-9 text-[13px]" />}
           <CommandList>
             <CommandEmpty className="py-6 text-center text-[12px] text-muted-foreground">无匹配分类</CommandEmpty>
             <CommandGroup>

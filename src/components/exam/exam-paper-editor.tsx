@@ -61,7 +61,7 @@ interface PaperBasicInfo {
   name: string;
   goal: ExamGoal;
   category: string;
-  position: string;
+  specialty: string;
   duration: string;
   passLine: string;
   difficulty: Difficulty | "";
@@ -72,7 +72,7 @@ const EMPTY_BASIC_INFO: PaperBasicInfo = {
   name: "",
   goal: "取证复习",
   category: "",
-  position: "",
+  specialty: "",
   duration: "",
   passLine: "60",
   difficulty: "",
@@ -83,7 +83,7 @@ const AI_GENERATED_BASIC_INFO: PaperBasicInfo = {
   name: "AGC / 两细则取证复习考试",
   goal: "取证复习",
   category: "调频调压",
-  position: "值班员 / 值班长",
+  specialty: "运行专业",
   duration: "30",
   passLine: "60",
   difficulty: "中",
@@ -178,7 +178,7 @@ export function ExamPaperEditor({
         name: paper.name,
         goal: paper.goal,
         category: paper.category,
-        position: "值班员 / 值班长",
+        specialty: "运行专业",
         duration: String(paper.duration),
         passLine: "60",
         difficulty: "中",
@@ -230,7 +230,7 @@ export function ExamPaperEditor({
       name: basicInfo.name,
       goal: basicInfo.goal,
       category: basicInfo.category,
-      position: basicInfo.position,
+      specialty: basicInfo.specialty,
       difficulty: basicInfo.difficulty,
       questionType: pendingAppendType,
       gapCount,
@@ -371,11 +371,11 @@ export function ExamPaperEditor({
                   </Select>
                 </div>
                 <div>
-                  <FieldLabel>适用岗位</FieldLabel>
+                  <FieldLabel>适用专业</FieldLabel>
                   <Input
-                    value={basicInfo.position}
-                    onChange={(e) => updateBasicInfo("position", e.target.value)}
-                    placeholder="如：值班员 / 值班长"
+                    value={basicInfo.specialty}
+                    onChange={(e) => updateBasicInfo("specialty", e.target.value)}
+                    placeholder="如：运行专业"
                     className="h-9 text-[13px]"
                   />
                 </div>

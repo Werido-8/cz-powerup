@@ -1,12 +1,14 @@
 import type { FileSearchMode, KnowledgeBase, KnowledgeFile } from "./types";
 
 export type FileDetailSearchScope = "personal-all" | "professional-all";
+export type FileDetailContext = "learning-materials";
 
 export type FileDetailSearchOptions = {
   query?: string;
   searchMode?: FileSearchMode;
   resultFiles?: KnowledgeFile[];
   scope?: FileDetailSearchScope;
+  context?: FileDetailContext;
   /** 打开详情页前的列表页地址，用于返回时回到上层来源页 */
   from?: string;
 };
@@ -27,6 +29,7 @@ export function buildFileDetailSearch(file: KnowledgeFile, opts: FileDetailSearc
     ...(trimmed ? { q: trimmed, mode: opts.searchMode ?? "filename" } : {}),
     ...(hasResultList ? { resultIds } : {}),
     ...(opts.scope ? { scope: opts.scope } : {}),
+    ...(opts.context ? { context: opts.context } : {}),
     ...(opts.from ? { from: opts.from } : {}),
   };
 }

@@ -1,3 +1,5 @@
+import type { ExamScoreMode } from "@/lib/exam-admin/types";
+import { EXAM_TASK_META } from "@/lib/mock/examAnalytics";
 import {
   EDITOR_GROUPS,
   PAPERS,
@@ -22,11 +24,36 @@ export interface ExamSessionPaper {
   title: string;
   groups: EditorGroup[];
   duration: number;
-  passLine: number;
+  passLine: number | null;
+  scoreMode: ExamScoreMode;
+  totalScore: number | null;
   goal: string;
   category: string;
   difficulty: string;
   questionCount: number;
+}
+
+export function examPaperTotalScore(groups: EditorGroup[]) {
+  return groups.reduce(
+    (sum, group) =>
+      sum +
+      group.questions.reduce((groupSum, question) => groupSum + (question.score ?? group.perScore), 0),
+    0,
+  );
+}
+
+export function scoreExamAnswers(
+  items: ReturnType<typeof flattenExamQuestions>,
+  answers: Record<string, string | string[]>,
+  wrongIds: string[],
+) {
+  const wrongSet = new Set(wrongIds);
+  return items.reduce((sum, { groupType, question }) => {
+    if (groupType === "简答题" || groupType === "案例分析题" || groupType === "填空题") return sum;
+    if (!isExamAnswerFilled(answers[question.id])) return sum;
+    if (wrongSet.has(question.id)) return sum;
+    return sum + (question.score ?? 0);
+  }, 0);
 }
 
 export function parseEmployeePaperId(sessionId: string): string | null {
@@ -43,6 +70,8 @@ export function resolveExamSessionPaper(sessionId: string): ExamSessionPaper | n
   const adminPaper = PAPERS.find((p) => p.id === adminPaperId);
   const groups = getPaperQuestionGroups(adminPaperId);
   const questionCount = groups.reduce((s, g) => s + g.questions.length, 0);
+  const scoreMode = EXAM_TASK_META[adminPaperId]?.scoreMode ?? "fixed";
+  const computedTotal = examPaperTotalScore(groups);
 
   return {
     employeePaperId,
@@ -50,7 +79,12 @@ export function resolveExamSessionPaper(sessionId: string): ExamSessionPaper | n
     title: adminPaper?.name ?? employeePaperId,
     groups,
     duration: adminPaper?.duration ?? 30,
-    passLine: 60,
+    passLine: scoreMode === "fixed" ? 60 : null,
+    scoreMode,
+    totalScore:
+      scoreMode === "fixed"
+        ? (EXAM_TASK_META[adminPaperId]?.totalScore ?? computedTotal || 100)
+        : null,
     goal: adminPaper?.goal ?? "取证复习",
     category: adminPaper?.category ?? "-",
     difficulty: "中",
@@ -126,6 +160,7 @@ export function fallbackExamSessionPaper(
     return { ...group, questions };
   });
   const questionCount = groups.reduce((sum, group) => sum + group.questions.length, 0);
+  const computedTotal = examPaperTotalScore(groups);
   return {
     employeePaperId: "default",
     adminPaperId: "p1",
@@ -133,6 +168,8 @@ export function fallbackExamSessionPaper(
     groups,
     duration: duration || 30,
     passLine,
+    scoreMode: "fixed",
+    totalScore: computedTotal || 100,
     goal,
     category,
     difficulty,

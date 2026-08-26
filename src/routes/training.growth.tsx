@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   CalendarDays,
   CheckCircle2,
-  ChevronLeft,
   ChevronRight,
   Flame,
   Target,
@@ -21,7 +20,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { PageShell } from "@/components/workbench/PageShell";
+import { TrainingPageFrame } from "@/components/learning/training-breadcrumb";
 import { PageHeader } from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 
@@ -176,22 +175,12 @@ function GrowthFeedbackPage() {
   const chartData = useMemo(() => current.trend.map((item) => ({ ...item })), [current]);
 
   return (
-    <PageShell>
-      <nav aria-label="页面导航" className="mb-2 flex items-center gap-1 text-[12px]">
-        <Link
-          to="/training"
-          className="inline-flex items-center gap-0.5 text-kb-muted hover:text-primary"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" /> 训练中心
-        </Link>
-        <ChevronRight className="h-3 w-3 text-kb-muted/35" />
-        <span className="text-kb-body">成长反馈</span>
-      </nav>
-
+    <TrainingPageFrame current="growth">
       <PageHeader
         title="成长反馈"
         subtitle="基于实际练习与正式考试数据，查看题量、正确率和薄弱知识点变化。"
         size="md"
+        className="mb-3 shrink-0"
         action={
           <div
             className="inline-flex rounded-[9px] border border-kb-border bg-white p-1"
@@ -218,6 +207,7 @@ function GrowthFeedbackPage() {
         }
       />
 
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto xl:overflow-hidden">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="训练指标概览">
         <MetricCard
           icon={Target}
@@ -410,6 +400,7 @@ function GrowthFeedbackPage() {
           </table>
         </div>
       </section>
-    </PageShell>
+      </div>
+    </TrainingPageFrame>
   );
 }

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
+  AlertTriangle,
   BarChart3,
-  CheckCircle2,
   Clock,
   FileText,
   Flag,
@@ -9,6 +9,7 @@ import {
   Target,
   X,
 } from "lucide-react";
+import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import {
   flattenExamQuestions,
   isExamAnswerFilled,
@@ -162,7 +163,9 @@ export function ExamSessionPaperView({
 }) {
   const flat = useMemo(() => flattenExamQuestions(groups), [groups]);
   const [activeQuestionId, setActiveQuestionId] = useState(flat[0]?.question.id ?? "");
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
   const answered = flat.filter((item) => isExamAnswerFilled(answers[item.question.id])).length;
+  const unansweredItems = flat.filter((item) => !isExamAnswerFilled(answers[item.question.id]));
   const personal = meta.employeePaperId === "default";
   const timerUrgent = remaining > 0 && remaining < 300;
   const totalScore = groups.reduce(
@@ -297,7 +300,7 @@ export function ExamSessionPaperView({
         </article>
 
         <aside className="flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-kb-border bg-white lg:h-full">
-          <div className="shrink-0 bg-[linear-gradient(135deg,#0c98a7_0%,#078a99_100%)] p-5 text-white">
+          <div className="shrink-0 bg-[linear-gradient(135deg,#0c98a7_0%,#078a99_100%)] px-4 py-4 text-white">
             <p className="flex items-center gap-2 text-[11.5px] font-medium text-white/85">
               <ShieldCheck className="h-4 w-4" /> 考试中
             </p>
@@ -305,7 +308,11 @@ export function ExamSessionPaperView({
             <dl className="mt-4 grid grid-cols-3 gap-2">
               <StatusMetric value={`${flat.length}`} label="题量" inverse />
               <StatusMetric value={`${meta.duration}`} label="分钟" inverse />
-              <StatusMetric value={`${meta.passLine}`} label="及格线" inverse />
+              <StatusMetric
+                value={meta.passLine == null ? "—" : `${meta.passLine}`}
+                label="及格线"
+                inverse
+              />
             </dl>
           </div>
 
@@ -325,100 +332,152 @@ export function ExamSessionPaperView({
             </div>
           </div>
 
-          <dl className="grid shrink-0 grid-cols-2 gap-4 border-b border-kb-border p-4 text-[11.5px]">
+          <dl className="grid shrink-0 grid-cols-2 gap-x-3 gap-y-2 border-b border-kb-border px-4 py-3 text-[11.5px]">
             <InfoItem icon={Target} label="考试目标" value={meta.goal} />
             <InfoItem icon={BarChart3} label="难度" value={meta.difficulty} />
             <InfoItem icon={FileText} label="知识分类" value={meta.category} />
             <InfoItem icon={ShieldCheck} label="答题进度" value={`${answered} / ${flat.length}`} />
           </dl>
 
-          <div className="min-h-0 flex-1 overflow-y-auto border-b border-kb-border p-4">
-            <div className="mb-3 flex items-center justify-between text-[11px] text-kb-muted">
-              <span>答题卡</span>
-              <span>
-                已答 {answered} / {flat.length}
-              </span>
-            </div>
-            <div className="space-y-4">
-              {groups
-                .filter((group) => group.questions.length > 0)
-                .map((group) => (
-                  <div key={group.type}>
-                    <div className="mb-2 flex items-center justify-between text-[10.5px] text-kb-muted">
-                      <span>{group.type}</span>
-                      <span>{group.questions.length} 题</span>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="mb-3 flex items-center justify-between text-[11px] text-kb-muted">
+                <span>答题卡</span>
+                <span>
+                  已答 {answered} / {flat.length}
+                </span>
+              </div>
+              <div className="space-y-4">
+                {groups
+                  .filter((group) => group.questions.length > 0)
+                  .map((group) => (
+                    <div key={group.type}>
+                      <div className="mb-2 flex items-center justify-between text-[10.5px] text-kb-muted">
+                        <span>{group.type}</span>
+                        <span>{group.questions.length} 题</span>
+                      </div>
+                      <div className="grid grid-cols-5 gap-2">
+                        {group.questions.map((question) => {
+                          const item = flat.find((entry) => entry.question.id === question.id);
+                          const filled = isExamAnswerFilled(answers[question.id]);
+                          return (
+                            <button
+                              key={question.id}
+                              type="button"
+                              onClick={() => jumpToQuestion(question.id)}
+                              aria-current={activeQuestionId === question.id ? "step" : undefined}
+                              aria-label={`跳转到第 ${item?.globalNo ?? ""} 题${filled ? "，已作答" : ""}`}
+                              className={cn(
+                                "grid h-9 place-items-center rounded-[7px] border text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                                activeQuestionId === question.id
+                                  ? "border-primary bg-primary text-white"
+                                  : filled
+                                    ? "border-success/10 bg-success-soft text-success"
+                                    : "border-transparent bg-kb-surface text-kb-muted hover:bg-primary-soft hover:text-primary",
+                              )}
+                            >
+                              {item?.globalNo}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="grid grid-cols-5 gap-2">
-                      {group.questions.map((question) => {
-                        const item = flat.find((entry) => entry.question.id === question.id);
-                        const filled = isExamAnswerFilled(answers[question.id]);
-                        return (
-                          <button
-                            key={question.id}
-                            type="button"
-                            onClick={() => jumpToQuestion(question.id)}
-                            aria-current={activeQuestionId === question.id ? "step" : undefined}
-                            aria-label={`跳转到第 ${item?.globalNo ?? ""} 题${filled ? "，已作答" : ""}`}
-                            className={cn(
-                              "grid h-9 place-items-center rounded-[7px] border text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
-                              activeQuestionId === question.id
-                                ? "border-primary bg-primary text-white"
-                                : filled
-                                  ? "border-success/10 bg-success-soft text-success"
-                                  : "border-transparent bg-kb-surface text-kb-muted hover:bg-primary-soft hover:text-primary",
-                            )}
-                          >
-                            {item?.globalNo}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+              </div>
+
+              <div className="mt-5 border-t border-kb-border pt-4">
+                <p className="mb-3 text-[11px] text-kb-muted">题型构成</p>
+                <div className="space-y-2">
+                  {groups
+                    .filter((group) => group.questions.length > 0)
+                    .map((group) => (
+                      <div
+                        key={group.type}
+                        className="grid grid-cols-[52px_minmax(0,1fr)_42px] items-center gap-2 text-[10.5px]"
+                      >
+                        <span className="text-kb-body">{group.type.replace("题", "")}</span>
+                        <span className="h-1.5 overflow-hidden rounded-full bg-kb-surface">
+                          <span
+                            className="block h-full rounded-full bg-primary/60"
+                            style={{
+                              width: `${Math.max(10, (group.questions.length / maxGroupCount) * 100)}%`,
+                            }}
+                          />
+                        </span>
+                        <span className="text-right tabular-nums text-kb-muted">
+                          {group.questions.length} 题
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="shrink-0 border-b border-kb-border p-4">
-            <p className="mb-3 text-[11px] text-kb-muted">题型构成</p>
-            <div className="space-y-2">
-              {groups
-                .filter((group) => group.questions.length > 0)
-                .map((group) => (
-                  <div
-                    key={group.type}
-                    className="grid grid-cols-[52px_minmax(0,1fr)_42px] items-center gap-2 text-[10.5px]"
-                  >
-                    <span className="text-kb-body">{group.type.replace("题", "")}</span>
-                    <span className="h-1.5 overflow-hidden rounded-full bg-kb-surface">
-                      <span
-                        className="block h-full rounded-full bg-primary/60"
-                        style={{
-                          width: `${Math.max(10, (group.questions.length / maxGroupCount) * 100)}%`,
-                        }}
-                      />
-                    </span>
-                    <span className="text-right tabular-nums text-kb-muted">
-                      {group.questions.length} 题
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          <div className="shrink-0 p-4">
+          <div className="shrink-0 border-t border-kb-border p-4">
             <button
               type="button"
-              onClick={onSubmit}
+              onClick={() => setConfirmSubmit(true)}
               className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-primary text-[13px] font-semibold text-white transition-colors hover:bg-primary/90"
             >
-              <Flag className="h-4 w-4" /> 统一交卷
+              <Flag className="h-4 w-4" /> 交卷
             </button>
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[10.5px] leading-5 text-kb-muted">
-              <CheckCircle2 className="h-3.5 w-3.5 text-success" /> 交卷前可回看并修改全部答案
-            </p>
           </div>
         </aside>
       </div>
+
+      <AppFormDialog
+        open={confirmSubmit}
+        size="small"
+        variant="confirm"
+        title="确认交卷？"
+        titleIcon={AlertTriangle}
+        onClose={() => setConfirmSubmit(false)}
+        footer={
+          <>
+            <AppDialogButton
+              variant="outline"
+              onClick={() => {
+                setConfirmSubmit(false);
+                if (unansweredItems[0]) jumpToQuestion(unansweredItems[0].question.id);
+              }}
+            >
+              返回作答
+            </AppDialogButton>
+            <AppDialogButton
+              variant="primary"
+              onClick={() => {
+                setConfirmSubmit(false);
+                onSubmit();
+              }}
+            >
+              确认交卷
+            </AppDialogButton>
+          </>
+        }
+      >
+        <div className="space-y-2 px-6 py-4 text-[13.5px] leading-relaxed text-[#526670]">
+          {unansweredItems.length > 0 ? (
+            <>
+              <p>
+                还有{" "}
+                <strong className="font-semibold text-foreground">{unansweredItems.length}</strong>{" "}
+                道题未作答，交卷后将无法继续修改。
+              </p>
+              <p className="text-[12.5px] text-kb-muted">
+                未答题号：
+                {unansweredItems
+                  .slice(0, 16)
+                  .map((item) => item.globalNo)
+                  .join("、")}
+                {unansweredItems.length > 16 ? "…" : ""}
+              </p>
+            </>
+          ) : (
+            <p>全部题目已作答，交卷后将无法继续修改。确认交卷？</p>
+          )}
+        </div>
+      </AppFormDialog>
     </div>
   );
 }

@@ -16,8 +16,8 @@ export interface AiDraftParams {
   goal: string;
   /** 分类 */
   category: string;
-  /** 适用岗位（多个） */
-  positions: string[];
+  /** 适用专业（多个） */
+  specialties: string[];
   /** 题目总数 */
   totalCount: number;
   /** 各题型分配数量 */
@@ -192,7 +192,7 @@ export async function generateExamDraft(params: AiDraftParams): Promise<AiExamDr
     throw new Error("请先填写组卷需求");
   }
 
-  const posStr = params.positions.filter(Boolean).join("、") || "值班员";
+  const specialtyStr = params.specialties.filter(Boolean).join("、") || "运行专业";
   const name = [params.category, params.goal].filter(Boolean).join(" · ") + " 考试";
 
   const groups = buildGroups(params);
@@ -205,7 +205,7 @@ export async function generateExamDraft(params: AiDraftParams): Promise<AiExamDr
     name,
     goal: (params.goal || "取证复习") as PaperBasicInfo["goal"],
     category: params.category,
-    position: posStr,
+    specialty: specialtyStr,
     duration: String(params.duration),
     passLine: String(Math.min(params.passScore, totalScore)),
     scoreMode: "fixed",

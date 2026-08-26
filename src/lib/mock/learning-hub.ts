@@ -5,8 +5,7 @@ export type PracticeSource =
   | "智能问答生成"
   | "知识学习推荐"
   | "知识学习生成"
-  | "错题本"
-  | "推荐路径";
+  | "错题本";
 
 export type RecommendedPractice = {
   id: string;
@@ -234,7 +233,7 @@ export const RECOMMENDED_PRACTICES: RecommendedPractice[] = [
     tags: ["一次调频", "AVC", "无功考核"],
     source: "智能问答生成",
     progress: 42,
-    filter: "一次调频",
+    filter: "一次调频,AVC",
   },
   {
     id: "rp3",
@@ -264,7 +263,7 @@ export const PRACTICE_RECORDS: PracticeRecord[] = [
   {
     id: "pr1",
     title: "AGC 考核依据专项练习",
-    source: "智能问答生成",
+    source: "专题练习",
     completedAt: "今天 14:30",
     questionCount: 5,
     accuracy: 80,
@@ -286,13 +285,79 @@ export const PRACTICE_RECORDS: PracticeRecord[] = [
   {
     id: "pr4",
     title: "运行基础模拟卷",
-    source: "模拟考试",
+    source: "自主考试",
     completedAt: "3 天前",
     questionCount: 20,
     accuracy: 82,
     wrongCount: 4,
     duration: "28 分钟",
     filter: "",
+  },
+  {
+    id: "pr5",
+    title: "一次调频与 AVC 专项",
+    source: "专项练习",
+    completedAt: "3 天前",
+    questionCount: 10,
+    accuracy: 70,
+    wrongCount: 3,
+    duration: "12 分钟",
+    filter: "一次调频",
+  },
+  {
+    id: "pr6",
+    title: "母线差动保护原理练习",
+    source: "错题本",
+    completedAt: "4 天前",
+    questionCount: 8,
+    accuracy: 75,
+    wrongCount: 2,
+    duration: "11 分钟",
+    filter: "母差保护",
+  },
+  {
+    id: "pr7",
+    title: "两细则辅助服务复习",
+    source: "错题本",
+    completedAt: "5 天前",
+    questionCount: 12,
+    accuracy: 83,
+    wrongCount: 2,
+    duration: "15 分钟",
+    filter: "两细则",
+  },
+  {
+    id: "pr8",
+    title: "直流接地排查专项",
+    source: "错题本",
+    completedAt: "6 天前",
+    questionCount: 6,
+    accuracy: 67,
+    wrongCount: 2,
+    duration: "8 分钟",
+    filter: "直流接地",
+  },
+  {
+    id: "pr9",
+    title: "AGC 调节死区参数练习",
+    source: "知识学习生成",
+    completedAt: "一周前",
+    questionCount: 9,
+    accuracy: 78,
+    wrongCount: 2,
+    duration: "10 分钟",
+    filter: "AGC",
+  },
+  {
+    id: "pr10",
+    title: "继电保护动作逻辑复盘",
+    source: "错题本",
+    completedAt: "一周前",
+    questionCount: 7,
+    accuracy: 86,
+    wrongCount: 1,
+    duration: "9 分钟",
+    filter: "继电保护",
   },
 ];
 

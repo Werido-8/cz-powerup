@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Maximize2, ZoomIn, ZoomOut } from "lucide-re
 import { useEffect, useMemo, useState } from "react";
 import { KbEmptyState, KbIconButton, KbStatusTag } from "@/components/knowledge/ui";
 import { isStorageOnlyFile } from "@/lib/knowledge/parseMerge";
+import { getLearningMaterialDocByFileId } from "@/lib/learning/material-files";
 import {
   parseStatusLabel,
   parseStatusTone,
@@ -366,6 +367,18 @@ const GRID_GUIDE_PAGES: PreviewPage[] = [
 
 function getPreviewPages(file: KnowledgeFile): PreviewPage[] {
   if (file.id === "file-grid-guide") return GRID_GUIDE_PAGES;
+  const learningDoc = getLearningMaterialDocByFileId(file.id);
+  if (learningDoc) {
+    const blocks: PreviewBlock[] = [{ type: "p", text: learningDoc.snippet }];
+    learningDoc.body.forEach((section) => {
+      blocks.push({ type: "h", text: section.title });
+      section.text
+        .split(/\n+/)
+        .filter(Boolean)
+        .forEach((text) => blocks.push({ type: "p", text }));
+    });
+    return [{ blocks }];
+  }
   return [
     {
       blocks: [
@@ -412,7 +425,10 @@ function PreviewBlocks({ blocks }: { blocks: PreviewBlock[] }) {
         }
         if (block.type === "ul") {
           return (
-            <ul key={index} className="list-disc space-y-2 pl-5 text-[13.5px] leading-[1.9] text-kb-body/90">
+            <ul
+              key={index}
+              className="list-disc space-y-2 pl-5 text-[13.5px] leading-[1.9] text-kb-body/90"
+            >
               {block.items.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -463,8 +479,13 @@ export function FilePreviewCanvas({
   }, [file.id, pageProp]);
 
   useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
+    if (page <= totalPages) return;
+    if (onPageChange) {
+      onPageChange(totalPages);
+    } else {
+      setInternalPage(totalPages);
+    }
+  }, [onPageChange, page, totalPages]);
 
   const [zoom, setZoom] = useState(100);
   const storageOnly = isStorageOnlyFile(file);
@@ -486,8 +507,7 @@ export function FilePreviewCanvas({
         <KbEmptyState
           title="文件解析失败"
           description={
-            file.parseError ??
-            "当前文件暂时无法在线预览，请下载原文件或联系管理员处理。"
+            file.parseError ?? "当前文件暂时无法在线预览，请下载原文件或联系管理员处理。"
           }
         />
       </div>

@@ -5,7 +5,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Dialog, DialogPortal } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-export type AppDialogSize = "small" | "compact" | "medium" | "large" | "xlarge";
+export type AppDialogSize = "small" | "compact" | "medium" | "large" | "xlarge" | "full";
 export type AppDialogVariant = "form" | "confirm" | "detail";
 
 const sizeWidth: Record<AppDialogSize, string> = {
@@ -14,6 +14,7 @@ const sizeWidth: Record<AppDialogSize, string> = {
   medium: "w-[720px]",
   large: "w-[940px]",
   xlarge: "w-[1040px]",
+  full: "w-[min(1320px,calc(100vw-32px))]",
 };
 
 export function AppFormDialog({
@@ -26,6 +27,9 @@ export function AppFormDialog({
   size = "medium",
   variant = "form",
   className,
+  headerRight,
+  fillHeight,
+  overlayClassName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,6 +40,9 @@ export function AppFormDialog({
   size?: AppDialogSize;
   variant?: AppDialogVariant;
   className?: string;
+  headerRight?: ReactNode;
+  fillHeight?: boolean;
+  overlayClassName?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -45,12 +52,16 @@ export function AppFormDialog({
             "app-dialog-overlay fixed inset-0 z-50",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+            overlayClassName,
           )}
         />
         <DialogPrimitive.Content
           className={cn(
-            "fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100vh-64px)] flex-col overflow-hidden border bg-white outline-none",
-            "max-[640px]:max-h-[calc(100vh-32px)] max-[640px]:max-w-[calc(100vw-32px)]",
+            "fixed inset-0 z-50 m-auto flex flex-col overflow-hidden border bg-white outline-none",
+            fillHeight
+              ? "h-[calc(100vh-40px)] max-h-[calc(100vh-40px)]"
+              : "h-fit max-h-[calc(100vh-64px)] max-[640px]:max-h-[calc(100vh-32px)]",
+            "max-[640px]:max-w-[calc(100vw-32px)]",
             "max-w-[calc(100vw-64px)] rounded-[12px]",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
@@ -59,9 +70,12 @@ export function AppFormDialog({
             variant === "form" && "border-[var(--dialog-border)] shadow-[var(--dialog-shadow)]",
             className,
           )}
-          style={{ borderColor: "var(--dialog-border)", height: "fit-content" }}
+          style={{
+            borderColor: "var(--dialog-border)",
+            height: fillHeight ? undefined : "fit-content",
+          }}
         >
-          <header className="flex h-16 shrink-0 items-center justify-between border-b border-[var(--dialog-header-border)] bg-white px-8">
+          <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--dialog-header-border)] bg-white px-6">
             <div className="flex min-w-0 items-center">
               {TitleIcon && (
                 <span
@@ -84,29 +98,33 @@ export function AppFormDialog({
                 {title}
               </DialogPrimitive.Title>
             </div>
-            <DialogPrimitive.Close
-              className={cn(
-                "grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-[#61717d] transition-colors",
-                "hover:bg-[#f3f6f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
-              )}
-              aria-label="关闭"
-            >
-              <X className="h-4 w-4" strokeWidth={1.8} />
-            </DialogPrimitive.Close>
+            {headerRight ?? (
+              <DialogPrimitive.Close
+                className={cn(
+                  "grid h-8 w-8 shrink-0 place-items-center rounded-[8px] text-[#61717d] transition-colors",
+                  "hover:bg-[#f3f6f7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
+                )}
+                aria-label="关闭"
+              >
+                <X className="h-4 w-4" strokeWidth={1.8} />
+              </DialogPrimitive.Close>
+            )}
           </header>
 
           <div
             className={cn(
-              "scrollbar-thin shrink-0 overflow-x-hidden bg-white",
-              variant === "form" &&
-                "max-h-[calc(100vh-64px-64px-64px)] overflow-y-auto px-8 py-5 max-[640px]:max-h-[calc(100vh-32px-64px-64px)]",
+              "scrollbar-thin overflow-x-hidden bg-white",
+              fillHeight ? "flex min-h-0 flex-1 flex-col overflow-hidden px-6 py-4" : "shrink-0",
+              !fillHeight &&
+                variant === "form" &&
+                "max-h-[calc(100vh-64px-56px-56px)] overflow-y-auto px-6 py-4 max-[640px]:max-h-[calc(100vh-32px-56px-56px)]",
             )}
           >
             {children}
           </div>
 
           {footer && (
-            <footer className="flex h-16 shrink-0 items-center justify-end gap-3 border-t border-[var(--dialog-header-border)] bg-[var(--dialog-footer-bg)] px-8">
+            <footer className="flex h-14 shrink-0 items-center justify-end gap-2.5 border-t border-[var(--dialog-header-border)] bg-[var(--dialog-footer-bg)] px-6">
               {footer}
             </footer>
           )}

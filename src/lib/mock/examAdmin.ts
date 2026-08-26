@@ -1,6 +1,7 @@
 // Mock data for the exam administration (考试管理) page.
 
 import { buildExamPaper100Groups, EXAM_PAPER_100_COUNT } from "./exam-paper-100";
+import { buildExamRoster } from "./examRoster";
 
 export type QuestionType = "单选题" | "多选题" | "判断题" | "填空题" | "案例分析题" | "简答题";
 export type Difficulty = "易" | "中" | "难";
@@ -57,7 +58,7 @@ export interface AssignRecord {
   id: string;
   user: string;
   team: string;
-  position: string;
+  specialty: string;
   status: "未开始" | "进行中" | "已提交";
   score: number | null;
   correctRate: number | null;
@@ -424,7 +425,7 @@ export const REVIEW_QUESTIONS: ReviewQuestion[] = [
   ),
 ];
 
-export const BANK_QUESTIONS: BankQuestion[] = [
+const BASE_BANK_QUESTIONS: BankQuestion[] = [
   {
     id: "bq1",
     stem: "AGC 控制方式下,机组响应调度指令的速率不满足要求会被两细则如何考核?",
@@ -497,6 +498,689 @@ export const BANK_QUESTIONS: BankQuestion[] = [
     correctRate: 67,
     status: "启用",
   },
+];
+
+type BankQuestionSeed = Omit<BankQuestion, "id"> & {
+  options?: { key: string; text: string }[];
+  answer: string;
+  analysis: string;
+  section?: string;
+};
+
+const ADDITIONAL_BANK_SEEDS: BankQuestionSeed[] = [
+  {
+    stem: "AGC 投入后机组出力与调度指令偏差持续超过 ±3% 时,应优先采取哪项措施?",
+    type: "单选题",
+    knowledge: "AGC / 两细则",
+    difficulty: "中",
+    source: "AGC 控制器 SOP v2024.06",
+    usedCount: 33,
+    lastUsed: "2026-06-14",
+    correctRate: 69,
+    status: "启用",
+    options: [
+      { key: "A", text: "立即大幅手动调整出力" },
+      { key: "B", text: "检查 AGC 通道及测点,必要时切至手动" },
+      { key: "C", text: "直接退出一次调频" },
+      { key: "D", text: "等待下一调度周期自动恢复" },
+    ],
+    answer: "B",
+    analysis: "偏差持续超限应先排查通道与测点,必要时切手动,避免盲目大幅调出力。",
+    section: "AGC 控制器 SOP v2024.06 · 第 4.2 节",
+  },
+  {
+    stem: "下列哪些属于两细则中 AGC 性能评价的核心指标?",
+    type: "多选题",
+    knowledge: "AGC / 两细则",
+    difficulty: "中",
+    source: "两细则考核知识点汇编 v2024.05",
+    usedCount: 27,
+    lastUsed: "2026-06-13",
+    correctRate: 62,
+    status: "启用",
+    options: [
+      { key: "A", text: "调节速率" },
+      { key: "B", text: "调节精度" },
+      { key: "C", text: "响应时间" },
+      { key: "D", text: "线损率" },
+    ],
+    answer: "ABC",
+    analysis: "AGC 考核三项指标为调节速率、调节精度与响应时间。",
+  },
+  {
+    stem: "AGC 死区越大越有利于通过调节精度考核。(判断)",
+    type: "判断题",
+    knowledge: "AGC / 两细则",
+    difficulty: "易",
+    source: "AGC 控制器 SOP v2024.06",
+    usedCount: 38,
+    lastUsed: "2026-06-10",
+    correctRate: 78,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "F",
+    analysis: "死区过大虽减少动作,但不利于精准跟踪与考核,变更须经调度同意。",
+  },
+  {
+    stem: "AVC 投自动后发生电压越限,值班员应在多长时间内完成报警确认?",
+    type: "单选题",
+    knowledge: "AVC",
+    difficulty: "中",
+    source: "AVC 电压无功控制运行导则 v2024.03",
+    usedCount: 19,
+    lastUsed: "2026-06-09",
+    correctRate: 73,
+    status: "启用",
+    options: [
+      { key: "A", text: "1 分钟内" },
+      { key: "B", text: "10 分钟内" },
+      { key: "C", text: "1 小时内" },
+      { key: "D", text: "下班前即可" },
+    ],
+    answer: "A",
+    analysis: "应在 1 分钟内确认报警类别并具备手动接管能力。",
+  },
+  {
+    stem: "AVC 与 AGC 发生协调闭锁时,值班员应先确认什么?",
+    type: "单选题",
+    knowledge: "AVC",
+    difficulty: "难",
+    source: "AVC 电压无功控制运行导则 v2024.03",
+    usedCount: 14,
+    lastUsed: "2026-06-07",
+    correctRate: 55,
+    status: "启用",
+    options: [
+      { key: "A", text: "闭锁原因码,必要时切手动维持关键指标" },
+      { key: "B", text: "直接加大无功指令" },
+      { key: "C", text: "立即退出全部保护" },
+      { key: "D", text: "无需处理等待自动解锁" },
+    ],
+    answer: "A",
+    analysis: "应先确认闭锁原因,必要时切手动,解锁前复核限幅与目标。",
+  },
+  {
+    stem: "下列关于 AVC 投运的说法正确的有哪些?",
+    type: "多选题",
+    knowledge: "AVC",
+    difficulty: "中",
+    source: "AVC 电压无功控制运行导则 v2024.03",
+    usedCount: 21,
+    lastUsed: "2026-06-05",
+    correctRate: 66,
+    status: "启用",
+    options: [
+      { key: "A", text: "投运前应核对电压目标与限幅" },
+      { key: "B", text: "可在电压异常时强行保持自动" },
+      { key: "C", text: "闭锁后应及时汇报并记录" },
+      { key: "D", text: "与 AGC 协调策略需按规程执行" },
+    ],
+    answer: "ACD",
+    analysis: "异常时应具备切手动能力,不可强行保持自动。",
+  },
+  {
+    stem: "AVC 退出自动后无需在运行日志中记录原因。(判断)",
+    type: "判断题",
+    knowledge: "AVC",
+    difficulty: "易",
+    source: "厂站运行规程(华东 A 厂) v2024.07",
+    usedCount: 30,
+    lastUsed: "2026-06-04",
+    correctRate: 81,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "F",
+    analysis: "退出自动属重要方式变更,须记录原因、时间与操作人。",
+  },
+  {
+    stem: "一次调频死区设置过大,会导致机组在小扰动下不动作。(判断)",
+    type: "判断题",
+    knowledge: "一次调频",
+    difficulty: "易",
+    source: "两细则考核知识点汇编 v2024.05",
+    usedCount: 47,
+    lastUsed: "2026-06-15",
+    correctRate: 86,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "T",
+    analysis: "死区过大时小扰动无法触发一次调频动作。",
+  },
+  {
+    stem: "一次调频的转速不等率一般整定为多少?",
+    type: "单选题",
+    knowledge: "一次调频",
+    difficulty: "中",
+    source: "一次调频试验与运维导则 v2024.02",
+    usedCount: 25,
+    lastUsed: "2026-06-12",
+    correctRate: 70,
+    status: "启用",
+    options: [
+      { key: "A", text: "1%~2%" },
+      { key: "B", text: "4%~5%" },
+      { key: "C", text: "8%~10%" },
+      { key: "D", text: "15% 以上" },
+    ],
+    answer: "B",
+    analysis: "常规机组一次调频转速不等率多整定在 4%~5%。",
+  },
+  {
+    stem: "一次调频试验结束后,试验记录应在多长时间内提交?",
+    type: "单选题",
+    knowledge: "一次调频",
+    difficulty: "易",
+    source: "一次调频试验与运维导则 v2024.02",
+    usedCount: 18,
+    lastUsed: "2026-06-08",
+    correctRate: 77,
+    status: "启用",
+    options: [
+      { key: "A", text: "24 小时内" },
+      { key: "B", text: "一周内" },
+      { key: "C", text: "月底汇总即可" },
+      { key: "D", text: "无需提交" },
+    ],
+    answer: "A",
+    analysis: "试验后 24 小时内应整理记录、曲线与结论并提交审核。",
+  },
+  {
+    stem: "影响一次调频可用率考核的因素通常包括哪些?",
+    type: "多选题",
+    knowledge: "一次调频",
+    difficulty: "中",
+    source: "两细则考核知识点汇编 v2024.05",
+    usedCount: 23,
+    lastUsed: "2026-06-06",
+    correctRate: 61,
+    status: "启用",
+    options: [
+      { key: "A", text: "装置投退状态" },
+      { key: "B", text: "测频通道质量" },
+      { key: "C", text: "死区与限幅整定" },
+      { key: "D", text: "当日天气情况" },
+    ],
+    answer: "ABC",
+    analysis: "可用率与投运状态、测频质量及参数整定密切相关。",
+  },
+  {
+    stem: "500kV 主变停役操作中,拉开刀闸前应确认断路器已断开且无负荷。(判断)",
+    type: "判断题",
+    knowledge: "主变停役",
+    difficulty: "易",
+    source: "500kV 主变停役标准化操作程序 v3.2",
+    usedCount: 36,
+    lastUsed: "2026-06-14",
+    correctRate: 88,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "T",
+    analysis: "严禁带负荷拉合刀闸,拉开前必须确认断路器已断开。",
+  },
+  {
+    stem: "母线倒闸必须坚持先合后拉,严禁带负荷拉合刀闸。(判断)",
+    type: "判断题",
+    knowledge: "典型操作",
+    difficulty: "易",
+    source: "厂站运行规程(华东 A 厂) v2024.07",
+    usedCount: 44,
+    lastUsed: "2026-06-13",
+    correctRate: 91,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "T",
+    analysis: "应先建立可靠并联路径再断开原路径。",
+  },
+  {
+    stem: "有载分接开关检修后送电前,升降档试验应至少完成几个完整循环?",
+    type: "单选题",
+    knowledge: "典型操作",
+    difficulty: "中",
+    source: "主变压器检修导则 v2023.12",
+    usedCount: 12,
+    lastUsed: "2026-06-02",
+    correctRate: 63,
+    status: "启用",
+    options: [
+      { key: "A", text: "不少于两个完整循环" },
+      { key: "B", text: "点动一次即可" },
+      { key: "C", text: "送电后再试验" },
+      { key: "D", text: "无需试验" },
+    ],
+    answer: "A",
+    analysis: "验收要求在检修电源下完成不少于两个完整循环。",
+  },
+  {
+    stem: "220kV 线路停役前必须核对的二次功能通常包括哪些?",
+    type: "多选题",
+    knowledge: "典型操作",
+    difficulty: "中",
+    source: "厂站运行规程(华东 A 厂) v2024.07",
+    usedCount: 20,
+    lastUsed: "2026-06-01",
+    correctRate: 68,
+    status: "启用",
+    options: [
+      { key: "A", text: "重合闸退出确认" },
+      { key: "B", text: "备自投状态核对" },
+      { key: "C", text: "保护定值区核对" },
+      { key: "D", text: "取消全部特巡安排" },
+    ],
+    answer: "ABC",
+    analysis: "停役前须确认重合闸、备自投与保护定值区等二次功能。",
+  },
+  {
+    stem: "母差保护误动复盘中,现场应优先核查的二次原因是?",
+    type: "单选题",
+    knowledge: "差动保护",
+    difficulty: "难",
+    source: "差动保护误动复盘案例库 v2023.11",
+    usedCount: 17,
+    lastUsed: "2026-05-28",
+    correctRate: 54,
+    status: "启用",
+    options: [
+      { key: "A", text: "TA 极性与二次回路绝缘" },
+      { key: "B", text: "主变油温是否超限" },
+      { key: "C", text: "AGC 死区是否过大" },
+      { key: "D", text: "环保设施是否投运" },
+    ],
+    answer: "A",
+    analysis: "母差误动复盘应先核对 TA 极性、二次回路与定值。",
+  },
+  {
+    stem: "差动保护动作后推荐的四步核查顺序是?",
+    type: "单选题",
+    knowledge: "差动保护",
+    difficulty: "中",
+    source: "差动保护误动复盘案例库 v2023.11",
+    usedCount: 24,
+    lastUsed: "2026-06-11",
+    correctRate: 67,
+    status: "启用",
+    options: [
+      { key: "A", text: "TA 极性 → 二次回路 → 定值 → 一次设备" },
+      { key: "B", text: "一次设备 → 定值 → TA → 二次回路" },
+      { key: "C", text: "定值 → 一次设备 → 二次回路 → TA" },
+      { key: "D", text: "二次回路 → 一次设备 → 定值 → TA" },
+    ],
+    answer: "A",
+    analysis: "推荐按 TA 极性、二次回路、定值、一次设备四步缩小范围。",
+  },
+  {
+    stem: "母线倒闸误送电事故的直接原因通常包括哪些?",
+    type: "多选题",
+    knowledge: "历史案例",
+    difficulty: "难",
+    source: "母线倒闸误送电事故复盘报告 v2024.01",
+    usedCount: 11,
+    lastUsed: "2026-05-26",
+    correctRate: 52,
+    status: "启用",
+    options: [
+      { key: "A", text: "母联三相位置未核对到位" },
+      { key: "B", text: "操作票漏写状态核对步骤" },
+      { key: "C", text: "监护流于形式" },
+      { key: "D", text: "AGC 死区设置过大" },
+    ],
+    answer: "ABC",
+    analysis: "该案例定位为位置核对缺失、票面漏项与监护失效。",
+  },
+  {
+    stem: "备自投误动导致全站失电的关键教训是?",
+    type: "单选题",
+    knowledge: "故障处置",
+    difficulty: "难",
+    source: "备自投误动失电案例库 v2023.08",
+    usedCount: 15,
+    lastUsed: "2026-05-22",
+    correctRate: 57,
+    status: "启用",
+    options: [
+      { key: "A", text: "检修前应退出备自投并核对一次方式与二次功能" },
+      { key: "B", text: "检修期间可保留全部备自投功能" },
+      { key: "C", text: "只需核对一次设备,无需核对二次功能" },
+      { key: "D", text: "方式变更后口头通知即可" },
+    ],
+    answer: "A",
+    analysis: "涉及方式变更必须执行一次方式、二次功能与调度令三联核对。",
+  },
+  {
+    stem: "直流接地查找应遵循哪些原则?",
+    type: "多选题",
+    knowledge: "故障处置",
+    difficulty: "中",
+    source: "直流系统运行维护规程 v2024.04",
+    usedCount: 26,
+    lastUsed: "2026-06-09",
+    correctRate: 65,
+    status: "启用",
+    options: [
+      { key: "A", text: "先信号回路后控制回路" },
+      { key: "B", text: "先备用后运行" },
+      { key: "C", text: "每次拉路前后记录绝缘监测值" },
+      { key: "D", text: "重要控制回路可擅自拉路" },
+    ],
+    answer: "ABC",
+    analysis: "拉路法须先次要后重要,重要控制回路拉路须经值长批准。",
+  },
+  {
+    stem: "GIS 气室 SF6 压力降至报警值后,下列做法正确的是?",
+    type: "单选题",
+    knowledge: "故障处置",
+    difficulty: "中",
+    source: "GIS 设备运行维护规程 v2023.10",
+    usedCount: 13,
+    lastUsed: "2026-06-03",
+    correctRate: 72,
+    status: "启用",
+    options: [
+      { key: "A", text: "立即汇报,查明泄漏点前不得盲目带压补气" },
+      { key: "B", text: "直接带压补气至正常值" },
+      { key: "C", text: "无需汇报,继续观察即可" },
+      { key: "D", text: "立即强行操作相关开关" },
+    ],
+    answer: "A",
+    analysis: "降至报警值应立即汇报并加强监视,查明泄漏点前不得盲目补气。",
+  },
+  {
+    stem: "新员工交接班「四清」包括人员、设备、运行方式与异常事项。(判断)",
+    type: "判断题",
+    knowledge: "新员工基础",
+    difficulty: "易",
+    source: "运行岗位培训管理办法 v2024.05",
+    usedCount: 52,
+    lastUsed: "2026-06-16",
+    correctRate: 90,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "T",
+    analysis: "交接班须完成人员、设备、运行方式、异常事项的全面核对。",
+  },
+  {
+    stem: "新员工首次独立巡检前,需要完成哪些授权与能力确认?",
+    type: "多选题",
+    knowledge: "新员工基础",
+    difficulty: "中",
+    source: "运行岗位培训管理办法 v2024.05",
+    usedCount: 29,
+    lastUsed: "2026-06-12",
+    correctRate: 74,
+    status: "启用",
+    options: [
+      { key: "A", text: "导师签字确认" },
+      { key: "B", text: "岗位应知应会考核合格" },
+      { key: "C", text: "值长授权" },
+      { key: "D", text: "自行口头声明即可独立上岗" },
+    ],
+    answer: "ABC",
+    analysis: "独立巡检前须完成培训考核、导师确认与值长授权。",
+  },
+  {
+    stem: "两票三制中,操作人与监护人可以是同一人。(判断)",
+    type: "判断题",
+    knowledge: "新员工基础",
+    difficulty: "易",
+    source: "电力安全工作规程(发电厂和变电站电气部分)",
+    usedCount: 48,
+    lastUsed: "2026-06-15",
+    correctRate: 93,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "F",
+    analysis: "操作人与监护人必须分开,严禁单人操作重要电气设备。",
+  },
+  {
+    stem: "厂站运行规程与通用规程冲突时,本站应如何执行?",
+    type: "单选题",
+    knowledge: "规程制度",
+    difficulty: "中",
+    source: "厂站运行规程(华东 A 厂) v2024.07",
+    usedCount: 22,
+    lastUsed: "2026-06-10",
+    correctRate: 69,
+    status: "启用",
+    options: [
+      { key: "A", text: "优先执行经批准的厂站资料" },
+      { key: "B", text: "一律执行通用规程" },
+      { key: "C", text: "由个人自行决定" },
+      { key: "D", text: "暂停所有操作直至新规程印发" },
+    ],
+    answer: "A",
+    analysis: "厂站资料优先适用,冲突时应请示值长并按批准口径执行。",
+  },
+  {
+    stem: "继电保护定期检验宜尽可能安排在什么期间进行?",
+    type: "单选题",
+    knowledge: "规程制度",
+    difficulty: "易",
+    source: "继电保护及安全自动装置检验规程",
+    usedCount: 31,
+    lastUsed: "2026-06-08",
+    correctRate: 80,
+    status: "启用",
+    options: [
+      { key: "A", text: "一次设备停电检修期间" },
+      { key: "B", text: "高峰负荷时段" },
+      { key: "C", text: "AGC 试验当天" },
+      { key: "D", text: "交接班过程中" },
+    ],
+    answer: "A",
+    analysis: "定期检验宜尽可能在一次设备停电检修期间进行。",
+  },
+  {
+    stem: "继电保护定值单现场执行前必须完成双人核对。(判断)",
+    type: "判断题",
+    knowledge: "规程制度",
+    difficulty: "易",
+    source: "继电保护及安全自动装置检验规程",
+    usedCount: 40,
+    lastUsed: "2026-06-14",
+    correctRate: 89,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "T",
+    analysis: "定值单须双人核对、审批生效后方可执行。",
+  },
+  {
+    stem: "迎峰度夏期间主变温升接近限值时,值班员应优先采取哪项措施?",
+    type: "单选题",
+    knowledge: "规程制度",
+    difficulty: "中",
+    source: "迎峰度夏保供电专项方案 v2025",
+    usedCount: 16,
+    lastUsed: "2026-06-07",
+    correctRate: 71,
+    status: "启用",
+    options: [
+      { key: "A", text: "立即拉开主变" },
+      { key: "B", text: "汇报值长,检查冷却装置并视情况调整负荷" },
+      { key: "C", text: "等待自然降温" },
+      { key: "D", text: "退出全部保护" },
+    ],
+    answer: "B",
+    analysis: "应先汇报并检查冷却系统,必要时调整负荷,不可盲目停运。",
+  },
+  {
+    stem: "迎峰度冬期间厂站应重点落实哪些工作?",
+    type: "多选题",
+    knowledge: "规程制度",
+    difficulty: "中",
+    source: "迎峰度冬保供电专项方案 v2025",
+    usedCount: 18,
+    lastUsed: "2026-05-30",
+    correctRate: 75,
+    status: "启用",
+    options: [
+      { key: "A", text: "防寒防冻检查" },
+      { key: "B", text: "线路覆冰监测" },
+      { key: "C", text: "备用电源与柴油发电机带载试验" },
+      { key: "D", text: "取消全部特巡" },
+    ],
+    answer: "ABC",
+    analysis: "度冬重点为防寒防冻、覆冰监测与备用电源可靠性。",
+  },
+  {
+    stem: "结合某次母差误动事故,说明二次回路核查的关键步骤与记录要求。",
+    type: "案例分析题",
+    knowledge: "历史案例",
+    difficulty: "难",
+    source: "差动保护误动复盘案例库 v2023.11",
+    usedCount: 8,
+    lastUsed: "2026-05-18",
+    correctRate: 46,
+    status: "启用",
+    answer: "按极性、回路、定值、一次设备顺序核查并留存记录。",
+    analysis: "案例要求形成可复核的核查链与影像签字记录。",
+  },
+  {
+    stem: "高峰时段励磁限制频繁动作导致无功不足,常见根因是?",
+    type: "单选题",
+    knowledge: "历史案例",
+    difficulty: "难",
+    source: "励磁限制动作案例复盘 v2024.02",
+    usedCount: 10,
+    lastUsed: "2026-05-20",
+    correctRate: 51,
+    status: "启用",
+    options: [
+      { key: "A", text: "AVR 限制曲线与电网电压水平不匹配" },
+      { key: "B", text: "操作票未签字" },
+      { key: "C", text: "直流系统一点接地" },
+      { key: "D", text: "SF6 压力偏低" },
+    ],
+    answer: "A",
+    analysis: "案例根因为 AVR 限制按冬季参数整定,未随季节校核。",
+  },
+  {
+    stem: "机组深调时环保设施运行窗口变窄,应提前与环保专工沟通并监视污染物浓度趋势。(判断)",
+    type: "判断题",
+    knowledge: "规程制度",
+    difficulty: "易",
+    source: "深度调峰运行管控规定 v2024.06",
+    usedCount: 14,
+    lastUsed: "2026-06-05",
+    correctRate: 84,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "T",
+    analysis: "深调烟气量、烟温变化大,需协同监视脱硝、除尘、脱硫参数。",
+  },
+  {
+    stem: "简述 AGC 退出运行后值班员应完成的汇报、记录与恢复确认要点。",
+    type: "简答题",
+    knowledge: "AGC / 两细则",
+    difficulty: "中",
+    source: "AGC 控制器 SOP v2024.06",
+    usedCount: 19,
+    lastUsed: "2026-06-11",
+    correctRate: 66,
+    status: "启用",
+    answer: "汇报调度、记录原因时间、确认手动跟踪正常后再投自动。",
+    analysis: "退出 AGC 须闭环汇报与记录,恢复前复核通道与测点。",
+  },
+  {
+    stem: "PSS 投入后机组阻尼不足时,应优先核对哪些项目?",
+    type: "多选题",
+    knowledge: "故障处置",
+    difficulty: "难",
+    source: "励磁系统与 PSS 运维导则 v2023.07",
+    usedCount: 7,
+    lastUsed: "2026-05-15",
+    correctRate: 48,
+    status: "禁用",
+    options: [
+      { key: "A", text: "PSS 投退状态与参数区" },
+      { key: "B", text: "机组运行工况与负荷点" },
+      { key: "C", text: "相关测点质量" },
+      { key: "D", text: "直接加大 AGC 死区" },
+    ],
+    answer: "ABC",
+    analysis: "应核对 PSS 状态、工况与测点,不可盲目改 AGC 死区。",
+  },
+  {
+    stem: "黑启动过程中厂用电恢复的优先顺序应遵循经批准的黑启动预案。(判断)",
+    type: "判断题",
+    knowledge: "故障处置",
+    difficulty: "易",
+    source: "黑启动预案与应急处置手册 v2024.01",
+    usedCount: 12,
+    lastUsed: "2026-05-25",
+    correctRate: 85,
+    status: "启用",
+    options: [
+      { key: "T", text: "正确" },
+      { key: "F", text: "错误" },
+    ],
+    answer: "T",
+    analysis: "黑启动须严格按批准预案执行厂用电与机组恢复顺序。",
+  },
+  {
+    stem: "新员工基础:巡检发现设备异响时应如何处置?",
+    type: "单选题",
+    knowledge: "新员工基础",
+    difficulty: "易",
+    source: "运行岗位培训管理办法 v2024.05",
+    usedCount: 35,
+    lastUsed: "2026-06-13",
+    correctRate: 82,
+    status: "启用",
+    options: [
+      { key: "A", text: "立即汇报值长并保持安全距离观察" },
+      { key: "B", text: "自行打开设备盖板检查" },
+      { key: "C", text: "忽略并继续巡检路线" },
+      { key: "D", text: "直接停电处理" },
+    ],
+    answer: "A",
+    analysis: "发现异常应立即汇报,不得擅自拆检或盲目停电。",
+  },
+];
+
+const BUILT_ADDITIONAL_BANK = ADDITIONAL_BANK_SEEDS.map((seed, index) => {
+  const id = `bq${index + 7}`;
+  const { options, answer, analysis, section, ...question } = seed;
+  return {
+    id,
+    question: { id, ...question },
+    detail: {
+      options,
+      answer,
+      analysis,
+      section: section ?? `${question.source} · 相关章节`,
+    },
+  };
+});
+
+export const BANK_QUESTIONS: BankQuestion[] = [
+  ...BASE_BANK_QUESTIONS,
+  ...BUILT_ADDITIONAL_BANK.map(({ question }) => question),
 ];
 
 export const PAPERS: Paper[] = [
@@ -783,7 +1467,7 @@ export const ASSIGN_RECORDS: AssignRecord[] = [
     id: "a1",
     user: "李工",
     team: "运行一班",
-    position: "值班员",
+    specialty: "运行专业",
     status: "已提交",
     score: 88,
     correctRate: 88,
@@ -795,7 +1479,7 @@ export const ASSIGN_RECORDS: AssignRecord[] = [
     id: "a2",
     user: "王工",
     team: "运行一班",
-    position: "值班长",
+    specialty: "运行专业",
     status: "已提交",
     score: 76,
     correctRate: 76,
@@ -807,7 +1491,7 @@ export const ASSIGN_RECORDS: AssignRecord[] = [
     id: "a3",
     user: "赵工",
     team: "运行二班",
-    position: "值班员",
+    specialty: "运行专业",
     status: "进行中",
     score: null,
     correctRate: null,
@@ -819,7 +1503,7 @@ export const ASSIGN_RECORDS: AssignRecord[] = [
     id: "a4",
     user: "孙工",
     team: "运行二班",
-    position: "副值",
+    specialty: "运行专业",
     status: "未开始",
     score: null,
     correctRate: null,
@@ -831,7 +1515,7 @@ export const ASSIGN_RECORDS: AssignRecord[] = [
     id: "a5",
     user: "周工",
     team: "运行三班",
-    position: "值班员",
+    specialty: "运行专业",
     status: "已提交",
     score: 64,
     correctRate: 64,
@@ -963,18 +1647,24 @@ export const GEN_PREVIEW = {
 };
 
 export const PERSONNEL = [
-  { id: "u1", user: "李工", team: "运行一班", position: "值班员" },
-  { id: "u2", user: "王工", team: "运行一班", position: "值班长" },
-  { id: "u3", user: "赵工", team: "运行二班", position: "值班员" },
-  { id: "u4", user: "孙工", team: "运行二班", position: "副值" },
-  { id: "u5", user: "周工", team: "运行三班", position: "值班员" },
-  { id: "u6", user: "吴工", team: "运行三班", position: "值班长" },
-  { id: "u7", user: "郑工", team: "检修班", position: "继保员" },
-  { id: "u8", user: "钱工", team: "检修班", position: "检修员" },
+  { id: "u1", user: "李工", team: "运行一班", specialty: "运行专业" },
+  { id: "u2", user: "王工", team: "运行一班", specialty: "运行专业" },
+  { id: "u3", user: "赵工", team: "运行二班", specialty: "运行专业" },
+  { id: "u4", user: "孙工", team: "运行二班", specialty: "运行专业" },
+  { id: "u5", user: "周工", team: "运行三班", specialty: "运行专业" },
+  { id: "u6", user: "吴工", team: "运行三班", specialty: "运行专业" },
+  { id: "u7", user: "郑工", team: "检修班", specialty: "继电保护" },
+  { id: "u8", user: "钱工", team: "检修班", specialty: "电气专业" },
 ];
 
 // ---------- Bank category navigation ----------
-export const BANK_CATEGORIES = [
+export type BankCategory = {
+  key: string;
+  name: string;
+  count: number;
+};
+
+export const BANK_CATEGORIES: BankCategory[] = [
   { key: "all", name: "全部题目", count: 1842 },
   { key: "agc", name: "AGC/两细则", count: 128 },
   { key: "avc", name: "AVC", count: 72 },
@@ -1454,7 +2144,7 @@ export interface PersonAggregate {
   id: string;
   user: string;
   team: string;
-  position: string;
+  specialty: string;
   // records sorted newest first; [0] is the latest issue
   records: PersonExamRecord[];
 }
@@ -1476,7 +2166,7 @@ export const PERSON_AGGREGATES: PersonAggregate[] = [
     id: "u1",
     user: "李工",
     team: "运行一班",
-    position: "值班员",
+    specialty: "运行专业",
     records: [
       {
         id: "u1-r2",
@@ -1508,7 +2198,7 @@ export const PERSON_AGGREGATES: PersonAggregate[] = [
     id: "u2",
     user: "王工",
     team: "运行一班",
-    position: "值班长",
+    specialty: "运行专业",
     records: [
       {
         id: "u2-r1",
@@ -1528,7 +2218,7 @@ export const PERSON_AGGREGATES: PersonAggregate[] = [
     id: "u3",
     user: "赵工",
     team: "运行二班",
-    position: "值班员",
+    specialty: "运行专业",
     records: [
       {
         id: "u3-r2",
@@ -1560,7 +2250,7 @@ export const PERSON_AGGREGATES: PersonAggregate[] = [
     id: "u4",
     user: "孙工",
     team: "运行二班",
-    position: "副值",
+    specialty: "运行专业",
     records: [
       {
         id: "u4-r1",
@@ -1580,7 +2270,7 @@ export const PERSON_AGGREGATES: PersonAggregate[] = [
     id: "u5",
     user: "周工",
     team: "运行三班",
-    position: "值班员",
+    specialty: "运行专业",
     records: [
       {
         id: "u5-r3",
@@ -1649,6 +2339,10 @@ export const PAPER_AGGREGATE_IDS: Record<string, string[]> = {
 };
 
 export function getAggregatesForPaper(paperId: string): PersonAggregate[] {
+  const paper = PAPERS.find((item) => item.id === paperId);
+  if (paper && paper.assigned > 0) {
+    return buildExamRoster(paperId, paper);
+  }
   const ids = PAPER_AGGREGATE_IDS[paperId];
   if (!ids) return [];
   return PERSON_AGGREGATES.filter((a) => ids.includes(a.id));
@@ -1771,6 +2465,7 @@ export const BANK_DETAILS: Record<string, BankDetail> = {
       "安控切机切负荷动作后,应立即向调度汇报动作情况,确认装置动作正确性,按规程恢复系统,并做好记录与复盘。",
     section: "安控装置运行规程 v2023.09 · 第 5.4 节 动作后处理",
   },
+  ...Object.fromEntries(BUILT_ADDITIONAL_BANK.map(({ id, detail }) => [id, detail])),
 };
 
 export const DISABLE_REASONS = ["表述不清", "答案争议", "重复题", "过时资料", "其他"] as const;

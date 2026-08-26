@@ -206,7 +206,7 @@ export function ExamSplitView({ onEdit, onAssign, onPreview }: ExamSplitViewProp
                         >
                           <span>姓名</span>
                           <span>班组</span>
-                          <span>岗位</span>
+                          <span>专业</span>
                           <span>状态</span>
                           <span className="text-right">得分</span>
                           <span className="text-right">正确率</span>
@@ -233,7 +233,7 @@ export function ExamSplitView({ onEdit, onAssign, onPreview }: ExamSplitViewProp
                                 <span className="truncate py-3.5 text-[#607681]">{a.team}</span>
                                 <span className="py-3.5">
                                   <span className="inline-flex rounded-full bg-[#F0F5F6] px-2 py-0.5 text-[11px] text-[#607681]">
-                                    {a.position}
+                                    {a.specialty}
                                   </span>
                                 </span>
                                 <span className="py-3.5">

@@ -17,12 +17,19 @@ export const Route = createFileRoute("/learn-admin/")({
 function LearnAdminIndexPage() {
   const navigate = useNavigate();
 
-  const handleNew = () => {
-    navigate({ to: "/learn-admin/topic/new", search: { preview: undefined } });
+  const handleNew = (mode: "standard" | "ai" = "standard") => {
+    navigate({
+      to: "/learn-admin/topic/new",
+      search: { preview: undefined, source: mode === "ai" ? "ai" : undefined },
+    });
   };
 
-  const handleEdit = (record: TopicAdminRecord) => {
-    navigate({ to: "/learn-admin/topic/$topicId/edit", params: { topicId: record.id } });
+  const handleEdit = (record: TopicAdminRecord, step?: number) => {
+    navigate({
+      to: "/learn-admin/topic/$topicId/edit",
+      params: { topicId: record.id },
+      search: { step },
+    });
   };
 
   const handlePreview = (record: TopicAdminRecord) => {
@@ -32,7 +39,7 @@ function LearnAdminIndexPage() {
     }
     navigate({
       to: "/learn-admin/topic/new",
-      search: { preview: record.id },
+      search: { preview: record.id, source: undefined },
     });
   };
 
@@ -41,7 +48,7 @@ function LearnAdminIndexPage() {
       <div className="flex h-full min-h-0 w-full flex-col">
         <PageHeader
           title="专题维护"
-          subtitle="组织学习内容、核对练习覆盖，并在同一个工作台完成发布交付。"
+          subtitle="组织学习内容与练习覆盖，并在同一个工作台完成发布交付。"
           size="md"
         />
 

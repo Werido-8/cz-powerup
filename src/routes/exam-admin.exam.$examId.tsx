@@ -1,501 +1,558 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronRight, FileSearch, Search } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import {
-  AdminPageFrame,
   AsyncState,
-  DataTableShell,
   ExamTaskStatusTag,
-  FilterBar,
-  FilterField,
-  MetricCard,
   ResultStatusTag,
 } from "@/components/ability-admin/admin-ui";
-import { PageHeader, TableListPager, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
+import { ExamAnswerList } from "@/components/exam/exam-answer-list";
+import { PageTitleMark } from "@/components/learning/ui";
 import { PageShell } from "@/components/workbench/PageShell";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  formatCount,
-  formatDateRange,
-  formatPercent,
-  formatScore,
-  formatScoreMode,
-} from "@/lib/exam-admin/format";
+import { formatDateRange, formatScoreMode } from "@/lib/exam-admin/format";
 import type { ExamPersonResult } from "@/lib/exam-admin/types";
+import {
+  getAggregatesForPaper,
+  type PersonAggregate,
+  type PersonExamRecord,
+  type QuestionType,
+} from "@/lib/mock/examAdmin";
 import { cn } from "@/lib/utils";
 import { getExamDetail } from "@/services/examAdmin";
 
 export const Route = createFileRoute("/exam-admin/exam/$examId")({
-  component: ExamDetailPage,
-  head: () => ({ meta: [{ title: "考试详情 · 涉网运行能力智能提升平台" }] }),
+  component: ExamProgressPage,
+  head: () => ({ meta: [{ title: "考试进度 · 涉网运行能力智能提升平台" }] }),
 });
 
-type DetailTab = "people" | "results" | "questions";
-type PersonStatusFilter = "all" | ExamPersonResult["status"];
+type ExamDetailData = NonNullable<Awaited<ReturnType<typeof getExamDetail>>>;
+type PersonListFilter = "all" | "submitted" | "pending";
 
-function ExamDetailPage() {
+const PEOPLE_PAGE_SIZE = 8;
+const QUESTION_TYPE_ORDER: QuestionType[] = [
+  "单选题",
+  "多选题",
+  "判断题",
+  "填空题",
+  "案例分析题",
+  "简答题",
+];
+
+function ExamProgressPage() {
   const { examId } = Route.useParams();
   const navigate = useNavigate();
   const detailQuery = useQuery({
     queryKey: ["exam-admin", "exam-detail", examId],
     queryFn: () => getExamDetail(examId),
   });
-  const [tab, setTab] = useState<DetailTab>("people");
 
   return (
-    <PageShell>
-      <AdminPageFrame>
-        <nav aria-label="面包屑" className="flex items-center gap-1 text-[12px] text-kb-muted">
-          <Link to="/exam-admin" className="hover:text-primary">
-            考试任务
-          </Link>
-          <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-kb-body">考试详情</span>
-        </nav>
-
-        {detailQuery.isPending ? (
-          <AsyncState state="loading" />
-        ) : detailQuery.isError ? (
-          <AsyncState
-            state="error"
-            description="单场考试详情暂时无法加载。"
-            actionLabel="重新加载"
-            onAction={() => detailQuery.refetch()}
-          />
-        ) : !detailQuery.data ? (
-          <AsyncState
-            state="empty"
-            title="未找到该考试"
-            description="考试可能已删除，或当前地址已经失效。"
-            actionLabel="返回考试任务"
-            onAction={() => navigate({ to: "/exam-admin" })}
-          />
-        ) : (
-          <ExamDetailContent detail={detailQuery.data} tab={tab} onTabChange={setTab} />
-        )}
-      </AdminPageFrame>
+    <PageShell compact mainClassName="flex min-h-0 flex-col overflow-hidden px-5 py-4 lg:px-6">
+      {detailQuery.isPending ? (
+        <AsyncState state="loading" />
+      ) : detailQuery.isError ? (
+        <AsyncState
+          state="error"
+          description="考试进度暂时无法加载。"
+          actionLabel="重新加载"
+          onAction={() => detailQuery.refetch()}
+        />
+      ) : !detailQuery.data ? (
+        <AsyncState
+          state="empty"
+          title="未找到该考试"
+          description="考试可能已删除，或当前地址已经失效。"
+          actionLabel="返回考试任务"
+          onAction={() => navigate({ to: "/exam-admin" })}
+        />
+      ) : (
+        <ExamProgressWorkspace detail={detailQuery.data} />
+      )}
     </PageShell>
   );
 }
 
-function ExamDetailContent({
-  detail,
-  tab,
-  onTabChange,
-}: {
-  detail: NonNullable<Awaited<ReturnType<typeof getExamDetail>>>;
-  tab: DetailTab;
-  onTabChange: (tab: DetailTab) => void;
-}) {
+function ExamProgressWorkspace({ detail }: { detail: ExamDetailData }) {
   const { task } = detail;
-  const isScoreTracked = task.scoreMode === "fixed";
-  return (
-    <div className="space-y-5">
-      <PageHeader
-        title={task.name}
-        subtitle={`${formatDateRange(task.startsAt, task.endsAt)}；${formatScoreMode(task.scoreMode, task.totalScore)}；${task.scope.teamNames.join("、") || "范围待设置"}；${task.scope.specialtyNames.join("、") || "专业待设置"}`}
-        size="md"
-        action={
-          <Link
-            to="/exam-admin"
-            className="inline-flex min-h-10 items-center gap-2 rounded-[8px] border border-kb-border bg-white px-4 text-[13px] font-medium text-kb-body hover:bg-kb-surface"
-          >
-            <ArrowLeft className="h-4 w-4" /> 返回任务列表
-          </Link>
-        }
-      />
-      <div className="-mt-3 flex flex-wrap items-center gap-2">
-        <ExamTaskStatusTag status={task.status} />
-        <span className="rounded-[6px] bg-kb-surface px-2 py-1 text-[10.5px] text-kb-body">
-          {task.goal}
-        </span>
-        <span className="rounded-[6px] bg-kb-surface px-2 py-1 text-[10.5px] text-kb-body">
-          {task.category}
-        </span>
-      </div>
-
-      <section
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5"
-        aria-label="单场考试摘要"
-      >
-        <MetricCard
-          label="应参加"
-          value={`${formatCount(task.scope.assignedCount)} 人`}
-          definition="考试任务下发范围内去重后的应参加人数。"
-          note="人员范围来自下发记录"
-        />
-        <MetricCard
-          label="已提交"
-          value={`${formatCount(task.submittedCount)} 人`}
-          definition="每位人员最新一次有效答卷为已提交状态的人数。"
-          note={`未提交 ${Math.max(0, task.scope.assignedCount - task.submittedCount)} 人`}
-        />
-        <MetricCard
-          label="完成率"
-          value={formatPercent(task.completionRate)}
-          definition="已提交人数 ÷ 应参加人数。"
-          note={`${task.submittedCount} / ${task.scope.assignedCount} 人`}
-        />
-        {isScoreTracked ? (
-          <>
-            <MetricCard
-              label="平均分"
-              value={formatScore(task.averageScore)}
-              definition="有效提交答卷的实际得分平均值。无有效答卷时显示无数据。"
-              note={`有效答卷 ${task.submittedCount} 份`}
-            />
-            <MetricCard
-              label="通过率"
-              value={formatPercent(task.passRate)}
-              definition="通过人数 ÷ 有效提交人数。未提交人员不进入分母。"
-              note={`分母 ${task.submittedCount} 份有效答卷`}
-            />
-          </>
-        ) : (
-          <MetricCard
-            label="计分规则"
-            value={task.scoreMode === "variable" ? "按题计分" : "不设分数"}
-            definition="未配置统一总分或及格线的考试，不计算平均分、通过率或成绩分布。"
-            note="仅跟踪参与和提交情况"
-          />
-        )}
-      </section>
-
-      <nav
-        className="flex min-h-12 gap-7 border-b border-kb-border"
-        role="tablist"
-        aria-label="考试详情内容"
-      >
-        {(
-          [
-            ["people", "人员完成情况"],
-            ["results", "成绩结果"],
-            ["questions", "题目分析"],
-          ] as const
-        ).map(([value, label]) => {
-          const active = tab === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => onTabChange(value)}
-              className={cn(
-                "relative min-h-12 text-[13.5px] font-medium transition-colors",
-                active ? "text-primary" : "text-kb-muted hover:text-kb-heading",
-              )}
-            >
-              {label}
-              {active && <span className="absolute inset-x-0 bottom-[-1px] h-0.5 bg-primary" />}
-            </button>
-          );
-        })}
-      </nav>
-
-      {tab === "people" && <PeoplePanel detail={detail} />}
-      {tab === "results" && <ResultsPanel detail={detail} />}
-      {tab === "questions" && <QuestionsPanel detail={detail} />}
-    </div>
+  const aggregateById = useMemo(
+    () =>
+      new Map(getAggregatesForPaper(task.paperId).map((person) => [person.id, person] as const)),
+    [task.paperId],
   );
-}
-
-function PeoplePanel({
-  detail,
-}: {
-  detail: NonNullable<Awaited<ReturnType<typeof getExamDetail>>>;
-}) {
+  const initialPersonId =
+    detail.people.find((person) => person.status === "submitted")?.id ?? detail.people[0]?.id ?? "";
+  const [selectedPersonId, setSelectedPersonId] = useState(initialPersonId);
   const [keyword, setKeyword] = useState("");
-  const [status, setStatus] = useState<PersonStatusFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<PersonListFilter>("all");
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
-  const filtered = useMemo(() => {
+
+  const submittedCount = useMemo(
+    () => detail.people.filter((person) => person.status === "submitted").length,
+    [detail.people],
+  );
+  const filteredPeople = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
     return detail.people.filter((person) => {
-      if (status !== "all" && person.status !== status) return false;
+      if (statusFilter === "submitted" && person.status !== "submitted") return false;
+      if (statusFilter === "pending" && person.status === "submitted") return false;
       if (!normalized) return true;
-      return [person.name, person.teamName, person.specialtyName, person.positionName]
+      return [person.name, person.teamName, person.specialtyName]
         .join(" ")
         .toLowerCase()
         .includes(normalized);
     });
-  }, [detail.people, keyword, status]);
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  }, [detail.people, keyword, statusFilter]);
+  const totalPages = Math.max(1, Math.ceil(filteredPeople.length / PEOPLE_PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const pageRows = useMemo(
+    () => filteredPeople.slice((safePage - 1) * PEOPLE_PAGE_SIZE, safePage * PEOPLE_PAGE_SIZE),
+    [filteredPeople, safePage],
+  );
+  const selectedPerson =
+    detail.people.find((person) => person.id === selectedPersonId) ?? pageRows[0] ?? null;
+  const selectedAggregate = selectedPerson ? (aggregateById.get(selectedPerson.id) ?? null) : null;
+  const selectedRecord = selectedAggregate?.records[0] ?? null;
 
-  useEffect(() => setPage(1), [keyword, pageSize, status]);
+  useEffect(() => {
+    setSelectedPersonId(initialPersonId);
+    setKeyword("");
+    setStatusFilter("all");
+    setPage(1);
+  }, [initialPersonId, task.id]);
+
+  useEffect(() => setPage(1), [keyword, statusFilter]);
+
+  useEffect(() => {
+    if (pageRows.length === 0) {
+      setSelectedPersonId("");
+      return;
+    }
+    if (!pageRows.some((person) => person.id === selectedPersonId)) {
+      setSelectedPersonId(pageRows[0]!.id);
+    }
+  }, [pageRows, selectedPersonId]);
 
   return (
-    <section className="space-y-3">
-      <FilterBar>
-        <FilterField label="人员搜索">
-          <div className="relative min-w-[280px] sm:w-[320px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-kb-muted" />
-            <Input
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="搜索姓名、班组、专业或岗位"
-              className="h-10 rounded-[8px] border-kb-border bg-white pl-9 text-[13px]"
-            />
-          </div>
-        </FilterField>
-        <FilterField label="完成状态">
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as PersonStatusFilter)}
-            className="h-10 min-w-[140px] rounded-[8px] border border-kb-border bg-white px-3 text-[13px] text-kb-body outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="all">全部状态</option>
-            <option value="notStarted">未开始</option>
-            <option value="inProgress">进行中</option>
-            <option value="submitted">已提交</option>
-            <option value="expired">已过期</option>
-          </select>
-        </FilterField>
-        <span className="ml-auto self-end pb-2 text-[11.5px] text-kb-muted">
-          共 {detail.peopleTotal} 人，当前筛选 {filtered.length} 人
-        </span>
-      </FilterBar>
-
-      {pageRows.length === 0 ? (
-        <AsyncState
-          state="empty"
-          title="没有符合条件的人员"
-          description="请调整姓名或完成状态筛选。"
-          actionLabel="清空筛选"
-          onAction={() => {
-            setKeyword("");
-            setStatus("all");
-          }}
-        />
-      ) : (
-        <DataTableShell
-          footer={
-            <TableListPager
-              page={safePage}
-              totalPages={totalPages}
-              totalItems={filtered.length}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onPageSizeChange={setPageSize}
-            />
-          }
+    <div className="flex min-h-0 w-full flex-1 flex-col">
+      <header className="mb-3 shrink-0">
+        <Link
+          to="/exam-admin"
+          className="inline-flex min-h-8 items-center gap-1 text-[12px] text-kb-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
         >
-          <table className="w-full min-w-[1060px] text-left text-[12.5px]">
-            <thead className="bg-kb-table-head text-[11.5px] text-kb-muted">
-              <tr>
-                <th className="px-4 py-3 font-medium">姓名</th>
-                <th className="px-3 py-3 font-medium">班组</th>
-                <th className="px-3 py-3 font-medium">专业 / 岗位</th>
-                <th className="px-3 py-3 font-medium">状态</th>
-                <th className="px-3 py-3 font-medium">提交时间</th>
-                {detail.task.scoreMode === "fixed" && (
-                  <>
-                    <th className="px-3 py-3 text-right font-medium">得分</th>
-                    <th className="px-3 py-3 text-center font-medium">结果</th>
-                  </>
-                )}
-                <th className="px-4 py-3 text-right font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageRows.map((person) => (
-                <tr key={person.id} className="border-t border-divider hover:bg-kb-surface/45">
-                  <td className="px-4 py-3.5 font-medium text-kb-heading">{person.name}</td>
-                  <td className="px-3 py-3.5 text-kb-body">{person.teamName}</td>
-                  <td className="px-3 py-3.5 text-kb-body">
-                    <div>{person.specialtyName}</div>
-                    <div className="mt-0.5 text-[10.5px] text-kb-muted">{person.positionName}</div>
-                  </td>
-                  <td className="px-3 py-3.5">
-                    <ResultStatusTag status={person.status} />
-                  </td>
-                  <td className="px-3 py-3.5 tabular-nums text-kb-muted">
-                    {person.submittedAt ?? "—"}
-                  </td>
-                  {detail.task.scoreMode === "fixed" && (
-                    <>
-                      <td className="px-3 py-3.5 text-right font-semibold tabular-nums text-kb-heading">
-                        {formatScore(person.score)}
-                      </td>
-                      <td className="px-3 py-3.5 text-center">
-                        {person.passed == null ? (
-                          <span className="text-kb-muted">—</span>
-                        ) : (
-                          <span className={person.passed ? "text-success" : "text-destructive"}>
-                            {person.passed ? "通过" : "未通过"}
-                          </span>
-                        )}
-                      </td>
-                    </>
-                  )}
-                  <td className="px-4 py-3.5 text-right">
-                    {person.answerRoutePersonId ? (
-                      <Link
-                        to="/exam-admin/paper/$paperId/person/$personId"
-                        params={{
-                          paperId: detail.task.paperId,
-                          personId: person.answerRoutePersonId,
-                        }}
-                        className="inline-flex min-h-9 items-center gap-1 rounded-[7px] px-2.5 text-[12px] font-medium text-primary hover:bg-primary-soft"
-                      >
-                        查看答卷 <ChevronRight className="h-3.5 w-3.5" />
-                      </Link>
-                    ) : (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <button
-                              type="button"
-                              disabled
-                              className="inline-flex min-h-9 cursor-not-allowed items-center gap-1 rounded-[7px] px-2.5 text-[12px] text-kb-muted opacity-55"
-                            >
-                              查看答卷 <ChevronRight className="h-3.5 w-3.5" />
-                            </button>
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {person.status === "submitted"
-                            ? "当前明细接口未返回答卷标识"
-                            : "人员尚未提交答卷"}
-                        </TooltipContent>
-                      </Tooltip>
+          <ArrowLeft className="h-3.5 w-3.5" /> 返回考试任务
+        </Link>
+        <div className="mt-0.5 flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <PageTitleMark className="pt-0.5" />
+            <div className="min-w-0">
+              <h1 className="truncate text-[19px] font-semibold tracking-[-0.01em] text-kb-heading">
+                {task.name}
+              </h1>
+              <p className="mt-1 text-[12px] leading-5 text-kb-muted">
+                {formatDateRange(task.startsAt, task.endsAt)}
+                <span className="mx-2 text-kb-border">|</span>
+                {formatScoreMode(task.scoreMode, task.totalScore)}
+                <span className="mx-2 text-kb-border">|</span>
+                {task.scope.teamNames.join("、") || "范围待设置"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-0.5">
+            <ExamTaskStatusTag status={task.status} />
+            <span className="text-[12px] tabular-nums text-kb-muted">
+              已交 <strong className="font-semibold text-kb-heading">{task.submittedCount}</strong>{" "}
+              / {task.scope.assignedCount}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[300px_minmax(0,1fr)] lg:overflow-hidden">
+        <aside className="flex min-h-[460px] flex-col overflow-hidden rounded-[10px] border border-kb-border bg-white lg:min-h-0">
+          <div className="shrink-0 border-b border-divider px-3.5 py-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-[13.5px] font-semibold text-kb-heading">考试学员</h2>
+              <span className="text-[11px] tabular-nums text-kb-muted">
+                已交 {submittedCount} / {detail.peopleTotal}
+              </span>
+            </div>
+            <div className="relative mt-2.5">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-kb-muted" />
+              <Input
+                value={keyword}
+                onChange={(event) => setKeyword(event.target.value)}
+                placeholder="搜索姓名或班组"
+                aria-label="搜索考试学员"
+                className="h-8 rounded-[6px] border-kb-border bg-kb-surface pl-8 text-[12px] shadow-none"
+              />
+            </div>
+            <div className="mt-2 flex gap-1" role="tablist" aria-label="学员交卷状态">
+              {(
+                [
+                  ["all", "全部", detail.people.length],
+                  ["submitted", "已交", submittedCount],
+                  ["pending", "未交", Math.max(0, detail.people.length - submittedCount)],
+                ] as const
+              ).map(([value, label, count]) => {
+                const active = statusFilter === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setStatusFilter(value)}
+                    className={cn(
+                      "inline-flex h-7 items-center gap-1 rounded-[5px] px-2 text-[11px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25",
+                      active
+                        ? "bg-primary text-white"
+                        : "bg-kb-surface text-kb-muted hover:text-kb-heading",
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </DataTableShell>
-      )}
-    </section>
+                  >
+                    {label}
+                    <span className={active ? "text-white/80" : "text-kb-muted"}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {pageRows.length === 0 ? (
+              <div className="grid min-h-48 place-items-center px-4 text-center">
+                <div>
+                  <p className="text-[13px] font-medium text-kb-heading">没有符合条件的学员</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setKeyword("");
+                      setStatusFilter("all");
+                    }}
+                    className="mt-2 text-[12px] font-medium text-primary hover:text-primary/80"
+                  >
+                    清空筛选
+                  </button>
+                </div>
+              </div>
+            ) : (
+              pageRows.map((person) => (
+                <PersonListItem
+                  key={person.id}
+                  person={person}
+                  active={person.id === selectedPerson?.id}
+                  onSelect={() => setSelectedPersonId(person.id)}
+                />
+              ))
+            )}
+          </div>
+
+          <PeoplePager
+            page={safePage}
+            totalPages={totalPages}
+            totalItems={filteredPeople.length}
+            onPageChange={setPage}
+          />
+        </aside>
+
+        <LearnerExamPanel
+          key={selectedPerson?.id ?? "empty"}
+          person={selectedPerson}
+          aggregate={selectedAggregate}
+          record={selectedRecord}
+          scoreTracked={task.scoreMode === "fixed"}
+        />
+      </div>
+    </div>
   );
 }
 
-function ResultsPanel({
-  detail,
+function PersonListItem({
+  person,
+  active,
+  onSelect,
 }: {
-  detail: NonNullable<Awaited<ReturnType<typeof getExamDetail>>>;
+  person: ExamPersonResult;
+  active: boolean;
+  onSelect: () => void;
 }) {
-  if (detail.task.scoreMode !== "fixed") {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? "true" : undefined}
+      className={cn(
+        "flex w-full items-center justify-between gap-3 border-b border-divider px-3.5 py-2.5 text-left transition-colors last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/25",
+        active ? "bg-primary-soft" : "hover:bg-kb-surface/70",
+      )}
+    >
+      <div className="min-w-0">
+        <div
+          className={cn(
+            "truncate text-[13px] font-medium",
+            active ? "text-primary" : "text-kb-heading",
+          )}
+        >
+          {person.name}
+        </div>
+        <div className="mt-0.5 truncate text-[10.5px] text-kb-muted">
+          {person.teamName} {person.specialtyName}
+        </div>
+      </div>
+      <div className="shrink-0 text-right">
+        <ResultStatusTag status={person.status} />
+        <div className="mt-1 text-[12px] font-semibold tabular-nums text-kb-heading">
+          {person.score != null ? `${person.score} 分` : "-"}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function PeoplePager({
+  page,
+  totalPages,
+  totalItems,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+}) {
+  const start = totalItems === 0 ? 0 : (page - 1) * PEOPLE_PAGE_SIZE + 1;
+  const end = Math.min(page * PEOPLE_PAGE_SIZE, totalItems);
+
+  return (
+    <div className="flex shrink-0 items-center justify-between gap-3 border-t border-divider px-3.5 py-2.5">
+      <span className="text-[11px] tabular-nums text-kb-muted">
+        {start}-{end} / {totalItems}
+      </span>
+      <div className="flex items-center gap-1" role="navigation" aria-label="学员列表分页">
+        <button
+          type="button"
+          onClick={() => onPageChange(page - 1)}
+          disabled={page === 1}
+          aria-label="上一页"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-[4px] text-kb-muted transition-colors hover:bg-kb-surface hover:text-kb-heading disabled:pointer-events-none disabled:opacity-30"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+        </button>
+        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-[4px] bg-primary px-2 text-[11.5px] font-semibold tabular-nums text-white">
+          {page}
+        </span>
+        <span className="px-0.5 text-[11px] tabular-nums text-kb-muted">/ {totalPages}</span>
+        <button
+          type="button"
+          onClick={() => onPageChange(page + 1)}
+          disabled={page === totalPages}
+          aria-label="下一页"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-[4px] text-kb-muted transition-colors hover:bg-kb-surface hover:text-kb-heading disabled:pointer-events-none disabled:opacity-30"
+        >
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function LearnerExamPanel({
+  person,
+  aggregate,
+  record,
+  scoreTracked,
+}: {
+  person: ExamPersonResult | null;
+  aggregate: PersonAggregate | null;
+  record: PersonExamRecord | null;
+  scoreTracked: boolean;
+}) {
+  if (!person) {
     return (
-      <section className="rounded-[8px] border border-kb-border bg-white px-5 py-6">
-        <h2 className="text-[16px] font-semibold text-kb-heading">答题结果</h2>
-        <p className="mt-2 text-[12.5px] leading-5 text-kb-muted">
-          该考试{detail.task.scoreMode === "variable" ? "按题计分且未设置统一总分" : "未设置分数"}
-          ，因此不展示平均分、通过率和成绩分布。
-        </p>
+      <section className="grid min-h-[560px] place-items-center rounded-[10px] border border-kb-border bg-white px-6 text-center lg:min-h-0">
+        <div>
+          <p className="text-[14px] font-medium text-kb-heading">请选择学员</p>
+          <p className="mt-1 text-[12px] text-kb-muted">选择左侧学员后查看考试情况。</p>
+        </div>
       </section>
     );
   }
-  const maxCount = Math.max(...detail.scoreDistribution.map((item) => item.count), 1);
+
+  const statusText = record?.status ?? statusLabel(person.status);
+  const resultText = person.passed == null ? "待判定" : person.passed ? "已通过" : "未通过";
+
   return (
-    <section className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(340px,.8fr)]">
-      <article className="rounded-[12px] border border-kb-border bg-white p-5">
-        <h2 className="text-[16px] font-semibold text-kb-heading">成绩分布</h2>
-        <p className="mt-1 text-[11.5px] text-kb-muted">按有效提交答卷统计，人数为精确值。</p>
-        <div className="mt-6 space-y-4">
-          {detail.scoreDistribution.map((item) => (
-            <div
-              key={item.label}
-              className="grid grid-cols-[64px_minmax(0,1fr)_56px] items-center gap-3"
-            >
-              <span className="text-[12px] tabular-nums text-kb-body">{item.label}</span>
-              <div className="h-2 overflow-hidden rounded-full bg-kb-surface">
-                <div
-                  className="h-full rounded-full bg-primary"
-                  style={{ width: `${(item.count / maxCount) * 100}%` }}
-                />
+    <section className="flex min-h-[560px] flex-col overflow-hidden rounded-[10px] border border-kb-border bg-white lg:min-h-0">
+      <header className="shrink-0 border-b border-divider px-5 py-4 lg:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-primary-soft text-[14px] font-semibold text-primary">
+              {person.name.slice(0, 1)}
+            </span>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-[16px] font-semibold text-kb-heading">{person.name}</h2>
+                <ResultStatusTag status={person.status} />
               </div>
-              <strong className="text-right text-[12px] tabular-nums text-kb-heading">
-                {item.count} 人
-              </strong>
+              <p className="mt-1 truncate text-[11.5px] text-kb-muted">
+                {aggregate?.team ?? person.teamName} {person.specialtyName}
+                {record?.submittedAt ? `  提交于 ${record.submittedAt}` : ""}
+              </p>
             </div>
-          ))}
+          </div>
+
+          <dl className="grid w-full grid-cols-2 gap-x-6 gap-y-3 sm:w-auto sm:grid-cols-5">
+            <ExamMetric label="状态" value={statusText} />
+            <ExamMetric
+              label="得分"
+              value={scoreTracked && record?.score != null ? `${record.score} 分` : "-"}
+            />
+            <ExamMetric
+              label="正确率"
+              value={scoreTracked && record?.correctRate != null ? `${record.correctRate}%` : "-"}
+            />
+            <ExamMetric
+              label="用时"
+              value={record?.duration != null ? `${record.duration} 分钟` : "-"}
+            />
+            <ExamMetric
+              label="结果"
+              value={scoreTracked ? resultText : "不计分"}
+              tone={person.passed == null ? "muted" : person.passed ? "success" : "danger"}
+            />
+          </dl>
         </div>
-      </article>
-      <article className="rounded-[12px] border border-kb-border bg-white p-5">
-        <h2 className="text-[16px] font-semibold text-kb-heading">结果口径</h2>
-        <dl className="mt-5 space-y-4 text-[12.5px]">
-          <DefinitionRow label="有效答卷" value={`${detail.task.submittedCount} 份`} />
-          <DefinitionRow label="平均分" value={formatScore(detail.task.averageScore)} />
-          <DefinitionRow label="通过率" value={formatPercent(detail.task.passRate)} />
-          <DefinitionRow
-            label="未提交"
-            value={`${Math.max(0, detail.task.scope.assignedCount - detail.task.submittedCount)} 人`}
-          />
-        </dl>
-        <p className="mt-5 border-t border-divider pt-4 text-[11px] leading-5 text-kb-muted">
-          通过率分母为有效提交人数；未提交人员只影响完成率，不会被当作零分答卷。
-        </p>
-      </article>
+      </header>
+
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[188px_minmax(0,1fr)]">
+        {record?.answers?.length ? (
+          <>
+            <QuestionNavigator items={record.answers} />
+            <div className="min-h-0 overflow-y-auto border-t border-divider px-5 py-2 lg:border-l lg:border-t-0 lg:px-6">
+            
+              <ExamAnswerList items={record.answers} />
+            </div>
+          </>
+        ) : (
+          <div className="lg:col-span-2">
+            <LearnerEmptyState status={record?.status ?? statusLabel(person.status)} />
+          </div>
+        )}
+      </div>
     </section>
   );
 }
 
-function QuestionsPanel({
-  detail,
+function QuestionNavigator({ items }: { items: PersonExamRecord["answers"] }) {
+  const groups = useMemo(() => {
+    const grouped = new Map<QuestionType, typeof items>();
+    for (const item of items) {
+      grouped.set(item.type, [...(grouped.get(item.type) ?? []), item]);
+    }
+    return QUESTION_TYPE_ORDER.filter((type) => grouped.has(type)).map((type) => ({
+      type,
+      items: grouped.get(type)!,
+    }));
+  }, [items]);
+
+  const jumpToQuestion = (questionNo: number) => {
+    document.getElementById(`answer-question-${questionNo}`)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  return (
+    <nav
+      aria-label="答卷题目导航"
+      className="shrink-0 overflow-x-auto px-3.5 py-4 lg:min-h-0 lg:overflow-y-auto"
+    >
+      <h3 className="text-[12.5px] font-semibold text-kb-heading">题目导航</h3>
+      <div className="mt-2 flex items-center gap-3 text-[10px] text-kb-muted">
+        <span className="inline-flex items-center gap-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-success" /> 正确
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-1.5 w-1.5 rounded-full bg-destructive" /> 错误
+        </span>
+      </div>
+      <div className="mt-4 flex min-w-max gap-5 lg:min-w-0 lg:flex-col lg:gap-4">
+        {groups.map((group) => (
+          <section key={group.type}>
+            <h4 className="text-[11px] font-medium text-kb-body">
+              {group.type}
+              <span className="ml-1 font-normal text-kb-muted">({group.items.length} 题)</span>
+            </h4>
+            <div className="mt-2 grid grid-cols-6 gap-1.5 lg:grid-cols-5">
+              {group.items.map((item) => (
+                <button
+                  key={item.no}
+                  type="button"
+                  onClick={() => jumpToQuestion(item.no)}
+                  aria-label={`查看第 ${item.no} 题，${item.isCorrect ? "正确" : "错误"}`}
+                  className={cn(
+                    "grid h-7 w-7 place-items-center rounded-[4px] text-[11px] font-semibold tabular-nums text-white transition-transform active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                    item.isCorrect ? "bg-success" : "bg-destructive",
+                  )}
+                >
+                  {item.no}
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+    </nav>
+  );
+}
+
+function ExamMetric({
+  label,
+  value,
+  tone = "default",
 }: {
-  detail: NonNullable<Awaited<ReturnType<typeof getExamDetail>>>;
+  label: string;
+  value: string;
+  tone?: "default" | "muted" | "success" | "danger";
 }) {
   return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-[17px] font-semibold text-kb-heading">题目与知识点表现</h2>
-        <p className="mt-1 text-[11.5px] text-kb-muted">
-          结合题目数与有效答题人数查看错误率，避免小样本误判。
-        </p>
-      </div>
-      <DataTableShell>
-        <table className="w-full min-w-[760px] text-left text-[12.5px]">
-          <thead className="bg-kb-table-head text-[11.5px] text-kb-muted">
-            <tr>
-              <th className="px-4 py-3 font-medium">知识点</th>
-              <th className="px-3 py-3 text-right font-medium">题目数</th>
-              <th className="px-3 py-3 text-right font-medium">有效答题人数</th>
-              <th className="px-3 py-3 text-right font-medium">错误率</th>
-              <th className="px-4 py-3 text-right font-medium">判断</th>
-            </tr>
-          </thead>
-          <tbody>
-            {detail.questionPerformance.map((item) => (
-              <tr key={item.id} className="border-t border-divider hover:bg-kb-surface/45">
-                <td className="px-4 py-3.5 font-medium text-kb-heading">{item.knowledgePoint}</td>
-                <td className="px-3 py-3.5 text-right tabular-nums text-kb-body">
-                  {item.questionCount}
-                </td>
-                <td className="px-3 py-3.5 text-right tabular-nums text-kb-body">
-                  {item.respondentCount}
-                </td>
-                <td className="px-3 py-3.5 text-right font-semibold tabular-nums text-kb-heading">
-                  {formatPercent(item.errorRate)}
-                </td>
-                <td className="px-4 py-3.5 text-right">
-                  {item.sampleSufficient ? (
-                    <span className="inline-flex items-center gap-1 text-kb-body">
-                      <FileSearch className="h-3.5 w-3.5 text-primary" /> 可用于分析
-                    </span>
-                  ) : (
-                    <span className="text-remind-foreground">样本不足</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </DataTableShell>
-    </section>
+    <div className="min-w-[68px]">
+      <dt className="text-[10.5px] text-kb-muted">{label}</dt>
+      <dd
+        className={cn(
+          "mt-1 whitespace-nowrap text-[15px] font-semibold tabular-nums text-kb-heading",
+          tone === "muted" && "text-kb-muted",
+          tone === "success" && "text-success",
+          tone === "danger" && "text-destructive",
+        )}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }
 
-function DefinitionRow({ label, value }: { label: string; value: string }) {
+function LearnerEmptyState({ status }: { status: string }) {
+  const copy =
+    status === "进行中"
+      ? ["考试进行中", "该学员正在作答，交卷后可查看答题明细。"]
+      : status === "已过期"
+        ? ["考试已过期", "该学员未在规定时间内提交答卷。"]
+        : ["尚未提交答卷", "该学员还未开始或尚未完成本次考试。"];
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-divider pb-3 last:border-b-0 last:pb-0">
-      <dt className="text-kb-muted">{label}</dt>
-      <dd className="font-semibold tabular-nums text-kb-heading">{value}</dd>
+    <div className="grid min-h-[320px] place-items-center text-center">
+      <div>
+        <p className="text-[14px] font-medium text-kb-heading">{copy[0]}</p>
+        <p className="mt-1 text-[12.5px] text-kb-muted">{copy[1]}</p>
+      </div>
     </div>
   );
+}
+
+function statusLabel(status: ExamPersonResult["status"]) {
+  if (status === "submitted") return "已提交";
+  if (status === "inProgress") return "进行中";
+  if (status === "expired") return "已过期";
+  return "未开始";
 }

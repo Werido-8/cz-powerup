@@ -4,7 +4,7 @@ import { DEFAULT_COLLECTIONS, type Collection } from "./scenario";
 import { QUIZ_SETS, type QuizSet } from "./learning-hub";
 import { getAutoGradableQuestionIdsForDoc, getQuestionIdsForDoc } from "./learning-progress";
 
-const KEY = "ai-grid-mock-store-v7";
+const KEY = "ai-grid-mock-store-v8";
 
 const DAY = 86400000;
 const daysAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString();
@@ -82,14 +82,14 @@ export type MockState = {
 
 const DEFAULT: MockState = {
   favorites: ["d1", "d2", "d8"],
-  favoriteQuestions: [],
+  favoriteQuestions: ["q1", "q3"],
   notes: [
     {
       id: "n-seed-1",
       docId: "d1",
       title: "AGC 三项指标速记",
       tag: "AGC",
-      body: "速率 / 精度 / 响应时间 三项任一未达均纳入考核;K 值法按月统计。复习时优先看 d1 第二章。",
+      body: "AGC 调节性能按调节速率、调节精度、响应时间三项综合考核，任一项未达调度合格阈值，均按对应规则纳入月度考核，不能用另外两项“平均”抵消。\n\n速记口径：\n1. 调节速率：跟踪目标功率变化的能力，关注升降负荷段是否跟上曲线，深调、启停并网初期最容易掉点。\n2. 调节精度：稳态跟踪偏差，死区设大了看起来“稳”，精度往往先被扣。\n3. 响应时间：接到指令后进入有效调节的时延，通讯抖动、控制器闭锁都会把它拉长。\n\n厂站侧执行：K 值法按月统计，值班应结合负荷率、燃料品质与控制策略看曲线，不要只看当班有没有告警。复习优先看细则第二章及厂家 SOP 中死区、速率上下限的对应关系。\n\n当班提醒：AGC 投自动前确认远方/就地、上下限、闭锁条件；退出前先跟调度说清原因，避免“自己退了还在考核窗口里”。",
       createdAt: "2024-09-12 10:24",
       collectionIds: ["kc-agc"],
     },
@@ -98,7 +98,7 @@ const DEFAULT: MockState = {
       docId: "d2",
       title: "主变停役前置核对清单",
       tag: "典型操作",
-      body: "1) 负荷转移 2) 保护连接片 3) 中性点接地刀闸 4) 调度命令与操作票一致性\n关键步骤双人监护、唱票复诵。",
+      body: "500kV 主变停役不是“拉开刀闸就结束”，前置核对漏一项，后面保护、接地、中性点都可能把人绕进去。操作前按下面四步走完再开票。\n\n1) 负荷转移\n确认并列、倒代路径和限额，低压侧、中压侧负荷是否已转移到指定变压器或线路；记录转移前后潮流，避免停役过程中另一台主变过载。\n\n2) 保护连接片\n差动、后备、瓦斯、失灵联跳压板按本次方式投退，严禁“习惯性全投/全退”。核对压板名称与定值单、一次接线图一致，特别注意旁路代路、联变分列时的范围变化。\n\n3) 中性点接地刀闸\n停役变压器中性点接地方式要与系统接地要求一致：哪台接地、哪台断开，写进操作票并在现场复诵。切换顺序错误会造成短时失地或两点接地。\n\n4) 调度命令与操作票一致性\n核对调度下令范围、设备双重名称、操作任务与现场实际状态。关键步骤双人监护、唱票复诵，操作中若方式变化，停下来重新请示，不现场“顺手改票”。",
       createdAt: "2024-08-21 14:02",
       collectionIds: ["kc-main"],
     },
@@ -107,9 +107,81 @@ const DEFAULT: MockState = {
       docId: "d10",
       title: "差动保护复盘四步法",
       tag: "继电保护",
-      body: "TA 极性 → 二次回路 → 定值 → 一次设备状态，按序核查避免遗漏。",
+      body: "差动保护动作后不要一上来就“恢复送电”。按 TA 极性 → 二次回路 → 定值 → 一次设备状态的顺序核查，前面没查完不要跳到后面，避免把二次问题当成一次故障处理。\n\n第一步：TA 极性与变比\n核对接线、极性标识、变比与保护装置采样是否一致。重点看是否有反接、开路、饱和，以及两侧 TA 型号混用造成的差流。\n\n第二步：二次回路\n查电流回路端子、屏柜连片、电缆屏蔽与接地。瞬时接地、端子松动、试验接线未恢复，都是高频误动原因。对照动作报告里的差流、制动电流波形，判断是区外穿越还是区内真实故障。\n\n第三步：定值\n核对差动门槛、比率制动、二次谐波闭锁、TA 断线闭锁是否与最新定值单一致。版本、执行日期、现场压板状态三者对不上时，先把定值问题钉死。\n\n第四步：一次设备\n绕组、套管、引线、油色谱和气体继电器。确认一次无明显异常后，才能讨论“误动后的恢复条件”。四步都记进复盘，下次值班按同一清单走，不靠临场发挥。",
       createdAt: "2024-07-08 09:15",
-      collectionIds: [],
+      collectionIds: ["kc-fault"],
+    },
+    {
+      id: "n-seed-4",
+      docId: "d2",
+      title: "主变中性点接地方式与停役配合",
+      tag: "主变",
+      body: "主变停役时中性点怎么处理，最容易和“系统必须保持一点接地”这条打架。记住：停哪台、留哪台接地，要按当前运行方式算，不能按上次票抄。\n\n配合要点：\n- 两台主变并列，停役一台前，确认另一台中性点已接地且刀闸位置核对无误。\n- 切换接地刀闸的顺序写进票：先合后拉，避免系统短时失地。\n- 间隙接地、避雷器侧的状态也要看，不要只盯接地刀闸一把。\n- 操作结束后在监控核对中性点刀闸遥信、现场位置牌、一次接线图三处一致。\n\n易错：有人停役完成后才发现接地还留在已停电变压器上，运行变变成不接地。复盘里把这一条单列成检查项。",
+      createdAt: "2024-08-19 16:40",
+      collectionIds: ["kc-main"],
+    },
+    {
+      id: "n-seed-5",
+      docId: "d4",
+      title: "500kV 主变停役操作票易错项",
+      tag: "典型操作",
+      body: "对照厂站规程和标准化程序，把近几次主变停役票里反复出现的错漏记下来，开票前先过一遍。\n\n1. 设备双重名称漏写电压等级或左右侧，调度令与现场牌对不上。\n2. 把“冷倒”写成“热倒”，或漏写旁路代路时的保护范围变化。\n3. 瓦斯、压力释放、油温高跳闸压板未按本次检修范围退出，检修中误跳运行变。\n4. 接地线（地刀）装设位置与工作地点不对应，工作票和操作票各写各的。\n5. 操作中断后未重新核对当前状态，接着往下走导致漏项。\n\n处理习惯：票面改动必须重新审核；现场发现与票不符，停止操作并汇报值班负责人。这些不是“形式”，是把误操作挡在执行前。",
+      createdAt: "2024-08-18 09:12",
+      collectionIds: ["kc-main"],
+    },
+    {
+      id: "n-seed-6",
+      docId: "d6",
+      title: "AGC 死区与调节速率现场整定要点",
+      tag: "AGC",
+      body: "厂家 SOP 里死区和速率是一对：死区太大，小指令不动作，精度差；死区太小，频繁调节，设备累、速率曲线也不好看。现场整定不要只听“调灵敏一点”。\n\n整定前先确认：\n- 当前有功上下限、滑压/定压方式、磨煤机组合是否与试验工况一致。\n- 控制器远方给定与 DCS 手自动无冲突，闭锁条件（RB、RUNBACK、主汽压力低）已理解。\n- 记录整定前 30 分钟 AGC 跟踪曲线，作为对比基线。\n\n整定时：先改死区观察稳态偏差，再动速率限幅。每次只动一个参数，等一个调度指令周期再判断。深调段、过阀点段单独看，不要用满负荷曲线代替。\n\n整定后：把参数、时间、值班人记进运行记事，并对照两细则精度、速率条款做一次自查，避免“现场顺了、月底考核没顺”。",
+      createdAt: "2024-09-10 15:05",
+      collectionIds: ["kc-agc"],
+    },
+    {
+      id: "n-seed-7",
+      docId: "d8",
+      title: "两细则月度考核对标自查清单",
+      tag: "AGC",
+      body: "月底考核出来再解释，不如月中按清单自查。把两细则里和值班最相关的几条做成固定动作。\n\nAGC：抽查本月调节速率、精度、响应时间不合格时段，对应到当时工况（启停、深调、燃料波动、通讯中断）。\n一次调频：核对投入信号、动作死区、限幅是否与试验报告一致；就地退出要有调度许可记录。\nAVC：投自动后电压越限次数、无功越限是否及时切手动并汇报。\n非计划停运、降出力：原因分类有没有填对，避免“设备问题”写成“电网原因”对不上调度口径。\n\n资料侧：细则条款、厂家 SOP、本厂月报三份对着看。自查记录留在这个目录，交接班时点一下未闭环项。",
+      createdAt: "2024-09-08 11:20",
+      collectionIds: ["kc-agc"],
+    },
+    {
+      id: "n-seed-8",
+      docId: "d3",
+      title: "母差保护误动复盘要点",
+      tag: "继电保护",
+      body: "某 500kV 站母差误动，核心不是“保护不好”，而是二次回路和运行方式变化没有同步。复盘时抓住三条线：动作时刻一次有没有故障、差流从哪来、闭锁为什么没挡住。\n\n记录要写清：\n- 动作母线、跳闸开关清单、重合/闭锁情况。\n- 故障录波：差流、制动电流、电压、开关量变位时序。\n- 当时母线倒闸、CT 二次是否有工作、试验接线是否恢复。\n- 母差比率制动、TA 断线闭锁、电压闭锁是否按定值执行。\n\n结论模板：原因（回路/定值/方式）→ 暴露的管理漏洞（谁许可、谁监护、谁验收）→ 反措（端子标记、工作结束核对、倒闸后复归检查）。同类倒闸前把这三条当必读。",
+      createdAt: "2024-08-30 17:02",
+      collectionIds: ["kc-fault"],
+    },
+    {
+      id: "n-seed-9",
+      docId: "d12",
+      title: "母线倒闸误送电：操作与监护断点",
+      tag: "故障复盘",
+      body: "误送电事故里，票面往往是对的，断在执行和监护。把断点写明白，比再背一遍步骤有用。\n\n常见断点：\n1. 倒闸中途方式变化，监护人去接电话，操作人继续走下一步。\n2. 地刀/接地线位置看错间隔，名称相近的开关、刀闸在灯光下不好辨。\n3. 五防解锁后未恢复闭锁，后续步骤失去校核。\n4. 送电前未确认工作班全部撤离、接地已拆除。\n\n当班做法：倒闸过程监护人不离岗；解锁必须登记、限时、监护；送电前“人、地、牌、图”四核对。这份笔记放在复盘目录，专题练习时当反面教材用。",
+      createdAt: "2024-08-28 08:46",
+      collectionIds: ["kc-fault"],
+    },
+    {
+      id: "n-seed-10",
+      docId: "d8",
+      title: "一次调频考试高频易错点",
+      tag: "考试",
+      body: "考试和现场最容易混的是：一次调频是系统频率变化时机组主动贡献有功，不是 AGC 指令跟踪。题目里出现“调度下达目标功率”要先分清考的是哪一套。\n\n易错点：\n- 死区：一次调频死区与 AGC 死区不是同一个参数，不能互相套用。\n- 限幅：一次调频出力限制与 AGC 上下限同时存在时，以更严的约束为准，但考核条款分开计算。\n- 投入信号：装置投入、DCS 投入、调度侧看见的状态，三处不一致时判“未投入”。\n- 试验与运行：试验步骤按厂家 SOP，运行中退出必须有调度令，考试爱考“能不能自己退”。\n\n答题策略：先判断题干说的是频率响应还是远方 AGC，再写死区、限幅、投入状态。把这页在考前过一遍。",
+      createdAt: "2024-08-22 20:18",
+      collectionIds: ["kc-exam"],
+    },
+    {
+      id: "n-seed-11",
+      docId: "d11",
+      title: "AVC 投自动后电压越限处置口诀",
+      tag: "AVC",
+      body: "AVC 投自动后母线电压越限，不要先改变压器分接头“顶回去”，顺序错了会和 AVC 对着调。\n\n口诀：看闭锁 → 转手动 → 报调度 → 查无功 → 再谈投退。\n\n1. 看闭锁：装置是否因越限、滑档、通讯异常已经闭锁；闭锁灯、报文、DCS 状态对照。\n2. 转手动：确认 AVC 切就地/手动，避免自动指令继续发。\n3. 报调度：说明越限幅度、已采取的切手动，听调度定电压曲线还是保持。\n4. 查无功：机组无功、受阻、电容器/电抗器、邻近机组 AVC 是否同时异常。\n5. 再谈投退：原因未查清不重新投自动；投之前核对目标电压、上下限、闭锁复归。\n\n考试和现场都爱考“首先应做什么”，答案通常是切手动并汇报，不是直接调档。",
+      createdAt: "2024-08-16 13:55",
+      collectionIds: ["kc-exam"],
     },
   ],
   wrong: [
@@ -225,9 +297,9 @@ const DEFAULT: MockState = {
   recentDocs: [
     { docId: "d1", visitedAt: new Date(Date.now() - 3600000).toISOString() },
     { docId: "d2", visitedAt: new Date(Date.now() - 86400000).toISOString() },
-    { docId: "d8", visitedAt: new Date(Date.now() - 86400000 * 2).toISOString() },
-    { docId: "d10", visitedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
-    { docId: "d6", visitedAt: new Date(Date.now() - 86400000 * 4).toISOString() },
+    { docId: "d9", visitedAt: new Date(Date.now() - 86400000 * 2).toISOString() },
+    { docId: "d12", visitedAt: new Date(Date.now() - 86400000 * 3).toISOString() },
+    { docId: "d13", visitedAt: new Date(Date.now() - 86400000 * 4).toISOString() },
   ],
   quizSets: QUIZ_SETS.map((q) => ({ ...q })),
   docProgress: {},
@@ -447,6 +519,26 @@ export function useMockStore() {
     return id;
   }, []);
 
+  const updateCollection = useCallback((id: string, patch: Partial<Collection>) => {
+    const s = read();
+    s.collections = s.collections.map((c) =>
+      c.id === id
+        ? { ...c, ...patch, updatedAt: new Date().toLocaleString("zh-CN", { hour12: false }) }
+        : c,
+    );
+    write(s);
+  }, []);
+
+  const removeCollection = useCallback((id: string) => {
+    const s = read();
+    s.collections = s.collections.filter((c) => c.id !== id);
+    s.notes = s.notes.map((n) => ({
+      ...n,
+      collectionIds: (n.collectionIds ?? []).filter((cid) => cid !== id),
+    }));
+    write(s);
+  }, []);
+
   const addToCollection = useCallback(
     (collectionId: string, item: { docId?: string; noteId?: string; scenarioId?: string }) => {
       const s = read();
@@ -629,6 +721,8 @@ export function useMockStore() {
     removeSpacedReview,
     hasSpacedReview,
     createCollection,
+    updateCollection,
+    removeCollection,
     addToCollection,
     saveScenarioFavorite,
     pushRecentScenario,

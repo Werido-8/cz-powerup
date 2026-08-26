@@ -14,7 +14,7 @@ export interface AiAppendContext {
   name: string;
   goal: string;
   category: string;
-  position: string;
+  specialty: string;
   difficulty: Difficulty;
   questionType: QuestionType;
   gapCount: number;
@@ -54,7 +54,7 @@ export function AiAppendConfirmDialog({
         <ul className="space-y-1.5 rounded-lg border border-border bg-muted/30 px-4 py-3 text-[12.5px]">
           <li><span className="text-muted-foreground">试卷名称：</span>{context.name}</li>
           <li><span className="text-muted-foreground">考试目标：</span>{context.goal}</li>
-          <li><span className="text-muted-foreground">适用岗位：</span>{context.position}</li>
+          <li><span className="text-muted-foreground">适用专业：</span>{context.specialty}</li>
           <li><span className="text-muted-foreground">分类：</span>{context.category}</li>
           <li><span className="text-muted-foreground">难度：</span>{difficultyLabel(context.difficulty)}</li>
           <li><span className="text-muted-foreground">题型：</span>{context.questionType}</li>

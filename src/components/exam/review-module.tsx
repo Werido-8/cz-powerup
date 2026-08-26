@@ -22,8 +22,6 @@ import {
   X,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
   ArrowUp,
   ArrowDown,
   Trash2,
@@ -32,7 +30,6 @@ import {
   ShieldCheck,
   XCircle,
   RefreshCw,
-  MoreHorizontal,
   Power,
   PlusCircle,
   ListChecks,
@@ -78,12 +75,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { RowActionBar } from "@/components/exam/row-actions";
+import { FileListCheckbox } from "@/components/knowledge/workbench/FileListCheckbox";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+  FileListRefreshButton,
+  FileListSortButton,
+} from "@/components/knowledge/workbench/KnowledgeFileTable";
 import {
   Select,
   SelectTrigger,
@@ -91,6 +88,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import type { KnowledgeSortBy } from "@/lib/knowledge/types";
 import {
   EXAM_STATS,
   REVIEW_QUESTIONS,
@@ -274,6 +272,24 @@ const REVIEW_QUESTION_TYPES: QuestionType[] = [
   "案例分析题",
 ];
 const REVIEW_DIFFICULTIES: Difficulty[] = ["易", "中", "难"];
+const REVIEW_SORT_OPTIONS: { value: KnowledgeSortBy; label: string }[] = [
+  { value: "name", label: "题干" },
+  { value: "size", label: "题型" },
+  { value: "status", label: "难度" },
+  { value: "updated", label: "来源资料" },
+];
+const REVIEW_DIFFICULTY_ORDER: Record<Difficulty, number> = { 易: 0, 中: 1, 难: 2 };
+
+function sortReviewItems(items: ReviewItem[], sortBy: KnowledgeSortBy) {
+  return [...items].sort((a, b) => {
+    if (sortBy === "name") return a.stem.localeCompare(b.stem, "zh");
+    if (sortBy === "size") return a.type.localeCompare(b.type, "zh");
+    if (sortBy === "status") {
+      return REVIEW_DIFFICULTY_ORDER[a.difficulty] - REVIEW_DIFFICULTY_ORDER[b.difficulty];
+    }
+    return a.source.localeCompare(b.source, "zh");
+  });
+}
 
 function ReviewStatusBadge({ status }: { status: ReviewItem["status"] }) {
   const cls =
@@ -298,15 +314,122 @@ function ReviewFilterField({ label, children }: { label: string; children: React
   );
 }
 
+function ReviewBatchToolbar({
+  selectedCount,
+  totalCount,
+  pageItemCount,
+  isAllResultsSelected,
+  onSelectAllResults,
+  onBatchApprove,
+  onBatchReject,
+  onBatchDelete,
+  onClearSelection,
+}: {
+  selectedCount: number;
+  totalCount: number;
+  pageItemCount: number;
+  isAllResultsSelected: boolean;
+  onSelectAllResults?: () => void;
+  onBatchApprove: () => void;
+  onBatchReject: () => void;
+  onBatchDelete: () => void;
+  onClearSelection: () => void;
+}) {
+  const allPageSelected = pageItemCount > 0 && selectedCount >= pageItemCount;
+  const canSelectAllResults =
+    !isAllResultsSelected &&
+    allPageSelected &&
+    totalCount > pageItemCount &&
+    Boolean(onSelectAllResults);
+
+  return (
+    <div
+      className={cn(
+        "relative box-border flex h-[52px] min-h-[52px] items-center justify-between gap-4 overflow-hidden border-0 bg-[rgba(52,155,172,0.055)] px-3.5",
+        "before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-primary",
+      )}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2 pl-2">
+        <div className="flex min-w-0 items-center gap-2 text-[14px] leading-[22px] text-[#526670]">
+          <CheckCircle2 className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={1.8} />
+          <span className="truncate whitespace-nowrap">
+            {isAllResultsSelected ? (
+              <>
+                已选择全部{" "}
+                <strong className="mx-1 font-semibold text-primary">{selectedCount}</strong> 道题目
+              </>
+            ) : (
+              <>
+                已选择 <strong className="mx-1 font-semibold text-primary">{selectedCount}</strong>{" "}
+                道题目
+              </>
+            )}
+          </span>
+          {canSelectAllResults && (
+            <button
+              type="button"
+              onClick={onSelectAllResults}
+              className="shrink-0 border-0 bg-transparent p-0 text-[14px] text-primary hover:underline"
+            >
+              选择全部 {totalCount} 道题目
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onBatchApprove}
+          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium text-[#344a55] transition-colors hover:bg-white/80 hover:text-primary"
+        >
+          <CheckCircle2 className="h-3.5 w-3.5 stroke-[1.8]" />
+          批量通过
+        </button>
+        <button
+          type="button"
+          onClick={onBatchReject}
+          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium text-[#d83a40] transition-colors hover:bg-[rgba(216,58,64,0.08)]"
+        >
+          <XCircle className="h-3.5 w-3.5 stroke-[1.8]" />
+          批量驳回
+        </button>
+        <button
+          type="button"
+          onClick={onBatchDelete}
+          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium text-[#d83a40] transition-colors hover:bg-[rgba(216,58,64,0.08)]"
+        >
+          <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+          批量删除
+        </button>
+        <span className="mx-1 h-5 w-px bg-[#d8e2e7]" aria-hidden />
+        <button
+          type="button"
+          onClick={onClearSelection}
+          aria-label="取消选择"
+          title="取消选择"
+          className="grid h-8 w-8 place-items-center rounded-[8px] text-[#637781] transition-colors hover:bg-white/80 hover:text-primary"
+        >
+          <X className="h-4 w-4 stroke-[1.8]" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ReviewModule() {
   const [rows, setRows] = useState<ReviewItem[]>(REVIEW_QUESTIONS);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isAllResultsSelected, setIsAllResultsSelected] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [typeFilter, setTypeFilter] = useState<QuestionType | "all">("all");
   const [originFilter, setOriginFilter] = useState<ReviewItem["origin"] | "all">("all");
   const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | "all">("all");
+  const [draftTypeFilter, setDraftTypeFilter] = useState<QuestionType | "all">("all");
+  const [draftOriginFilter, setDraftOriginFilter] = useState<ReviewItem["origin"] | "all">("all");
+  const [draftDifficultyFilter, setDraftDifficultyFilter] = useState<Difficulty | "all">("all");
   const [page, setPage] = useState(1);
-  const pageSize = 5;
+  const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const [sortBy, setSortBy] = useState<KnowledgeSortBy>("name");
 
   const [evidenceOf, setEvidenceOf] = useState<ReviewItem | null>(null);
   const [auditOf, setAuditOf] = useState<ReviewItem | null>(null);
@@ -320,15 +443,21 @@ export function ReviewModule() {
 
   const updateStatus = (ids: string[], status: ReviewItem["status"]) => {
     setRows((rs) => rs.map((r) => (ids.includes(r.id) ? { ...r, status } : r)));
-    setSelected(new Set());
+    clearSelection();
   };
 
   const removeRows = (ids: string[]) => {
     setRows((rs) => rs.filter((r) => !ids.includes(r.id)));
+    clearSelection();
+  };
+
+  const clearSelection = () => {
     setSelected(new Set());
+    setIsAllResultsSelected(false);
   };
 
   const toggle = (id: string) => {
+    setIsAllResultsSelected(false);
     setSelected((s) => {
       const n = new Set(s);
       if (n.has(id)) n.delete(id);
@@ -343,7 +472,7 @@ export function ReviewModule() {
   );
   const filteredRows = useMemo(() => {
     const normalizedKeyword = keyword.trim().toLowerCase();
-    return pendingRows.filter((row) => {
+    const matched = pendingRows.filter((row) => {
       if (typeFilter !== "all" && row.type !== typeFilter) return false;
       if (originFilter !== "all" && row.origin !== originFilter) return false;
       if (difficultyFilter !== "all" && row.difficulty !== difficultyFilter) return false;
@@ -352,7 +481,8 @@ export function ReviewModule() {
         value.toLowerCase().includes(normalizedKeyword),
       );
     });
-  }, [pendingRows, keyword, typeFilter, originFilter, difficultyFilter]);
+    return sortReviewItems(matched, sortBy);
+  }, [pendingRows, keyword, typeFilter, originFilter, difficultyFilter, sortBy]);
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageRows = useMemo(() => {
@@ -362,23 +492,42 @@ export function ReviewModule() {
 
   useEffect(() => setPage(1), [keyword, typeFilter, originFilter, difficultyFilter]);
   useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+  useEffect(() => {
     if (page > totalPages) setPage(totalPages);
   }, [page, totalPages]);
 
   const allChecked = pageRows.length > 0 && pageRows.every((row) => selected.has(row.id));
-  const toggleAll = () =>
+  const someChecked = pageRows.some((row) => selected.has(row.id)) && !allChecked;
+  const toggleAll = () => {
+    setIsAllResultsSelected(false);
     setSelected((current) => {
       const next = new Set(current);
       if (allChecked) pageRows.forEach((row) => next.delete(row.id));
       else pageRows.forEach((row) => next.add(row.id));
       return next;
     });
+  };
+  const selectAllFiltered = () => {
+    setSelected(new Set(filteredRows.map((row) => row.id)));
+    setIsAllResultsSelected(true);
+  };
 
   const selectedRows = rows.filter((r) => selected.has(r.id));
   const highRiskCount = selectedRows.filter((r) => r.similarRisk === "高").length;
 
+  const handleQuery = () => {
+    setTypeFilter(draftTypeFilter);
+    setOriginFilter(draftOriginFilter);
+    setDifficultyFilter(draftDifficultyFilter);
+  };
+
   const resetFilters = () => {
     setKeyword("");
+    setDraftTypeFilter("all");
+    setDraftOriginFilter("all");
+    setDraftDifficultyFilter("all");
     setTypeFilter("all");
     setOriginFilter("all");
     setDifficultyFilter("all");
@@ -386,10 +535,6 @@ export function ReviewModule() {
 
   return (
     <div>
-      <div className="mb-3 flex items-start gap-2 border-l-2 border-primary px-3 py-1.5 text-[12.5px] text-muted-foreground">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-        AI 生成或人工录入题目需审核后进入正式题库。所有操作均需人工确认，不会自动入库。
-      </div>
 
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-kb-border pb-3">
         <ReviewFilterField label="关键词">
@@ -398,6 +543,7 @@ export function ReviewModule() {
             <Input
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && handleQuery()}
               placeholder="搜索题干、知识点或来源"
               aria-label="搜索待审核题目"
               className="h-9 w-[250px] rounded-md border-kb-border pl-8 text-[12.5px]"
@@ -406,8 +552,8 @@ export function ReviewModule() {
         </ReviewFilterField>
         <ReviewFilterField label="题型">
           <Select
-            value={typeFilter}
-            onValueChange={(value) => setTypeFilter(value as QuestionType | "all")}
+            value={draftTypeFilter}
+            onValueChange={(value) => setDraftTypeFilter(value as QuestionType | "all")}
           >
             <SelectTrigger
               className="h-9 w-[132px] rounded-md border-kb-border text-[12.5px]"
@@ -427,8 +573,8 @@ export function ReviewModule() {
         </ReviewFilterField>
         <ReviewFilterField label="来源">
           <Select
-            value={originFilter}
-            onValueChange={(value) => setOriginFilter(value as ReviewItem["origin"] | "all")}
+            value={draftOriginFilter}
+            onValueChange={(value) => setDraftOriginFilter(value as ReviewItem["origin"] | "all")}
           >
             <SelectTrigger
               className="h-9 w-[132px] rounded-md border-kb-border text-[12.5px]"
@@ -445,8 +591,8 @@ export function ReviewModule() {
         </ReviewFilterField>
         <ReviewFilterField label="难度">
           <Select
-            value={difficultyFilter}
-            onValueChange={(value) => setDifficultyFilter(value as Difficulty | "all")}
+            value={draftDifficultyFilter}
+            onValueChange={(value) => setDraftDifficultyFilter(value as Difficulty | "all")}
           >
             <SelectTrigger
               className="h-9 w-[104px] rounded-md border-kb-border text-[12.5px]"
@@ -464,71 +610,70 @@ export function ReviewModule() {
             </SelectContent>
           </Select>
         </ReviewFilterField>
-        <button
-          type="button"
-          onClick={resetFilters}
-          className="ml-auto inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-white px-3 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <RotateCcw className="h-3.5 w-3.5" /> 重置
-        </button>
-      </div>
-
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-kb-border py-2">
-        <div className="text-[12.5px] text-muted-foreground">
-          待审核共 <span className="font-semibold text-foreground">{pendingRows.length}</span> 道
-          <span className="mx-1.5">·</span>
-          筛选后 {filteredRows.length} 道<span className="mx-1.5">·</span>
-          本页 {pageRows.length} 道<span className="mx-1.5">·</span>
-          已选 <span className="font-semibold text-foreground">{selected.size}</span> 道
-          {highRiskCount > 0 && (
-            <span className="ml-2 rounded-md bg-destructive/10 px-2 py-0.5 text-[11px] text-destructive">
-              含 {highRiskCount} 道高相似风险
-            </span>
-          )}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={handleQuery}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-[13px] font-medium text-white hover:bg-[#2b91a3]"
+          >
+            <Search className="h-3.5 w-3.5" /> 查询
+          </button>
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-white px-4 text-[13px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> 重置
+          </button>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <button
-            disabled={selected.size === 0}
-            onClick={() => setBatchApproveOpen(true)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] disabled:opacity-40 hover:bg-muted"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5" /> 批量通过
-          </button>
-          <button
-            disabled={selected.size === 0}
-            onClick={() => setBatchRejectOpen(true)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-destructive disabled:opacity-40 hover:bg-destructive/10"
-          >
-            <XCircle className="h-3.5 w-3.5" /> 批量驳回
-          </button>
-          <button
-            disabled={selected.size === 0}
-            onClick={() => setBatchDeleteOpen(true)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] text-destructive disabled:opacity-40 hover:bg-destructive/10"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> 批量删除
-          </button>
-          {/* <button
-            disabled={selected.size === 0}
-            onClick={() => toast.info(`已对 ${selected.size} 道题进行查重`)}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1 text-[12px] disabled:opacity-40 hover:bg-muted"
-          >
-            <GitMerge className="h-3.5 w-3.5" /> 批量查重
-          </button> */}
+        <div className="ml-auto flex items-center gap-2">
+          <FileListRefreshButton
+            onClick={() => {
+              toast.message("列表已刷新");
+            }}
+          />
+          <FileListSortButton
+            value={sortBy}
+            onChange={(next) => {
+              setSortBy(next);
+              setPage(1);
+            }}
+            options={REVIEW_SORT_OPTIONS}
+            ariaLabel="排序"
+          />
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-[8px] border border-border bg-card">
+      {selected.size > 0 && (
+        <div className="mb-3 overflow-hidden rounded-[8px] border border-[#D8E5E7]">
+          <ReviewBatchToolbar
+            selectedCount={selected.size}
+            totalCount={filteredRows.length}
+            pageItemCount={pageRows.length}
+            isAllResultsSelected={isAllResultsSelected}
+            onSelectAllResults={selectAllFiltered}
+            onBatchApprove={() => setBatchApproveOpen(true)}
+            onBatchReject={() => setBatchRejectOpen(true)}
+            onBatchDelete={() => setBatchDeleteOpen(true)}
+            onClearSelection={clearSelection}
+          />
+        </div>
+      )}
+
+      <div className="overflow-hidden rounded-[8px] border border-border bg-card">
+        <div className="overflow-x-auto">
         <table className="w-full text-[13px]">
           <thead className="bg-muted/40 text-[12px] text-muted-foreground">
             <tr>
               <Th className="w-10">
-                <input
-                  type="checkbox"
-                  checked={allChecked}
-                  onChange={toggleAll}
-                  className="h-3.5 w-3.5 cursor-pointer accent-primary"
-                />
+                <span className="flex items-center justify-center">
+                  <FileListCheckbox
+                    checked={allChecked}
+                    indeterminate={someChecked}
+                    onCheckedChange={() => toggleAll()}
+                    aria-label="全选当前页"
+                  />
+                </span>
               </Th>
               <Th className="min-w-[280px]">题干</Th>
               <Th>题型</Th>
@@ -562,12 +707,13 @@ export function ReviewModule() {
                 return (
                   <tr key={q.id} className="border-t border-border align-top">
                     <Td>
-                      <input
-                        type="checkbox"
-                        checked={selected.has(q.id)}
-                        onChange={() => toggle(q.id)}
-                        className="h-3.5 w-3.5 cursor-pointer accent-primary"
-                      />
+                      <span className="flex items-center justify-center">
+                        <FileListCheckbox
+                          checked={selected.has(q.id)}
+                          onCheckedChange={() => toggle(q.id)}
+                          aria-label={`选择题目 ${q.stem}`}
+                        />
+                      </span>
                     </Td>
                     <StemCell text={q.stem} />
                     <Td className="whitespace-nowrap text-muted-foreground">{q.type}</Td>
@@ -584,42 +730,45 @@ export function ReviewModule() {
                       </span>
                     </Td>
                     <Td className="max-w-[160px] text-[12px] text-muted-foreground">{q.source}</Td>
-                    <Td>
-                      <div className="flex flex-nowrap justify-end gap-0.5">
-                        <ActionBtn
-                          icon={ClipboardCheck}
-                          label="审核"
-                          tone="primary"
-                          onClick={() => setEditOf(q)}
-                        />
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-muted-foreground hover:bg-muted hover:text-foreground">
-                              <MoreHorizontal className="h-3.5 w-3.5" /> 更多
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={() => setEvidenceOf(q)}>
-                              <FileSearch className="mr-2 h-3.5 w-3.5" /> 查看依据
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={!hasAuditHistory}
-                              onClick={() => setAuditOf(q)}
-                            >
-                              <History className="mr-2 h-3.5 w-3.5" /> 审核记录
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setMergeOf(q)}>
-                              <GitMerge className="mr-2 h-3.5 w-3.5" /> 合并相似题
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setDeleteOf(q)}
-                            >
-                              <Trash2 className="mr-2 h-3.5 w-3.5" /> 删除
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                    <Td className="text-right">
+                      <RowActionBar
+                        moreAriaLabel={`${q.stem}更多操作`}
+                        actions={[
+                          {
+                            key: "review",
+                            icon: ClipboardCheck,
+                            label: "审核",
+                            tone: "primary",
+                            onClick: () => setEditOf(q),
+                          },
+                          {
+                            key: "evidence",
+                            icon: FileSearch,
+                            label: "查看依据",
+                            onClick: () => setEvidenceOf(q),
+                          },
+                          {
+                            key: "audit",
+                            icon: History,
+                            label: "审核记录",
+                            disabled: !hasAuditHistory,
+                            onClick: () => setAuditOf(q),
+                          },
+                          {
+                            key: "merge",
+                            icon: GitMerge,
+                            label: "合并相似题",
+                            onClick: () => setMergeOf(q),
+                          },
+                          {
+                            key: "delete",
+                            icon: Trash2,
+                            label: "删除",
+                            tone: "danger",
+                            onClick: () => setDeleteOf(q),
+                          },
+                        ]}
+                      />
                     </Td>
                   </tr>
                 );
@@ -627,30 +776,15 @@ export function ReviewModule() {
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted-foreground">
-        <span>
-          第 {safePage} / {totalPages} 页 · 每页 {pageSize} 道
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            disabled={safePage <= 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-muted"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" /> 上一页
-          </button>
-          <button
-            type="button"
-            disabled={safePage >= totalPages}
-            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-            className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 disabled:cursor-not-allowed disabled:opacity-40 hover:bg-muted"
-          >
-            下一页 <ChevronRight className="h-3.5 w-3.5" />
-          </button>
         </div>
+        <TableListPager
+          page={safePage}
+          totalPages={totalPages}
+          totalItems={filteredRows.length}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
       </div>
 
       <EvidenceDrawer

@@ -56,5 +56,23 @@ export function countAvailableQuestions(opts: {
   types: QuestionType[];
   diff: PracticeDifficulty;
 }): number {
-  return filterPracticeQuestions(opts).length;
+  if (opts.types.length === 0) return 0;
+
+  const categories =
+    opts.categoryKeys.length > 0
+      ? KNOWLEDGE_CATEGORIES.filter((item) => opts.categoryKeys.includes(item.key))
+      : KNOWLEDGE_CATEGORIES;
+  const bankSize = categories.reduce((sum, item) => sum + item.questionCount, 0);
+  if (bankSize === 0) return 0;
+
+  const typeShare: Record<QuestionType, number> = {
+    single: 0.46,
+    multiple: 0.24,
+    judge: 0.2,
+    text: 0.1,
+  };
+  const typeRatio = opts.types.reduce((sum, type) => sum + typeShare[type], 0);
+  const diffRatio = opts.diff === "all" ? 1 : opts.diff === "easy" ? 0.58 : 0.42;
+
+  return Math.max(1, Math.round(bankSize * typeRatio * diffRatio));
 }

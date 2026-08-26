@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   ClipboardCheck,
@@ -32,17 +32,18 @@ import {
   ShieldCheck,
   XCircle,
   RefreshCw,
-  MoreHorizontal,
   Power,
   PlusCircle,
   ListChecks,
   Clock,
   TrendingUp,
   Folder,
+  FolderPlus,
   Zap,
   SlidersHorizontal,
   RotateCcw,
   HelpCircle,
+  CircleOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageShell } from "@/components/workbench/PageShell";
@@ -77,12 +78,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { AppDialogButton } from "@/components/ui/app-dialog";
+import { AppFormInput } from "@/components/ui/app-form";
+import { KbFormDialog, KbFormField } from "@/components/knowledge/ui";
+import { RowActionBar } from "@/components/exam/row-actions";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+  FileListRefreshButton,
+  FileListSortButton,
+} from "@/components/knowledge/workbench/KnowledgeFileTable";
 import {
   Select,
   SelectTrigger,
@@ -90,6 +93,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import type { KnowledgeSortBy } from "@/lib/knowledge/types";
 import {
   EXAM_STATS,
   REVIEW_QUESTIONS,
@@ -98,6 +102,7 @@ import {
   ANSWER_DETAIL,
   PERSONNEL,
   BANK_CATEGORIES,
+  type BankCategory,
   SWAP_CANDIDATES,
   PAPER_PREVIEW,
   OPTIMIZE,
@@ -175,8 +180,16 @@ function StatCards() {
 function Th({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <th className={`px-4 py-3 text-left font-medium ${className}`}>{children}</th>;
 }
-function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-3 align-middle ${className}`}>{children}</td>;
+function Td({
+  children,
+  className,
+  ...props
+}: React.TdHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <td className={cn("px-4 py-3 align-middle", className)} {...props}>
+      {children}
+    </td>
+  );
 }
 
 function ThWithTip({
@@ -255,20 +268,29 @@ const BANK_CATEGORY_FILTER: Record<string, (row: BankQuestion) => boolean> = {
   case: (r) => /案例/.test(r.knowledge),
 };
 
-const BANK_CAT_ICONS: Record<string, typeof Folder> = {
-  all: Layers,
-  agc: TrendingUp,
-  avc: RefreshCw,
-  pf: Zap,
-  op: ListChecks,
-  fault: ShieldCheck,
-  newbie: Users,
-  reg: FileText,
-  case: History,
-};
-
 function diffOptionBadge(d: Difficulty) {
   return <span className={`rounded-md px-2 py-0.5 text-[11px] ${diffClass(d)}`}>{d}</span>;
+}
+
+const BANK_SORT_OPTIONS: { value: KnowledgeSortBy; label: string }[] = [
+  { value: "updated", label: "最近使用" },
+  { value: "name", label: "题目内容" },
+  { value: "size", label: "使用次数" },
+  { value: "status", label: "状态" },
+];
+
+const BANK_STATUS_ORDER: Record<BankQuestion["status"], number> = {
+  启用: 0,
+  禁用: 1,
+};
+
+function sortBankQuestions(items: BankQuestion[], sortBy: KnowledgeSortBy) {
+  return [...items].sort((a, b) => {
+    if (sortBy === "name") return a.stem.localeCompare(b.stem, "zh");
+    if (sortBy === "status") return BANK_STATUS_ORDER[a.status] - BANK_STATUS_ORDER[b.status];
+    if (sortBy === "size") return b.usedCount - a.usedCount;
+    return b.lastUsed.localeCompare(a.lastUsed);
+  });
 }
 
 function createBankQuestionId(rows: BankQuestion[]) {
@@ -288,6 +310,289 @@ function BankFilterField({ label, children }: { label: string; children: React.R
   );
 }
 
+function createBankCategoryKey(name: string, existing: BankCategory[]) {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^\w\u4e00-\u9fa5]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "cat";
+  const keys = new Set(existing.map((c) => c.key));
+  let key = `custom-${base}`;
+  let i = 2;
+  while (keys.has(key)) key = `custom-${base}-${i++}`;
+  return key;
+}
+
+function matchesBankCategory(row: BankQuestion, key: string, categories: BankCategory[]) {
+  if (key === "all") return true;
+  const builtin = BANK_CATEGORY_FILTER[key];
+  if (builtin) return builtin(row);
+  const category = categories.find((c) => c.key === key);
+  if (!category) return true;
+  return row.knowledge.includes(category.name);
+}
+
+function sortBankCategories(items: BankCategory[]) {
+  const all = items.find((c) => c.key === "all");
+  const rest = items
+    .filter((c) => c.key !== "all")
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
+  return all ? [all, ...rest] : rest;
+}
+
+function CategoryNameInput({
+  value,
+  onChange,
+  onCommit,
+  onCancel,
+  ariaLabel,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+  onCancel: () => void;
+  ariaLabel: string;
+  placeholder?: string;
+}) {
+  const cancelledRef = useRef(false);
+
+  return (
+    <input
+      autoFocus
+      value={value}
+      placeholder={placeholder}
+      onChange={(event) => onChange(event.target.value)}
+      onBlur={() => {
+        if (cancelledRef.current) return;
+        onCommit();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          cancelledRef.current = true;
+          onCancel();
+        }
+      }}
+      aria-label={ariaLabel}
+      className="h-9 w-full rounded-md border border-primary bg-background px-2.5 text-[13px] text-foreground outline-none focus:ring-1 focus:ring-primary/20"
+    />
+  );
+}
+
+function CategoryNavItem({
+  item,
+  active,
+  onSelect,
+  onRename,
+  onDelete,
+}: {
+  item: BankCategory;
+  active: boolean;
+  onSelect: () => void;
+  onRename?: (name: string) => boolean;
+  onDelete?: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.name);
+  const canManage = Boolean(onRename || onDelete);
+
+  useEffect(() => {
+    setDraft(item.name);
+  }, [item.name]);
+
+  const commitRename = () => {
+    const next = draft.trim();
+    if (!next || next === item.name) {
+      setDraft(item.name);
+      setEditing(false);
+      return;
+    }
+    if (onRename?.(next)) setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <CategoryNameInput
+        value={draft}
+        onChange={setDraft}
+        onCommit={commitRename}
+        onCancel={() => {
+          setDraft(item.name);
+          setEditing(false);
+        }}
+        ariaLabel="分类名称"
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "group relative flex min-h-9 min-w-[148px] items-center rounded-md xl:w-full xl:min-w-0",
+        active ? "bg-primary-soft/80 font-medium text-primary" : "text-foreground/85 hover:bg-muted/50",
+      )}
+    >
+      {active && (
+        <span className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-primary" aria-hidden />
+      )}
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-h-9 min-w-0 flex-1 items-center px-3 text-left"
+      >
+        <span className="min-w-0 flex-1 truncate text-[13.5px]">{item.name}</span>
+      </button>
+      <span
+        className={cn(
+          "mr-3 shrink-0 rounded-full px-1.5 py-px text-[10.5px] tabular-nums transition-opacity",
+          canManage && "group-hover:opacity-0 group-focus-within:opacity-0",
+          active ? "bg-primary/10 text-primary" : "bg-muted/80 text-muted-foreground",
+        )}
+      >
+        {item.count}
+      </span>
+      {canManage && (
+        <span className="absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          {onRename && (
+            <button
+              type="button"
+              aria-label={`编辑分类 ${item.name}`}
+              title="编辑"
+              onClick={() => setEditing(true)}
+              className="grid h-7 w-7 place-items-center rounded-md text-primary transition-colors hover:bg-white"
+            >
+              <Pencil className="h-3 w-3" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              aria-label={`删除分类 ${item.name}`}
+              title="删除"
+              onClick={onDelete}
+              className="grid h-7 w-7 place-items-center rounded-md text-destructive transition-colors hover:bg-white"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function BankBatchToolbar({
+  selectedCount,
+  totalCount,
+  pageItemCount,
+  isAllResultsSelected,
+  onSelectAllResults,
+  onBatchEnable,
+  onBatchDisable,
+  onBatchDelete,
+  onClearSelection,
+}: {
+  selectedCount: number;
+  totalCount: number;
+  pageItemCount: number;
+  isAllResultsSelected: boolean;
+  onSelectAllResults?: () => void;
+  onBatchEnable: () => void;
+  onBatchDisable: () => void;
+  onBatchDelete: () => void;
+  onClearSelection: () => void;
+}) {
+  const allPageSelected = pageItemCount > 0 && selectedCount >= pageItemCount;
+  const canSelectAllResults =
+    !isAllResultsSelected &&
+    allPageSelected &&
+    totalCount > pageItemCount &&
+    Boolean(onSelectAllResults);
+
+  return (
+    <div
+      className={cn(
+        "relative box-border flex h-[52px] min-h-[52px] items-center justify-between gap-4 overflow-hidden border-0 bg-[rgba(52,155,172,0.055)] px-3.5",
+        "before:absolute before:bottom-2 before:left-0 before:top-2 before:w-[3px] before:rounded-r-[3px] before:bg-primary",
+      )}
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-2 pl-2">
+        <div className="flex min-w-0 items-center gap-2 text-[14px] leading-[22px] text-[#526670]">
+          <CheckCircle2 className="h-[18px] w-[18px] shrink-0 text-primary" strokeWidth={1.8} />
+          <span className="truncate whitespace-nowrap">
+            {isAllResultsSelected ? (
+              <>
+                已选择全部{" "}
+                <strong className="mx-1 font-semibold text-primary">{selectedCount}</strong> 道题目
+              </>
+            ) : (
+              <>
+                已选择 <strong className="mx-1 font-semibold text-primary">{selectedCount}</strong>{" "}
+                道题目
+              </>
+            )}
+          </span>
+          {canSelectAllResults && (
+            <button
+              type="button"
+              onClick={onSelectAllResults}
+              className="shrink-0 border-0 bg-transparent p-0 text-[14px] text-primary hover:underline"
+            >
+              选择全部 {totalCount} 道题目
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onBatchEnable}
+          title="启用"
+          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium text-[#344a55] transition-colors hover:bg-white/80 hover:text-primary"
+        >
+          <Power className="h-3.5 w-3.5 stroke-[1.8]" />
+          启用
+        </button>
+        <button
+          type="button"
+          onClick={onBatchDisable}
+          title="禁用"
+          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium text-[#344a55] transition-colors hover:bg-white/80 hover:text-primary"
+        >
+          <CircleOff className="h-3.5 w-3.5 stroke-[1.8]" />
+          禁用
+        </button>
+        <button
+          type="button"
+          onClick={onBatchDelete}
+          title="删除"
+          className="inline-flex h-8 items-center gap-1.5 rounded-[8px] px-2.5 text-[13px] font-medium text-[#d83a40] transition-colors hover:bg-[rgba(216,58,64,0.08)]"
+        >
+          <Trash2 className="h-3.5 w-3.5 stroke-[1.8]" />
+          删除
+        </button>
+        <span className="mx-1 h-5 w-px bg-[#d8e2e7]" aria-hidden />
+        <button
+          type="button"
+          onClick={onClearSelection}
+          aria-label="取消选择"
+          title="取消选择"
+          className="grid h-8 w-8 place-items-center rounded-[8px] text-[#637781] transition-colors hover:bg-white/80 hover:text-primary"
+        >
+          <X className="h-4 w-4 stroke-[1.8]" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function BankModule() {
   const [keyword, setKeyword] = useState("");
   const [cat, setCat] = useState("all");
@@ -300,8 +605,10 @@ export function BankModule() {
   const [draftDifficulty, setDraftDifficulty] = useState<Difficulty | "all">("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(TABLE_PAGE_SIZE_DEFAULT);
+  const [sortBy, setSortBy] = useState<KnowledgeSortBy>("updated");
   const [rows, setRows] = useState<BankQuestion[]>(BANK_QUESTIONS);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isAllResultsSelected, setIsAllResultsSelected] = useState(false);
 
   const [detail, setDetail] = useState<BankQuestion | null>(null);
   const [edit, setEdit] = useState<BankQuestion | null>(null);
@@ -313,12 +620,20 @@ export function BankModule() {
   const [usage, setUsage] = useState<BankQuestion | null>(null);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [batchDisableOpen, setBatchDisableOpen] = useState(false);
+  const [categories, setCategories] = useState<BankCategory[]>(() =>
+    sortBankCategories(BANK_CATEGORIES.map((item) => ({ ...item }))),
+  );
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [deleteCategory, setDeleteCategory] = useState<BankCategory | null>(null);
+
+  const sortedCategories = useMemo(() => sortBankCategories(categories), [categories]);
 
   const filtered = useMemo(() => {
-    const matchCat = BANK_CATEGORY_FILTER[cat] ?? (() => true);
     const kw = keyword.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (!matchCat(r)) return false;
+    const matched = rows.filter((r) => {
+      if (!matchesBankCategory(r, cat, categories)) return false;
       if (filterType !== "all" && r.type !== filterType) return false;
       if (filterStatus !== "all" && r.status !== filterStatus) return false;
       if (filterDifficulty !== "all" && r.difficulty !== filterDifficulty) return false;
@@ -327,7 +642,8 @@ export function BankModule() {
         field.toLowerCase().includes(kw),
       );
     });
-  }, [rows, cat, filterType, filterStatus, filterDifficulty, keyword]);
+    return sortBankQuestions(matched, sortBy);
+  }, [rows, cat, categories, filterType, filterStatus, filterDifficulty, keyword, sortBy]);
 
   const handleFormQuery = () => {
     setCat(draftCat);
@@ -353,6 +669,53 @@ export function BankModule() {
     setDraftCat(key);
   };
 
+  const closeAddCategory = () => {
+    setAddCategoryOpen(false);
+    setAddName("");
+    setAddError(null);
+  };
+
+  const commitAddCategory = () => {
+    const name = addName.trim();
+    if (!name) {
+      setAddError("请输入分类名称");
+      return;
+    }
+    if (categories.some((c) => c.name === name)) {
+      setAddError("已存在同名分类");
+      return;
+    }
+    const next: BankCategory = {
+      key: createBankCategoryKey(name, categories),
+      name,
+      count: 0,
+    };
+    setCategories((cs) => sortBankCategories([...cs, next]));
+    selectCategory(next.key);
+    closeAddCategory();
+    toast.success("已新增分类");
+  };
+
+  const renameCategory = (key: string, name: string) => {
+    if (categories.some((c) => c.key !== key && c.name === name)) {
+      toast.error("已存在同名分类");
+      return false;
+    }
+    setCategories((cs) => sortBankCategories(cs.map((c) => (c.key === key ? { ...c, name } : c))));
+    toast.success("分类已重命名");
+    return true;
+  };
+
+  const confirmDeleteCategory = () => {
+    if (!deleteCategory) return;
+    const key = deleteCategory.key;
+    setCategories((cs) => cs.filter((c) => c.key !== key));
+    if (cat === key) selectCategory("all");
+    else if (draftCat === key) setDraftCat("all");
+    setDeleteCategory(null);
+    toast.success("分类已删除");
+  };
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageRows = useMemo(() => {
@@ -375,6 +738,11 @@ export function BankModule() {
   const toggleStatus = (id: string, status: "启用" | "禁用") =>
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
 
+  const clearSelection = () => {
+    setSelected(new Set());
+    setIsAllResultsSelected(false);
+  };
+
   const removeRows = (ids: string[]) => {
     setRows((rs) => rs.filter((r) => !ids.includes(r.id)));
     setSelected((s) => {
@@ -382,14 +750,16 @@ export function BankModule() {
       ids.forEach((id) => n.delete(id));
       return n;
     });
+    setIsAllResultsSelected(false);
   };
 
   const batchSetStatus = (ids: string[], status: "启用" | "禁用") => {
     setRows((rs) => rs.map((r) => (ids.includes(r.id) ? { ...r, status } : r)));
-    setSelected(new Set());
+    clearSelection();
   };
 
   const toggle = (id: string) => {
+    setIsAllResultsSelected(false);
     setSelected((s) => {
       const n = new Set(s);
       if (n.has(id)) n.delete(id);
@@ -400,12 +770,18 @@ export function BankModule() {
 
   const pageAllChecked = pageRows.length > 0 && pageRows.every((r) => selected.has(r.id));
   const togglePageAll = () => {
+    setIsAllResultsSelected(false);
     setSelected((s) => {
       const n = new Set(s);
       if (pageAllChecked) pageRows.forEach((r) => n.delete(r.id));
       else pageRows.forEach((r) => n.add(r.id));
       return n;
     });
+  };
+
+  const selectAllFiltered = () => {
+    setSelected(new Set(filtered.map((r) => r.id)));
+    setIsAllResultsSelected(true);
   };
 
   const selectedRows = rows.filter((r) => selected.has(r.id));
@@ -420,67 +796,45 @@ export function BankModule() {
   };
 
   return (
-    <div className="flex max-w-full min-w-0 flex-col gap-4 border-t border-kb-border pt-4 xl:flex-row">
-      <aside className="w-full shrink-0 border-b border-kb-border pb-3 xl:w-[238px] xl:border-b-0 xl:border-r xl:pb-0 xl:pr-4">
-        <div>
-          <div className="flex items-center gap-3 border-b border-border px-1 pb-3">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-kb-border bg-white text-primary">
-              <Library className="h-[18px] w-[18px]" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[14px] font-semibold text-foreground">题库分类</div>
-              <div className="mt-0.5 text-[11.5px] text-muted-foreground">按业务主题筛选</div>
-            </div>
-          </div>
-          <nav
-            className="flex gap-1 overflow-x-auto px-1 pt-2 xl:block xl:max-h-[min(38rem,68vh)] xl:space-y-1 xl:overflow-y-auto"
-            aria-label="题库分类"
+    <div className="flex max-w-full min-w-0 flex-col gap-4 xl:flex-row">
+      <aside className="w-full shrink-0 xl:w-[220px] xl:border-r xl:border-divider xl:pr-4">
+        <div className="mb-1.5 flex items-center justify-between gap-2 px-1">
+          <span className="text-[12.5px] font-medium text-muted-foreground">题目分类</span>
+          <button
+            type="button"
+            aria-label="新增分类"
+            title="新增分类"
+            onClick={() => {
+              setAddError(null);
+              setAddName("");
+              setAddCategoryOpen(true);
+            }}
+            className="grid h-7 w-7 place-items-center rounded-md text-primary transition-colors hover:bg-primary-soft/70"
           >
-            {BANK_CATEGORIES.map((c) => {
-              const active = c.key === cat;
-              const Icon = BANK_CAT_ICONS[c.key] ?? Folder;
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => selectCategory(c.key)}
-                  className={cn(
-                    "relative flex min-h-10 min-w-[148px] items-center gap-2.5 rounded-md px-3 text-left transition-colors xl:w-full xl:min-w-0",
-                    active
-                      ? "bg-primary-soft/80 font-medium text-primary"
-                      : "text-foreground/85 hover:bg-muted/50",
-                  )}
-                >
-                  {active && (
-                    <span
-                      className="absolute bottom-1.5 left-0 top-1.5 w-0.5 rounded-full bg-primary"
-                      aria-hidden
-                    />
-                  )}
-                  <Icon
-                    className={cn(
-                      "h-3.5 w-3.5 shrink-0",
-                      active ? "text-primary" : "text-muted-foreground/70",
-                    )}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-[13.5px]">{c.name}</span>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full px-1.5 py-px text-[10.5px] tabular-nums",
-                      active ? "bg-primary/10 text-primary" : "bg-muted/80 text-muted-foreground",
-                    )}
-                  >
-                    {c.count}
-                  </span>
-                </button>
-              );
-            })}
-          </nav>
+            <Plus className="h-3.5 w-3.5" />
+          </button>
         </div>
+        <nav
+          className="flex gap-1 overflow-x-auto xl:block xl:max-h-[min(38rem,68vh)] xl:space-y-0.5 xl:overflow-y-auto"
+          aria-label="题库分类"
+        >
+          {sortedCategories.map((c) => (
+            <CategoryNavItem
+              key={c.key}
+              item={c}
+              active={c.key === cat}
+              onSelect={() => selectCategory(c.key)}
+              onRename={c.key === "all" ? undefined : (name) => renameCategory(c.key, name)}
+              onDelete={
+                c.key === "all" || c.count > 0 ? undefined : () => setDeleteCategory(c)
+              }
+            />
+          ))}
+        </nav>
       </aside>
 
       <div className="min-w-0 flex-1">
-        <div className="border-b border-kb-border py-2">
+        <div className="pb-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
             <BankFilterField label="关键词">
               <div className="relative">
@@ -500,7 +854,7 @@ export function BankModule() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {BANK_CATEGORIES.map((c) => (
+                  {sortedCategories.map((c) => (
                     <SelectItem key={c.key} value={c.key} className="text-[12px]">
                       {c.key === "all" ? "全部" : c.name}
                     </SelectItem>
@@ -578,7 +932,7 @@ export function BankModule() {
                 </SelectContent>
               </Select>
             </BankFilterField>
-            <div className="flex w-full flex-wrap items-center gap-1.5 lg:ml-auto lg:w-auto lg:flex-nowrap">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={handleFormQuery}
@@ -594,69 +948,61 @@ export function BankModule() {
                 <RotateCcw className="h-3.5 w-3.5" /> 重置
               </button>
             </div>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateOpen(true)}
+                className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                <Plus className="h-3.5 w-3.5" /> 新增题目
+              </button>
+              <FileListRefreshButton
+                onClick={() => {
+                  toast.message("列表已刷新");
+                }}
+              />
+              <FileListSortButton
+                value={sortBy}
+                onChange={(next) => {
+                  setSortBy(next);
+                  setPage(1);
+                }}
+                options={BANK_SORT_OPTIONS}
+                ariaLabel="排序"
+              />
+            </div>
           </div>
         </div>
 
-        {/* 操作区：新增 + 批量 */}
-        <div className="mb-3 flex min-h-[48px] flex-wrap items-center justify-between gap-3 border-b border-kb-border px-0 py-2">
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="h-3.5 w-3.5" /> 新增题目
-          </button>
-          <div className="flex w-full flex-nowrap items-center justify-between gap-2 sm:w-auto sm:justify-start">
-            <span className="whitespace-nowrap text-[12px] text-muted-foreground">
-              已选 <span className="font-semibold text-foreground">{selected.size}</span> 项
-            </span>
-            <button
-              type="button"
-              disabled={selected.size === 0}
-              onClick={() => {
+        {/* 多选时展示批量操作条 */}
+        {selected.size > 0 && (
+          <div className="mb-3 overflow-hidden rounded-[8px] border border-[#D8E5E7]">
+            <BankBatchToolbar
+              selectedCount={selected.size}
+              totalCount={filtered.length}
+              pageItemCount={pageRows.length}
+              isAllResultsSelected={isAllResultsSelected}
+              onSelectAllResults={selectAllFiltered}
+              onBatchEnable={() => {
                 batchSetStatus(
                   selectedRows.map((r) => r.id),
                   "启用",
                 );
                 toast.success(`已启用 ${selected.size} 道题目`);
               }}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] disabled:opacity-40 hover:bg-muted"
-            >
-              <Power className="h-3.5 w-3.5" /> 启用
-            </button>
-            <button
-              type="button"
-              disabled={selected.size === 0}
-              onClick={() => setBatchDisableOpen(true)}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] disabled:opacity-40 hover:bg-muted"
-            >
-              <Ban className="h-3.5 w-3.5" /> 禁用
-            </button>
-            {/* <button
-              type="button"
-              disabled={selected.size === 0}
-              onClick={() => toast.info(`已对 ${selected.size} 道题查相似题`)}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] disabled:opacity-40 hover:bg-muted"
-            >
-              <FileSearch className="h-3.5 w-3.5" /> 查重
-            </button> */}
-            <button
-              type="button"
-              disabled={selected.size === 0}
-              onClick={() => setBatchDeleteOpen(true)}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[12px] text-destructive disabled:opacity-40 hover:bg-destructive/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> 删除
-            </button>
+              onBatchDisable={() => setBatchDisableOpen(true)}
+              onBatchDelete={() => setBatchDeleteOpen(true)}
+              onClearSelection={clearSelection}
+            />
           </div>
-        </div>
+        )}
 
-        <div className="overflow-hidden rounded-[8px] border border-[#D8E5E7] bg-card">
+        <div className="overflow-hidden rounded-[8px] border border-border bg-card">
           <div className="overflow-x-auto">
-            <table className="w-full whitespace-nowrap text-[13.5px]">
-              <thead className="bg-[#F3F7F8] text-[12.5px] text-muted-foreground">
+            <table className="w-full text-[13px]">
+              <thead className="bg-muted/40 text-[12px] text-muted-foreground">
                 <tr>
-                  <Th className="w-10 px-4 py-3.5">
+                  <Th className="w-10">
                     <input
                       type="checkbox"
                       checked={pageAllChecked}
@@ -664,20 +1010,23 @@ export function BankModule() {
                       className="h-3.5 w-3.5 cursor-pointer accent-primary"
                     />
                   </Th>
-                  <Th className="min-w-[300px] px-4 py-3.5">题目内容</Th>
-                  <Th className="px-3 py-2.5">题型</Th>
-                  <Th className="px-3 py-2.5">知识点</Th>
-                  <Th className="px-3 py-2.5">难度</Th>
-                  <Th className="px-3 py-2.5">状态</Th>
-                  <Th className="px-3 py-2.5 text-right">操作</Th>
+                  <Th className="min-w-[320px] w-[38%]">题目内容</Th>
+                  <Th className="whitespace-nowrap">题型</Th>
+                  <Th className="whitespace-nowrap">知识点</Th>
+                  <Th className="whitespace-nowrap">难度</Th>
+                  <Th className="whitespace-nowrap tabular-nums">使用次数</Th>
+                  <Th className="whitespace-nowrap">最近使用</Th>
+                  <Th className="whitespace-nowrap">正确率</Th>
+                  <Th className="whitespace-nowrap">状态</Th>
+                  <Th className="whitespace-nowrap text-right">操作</Th>
                 </tr>
               </thead>
               <tbody>
                 {pageRows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
-                      className="px-4 py-14 text-center text-[14px] text-muted-foreground"
+                      colSpan={10}
+                      className="px-4 py-12 text-center text-[13px] text-muted-foreground"
                     >
                       当前分类或搜索条件下暂无题目
                     </td>
@@ -686,9 +1035,10 @@ export function BankModule() {
                   pageRows.map((b) => (
                     <tr
                       key={b.id}
-                      className="border-t border-border transition-colors hover:bg-[#F8FBFB]"
+                      onClick={() => setDetail(b)}
+                      className="cursor-pointer border-t border-border align-middle transition-colors hover:bg-[#F8FBFB]"
                     >
-                      <Td className="px-4 py-3.5">
+                      <Td onClick={(event) => event.stopPropagation()}>
                         <input
                           type="checkbox"
                           checked={selected.has(b.id)}
@@ -696,44 +1046,44 @@ export function BankModule() {
                           className="h-3.5 w-3.5 cursor-pointer accent-primary"
                         />
                       </Td>
-                      <Td className="min-w-[360px] max-w-[560px] px-4 py-3.5">
-                        <div className="whitespace-normal text-[13.5px] font-medium leading-5 text-foreground">
-                          {b.stem}
-                        </div>
-                        <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
-                          <span className="max-w-[280px] truncate">来源 {b.source}</span>
-                          <span>使用 {b.usedCount} 次</span>
-                          <span>最近 {b.lastUsed}</span>
-                          {b.usedCount > 0 ? (
-                            <span
-                              className={
-                                b.correctRate >= 70
-                                  ? "text-success"
-                                  : b.correctRate >= 55
-                                    ? "text-warning-foreground"
-                                    : "text-destructive"
-                              }
-                            >
-                              正确率 {b.correctRate}%
-                            </span>
-                          ) : (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help">正确率 —</span>
-                              </TooltipTrigger>
-                              <TooltipContent>暂无已提交答卷，暂不计算正确率</TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      </Td>
-                      <Td className="px-3 py-2.5 text-muted-foreground">{b.type}</Td>
-                      <Td className="px-3 py-2.5">
-                        <Badge variant="secondary" className="max-w-[120px] truncate font-normal">
+                      <StemCell text={b.stem} maxWidthClass="min-w-[280px]" />
+                      <Td className="whitespace-nowrap text-muted-foreground">{b.type}</Td>
+                      <Td className="whitespace-nowrap">
+                        <Badge variant="secondary" className="font-normal">
                           {b.knowledge}
                         </Badge>
                       </Td>
-                      <Td className="px-3 py-2.5">{diffOptionBadge(b.difficulty)}</Td>
-                      <Td className="px-3 py-2.5">
+                      <Td className="whitespace-nowrap">{diffOptionBadge(b.difficulty)}</Td>
+                      <Td className="whitespace-nowrap tabular-nums text-muted-foreground">
+                        {b.usedCount}
+                      </Td>
+                      <Td className="whitespace-nowrap tabular-nums text-muted-foreground">
+                        {b.lastUsed}
+                      </Td>
+                      <Td className="whitespace-nowrap">
+                        {b.usedCount > 0 ? (
+                          <span
+                            className={cn(
+                              "tabular-nums font-medium",
+                              b.correctRate >= 70
+                                ? "text-success"
+                                : b.correctRate >= 55
+                                  ? "text-warning-foreground"
+                                  : "text-destructive",
+                            )}
+                          >
+                            {b.correctRate}%
+                          </span>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help text-muted-foreground">—</span>
+                            </TooltipTrigger>
+                            <TooltipContent>暂无已提交答卷，暂不计算正确率</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </Td>
+                      <Td className="whitespace-nowrap">
                         <span
                           className={`rounded-md px-2 py-0.5 text-[11px] ${
                             b.status === "启用"
@@ -744,48 +1094,56 @@ export function BankModule() {
                           {b.status}
                         </span>
                       </Td>
-                      <Td className="px-3 py-2.5 text-right">
-                        <div className="inline-flex flex-nowrap items-center justify-end gap-0.5">
-                          <ActionBtn icon={Eye} label="查看详情" onClick={() => setDetail(b)} />
-                          {/* 本期暂不开放：智能改写
-                          <ActionBtn icon={Wand2} label="智能改写" tone="primary" onClick={() => setRewrite(b)} />
-                          */}
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                                <MoreHorizontal className="h-3.5 w-3.5" /> 更多
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem onClick={() => setEdit(b)}>
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> 编辑
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setSimilar(b)}>
-                                <FileSearch className="mr-2 h-3.5 w-3.5" /> 查相似题
-                              </DropdownMenuItem>
-                              {b.status === "启用" ? (
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onClick={() => setDisable(b)}
-                                >
-                                  <Ban className="mr-2 h-3.5 w-3.5" /> 禁用
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={() => {
+                      <Td
+                        className="whitespace-nowrap text-right"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <RowActionBar
+                          moreAriaLabel={`${b.stem}更多操作`}
+                          actions={[
+                            {
+                              key: "detail",
+                              icon: Eye,
+                              label: "查看详情",
+                              onClick: () => setDetail(b),
+                            },
+                            {
+                              key: "edit",
+                              icon: Pencil,
+                              label: "编辑",
+                              onClick: () => setEdit(b),
+                            },
+                            {
+                              key: "similar",
+                              icon: FileSearch,
+                              label: "查相似题",
+                              onClick: () => setSimilar(b),
+                            },
+                            b.status === "启用"
+                              ? {
+                                  key: "disable",
+                                  icon: Ban,
+                                  label: "禁用",
+                                  tone: "danger" as const,
+                                  onClick: () => setDisable(b),
+                                }
+                              : {
+                                  key: "enable",
+                                  icon: Power,
+                                  label: "启用",
+                                  onClick: () => {
                                     toggleStatus(b.id, "启用");
                                     toast.success("已启用题目");
-                                  }}
-                                >
-                                  <Power className="mr-2 h-3.5 w-3.5" /> 启用
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={() => setUsage(b)}>
-                                <History className="mr-2 h-3.5 w-3.5" /> 查看使用记录
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                                  },
+                                },
+                            {
+                              key: "usage",
+                              icon: History,
+                              label: "查看使用记录",
+                              onClick: () => setUsage(b),
+                            },
+                          ]}
+                        />
                       </Td>
                     </tr>
                   ))
@@ -836,6 +1194,71 @@ export function BankModule() {
         }}
       />
       <UsageDialog q={usage} onClose={() => setUsage(null)} />
+
+      <KbFormDialog
+        open={addCategoryOpen}
+        size="compact"
+        variant="form"
+        title="新增分类"
+        titleIcon={FolderPlus}
+        onClose={closeAddCategory}
+        footer={
+          <>
+            <AppDialogButton variant="outline" onClick={closeAddCategory}>
+              取消
+            </AppDialogButton>
+            <AppDialogButton variant="primary" onClick={commitAddCategory}>
+              创建
+            </AppDialogButton>
+          </>
+        }
+      >
+        <KbFormField label="分类名称" icon={Pencil} required className="mb-0" error={addError}>
+          <AppFormInput
+            value={addName}
+            error={Boolean(addError)}
+            autoFocus
+            placeholder="请输入分类名称"
+            onChange={(event) => {
+              setAddName(event.target.value);
+              if (addError) setAddError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commitAddCategory();
+              }
+            }}
+          />
+        </KbFormField>
+      </KbFormDialog>
+
+      <Dialog open={!!deleteCategory} onOpenChange={(open) => !open && setDeleteCategory(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除分类</DialogTitle>
+            <DialogDescription>
+              确认删除分类「{deleteCategory?.name}」？该分类下的题目仍保留在全部题目中。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => setDeleteCategory(null)}
+              className="rounded-lg border border-border px-3.5 py-2 text-[12.5px] hover:bg-muted"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteCategory}
+              className="rounded-lg bg-destructive px-3.5 py-2 text-[12.5px] font-medium text-destructive-foreground hover:bg-destructive/90"
+            >
+              确认删除
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
         <DialogContent className="sm:max-w-md">
@@ -1211,6 +1634,8 @@ function BankField({ label, children }: { label: string; children: React.ReactNo
   );
 }
 
+const BANK_FORM_CONTROL = "text-[13px] shadow-none";
+
 function ChoiceOptionsEditor({
   type,
   options,
@@ -1264,7 +1689,7 @@ function ChoiceOptionsEditor({
                     options.map((x) => (x.key === o.key ? { ...x, text: e.target.value } : x)),
                   )
                 }
-                className="text-[13px]"
+                className={BANK_FORM_CONTROL}
               />
               <button
                 type="button"
@@ -1292,7 +1717,7 @@ function ChoiceOptionsEditor({
           readOnly
           value={answerDisplay}
           placeholder={isSingle ? "请在上方选择正确选项" : "请在上方勾选正确选项"}
-          className="cursor-default bg-muted/40 text-[13px]"
+          className={cn("cursor-default bg-muted/40", BANK_FORM_CONTROL)}
         />
       </BankField>
     </>
@@ -1326,13 +1751,13 @@ function JudgeOptionsEditor({
               <span className="w-5 shrink-0 text-center text-[12px] font-medium text-muted-foreground">
                 {o.key}
               </span>
-              <Input readOnly value={o.text} className="cursor-default bg-muted/30 text-[13px]" />
+              <Input readOnly value={o.text} className={cn("cursor-default bg-muted/30", BANK_FORM_CONTROL)} />
             </div>
           ))}
         </div>
       </BankField>
       <BankField label="正确答案">
-        <Input readOnly value={answerDisplay} className="cursor-default bg-muted/40 text-[13px]" />
+        <Input readOnly value={answerDisplay} className={cn("cursor-default bg-muted/40", BANK_FORM_CONTROL)} />
       </BankField>
     </>
   );
@@ -1473,7 +1898,14 @@ function BankEditDrawer({
         {open && (
           <>
             <SheetHeader className="border-b border-border px-6 py-4">
-              <SheetTitle>{isCreate ? "新增题目" : "编辑题目"}</SheetTitle>
+              <SheetTitle className="flex items-center gap-2">
+                {isCreate ? (
+                  <PlusCircle className="h-4 w-4 text-primary" />
+                ) : (
+                  <Pencil className="h-4 w-4 text-primary" />
+                )}
+                {isCreate ? "新增题目" : "编辑题目"}
+              </SheetTitle>
               <SheetDescription>
                 {isCreate ? "录入新题目并加入正式题库" : "修改正式题库题目信息"}
               </SheetDescription>
@@ -1484,13 +1916,13 @@ function BankEditDrawer({
                   value={stem}
                   onChange={(e) => setStem(e.target.value)}
                   rows={3}
-                  className="text-[13px]"
+                  className={BANK_FORM_CONTROL}
                 />
               </BankField>
               <div className="grid grid-cols-2 gap-3">
                 <BankField label="题型">
                   <Select value={type} onValueChange={(v) => handleTypeChange(v as QuestionType)}>
-                    <SelectTrigger className="text-[13px]">
+                    <SelectTrigger className={BANK_FORM_CONTROL}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1504,7 +1936,7 @@ function BankEditDrawer({
                 </BankField>
                 <BankField label="难度">
                   <Select value={difficulty} onValueChange={(v) => setDifficulty(v as Difficulty)}>
-                    <SelectTrigger className="text-[13px]">
+                    <SelectTrigger className={BANK_FORM_CONTROL}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1528,14 +1960,14 @@ function BankEditDrawer({
                   <Input
                     value={knowledge}
                     onChange={(e) => setKnowledge(e.target.value)}
-                    className="text-[13px]"
+                    className={BANK_FORM_CONTROL}
                   />
                 </BankField>
                 <BankField label="来源资料">
                   <Input
                     value={source}
                     onChange={(e) => setSource(e.target.value)}
-                    className="text-[13px]"
+                    className={BANK_FORM_CONTROL}
                   />
                 </BankField>
               </div>
@@ -1564,23 +1996,23 @@ function BankEditDrawer({
                   <Input
                     value={textAnswer}
                     onChange={(e) => setTextAnswer(e.target.value)}
-                    className="text-[13px]"
+                    className={BANK_FORM_CONTROL}
                   />
                 </BankField>
               )}
 
               {isLong && (
                 <BankField label="参考答案">
-                  <Textarea defaultValue={d?.answer} rows={3} className="text-[13px]" />
+                  <Textarea defaultValue={d?.answer} rows={3} className={BANK_FORM_CONTROL} />
                 </BankField>
               )}
 
               <BankField label="解析">
-                <Textarea defaultValue={d?.analysis} rows={3} className="text-[13px]" />
+                <Textarea defaultValue={d?.analysis} rows={3} className={BANK_FORM_CONTROL} />
               </BankField>
               <BankField label="状态">
                 <Select value={status} onValueChange={(v) => setStatus(v as "启用" | "禁用")}>
-                  <SelectTrigger className="text-[13px]">
+                  <SelectTrigger className={BANK_FORM_CONTROL}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

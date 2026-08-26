@@ -15,6 +15,8 @@ export interface ExamTask {
   name: string;
   goal: string;
   category: string;
+  /** 与新建试卷基本信息中的「适用专业」一致。 */
+  specialty: string;
   status: ExamTaskStatus;
   startsAt: string | null;
   endsAt: string | null;
@@ -34,6 +36,8 @@ export interface ExamTaskQuery {
   keyword?: string;
   status?: ExamTaskStatus | "all";
   timeRange?: "all" | "30d" | "90d";
+  goal?: string | "all";
+  specialty?: string | "all";
   teamId?: string;
   specialtyId?: string;
 }

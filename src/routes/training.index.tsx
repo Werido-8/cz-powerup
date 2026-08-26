@@ -5,13 +5,13 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronRight,
+  CircleAlert,
   ClipboardList,
   Clock3,
   History,
   Play,
   Sparkles,
   Target,
-  TrendingUp,
 } from "lucide-react";
 import { PageHeader } from "@/components/learning/ui";
 import { PageShell } from "@/components/workbench/PageShell";
@@ -90,22 +90,12 @@ function TrainingHome() {
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto xl:overflow-hidden">
-          <section className="grid gap-3 xl:min-h-0 xl:flex-[1.28] xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.62fr)]">
-            <article className="relative flex min-h-[240px] overflow-hidden rounded-[20px] border border-[#cfe4e8] bg-white p-5 shadow-[0_18px_50px_rgba(28,88,99,0.07)] xl:min-h-0 xl:p-6">
+          <section className="grid shrink-0 gap-3 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.62fr)] xl:items-stretch">
+            <article className="relative flex h-full overflow-hidden rounded-[20px] border border-[#cfe4e8] bg-white p-4 shadow-[0_18px_50px_rgba(28,88,99,0.07)] xl:p-5">
               <div className="pointer-events-none absolute inset-y-0 right-0 w-[42%] bg-[radial-gradient(circle_at_72%_38%,rgba(52,155,172,.11),transparent_64%)]" />
               <div className="pointer-events-none absolute -right-12 -top-20 h-56 w-56 rounded-full border-[32px] border-primary/[0.055]" />
-              <div
-                className="pointer-events-none absolute bottom-6 right-20 hidden h-20 w-40 opacity-55 lg:block"
-                aria-hidden
-              >
-                <span className="absolute left-0 top-11 h-2.5 w-2.5 rounded-full bg-primary/25" />
-                <span className="absolute left-16 top-2 h-3 w-3 rounded-full bg-primary/18" />
-                <span className="absolute right-1 top-16 h-2.5 w-2.5 rounded-full bg-primary/25" />
-                <span className="absolute left-2 top-12 h-px w-16 -rotate-[30deg] bg-primary/20" />
-                <span className="absolute left-[75px] top-8 h-px w-24 rotate-[22deg] bg-primary/20" />
-              </div>
 
-              <div className="relative flex min-h-0 w-full max-w-[820px] flex-col justify-between">
+              <div className="relative flex min-h-0 flex-1 flex-col justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/75 px-3 py-1 text-[12px] font-semibold text-primary backdrop-blur">
@@ -113,12 +103,11 @@ function TrainingHome() {
                     </span>
                     <span className="text-[12px] text-kb-muted">依据近 7 天答题表现生成</span>
                   </div>
-                  <h2 className="mt-3 max-w-[760px] text-[26px] font-bold tracking-[-0.035em] text-kb-heading xl:text-[32px]">
+                  <h2 className="mt-2 text-[22px] font-bold tracking-[-0.035em] text-kb-heading xl:text-[26px]">
                     {todayPractice.title}
                   </h2>
-                  <p className="mt-2 max-w-2xl text-[13px] leading-6 text-kb-muted">
-                    AGC
-                    相关题目正确率低于个人平均水平。先完成这组短练习，系统会据此更新薄弱点与错题建议。
+                  <p className="mt-1.5 max-w-2xl text-[13px] leading-6 text-kb-muted">
+                    AGC 相关题目正确率低于个人平均水平。先完成这组短练习，系统会据此更新薄弱点与错题建议。
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {todayPractice.tags.map((tag) => (
@@ -131,33 +120,14 @@ function TrainingHome() {
                     ))}
                   </div>
                 </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3">
-                  <Link
-                    to="/training/practice"
-                    className="inline-flex min-h-11 items-center gap-2 rounded-[12px] bg-primary px-5 text-[14px] font-semibold text-white shadow-[0_10px_24px_rgba(52,155,172,0.22)] transition hover:-translate-y-0.5 hover:bg-[#2b91a3]"
-                  >
-                    <Play className="h-4 w-4 fill-current" /> 开始今日练习
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <div className="flex items-center gap-5 text-[12px] text-kb-muted">
-                    <span>
-                      <strong className="mr-1 text-[18px] text-kb-heading">
-                        {todayPractice.count}
-                      </strong>
-                      题
-                    </span>
-                    <span>
-                      <strong className="mr-1 text-[18px] text-kb-heading">12</strong>分钟
-                    </span>
-                    <span>
-                      <strong className="mr-1 text-[18px] text-[#b56a20]">
-                        {todayPractice.mastery}%
-                      </strong>
-                      掌握度
-                    </span>
-                  </div>
-                </div>
+                <Link
+                  to="/training/practice"
+                  search={{ filters: todayPractice.filter }}
+                  className="mt-4 inline-flex min-h-11 w-fit items-center gap-2 rounded-[12px] bg-primary px-5 text-[14px] font-semibold text-white shadow-[0_10px_24px_rgba(52,155,172,0.22)] transition hover:-translate-y-0.5 hover:bg-[#2b91a3]"
+                >
+                  <Play className="h-4 w-4 fill-current" /> 开始今日练习
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
               </div>
             </article>
 
@@ -213,17 +183,14 @@ function TrainingHome() {
             </aside>
           </section>
 
-          <section className="grid gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1.28fr)_minmax(300px,.72fr)]">
-            <article className="flex min-h-0 flex-col rounded-[18px] border border-kb-border bg-white p-4">
-              <div className="flex shrink-0 flex-wrap items-end justify-between gap-2">
-                <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#b06b24]">
-                    Next focus
+          <section className="grid min-h-0 flex-1 gap-3 xl:grid-cols-[minmax(0,1.28fr)_minmax(300px,.72fr)] xl:items-stretch">
+            <article className="flex h-full min-h-0 flex-col rounded-[18px] border border-kb-border bg-white p-4">
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[#fff1e1] text-[#b3681d]">
+                    <CircleAlert className="h-4 w-4" />
                   </span>
-                  <h2 className="mt-0.5 text-[16px] font-semibold text-kb-heading">薄弱点强化</h2>
-                  <p className="mt-0.5 text-[12px] text-kb-muted">
-                    完成今日练习后，从这里选择下一轮强化内容。
-                  </p>
+                  <h2 className="text-[16px] font-semibold text-kb-heading">薄弱点强化</h2>
                 </div>
                 <Link
                   to="/training/practice"
@@ -233,39 +200,46 @@ function TrainingHome() {
                 </Link>
               </div>
               <div className="mt-3 grid min-h-0 flex-1 gap-3 md:grid-cols-3">
-                {RECOMMENDED_PRACTICES.slice(0, 3).map((item, index) => (
+                {RECOMMENDED_PRACTICES.slice(0, 3).map((item) => (
                   <Link
                     key={item.id}
                     to="/training/practice"
-                    className="group relative flex min-h-[128px] flex-col overflow-hidden rounded-[14px] border border-kb-border bg-[linear-gradient(155deg,#ffffff_0%,#f7fafb_100%)] p-3.5 transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_10px_26px_rgba(28,85,96,0.07)] xl:min-h-0"
+                    search={{ filters: item.filter }}
+                    className="group relative flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-kb-border bg-[linear-gradient(155deg,#ffffff_0%,#f7fafb_100%)] p-3.5 transition hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-[0_10px_26px_rgba(28,85,96,0.07)]"
                   >
                     <span className="absolute -right-6 -top-7 h-16 w-16 rounded-full border-[12px] border-primary/[0.035]" />
-                    <span className="text-[11px] font-semibold text-primary">0{index + 1}</span>
-                    <h3 className="mt-2 line-clamp-2 text-[13.5px] font-semibold leading-5 text-kb-heading">
+                    <span className="relative inline-flex w-fit items-center rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-kb-body shadow-sm">
+                      专项
+                    </span>
+                    <h3 className="relative mt-2.5 line-clamp-2 text-[13.5px] font-semibold leading-5 text-kb-heading">
                       {item.title}
                     </h3>
-                    <p className="mt-1 line-clamp-1 text-[12px] text-kb-muted">
-                      {item.tags.join(" · ")}
+                    <p className="relative mt-1.5 line-clamp-2 text-[12px] leading-5 text-kb-muted">
+                      {item.reason}
                     </p>
-                    <div className="mt-auto pt-3">
-                      <div className="flex items-center justify-between text-[11px] text-kb-muted">
-                        <span>建议 {item.count} 题</span>
-                        <strong className="text-[#ae671f]">掌握度 {item.mastery}%</strong>
+                    <div className="relative mt-auto flex items-end justify-between gap-2 pt-3">
+                      <div className="flex min-w-0 flex-wrap gap-1">
+                        {item.tags.slice(0, 2).map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full bg-white/90 px-2 py-0.5 text-[11px] text-kb-muted"
+                          >
+                            {tag}
+                          </span>
+                        ))}
                       </div>
-                      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#edf1f2]">
-                        <div
-                          className="h-full rounded-full bg-[#e6a04f]"
-                          style={{ width: `${item.mastery}%` }}
-                        />
-                      </div>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] font-medium text-primary">
+                        去练习
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </span>
                     </div>
                   </Link>
                 ))}
               </div>
             </article>
 
-            <div className="grid min-h-0 gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <article className="relative flex min-h-0 flex-col overflow-hidden rounded-[18px] border border-[#eadbc9] bg-[linear-gradient(135deg,#fffdf9_0%,#fff7ed_100%)] p-4">
+            <div className="grid h-full min-h-0 gap-3 sm:grid-cols-2 xl:grid-cols-1 xl:grid-rows-2">
+              <article className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-[18px] border border-[#eadbc9] bg-[linear-gradient(135deg,#fffdf9_0%,#fff7ed_100%)] p-4">
                 <div className="pointer-events-none absolute -bottom-10 -right-8 h-28 w-28 rounded-full border-[18px] border-[#d99145]/[0.06]" />
                 <div className="relative flex items-start justify-between gap-3">
                   <div>
@@ -292,7 +266,7 @@ function TrainingHome() {
 
               <Link
                 to="/training/growth"
-                className="group flex min-h-0 flex-col rounded-[18px] border border-kb-border bg-[linear-gradient(145deg,#ffffff_0%,#f4faf9_100%)] p-4 transition hover:border-primary/30 hover:shadow-[0_10px_25px_rgba(28,85,96,.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+                className="group flex h-full min-h-0 flex-col rounded-[18px] border border-kb-border bg-[linear-gradient(145deg,#ffffff_0%,#f4faf9_100%)] p-4 transition hover:border-primary/30 hover:shadow-[0_10px_25px_rgba(28,85,96,.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -334,41 +308,51 @@ function TrainingHome() {
           </section>
 
           {recentRecords.length > 0 && (
-            <section className="shrink-0 rounded-[16px] border border-kb-border bg-white px-4 py-2.5">
-              <div className="grid gap-2.5 md:grid-cols-[160px_repeat(2,minmax(0,1fr))] md:items-center">
-                <div>
+            <section className="shrink-0 rounded-[16px] border border-kb-border bg-white px-4 py-2">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-primary-soft text-primary">
+                    <History className="h-3.5 w-3.5" />
+                  </span>
                   <h2 className="text-[14px] font-semibold text-kb-heading">最近完成</h2>
-                  <p className="mt-0.5 text-[12px] text-kb-muted">训练结果已计入掌握度</p>
                 </div>
-                {recentRecords.slice(0, 2).map((record) => (
+                <Link
+                  to="/training/records"
+                  className="inline-flex items-center gap-0.5 text-[12px] font-medium text-primary"
+                >
+                  全部 <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+              <div className="grid gap-x-4 sm:grid-cols-2">
+                {recentRecords.slice(0, 8).map((record) => (
                   <Link
                     key={record.id}
                     to="/training/records"
-                    className="group flex min-h-11 items-center gap-3 rounded-[12px] bg-[#f7fafb] px-3 transition hover:bg-primary-soft/35"
+                    className="group flex min-h-8 items-center gap-2 rounded-[8px] px-1 py-0.5 transition hover:bg-[#f7fafb]"
                   >
                     <span
                       className={cn(
-                        "grid h-8 w-8 place-items-center rounded-full",
+                        "grid h-6 w-6 shrink-0 place-items-center rounded-full",
                         record.accuracy >= 80
                           ? "bg-success-soft text-success"
                           : "bg-remind-soft text-remind-foreground",
                       )}
                     >
                       {record.accuracy >= 80 ? (
-                        <CheckCircle2 className="h-4 w-4" />
+                        <CheckCircle2 className="h-3.5 w-3.5" />
                       ) : (
-                        <Target className="h-4 w-4" />
+                        <Target className="h-3.5 w-3.5" />
                       )}
                     </span>
-                    <span className="min-w-0 flex-1">
-                      <strong className="block truncate text-[13px] text-kb-heading">
-                        {record.title}
-                      </strong>
-                      <span className="text-[11px] text-kb-muted">
-                        {record.completedAt} · {record.questionCount} 题
-                      </span>
+                    <strong className="min-w-0 flex-1 truncate text-[13px] font-medium text-kb-heading">
+                      {record.title}
+                    </strong>
+                    <span className="shrink-0 text-[12px] text-kb-muted">
+                      {record.questionCount} 题
                     </span>
-                    <strong className="text-[14px] text-kb-heading">{record.accuracy}%</strong>
+                    <span className="w-[72px] shrink-0 text-right text-[12px] text-kb-muted">
+                      {record.completedAt}
+                    </span>
                   </Link>
                 ))}
               </div>

@@ -1,8 +1,8 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { PageShell } from "@/components/workbench/PageShell";
 import { TopicDetailView } from "@/components/learning/topic-detail-view";
+import { LearningBreadcrumb } from "@/components/learning/learning-breadcrumb";
+import { PageShell } from "@/components/workbench/PageShell";
 import { TOPICS } from "@/lib/mock/data";
 import { useMockStore } from "@/lib/mock/store";
 
@@ -39,15 +39,10 @@ function TopicPage() {
 
   return (
     <PageShell>
-      <nav className="mb-4 flex items-center gap-1 text-[12px] text-muted-foreground">
-        <Link to="/learn" className="hover:text-primary">
-          知识学习
-        </Link>
-        <ChevronRight className="h-3 w-3" />
-        <span>专题学习</span>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground">{topic.title}</span>
-      </nav>
+      <LearningBreadcrumb
+        current="knowledge"
+        trail={[{ label: topic.title }]}
+      />
 
       <TopicDetailView
         topic={topic}

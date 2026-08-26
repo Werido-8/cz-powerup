@@ -132,7 +132,7 @@ export function TopicPracticeSheet({
             <div className="flex flex-wrap items-center justify-between gap-3 pr-8">
               <div>
                 <DialogTitle className="text-left text-[16px]">
-                  {topic.title} · 专题练习卷
+                  {topic.title} · 专题练习
                 </DialogTitle>
                 <p className="mt-1 text-left text-[12px] text-muted-foreground">
                   汇总本专题 {items.length} 道题 · 已作答 {answeredCount} 题

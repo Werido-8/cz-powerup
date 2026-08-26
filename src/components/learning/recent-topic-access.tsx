@@ -1,6 +1,6 @@
 import { useId, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, ChevronRight, Clock3 } from "lucide-react";
+import { BookOpen, BookOpenCheck, Clock3 } from "lucide-react";
 import { DOCS } from "@/lib/mock/data";
 import { ENRICHED_TOPICS, type EnrichedTopic } from "@/lib/mock/learning-hub";
 import { getTopicProgress } from "@/lib/mock/learning-progress";
@@ -59,12 +59,26 @@ function buildRecentTopics(state: MockState, limit: number): RecentTopicItem[] {
     if (items.length >= limit) break;
   }
 
+  if (items.length < limit) {
+    for (const topic of ENRICHED_TOPICS) {
+      if (seenTopicIds.has(topic.id)) continue;
+      seenTopicIds.add(topic.id);
+      items.push({
+        topic,
+        visitedAt: `${topic.updatedAt}T09:00:00.000Z`,
+        lastDocTitle: topic.title,
+        progress: getTopicProgress(topic.id, state),
+      });
+      if (items.length >= limit) break;
+    }
+  }
+
   return items;
 }
 
 export function RecentTopicAccess({
   state,
-  limit = 3,
+  limit = 5,
   className,
 }: {
   state: MockState;
@@ -77,21 +91,20 @@ export function RecentTopicAccess({
   return (
     <section
       aria-labelledby={headingId}
-      className={cn("rounded-lg border border-kb-border bg-white p-2", className)}
+      className={cn("flex min-h-0 flex-col rounded-lg border border-kb-border bg-white p-2", className)}
     >
-      <div className="flex min-h-9 items-center justify-between gap-2 px-2">
+      <div className="flex min-h-9 shrink-0 items-center justify-between gap-2 px-2">
         <h3
           id={headingId}
           className="inline-flex items-center gap-1.5 text-[12px] font-medium text-kb-heading"
         >
           <Clock3 className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-          最近学习
+          最近访问
         </h3>
-        <span className="text-[10.5px] text-kb-muted">快速访问</span>
       </div>
 
       {items.length > 0 ? (
-        <ul className="space-y-1" aria-label="最近学习的专题">
+        <ul className="min-h-0 flex-1 space-y-0.5 overflow-hidden scrollbar-thin" aria-label="最近访问的专题">
           {items.map((item) => {
             const relativeTime = formatRelativeTime(item.visitedAt);
             const progressLabel =
@@ -107,32 +120,29 @@ export function RecentTopicAccess({
                   to="/learn/topic/$id"
                   params={{ id: item.topic.id }}
                   aria-label={`打开专题：${item.topic.title}，${relativeTime}，${progressLabel}`}
-                  title={`上次学习资料：${item.lastDocTitle}`}
-                  className="group flex min-h-11 items-center gap-2 rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-primary-soft/35 active:bg-primary-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                  title={`上次访问资料：${item.lastDocTitle}`}
+                  className="group flex min-h-8 items-center gap-1.5 rounded-md px-2 py-1 transition-colors duration-150 hover:bg-primary-soft/35 active:bg-primary-soft/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[12.5px] font-medium text-kb-heading group-hover:text-primary">
-                      {item.topic.title}
-                    </span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10.5px] text-kb-muted">
-                      <span>{relativeTime}</span>
-                      <span>{progressLabel}</span>
-                    </span>
-                  </span>
-                  <ChevronRight
-                    className="h-3.5 w-3.5 shrink-0 text-kb-muted transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary"
+                  <BookOpenCheck
+                    className="h-3.5 w-3.5 shrink-0 text-primary"
                     aria-hidden="true"
                   />
+                  <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-kb-heading group-hover:text-primary">
+                    {item.topic.title}
+                  </span>
+                  <span className="shrink-0 text-[10.5px] tabular-nums text-kb-muted">
+                    {relativeTime}
+                  </span>
                 </Link>
               </li>
             );
           })}
         </ul>
       ) : (
-        <div className="mx-1 mb-1 rounded-md border border-dashed border-kb-border bg-kb-surface/40 px-3 py-3 text-center">
-          <BookOpen className="mx-auto h-3.5 w-3.5 text-kb-muted" aria-hidden="true" />
-          <p className="mt-1.5 text-[12px] font-medium text-kb-heading">暂无学习记录</p>
-          <p className="mt-0.5 text-[10.5px] leading-4 text-kb-muted">开始学习专题后会显示在这里。</p>
+        <div className="mx-1 mb-1 flex flex-1 flex-col items-center justify-center rounded-md border border-dashed border-kb-border bg-kb-surface/40 px-3 py-4 text-center">
+          <BookOpen className="h-3.5 w-3.5 text-kb-muted" aria-hidden="true" />
+          <p className="mt-1.5 text-[12px] font-medium text-kb-heading">暂无访问记录</p>
+          <p className="mt-0.5 text-[10.5px] leading-4 text-kb-muted">打开专题后会显示在这里。</p>
         </div>
       )}
     </section>

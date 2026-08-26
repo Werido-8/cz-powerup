@@ -8,9 +8,10 @@ import {
   getFilesForPersonalTree,
   getFilesForProfessionalTree,
 } from "@/lib/knowledge/model";
+import { getLearningMaterialFiles } from "@/lib/learning/material-files";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { FileSearchMode, KnowledgeFile, KnowledgeFileVersion } from "@/lib/knowledge/types";
-import type { FileDetailSearchScope } from "@/lib/knowledge/searchNav";
+import type { FileDetailContext, FileDetailSearchScope } from "@/lib/knowledge/searchNav";
 import { resolveFileDetailReturnHref } from "@/lib/knowledge/searchNav";
 import { cn } from "@/lib/utils";
 import { FileAIAssistantPanel } from "./preview/FileAIAssistantPanel";
@@ -26,6 +27,7 @@ export function FileDetailPage({
   searchMode,
   searchResultIds,
   searchScope,
+  detailContext,
   returnFrom,
 }: {
   fileId: string;
@@ -35,44 +37,58 @@ export function FileDetailPage({
   searchMode?: FileSearchMode;
   searchResultIds?: string[];
   searchScope?: FileDetailSearchScope;
+  detailContext?: FileDetailContext;
   returnFrom?: string;
 }) {
   const navigate = useNavigate({ from: "/knowledge/file/$fileId" });
   const router = useRouter();
+  const isLearningMaterials = detailContext === "learning-materials";
   const routeFile = getFileById(fileId);
   const routeBase = initialKnowledgeBaseId ? getBaseById(initialKnowledgeBaseId) : undefined;
   const fileBase = routeFile ? getBaseById(routeFile.knowledgeBaseId) : undefined;
   const currentBase = routeBase ?? fileBase;
-  const baseFiles = currentBase ? getFilesForBase(currentBase.id) : [];
-  const currentFile = baseFiles.find((file) => file.id === fileId) ?? baseFiles[0] ?? routeFile;
+  const currentBaseId = currentBase?.id;
+  const baseFiles = useMemo(
+    () => (currentBaseId ? getFilesForBase(currentBaseId) : []),
+    [currentBaseId],
+  );
+  const currentFile = isLearningMaterials
+    ? routeFile
+    : (baseFiles.find((file) => file.id === fileId) ?? baseFiles[0] ?? routeFile);
   const versions = currentFile?.versions ?? buildDefaultVersion(currentFile);
   const currentVersion =
     versions.find((version) => version.id === versionId) ??
     versions.find((version) => version.isCurrent) ??
     versions[0];
   const historyVersion = currentVersion ? !currentVersion.isCurrent : false;
-
   // ─── List context (search / metadata filter / sorted list from origin page) ─
   const trimmedQuery = searchQuery?.trim() ?? "";
 
   const listContextFiles = useMemo<KnowledgeFile[]>(() => {
     if (!searchResultIds?.length) return [];
-    return searchResultIds.map((id) => getFileById(id)).filter((f): f is KnowledgeFile => f != null);
+    return searchResultIds
+      .map((id) => getFileById(id))
+      .filter((f): f is KnowledgeFile => f != null);
   }, [searchResultIds]);
 
   const fullFileList = useMemo<KnowledgeFile[]>(() => {
+    if (isLearningMaterials) return getLearningMaterialFiles();
     if (searchScope === "personal-all") return getFilesForPersonalTree();
     if (searchScope === "professional-all") return getFilesForProfessionalTree();
     return baseFiles;
-  }, [searchScope, baseFiles]);
+  }, [isLearningMaterials, searchScope, baseFiles]);
 
   const hasActiveSearch = Boolean(trimmedQuery);
   const hasFilteredList =
     listContextFiles.length > 0 && !isSameFileSet(listContextFiles, fullFileList);
-  const hasListContext = hasActiveSearch || hasFilteredList;
+  const hasListContext = !isLearningMaterials && (hasActiveSearch || hasFilteredList);
 
   // The file list shown in the sidebar mirrors the list page the user came from.
-  const sidebarFiles = hasListContext ? listContextFiles : fullFileList;
+  const sidebarFiles = isLearningMaterials
+    ? fullFileList
+    : hasListContext
+      ? listContextFiles
+      : fullFileList;
 
   const exitResultsLabel =
     searchScope === "personal-all"
@@ -90,13 +106,15 @@ export function FileDetailPage({
     });
   };
 
-  const sidebarTitle = hasListContext
-    ? trimmedQuery
-      ? "检索结果"
-      : "筛选结果"
-    : searchScope
-      ? "全部文件列表"
-      : "当前库文件";
+  const sidebarTitle = isLearningMaterials
+    ? "学习资料"
+    : hasListContext
+      ? trimmedQuery
+        ? "检索结果"
+        : "筛选结果"
+      : searchScope
+        ? "全部文件列表"
+        : "当前库文件";
 
   const sidebarSubtitle =
     hasListContext && trimmedQuery ? `搜索内容："${trimmedQuery}"` : undefined;
@@ -171,10 +189,9 @@ export function FileDetailPage({
         currentFile={currentFile}
         versions={versions}
         currentVersionId={currentVersion?.id}
+        baseName={isLearningMaterials ? "知识资料" : undefined}
         onBack={handleGoBack}
-        onVersionChange={(vid) =>
-          navigate({ search: (prev) => ({ ...prev, version: vid }) })
-        }
+        onVersionChange={(vid) => navigate({ search: (prev) => ({ ...prev, version: vid }) })}
       />
 
       <div className="flex min-h-0 flex-1 overflow-hidden bg-[#F5F8FA]">

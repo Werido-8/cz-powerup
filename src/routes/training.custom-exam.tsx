@@ -1,34 +1,135 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   Check,
-  ChevronLeft,
-  Clock3,
-  FilePlus2,
-  Layers3,
+  FileText,
+  History,
+  Info,
   LoaderCircle,
   ShieldCheck,
-  SlidersHorizontal,
   Sparkles,
-  X,
+  WandSparkles,
 } from "lucide-react";
-import { PageHeader } from "@/components/learning/ui";
-import { PageShell } from "@/components/workbench/PageShell";
-import type { QuestionType } from "@/lib/mock/data";
-import { KNOWLEDGE_CATEGORIES } from "@/lib/mock/data";
-import { PRACTICE_TYPE_OPTIONS, type PracticeDifficulty } from "@/lib/mock/practice-filter";
+import { toast } from "sonner";
+import { PageTitleMark } from "@/components/learning/ui";
+import { TrainingPageFrame } from "@/components/learning/training-breadcrumb";
+import { KNOWLEDGE_CATEGORIES, type QuestionType } from "@/lib/mock/data";
+import {
+  PRACTICE_TYPE_OPTIONS,
+  countAvailableQuestions,
+  type PracticeDifficulty,
+} from "@/lib/mock/practice-filter";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/training/custom-exam")({
   component: CustomExamPage,
-  head: () => ({ meta: [{ title: "自主组卷 · 训练中心" }] }),
+  head: () => ({ meta: [{ title: "AI自主组卷 · 训练中心" }] }),
 });
 
-const PROMPT_SAMPLES = [
-  { label: "AGC 易错规则", prompt: "检验我对 AGC 与两细则的掌握，重点考易错规则" },
-  { label: "主变操作进阶", prompt: "生成一套主变操作进阶测评，控制在 20 分钟" },
-  { label: "结合最近错题", prompt: "结合最近错题，给我一套 15 题的查漏补缺卷" },
+const PROMPT_MAX = 200;
+const COUNT_OPTIONS = [20, 30, 45] as const;
+const DURATION_OPTIONS = [20, 30, 45] as const;
+const COUNT_MIN = 1;
+const COUNT_MAX = 200;
+const DURATION_MIN = 1;
+const DURATION_MAX = 180;
+
+function clampInt(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function parseBoundedInt(text: string, pattern: RegExp, fallback: number, min: number, max: number) {
+  const match = text.match(pattern);
+  if (!match) return fallback;
+  const parsed = Number.parseInt(match[1], 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return clampInt(parsed, min, max);
+}
+
+type ExamPrefs = {
+  recentWrong: boolean;
+  coverRules: boolean;
+  avoidDup: boolean;
+  scenario: boolean;
+};
+
+type PromptSample = {
+  label: string;
+  prompt: string;
+  title: string;
+  cats: string[];
+  types: QuestionType[];
+  count: number;
+  limit: number;
+  diff: PracticeDifficulty;
+  audience: string;
+  prefs: ExamPrefs;
+};
+
+const DEFAULT_PREFS: ExamPrefs = {
+  recentWrong: false,
+  coverRules: false,
+  avoidDup: false,
+  scenario: false,
+};
+
+const PROMPT_SAMPLES: PromptSample[] = [
+  {
+    label: "新员工入职测评",
+    prompt: "为新员工生成入职测评，覆盖厂站规程与典型操作，控制在 30 分钟。",
+    title: "新员工入职能力测评",
+    cats: ["厂站规程", "主变停役", "规程规定和制度"],
+    types: ["single", "judge", "multiple"],
+    count: 20,
+    limit: 30,
+    diff: "easy",
+    audience: "新员工 / 值班员",
+    prefs: { recentWrong: false, coverRules: true, avoidDup: true, scenario: true },
+  },
+  {
+    label: "班前抽考",
+    prompt: "生成一套班前抽考卷，覆盖近期重点规则，题量精简、时长 20 分钟。",
+    title: "班前重点规则抽考",
+    cats: ["AGC", "一次调频"],
+    types: ["single", "judge"],
+    count: 20,
+    limit: 20,
+    diff: "easy",
+    audience: "值班员",
+    prefs: { recentWrong: false, coverRules: true, avoidDup: true, scenario: false },
+  },
+  {
+    label: "AGC 易错点复盘",
+    prompt: "检验我对 AGC、一次调频与两细则的掌握，重点考易错规则。",
+    title: "AGC 与两细则能力自测",
+    cats: ["AGC", "一次调频", "主变停役"],
+    types: ["single", "judge", "multiple"],
+    count: 20,
+    limit: 30,
+    diff: "all",
+    audience: "值班员 / 新员工",
+    prefs: { recentWrong: true, coverRules: true, avoidDup: true, scenario: false },
+  },
+  {
+    label: "主变操作进阶",
+    prompt: "生成一套主变操作进阶测评，控制在 20 分钟，加入情景题。",
+    title: "主变操作进阶自测",
+    cats: ["主变停役", "电网调度运行操作", "异常处置"],
+    types: ["single", "multiple", "text"],
+    count: 20,
+    limit: 20,
+    diff: "hard",
+    audience: "值班员 / 值班长",
+    prefs: { recentWrong: true, coverRules: true, avoidDup: true, scenario: true },
+  },
+];
+
+const PREF_ITEMS: { key: keyof ExamPrefs; label: string }[] = [
+  { key: "recentWrong", label: "优先最近错题" },
+  { key: "coverRules", label: "覆盖重点规则" },
+  { key: "avoidDup", label: "避免重复题目" },
+  { key: "scenario", label: "加入情景题" },
 ];
 
 const DIFFICULTY_LABEL: Record<PracticeDifficulty, string> = {
@@ -37,14 +138,20 @@ const DIFFICULTY_LABEL: Record<PracticeDifficulty, string> = {
   hard: "进阶",
 };
 
+const TYPE_RATIO: Record<QuestionType, number> = {
+  single: 0.5,
+  judge: 0.3,
+  multiple: 0.2,
+  text: 0.15,
+};
+
 function CustomExamPage() {
   const navigate = useNavigate();
-  const [prompt, setPrompt] = useState(PROMPT_SAMPLES[0].prompt);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiReady, setAiReady] = useState(false);
+  const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [appliedPrompt, setAppliedPrompt] = useState("");
-  const [title, setTitle] = useState("AGC 与两细则能力自测");
+  const [aiReady, setAiReady] = useState(false);
+  const [title, setTitle] = useState("");
+  const [audience, setAudience] = useState("");
   const [selectedCats, setSelectedCats] = useState<Set<string>>(() => new Set(["AGC"]));
   const [selectedTypes, setSelectedTypes] = useState<Set<QuestionType>>(
     () => new Set(["single", "multiple", "judge"]),
@@ -52,46 +159,104 @@ function CustomExamPage() {
   const [diff, setDiff] = useState<PracticeDifficulty>("all");
   const [count, setCount] = useState(20);
   const [limit, setLimit] = useState(30);
-  const [passScore, setPassScore] = useState(60);
+  const [prefs, setPrefs] = useState<ExamPrefs>(DEFAULT_PREFS);
+  const passScore = 60;
 
   const categoryKeys = useMemo(() => Array.from(selectedCats), [selectedCats]);
   const types = useMemo(() => Array.from(selectedTypes), [selectedTypes]);
   const selectedCategories = KNOWLEDGE_CATEGORIES.filter((item) => selectedCats.has(item.key));
   const selectedLabels = selectedCategories.map((item) => item.label);
-  const available = selectedCategories.reduce((sum, item) => sum + item.questionCount, 0);
-  const canCreate = title.trim().length > 0 && selectedCats.size > 0 && types.length > 0;
+  const available = useMemo(
+    () => countAvailableQuestions({ categoryKeys, types, diff }),
+    [categoryKeys, types, diff],
+  );
+  const typeShares = useMemo(() => distributeTypes(types, count), [types, count]);
 
-  const generateWithAi = () => {
-    const input = prompt.trim();
+  const resolvedTitle = title.trim() || "个人能力自测";
+  const countValid = count >= COUNT_MIN && count <= COUNT_MAX;
+  const limitValid = limit >= DURATION_MIN && limit <= DURATION_MAX;
+  const canCreate = selectedCats.size > 0 && types.length > 0 && countValid && limitValid;
+
+  const coverage = canCreate
+    ? Math.min(96, 64 + selectedCats.size * 6 + (prefs.coverRules ? 6 : 0) + (prefs.recentWrong ? 4 : 0))
+    : 0;
+
+  const applyPlan = (plan: Omit<PromptSample, "label" | "prompt">) => {
+    setSelectedCats(new Set(plan.cats));
+    setSelectedTypes(new Set(plan.types));
+    setCount(clampInt(plan.count, COUNT_MIN, COUNT_MAX));
+    setLimit(clampInt(plan.limit, DURATION_MIN, DURATION_MAX));
+    setDiff(plan.diff);
+    setTitle(plan.title);
+    setAudience(plan.audience);
+    setPrefs(plan.prefs);
+    setAiReady(true);
+  };
+
+  const inferPlan = (input: string): Omit<PromptSample, "label" | "prompt"> => {
+    const preset = PROMPT_SAMPLES.find(
+      (sample) => sample.prompt === input || input.includes(sample.label),
+    );
+    if (preset) {
+      return {
+        title: preset.title,
+        cats: preset.cats,
+        types: preset.types,
+        count: preset.count,
+        limit: preset.limit,
+        diff: preset.diff,
+        audience: preset.audience,
+        prefs: preset.prefs,
+      };
+    }
+
+    const nextCats = new Set<string>();
+    KNOWLEDGE_CATEGORIES.forEach((item) => {
+      if (input.includes(item.label) || input.includes(item.key)) nextCats.add(item.key);
+    });
+    if (input.includes("主变") || input.includes("倒闸") || input.includes("操作票")) {
+      nextCats.add("主变停役");
+    }
+    if (input.includes("保护") || input.includes("故障复盘")) nextCats.add("差动保护");
+    if (input.includes("调频")) nextCats.add("一次调频");
+    if (input.includes("新员工") || input.includes("入职") || input.includes("规程")) {
+      nextCats.add("厂站规程");
+    }
+    if (nextCats.size === 0) nextCats.add("AGC");
+
+    const nextTypes = new Set<QuestionType>(["single", "judge"]);
+    if (!input.includes("抽考") && !input.includes("精简")) nextTypes.add("multiple");
+    if (input.includes("情景") || input.includes("简答") || input.includes("进阶")) nextTypes.add("text");
+
+    return {
+      title: input.includes("主变")
+        ? "主变操作进阶自测"
+        : input.includes("新员工")
+          ? "新员工入职能力测评"
+          : "AGC 与两细则能力自测",
+      cats: Array.from(nextCats),
+      types: Array.from(nextTypes),
+      count: parseBoundedInt(input, /(\d+)\s*(?:道)?题/, 20, COUNT_MIN, COUNT_MAX),
+      limit: parseBoundedInt(input, /(\d+)\s*分钟/, 30, DURATION_MIN, DURATION_MAX),
+      diff: input.includes("进阶") || input.includes("易错") ? "hard" : input.includes("新员工") || input.includes("班前") ? "easy" : "all",
+      audience: input.includes("新员工") ? "新员工 / 值班员" : input.includes("班前") ? "值班员" : "值班员 / 运行人员",
+      prefs: {
+        recentWrong: input.includes("错题") || input.includes("易错"),
+        coverRules: true,
+        avoidDup: true,
+        scenario: input.includes("情景") || input.includes("操作"),
+      },
+    };
+  };
+
+  const generateWithAi = (nextPrompt = prompt) => {
+    const input = nextPrompt.trim();
     if (!input || isGenerating) return;
     setIsGenerating(true);
-
     window.setTimeout(() => {
-      const nextCats = new Set<string>();
-      KNOWLEDGE_CATEGORIES.forEach((item) => {
-        if (input.includes(item.label) || input.toLowerCase().includes(item.key.toLowerCase())) {
-          nextCats.add(item.key);
-        }
-      });
-      if (input.includes("主变") || input.includes("倒闸") || input.includes("操作票")) {
-        nextCats.add("主变停役");
-      }
-      if (input.includes("保护") || input.includes("故障复盘")) {
-        nextCats.add("差动保护");
-      }
-      if (input.includes("调频")) nextCats.add("一次调频");
-      if (nextCats.size === 0) nextCats.add("AGC");
-      setSelectedCats(nextCats);
-      setCount(input.includes("15") ? 15 : input.includes("30") ? 30 : 20);
-      setLimit(input.includes("20 分钟") ? 20 : input.includes("45 分钟") ? 45 : 30);
-      setDiff(input.includes("进阶") || input.includes("易错") ? "hard" : "all");
-      setSelectedTypes(new Set(["single", "multiple", "judge"]));
-      setTitle(input.includes("主变") ? "主变操作进阶自测" : "AGC 与两细则能力自测");
-      setAppliedPrompt(input);
-      setAiReady(true);
-      setAiOpen(false);
+      applyPlan(inferPlan(input));
       setIsGenerating(false);
-    }, 450);
+    }, 420);
   };
 
   const toggleCategory = (key: string) => {
@@ -114,6 +279,11 @@ function CustomExamPage() {
     });
   };
 
+  const togglePref = (key: keyof ExamPrefs) => {
+    setAiReady(false);
+    setPrefs((current) => ({ ...current, [key]: !current[key] }));
+  };
+
   const createAndStart = () => {
     if (!canCreate) return;
     navigate({
@@ -128,167 +298,129 @@ function CustomExamPage() {
         count,
         limit,
         passScore,
-        title: title.trim(),
+        title: resolvedTitle,
       },
     });
   };
 
   return (
-    <PageShell compact>
-      <div className="flex h-full min-h-0 flex-col">
-        <nav aria-label="页面导航" className="mb-1 flex shrink-0 items-center text-[12px]">
+    <TrainingPageFrame current="custom-exam">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <PageTitleMark className="pt-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="truncate text-[18px] font-semibold text-kb-heading">自主组卷</h1>
+              </div>
+              <p className="mt-0.5 hidden text-[12px] text-kb-muted sm:block">
+                输入目标后自动匹配约束，确认即可开始自测。
+              </p>
+            </div>
+          </div>
           <Link
-            to="/training"
-            className="inline-flex min-h-8 items-center gap-1 text-kb-muted hover:text-primary"
+            to="/training/records"
+            search={{ source: "模拟考试" }}
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[9px] border border-kb-border bg-white px-3 text-[12px] font-medium text-kb-body transition-colors hover:border-primary/35 hover:text-primary"
           >
-            <ChevronLeft className="h-3.5 w-3.5" /> 训练中心
+            <History className="h-3.5 w-3.5" />
+            查看历史组卷
           </Link>
-        </nav>
-        <div className="shrink-0">
-          <PageHeader
-            title="自主组卷"
-            subtitle="选择测试范围与规则，实时预览无误后即可开始个人自测。"
-            size="md"
-          />
-        </div>
+        </header>
 
-        <div className="grid min-h-0 flex-1 items-stretch gap-5 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_350px] xl:overflow-hidden">
-          <main className="min-h-0 min-w-0">
-            <section className="flex h-full min-h-[640px] flex-col overflow-hidden rounded-[18px] border border-kb-border bg-white shadow-[0_12px_36px_rgba(25,69,78,0.04)] xl:min-h-0">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-9 w-9 place-items-center rounded-[9px] bg-kb-surface text-primary">
-                    <SlidersHorizontal className="h-[18px] w-[18px]" />
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_300px] xl:overflow-hidden">
+          <main className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden">
+            <section className="shrink-0 rounded-[14px] border border-kb-border bg-white px-4 py-3">
+              <SectionHeading
+                index="01"
+                title="组卷目标"
+                description="告诉 AI 测评目标，将自动匹配组卷方案。"
+              />
+              <div className="relative mt-2.5">
+                <label className="sr-only" htmlFor="exam-goal">
+                  组卷目标
+                </label>
+                <textarea
+                  id="exam-goal"
+                  value={prompt}
+                  maxLength={PROMPT_MAX}
+                  onChange={(event) => setPrompt(event.target.value.slice(0, PROMPT_MAX))}
+                  placeholder="例如：检验我对 AGC、一次调频与两细则的掌握，重点考易错规则，控制在 30 分钟。"
+                  className="h-[84px] w-full resize-none rounded-[10px] border border-kb-border bg-[#F8FBFC] px-3 py-2.5 pr-[148px] text-[13px] leading-5 text-kb-heading outline-none transition placeholder:text-kb-muted/80 focus:border-primary/55 focus:bg-white focus:ring-2 focus:ring-primary/10"
+                />
+                <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                  <span className="text-[11px] tabular-nums text-kb-muted">
+                    {prompt.length}/{PROMPT_MAX}
                   </span>
-                  <div>
-                    <h2 className="text-[16px] font-semibold text-kb-heading">组卷设置</h2>
-                    <p className="mt-0.5 text-[11.5px] text-kb-muted">
-                      所有设置在一个页面内完成，修改后预览立即更新。
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  {aiReady && !aiOpen && (
-                    <span className="hidden items-center gap-1.5 text-[11px] text-success sm:inline-flex">
-                      <Check className="h-3.5 w-3.5" /> 智能方案已应用
-                    </span>
-                  )}
                   <button
                     type="button"
-                    onClick={() => setAiOpen((open) => !open)}
-                    aria-expanded={aiOpen}
-                    className={cn(
-                      "inline-flex min-h-10 items-center gap-2 rounded-[9px] border px-3 text-[12px] font-medium transition-colors",
-                      aiOpen
-                        ? "border-primary/25 bg-primary-soft text-primary"
-                        : "border-kb-border bg-white text-kb-body hover:border-primary/30 hover:text-primary",
-                    )}
+                    onClick={() => generateWithAi()}
+                    disabled={!prompt.trim() || isGenerating}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[8px] bg-primary px-3 text-[12px] font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-45"
                   >
-                    {aiOpen ? <X className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    {aiOpen ? "收起" : aiReady ? "重新配置" : "智能配置"}
+                    {isGenerating ? (
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <WandSparkles className="h-3.5 w-3.5" />
+                    )}
+                    {isGenerating ? "匹配中" : "AI生成建议"}
                   </button>
                 </div>
               </div>
-
-              {aiOpen && (
-                <div className="border-b border-divider bg-[#fbfcfc] px-5 py-4 sm:px-6">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                    <label className="min-w-0 flex-1">
-                      <span className="sr-only">描述希望如何组卷</span>
-                      <input
-                        value={prompt}
-                        onChange={(event) => setPrompt(event.target.value)}
-                        className="min-h-11 w-full rounded-[10px] border border-kb-border bg-white px-3.5 text-[13px] text-kb-heading outline-none transition focus:border-primary/55 focus:ring-2 focus:ring-primary/10"
-                        placeholder="一句话说明想考什么，例如：主变操作进阶，20 分钟"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={generateWithAi}
-                      disabled={!prompt.trim() || isGenerating}
-                      className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[10px] bg-primary px-4 text-[12.5px] font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <LoaderCircle className="h-4 w-4 animate-spin" /> 正在配置
-                        </>
-                      ) : (
-                        <>
-                          应用建议 <ArrowRight className="h-4 w-4" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                    <span className="text-[10.5px] text-kb-muted">快速选择：</span>
-                    {PROMPT_SAMPLES.map((sample) => (
-                      <button
-                        key={sample.label}
-                        type="button"
-                        onClick={() => setPrompt(sample.prompt)}
-                        className="min-h-8 rounded-full border border-kb-border bg-white px-3 text-[10.5px] text-kb-body transition hover:border-primary/30 hover:text-primary"
-                      >
-                        {sample.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {aiReady && !aiOpen && (
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-success/10 bg-success-soft/30 px-5 py-2.5 text-[11px] sm:px-6">
-                  <span className="inline-flex min-w-0 items-center gap-2 text-success">
-                    <Check className="h-3.5 w-3.5 shrink-0" />
-                    已根据“
-                    <span className="max-w-[420px] truncate font-medium">{appliedPrompt}</span>
-                    ”更新组卷设置
-                  </span>
+              <div className="mt-2 flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+                <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-kb-muted">
+                  <Sparkles className="h-3.5 w-3.5 text-primary" />
+                  快速建议
+                </span>
+                {PROMPT_SAMPLES.map((sample) => (
                   <button
+                    key={sample.label}
                     type="button"
-                    onClick={() => setAiOpen(true)}
-                    className="font-medium text-primary hover:underline"
+                    onClick={() => {
+                      setPrompt(sample.prompt);
+                      generateWithAi(sample.prompt);
+                    }}
+                    className={cn(
+                      "h-7 shrink-0 rounded-full border px-2.5 text-[11.5px] transition-colors",
+                      prompt === sample.prompt
+                        ? "border-primary/30 bg-primary-soft text-primary"
+                        : "border-kb-border bg-white text-kb-body hover:border-primary/30 hover:text-primary",
+                    )}
                   >
-                    调整建议
+                    {sample.label}
                   </button>
-                </div>
+                ))}
+              </div>
+            </section>
+
+            <section
+              className={cn(
+                "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[14px] border border-kb-border bg-white px-4 py-3",
+                aiReady && "ring-1 ring-primary/15",
               )}
+            >
+              <SectionHeading
+                index="02"
+                title="组卷约束"
+                description={
+                  aiReady
+                    ? `已根据目标自动匹配，已选 ${selectedLabels.length} 个范围，可抽取 ${available.toLocaleString()} 道题。`
+                    : `已选 ${selectedLabels.length} 个范围，可抽取 ${available.toLocaleString()} 道题。`
+                }
+                extra={
+                  aiReady ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] text-success">
+                      <Check className="h-3.5 w-3.5" />
+                      已自动匹配
+                    </span>
+                  ) : null
+                }
+              />
 
-              <div className="min-h-0 flex-1 divide-y divide-divider overflow-y-auto px-5 sm:px-6">
-                <SettingSection
-                  index="01"
-                  title="试卷名称与规则"
-                  description="用于个人组卷记录，不计入单位正式考试。"
-                >
-                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_150px_150px]">
-                    <input
-                      value={title}
-                      onChange={(event) => setTitle(event.target.value)}
-                      className="min-h-11 rounded-[9px] border border-kb-border px-3.5 text-[13px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/10"
-                      aria-label="试卷名称"
-                    />
-                    <CompactSelect
-                      value={limit}
-                      options={[20, 30, 45, 60]}
-                      suffix="分钟"
-                      onChange={setLimit}
-                      label="考试时长"
-                    />
-                    <CompactSelect
-                      value={passScore}
-                      options={[60, 70, 80]}
-                      suffix="分及格"
-                      onChange={setPassScore}
-                      label="及格线"
-                    />
-                  </div>
-                </SettingSection>
-
-                <SettingSection
-                  index="02"
-                  title="测试范围"
-                  description={`已选 ${selectedLabels.length} 个范围，可用 ${available.toLocaleString()} 道题。`}
-                >
-                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-2.5 min-h-0 flex-1 space-y-3 overflow-y-auto">
+                <div>
+                  <div className="mb-1.5 text-[11px] font-medium text-kb-muted">知识范围</div>
+                  <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
                     {KNOWLEDGE_CATEGORIES.map((category) => {
                       const active = selectedCats.has(category.key);
                       return (
@@ -298,15 +430,13 @@ function CustomExamPage() {
                           onClick={() => toggleCategory(category.key)}
                           aria-pressed={active}
                           className={cn(
-                            "flex min-h-12 items-center justify-between gap-3 rounded-[9px] border px-3 text-left transition-colors",
+                            "flex h-10 items-center justify-between gap-2 rounded-[8px] border px-2.5 text-left transition-colors",
                             active
                               ? "border-primary/35 bg-primary-soft/60 text-primary"
                               : "border-kb-border bg-white text-kb-body hover:border-primary/25",
                           )}
                         >
-                          <span className="truncate text-[12.5px] font-medium">
-                            {category.label}
-                          </span>
+                          <span className="truncate text-[12.5px] font-medium">{category.label}</span>
                           <span className="shrink-0 text-[10.5px] tabular-nums text-kb-muted">
                             {category.questionCount} 题
                           </span>
@@ -314,53 +444,45 @@ function CustomExamPage() {
                       );
                     })}
                   </div>
-                </SettingSection>
+                </div>
 
-                <SettingSection
-                  index="03"
-                  title="题型与难度"
-                  description="根据测试目的选择题型，并设置基础、综合或进阶难度。"
-                >
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
-                    <div>
-                      <div className="mb-2 text-[11px] font-medium text-kb-muted">题型</div>
-                      <div className="flex flex-wrap gap-2">
-                        {PRACTICE_TYPE_OPTIONS.map((item) => (
-                          <ChoiceButton
-                            key={item.key}
-                            active={selectedTypes.has(item.key)}
-                            onClick={() => toggleType(item.key)}
-                            label={item.label}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="mb-2 text-[11px] font-medium text-kb-muted">难度</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(["easy", "all", "hard"] as PracticeDifficulty[]).map((value) => (
-                          <ChoiceButton
-                            key={value}
-                            active={diff === value}
-                            onClick={() => {
-                              setAiReady(false);
-                              setDiff(value);
-                            }}
-                            label={DIFFICULTY_LABEL[value]}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </SettingSection>
-
-                <SettingSection
-                  index="04"
-                  title="题量"
-                  description="建议控制在一次可以专注完成的范围内。"
-                >
-                  <div className="flex flex-wrap gap-2">
-                    {[10, 15, 20, 30, 50].map((value) => (
+                <div className="grid gap-3 lg:grid-cols-2">
+                  <ConstraintRow label="题型">
+                    {PRACTICE_TYPE_OPTIONS.map((item) => (
+                      <ChoiceButton
+                        key={item.key}
+                        active={selectedTypes.has(item.key)}
+                        onClick={() => toggleType(item.key)}
+                        label={item.label}
+                      />
+                    ))}
+                  </ConstraintRow>
+                  <ConstraintRow label="难度">
+                    {(["all", "easy", "hard"] as PracticeDifficulty[]).map((value) => (
+                      <ChoiceButton
+                        key={value}
+                        active={diff === value}
+                        onClick={() => {
+                          setAiReady(false);
+                          setDiff(value);
+                        }}
+                        label={DIFFICULTY_LABEL[value]}
+                      />
+                    ))}
+                  </ConstraintRow>
+                  <ConstraintRow label="题量" hint={`可输入 ${COUNT_MIN}–${COUNT_MAX} 题`}>
+                    <NumberField
+                      value={count}
+                      min={COUNT_MIN}
+                      max={COUNT_MAX}
+                      unit="题"
+                      ariaLabel="题量"
+                      onChange={(value) => {
+                        setAiReady(false);
+                        setCount(value);
+                      }}
+                    />
+                    {COUNT_OPTIONS.map((value) => (
                       <ChoiceButton
                         key={value}
                         active={count === value}
@@ -371,140 +493,251 @@ function CustomExamPage() {
                         label={`${value} 题`}
                       />
                     ))}
-                  </div>
-                </SettingSection>
+                  </ConstraintRow>
+                  <ConstraintRow label="时长" hint={`可输入 ${DURATION_MIN}–${DURATION_MAX} 分钟`}>
+                    <NumberField
+                      value={limit}
+                      min={DURATION_MIN}
+                      max={DURATION_MAX}
+                      unit="分钟"
+                      ariaLabel="考试时长"
+                      onChange={(value) => {
+                        setAiReady(false);
+                        setLimit(value);
+                      }}
+                    />
+                    {DURATION_OPTIONS.map((value) => (
+                      <ChoiceButton
+                        key={value}
+                        active={limit === value}
+                        onClick={() => {
+                          setAiReady(false);
+                          setLimit(value);
+                        }}
+                        label={`${value} 分钟`}
+                      />
+                    ))}
+                  </ConstraintRow>
+                </div>
+
+                <ConstraintRow label="出题偏好">
+                  {PREF_ITEMS.map((item) => (
+                    <ChoiceButton
+                      key={item.key}
+                      active={prefs[item.key]}
+                      onClick={() => togglePref(item.key)}
+                      label={item.label}
+                    />
+                  ))}
+                </ConstraintRow>
               </div>
             </section>
           </main>
 
-          <aside className="flex min-h-0 flex-col gap-4 overflow-y-auto">
-            <section className="relative flex min-h-[390px] flex-1 flex-col overflow-hidden rounded-[18px] border border-kb-border bg-[#f4fafb] p-5 shadow-[0_14px_34px_rgba(25,69,78,0.055)]">
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(90%_55%_at_100%_0%,rgba(52,155,172,0.18),transparent_62%),radial-gradient(80%_50%_at_0%_100%,rgba(52,155,172,0.08),transparent_55%),linear-gradient(180deg,#eef7f8_0%,#f7fbfb_48%,#f4fafb_100%)]" />
-              <div className="pointer-events-none absolute -right-10 -top-12 h-44 w-44 rounded-full border-[22px] border-primary/[0.04]" />
-              <div className="pointer-events-none absolute -bottom-16 -left-14 h-52 w-52 rounded-full border-[22px] border-primary/[0.035]" />
-              <div className="relative flex items-center gap-2 text-[11.5px] font-semibold text-primary">
-                <Layers3 className="h-4 w-4" /> 实时试卷预览
+          <aside className="flex min-h-0 flex-col overflow-hidden rounded-[14px] border border-kb-border bg-white">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-primary">
+                <FileText className="h-3.5 w-3.5" />
+                本次组卷预览
               </div>
-              <h2 className="relative mt-3 text-[19px] font-semibold leading-7 text-kb-heading">
-                {title.trim() || "未命名试卷"}
+              <h2 className="mt-2 text-[16px] font-semibold leading-6 text-kb-heading">
+                {canCreate ? resolvedTitle : "等待生成试卷方案"}
               </h2>
-              <div className="relative mt-5 grid grid-cols-3 gap-2">
-                <PreviewMetric value={`${count}`} label="题" />
-                <PreviewMetric value={`${limit}`} label="分钟" />
-                <PreviewMetric value={`${passScore}`} label="及格" />
+              <div className="mt-3 grid grid-cols-4 gap-1.5">
+                <PreviewMetric value={String(count)} label="题" />
+                <PreviewMetric value={String(limit)} label="分钟" />
+                <PreviewMetric value={canCreate ? "100" : "—"} label="分" />
+                <PreviewMetric value={DIFFICULTY_LABEL[diff]} label="难度" />
               </div>
-              <div className="relative mt-5 space-y-3 border-t border-divider pt-4 text-[11.5px]">
+              <dl className="mt-3 space-y-2 border-t border-divider pt-3 text-[12px]">
                 <PreviewRow
-                  label="范围"
+                  label="知识覆盖"
                   value={selectedLabels.length ? selectedLabels.join("、") : "未选择"}
                 />
-                <PreviewRow label="难度" value={DIFFICULTY_LABEL[diff]} />
-                <PreviewRow label="题型" value={`${types.length} 种`} />
-              </div>
-              <div className="relative mt-auto rounded-[10px] border border-primary/10 bg-[#f7fbfb] p-3">
-                <div className="flex items-center justify-between text-[10.5px] text-kb-muted">
-                  <span>题目覆盖</span>
-                  <span className="font-medium text-primary">
-                    {Math.min(100, Math.round((available / Math.max(count, 1)) * 18))}%
-                  </span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#e8eff0]">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{
-                      width: `${Math.min(100, Math.round((available / Math.max(count, 1)) * 18))}%`,
-                    }}
-                  />
-                </div>
-                <p className="mt-2 text-[10.5px] leading-4 text-kb-muted">
-                  题量与范围匹配良好，能够形成基础—应用—易错点梯度。
-                </p>
-              </div>
-            </section>
+                <PreviewRow
+                  label="题型构成"
+                  value={
+                    typeShares.length
+                      ? typeShares.map((item) => `${item.label} ${item.n}`).join(" · ")
+                      : "未选择"
+                  }
+                />
+              </dl>
+              <ul className="mt-3 space-y-1.5 border-t border-divider pt-3 text-[11.5px] leading-5 text-kb-body">
+                {[
+                  "根据目标自动匹配知识点与题型结构",
+                  prefs.recentWrong ? "优先抽取近期错题与高频易错点" : "控制题型比例，避免单一题型堆叠",
+                  "答题记录不影响正式考试成绩",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-1.5">
+                    <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-            <section className="rounded-[16px] border border-kb-border bg-[linear-gradient(145deg,#ffffff,#f5fafb)] p-5">
-              <div className="flex items-start gap-3">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-success-soft text-success">
-                  <ShieldCheck className="h-[18px] w-[18px]" />
-                </span>
-                <div>
-                  <h3 className="text-[13.5px] font-semibold text-kb-heading">
-                    生成后直接进入自测
-                  </h3>
-                  <p className="mt-1 text-[11.5px] leading-5 text-kb-muted">
-                    答题记录归入个人组卷，不影响单位正式考试成绩。
-                  </p>
-                </div>
-              </div>
+            <div className="shrink-0 border-t border-divider px-4 py-3">
               <button
                 type="button"
                 disabled={!canCreate}
                 onClick={createAndStart}
-                className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-[10px] bg-primary text-[13.5px] font-semibold text-white hover:bg-primary/90 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-[10px] bg-primary text-[13px] font-semibold text-white shadow-[0_6px_14px_rgba(52,155,172,0.24)] transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
               >
-                <FilePlus2 className="h-4 w-4" /> 生成试卷并开始 <ArrowRight className="h-4 w-4" />
+                开始组卷并进入测试
+                <ArrowRight className="h-4 w-4" />
               </button>
-            </section>
+     
+              <p className="mt-1.5 flex items-start gap-1 text-[10.5px] leading-4 text-kb-muted">
+                <ShieldCheck className="mt-px h-3 w-3 shrink-0" />
+                答题记录记入个人训练，不影响正式考试。
+              </p>
+            </div>
           </aside>
         </div>
       </div>
-    </PageShell>
+    </TrainingPageFrame>
   );
 }
 
-function SettingSection({
+function distributeTypes(types: QuestionType[], total: number) {
+  if (types.length === 0) return [];
+  const weights = types.map((type) => TYPE_RATIO[type]);
+  const sum = weights.reduce((acc, item) => acc + item, 0);
+  const percents = weights.map((weight) => (weight / sum) * 100);
+  const rounded = percents.map((item) => Math.round(item));
+  rounded[rounded.length - 1] += 100 - rounded.reduce((acc, item) => acc + item, 0);
+
+  const rawCounts = percents.map((percent) => (total * percent) / 100);
+  const counts = rawCounts.map((item) => Math.floor(item));
+  let remain = Math.max(0, total - counts.reduce((acc, item) => acc + item, 0));
+  const order = rawCounts
+    .map((value, index) => ({ index, frac: value - Math.floor(value) }))
+    .sort((a, b) => b.frac - a.frac);
+  order.forEach((item) => {
+    if (remain <= 0) return;
+    counts[item.index] += 1;
+    remain -= 1;
+  });
+
+  return types.map((type, index) => ({
+    type,
+    label: PRACTICE_TYPE_OPTIONS.find((item) => item.key === type)?.label.replace("题", "") ?? type,
+    percent: Math.max(0, rounded[index]),
+    n: counts[index],
+  }));
+}
+
+function SectionHeading({
   index,
   title,
   description,
-  children,
+  extra,
 }: {
   index: string;
   title: string;
   description: string;
-  children: ReactNode;
+  extra?: ReactNode;
 }) {
   return (
-    <section className="grid gap-4 py-5 lg:grid-cols-[210px_minmax(0,1fr)]">
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 text-[10.5px] font-semibold text-primary">{index}</span>
-        <div>
-          <h3 className="text-[13.5px] font-semibold text-kb-heading">{title}</h3>
-          <p className="mt-1 text-[11px] leading-5 text-kb-muted">{description}</p>
+    <div className="flex items-center justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-[10px] font-semibold text-white">
+          {index}
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[14px] font-semibold leading-5 text-kb-heading">{title}</h2>
+          <p className="truncate text-[11.5px] leading-4 text-kb-muted">{description}</p>
         </div>
       </div>
-      <div className="min-w-0">{children}</div>
-    </section>
+      {extra}
+    </div>
   );
 }
 
-function CompactSelect({
-  value,
-  options,
-  suffix,
-  onChange,
+function ConstraintRow({
   label,
+  hint,
+  children,
 }: {
-  value: number;
-  options: number[];
-  suffix: string;
-  onChange: (value: number) => void;
   label: string;
+  hint?: string;
+  children: ReactNode;
 }) {
   return (
-    <label className="relative block">
-      <Clock3 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-kb-muted" />
-      <select
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="min-h-11 w-full appearance-none rounded-[9px] border border-kb-border bg-white pl-9 pr-3 text-[12.5px] outline-none focus:border-primary"
-        aria-label={label}
-      >
-        {options.map((item) => (
-          <option key={item} value={item}>
-            {item} {suffix}
-          </option>
-        ))}
-      </select>
+    <div>
+      <div className="mb-1.5 flex items-baseline gap-1.5">
+        <div className="text-[11px] font-medium text-kb-muted">{label}</div>
+        {hint ? <span className="text-[10.5px] text-kb-muted/75">{hint}</span> : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function NumberField({
+  value,
+  onChange,
+  min,
+  max,
+  unit,
+  ariaLabel,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+  unit: string;
+  ariaLabel: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = (raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    const next = clampInt(parsed, min, max);
+    setDraft(String(next));
+    if (next !== value) onChange(next);
+  };
+
+  return (
+    <label
+      className={cn(
+        "inline-flex h-8 items-center gap-1 rounded-[8px] border bg-white px-2.5 text-[12px] transition-colors",
+        "border-primary/40 focus-within:border-primary/55 focus-within:ring-2 focus-within:ring-primary/10",
+      )}
+    >
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        aria-label={ariaLabel}
+        value={draft}
+        onChange={(event) => {
+          const nextDraft = event.target.value;
+          setDraft(nextDraft);
+          const parsed = Number.parseInt(nextDraft, 10);
+          if (Number.isFinite(parsed) && parsed >= min && parsed <= max) {
+            onChange(parsed);
+          }
+        }}
+        onBlur={(event) => commit(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+        className="h-6 w-12 border-0 bg-transparent p-0 text-center text-[12px] font-medium tabular-nums text-kb-heading outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <span className="shrink-0 text-kb-muted">{unit}</span>
     </label>
   );
 }
@@ -524,7 +757,7 @@ function ChoiceButton({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "min-h-10 rounded-[8px] border px-3.5 text-[12px] font-medium transition-colors",
+        "h-8 rounded-[8px] border px-3 text-[12px] font-medium transition-colors",
         active
           ? "border-primary/35 bg-primary-soft text-primary"
           : "border-kb-border bg-white text-kb-body hover:border-primary/30",
@@ -537,8 +770,8 @@ function ChoiceButton({
 
 function PreviewMetric({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-[10px] border border-kb-border bg-white px-2 py-3 text-center">
-      <strong className="block text-[20px] tabular-nums text-kb-heading">{value}</strong>
+    <div className="rounded-[8px] border border-kb-border bg-[#F7FBFC] px-1 py-1.5 text-center">
+      <strong className="block text-[15px] font-semibold tabular-nums text-kb-heading">{value}</strong>
       <span className="text-[10px] text-kb-muted">{label}</span>
     </div>
   );

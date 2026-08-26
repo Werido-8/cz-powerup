@@ -26,7 +26,7 @@ export interface PaperBasicInfo {
   name: string;
   goal: ExamGoal;
   category: string;
-  position: string;
+  specialty: string;
   duration: string;
   passLine: string;
   /** 固定总分试卷的目标分值。 */
@@ -41,7 +41,7 @@ const EMPTY_BASIC_INFO: PaperBasicInfo = {
   name: "",
   goal: "取证复习",
   category: "",
-  position: "",
+  specialty: "",
   duration: "",
   passLine: "60",
   totalScore: "100",
@@ -89,7 +89,7 @@ export function ExamPaperEditorPage({
         name: paper.name,
         goal: paper.goal,
         category: paper.category,
-        position: "值班员 / 值班长",
+        specialty: "运行专业",
         duration: String(paper.duration),
         passLine: "60",
         difficulty: "中",

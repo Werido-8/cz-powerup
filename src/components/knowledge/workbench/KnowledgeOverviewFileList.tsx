@@ -155,10 +155,14 @@ export function FileListSortButton({
   value,
   onChange,
   className,
+  options = FILE_LIST_SORT_OPTIONS,
+  ariaLabel = "排序",
 }: {
   value: KnowledgeSortBy;
   onChange: (sortBy: KnowledgeSortBy) => void;
   className?: string;
+  options?: { value: KnowledgeSortBy; label: string }[];
+  ariaLabel?: string;
 }) {
   const { open, setOpen, hoverProps } = useHoverMenu();
   return (
@@ -166,7 +170,8 @@ export function FileListSortButton({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="排序"
+          aria-label={ariaLabel}
+          title={ariaLabel}
           {...hoverProps}
           className={cn(
             "grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border bg-card",
@@ -188,7 +193,7 @@ export function FileListSortButton({
           value={value}
           onValueChange={(next) => onChange(next as KnowledgeSortBy)}
         >
-          {FILE_LIST_SORT_OPTIONS.map((option) => (
+          {options.map((option) => (
             <DropdownMenuRadioItem
               key={option.value}
               value={option.value}
@@ -214,6 +219,7 @@ export function FileListRefreshButton({
     <button
       type="button"
       aria-label="刷新列表"
+      title="刷新"
       onClick={onClick}
       className={cn(
         "grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border bg-card",

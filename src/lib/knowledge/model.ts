@@ -1,4 +1,5 @@
 import { FAVORITE_FILE_IDS, PARSE_EXCEPTIONS, PERMISSION_REQUESTS, RECENT_FILE_IDS } from "./data";
+import { getLearningMaterialFileById } from "@/lib/learning/material-files";
 import { getCurrentKnowledgeUser } from "./demoRole";
 import { getEffectiveLevelForUser, getGrantsForBase, type PermissionLevel } from "./permission";
 import {
@@ -163,7 +164,7 @@ export function getBaseById(id: string) {
 }
 
 export function getFileById(id: string) {
-  return getStoreFiles().find((file) => file.id === id);
+  return getStoreFiles().find((file) => file.id === id) ?? getLearningMaterialFileById(id);
 }
 
 export function getCategoryById(id: string) {
@@ -308,9 +309,7 @@ export function getRecentFiles(): KnowledgeFile[] {
     if (!file) return;
     result.push({ ...file, lastAccessedAt: buildDemoRecentAccessTime(now, index) });
   });
-  return result.sort((a, b) =>
-    (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? ""),
-  );
+  return result.sort((a, b) => (b.lastAccessedAt ?? "").localeCompare(a.lastAccessedAt ?? ""));
 }
 
 /** 演示用访问时间：前若干条落在今天，其次本周，其余更早 */
@@ -373,10 +372,7 @@ export function getMoveTargetBases(
 
     if (sourceBase) {
       if (isEmployee(user)) {
-        return (
-          sourceIsPersonal &&
-          (base.scope === "personal" || canViewBaseFiles(base, user))
-        );
+        return sourceIsPersonal && (base.scope === "personal" || canViewBaseFiles(base, user));
       }
       if (sourceIsPersonal && base.scope === "personal") {
         return canManageFileList(base, user);

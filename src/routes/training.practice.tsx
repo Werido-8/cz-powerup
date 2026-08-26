@@ -1,16 +1,15 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   BookOpenCheck,
-  ChevronLeft,
   Layers3,
   SlidersHorizontal,
   Target,
 } from "lucide-react";
 import { z } from "zod";
 import { PageHeader } from "@/components/learning/ui";
-import { PageShell } from "@/components/workbench/PageShell";
+import { TrainingPageFrame } from "@/components/learning/training-breadcrumb";
 import { KNOWLEDGE_CATEGORIES, type QuestionType } from "@/lib/mock/data";
 import {
   PRACTICE_TYPE_OPTIONS,
@@ -46,7 +45,7 @@ function PracticePage() {
     () => new Set(["single", "multiple", "judge"]),
   );
   const [diff, setDiff] = useState<PracticeDifficulty>("all");
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState(20);
 
   const categoryKeys = useMemo(() => Array.from(selectedCats), [selectedCats]);
   const types = useMemo(() => Array.from(selectedTypes), [selectedTypes]);
@@ -96,26 +95,17 @@ function PracticePage() {
   };
 
   return (
-    <PageShell compact>
-      <div className="flex h-full min-h-0 flex-col">
-        <nav aria-label="页面导航" className="mb-1 flex shrink-0 items-center text-[12px]">
-          <Link
-            to="/training"
-            className="inline-flex min-h-8 items-center gap-1 text-kb-muted hover:text-primary"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" /> 训练中心
-          </Link>
-        </nav>
+    <TrainingPageFrame current="practice">
+      <div className="shrink-0">
+        <PageHeader
+          title="专项练习"
+          subtitle="选择需要强化的知识点与练习规则，提交后可逐题查看答案解析。"
+          size="md"
+          className="mb-3"
+        />
+      </div>
 
-        <div className="shrink-0">
-          <PageHeader
-            title="专项练习"
-            subtitle="选择需要强化的知识点与练习规则，提交后可逐题查看答案解析。"
-            size="md"
-          />
-        </div>
-
-        <div className="grid min-h-0 flex-1 items-stretch gap-5 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_350px] xl:overflow-hidden">
+      <div className="grid min-h-0 flex-1 items-stretch gap-5 overflow-y-auto xl:grid-cols-[minmax(0,1fr)_350px] xl:overflow-hidden">
           <main className="min-h-0 min-w-0">
             <section className="flex h-full min-h-[560px] flex-col overflow-hidden rounded-[18px] border border-kb-border bg-white shadow-[0_12px_36px_rgba(25,69,78,0.04)] xl:min-h-0">
               <div className="flex shrink-0 items-center gap-3 border-b border-divider px-5 py-4">
@@ -207,7 +197,7 @@ function PracticePage() {
                   description="建议选择一次可以专注完成的题量，练习中可随时退出。"
                 >
                   <div className="flex flex-wrap gap-2">
-                    {[5, 10, 15, 20].map((value) => (
+                    {[10, 20, 30, 50].map((value) => (
                       <ChoiceButton
                         key={value}
                         active={count === value}
@@ -262,12 +252,6 @@ function PracticePage() {
                   }
                 />
               </dl>
-
-              <div className="relative mt-auto pt-5">
-                <div className="rounded-[10px] border border-primary/10 bg-[#f7fbfb] p-3 text-[10.5px] leading-5 text-kb-muted">
-                  当前条件可生成 {available} 道练习题，本次随机抽取 {actualCount || 0} 道。
-                </div>
-              </div>
             </section>
 
             <section className="rounded-[16px] border border-kb-border bg-[linear-gradient(145deg,#ffffff,#f5fafb)] p-5">
@@ -294,9 +278,8 @@ function PracticePage() {
               </button>
             </section>
           </aside>
-        </div>
       </div>
-    </PageShell>
+    </TrainingPageFrame>
   );
 }
 

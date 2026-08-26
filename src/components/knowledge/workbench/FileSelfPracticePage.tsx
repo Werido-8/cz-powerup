@@ -17,6 +17,7 @@ import { KbFileTypeIcon } from "@/components/knowledge/ui";
 import { PageShell } from "@/components/workbench/PageShell";
 import {
   filePracticeTypeLabel,
+  getFilePracticeAnalysis,
   getFilePracticeQuestions,
   isPracticeAnswerCorrect,
   isPracticeAnswerFilled,
@@ -24,6 +25,7 @@ import {
   type FilePracticeQuestionType,
 } from "@/lib/knowledge/filePractice";
 import { getBaseById, getFileById } from "@/lib/knowledge/model";
+import { trainingResultStorageKey } from "@/lib/training/result";
 import { cn } from "@/lib/utils";
 
 type PracticeAnswers = Record<string, string | string[]>;
@@ -182,6 +184,7 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
   const [answers, setAnswers] = useState<PracticeAnswers>({});
   const [savedAt, setSavedAt] = useState<string>();
   const [submitted, setSubmitted] = useState(false);
+  const [startedAt] = useState(() => Date.now());
 
   useEffect(() => {
     if (!file || typeof window === "undefined") return;
@@ -248,14 +251,39 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
     setSubmitted(true);
     window.localStorage.removeItem(draftKey(file.id));
     setSavedAt(undefined);
-    toast.success(
-      `已提交自测，答对 ${
-        correctCount ||
-        questions.filter((question) =>
-          isPracticeAnswerCorrect(answers[question.id], question.answer),
-        ).length
-      } / ${questions.length} 题`,
+    const resultId = `资料练习-${file.id}-${Date.now()}`;
+    const wrongIds = questions
+      .filter((question) => !isPracticeAnswerCorrect(answers[question.id], question.answer))
+      .map((question) => question.id);
+    sessionStorage.setItem(
+      trainingResultStorageKey(resultId),
+      JSON.stringify({
+        wrongIds,
+        total: questions.length,
+        answers,
+        qids: questions.map((question) => question.id),
+        elapsed: Math.max(1, Math.round((Date.now() - startedAt) / 1000)),
+        mode: "practice",
+        kind: "file",
+        title: file.name,
+        sourceLabel: "资料内练习",
+        submittedAt: new Date().toISOString(),
+        passScore: null,
+        durationLimit: 0,
+        fileId: file.id,
+        knowledgeBaseId: file.knowledgeBaseId,
+        questions: questions.map((question) => ({
+          id: question.id,
+          type: filePracticeTypeLabel[question.type],
+          stem: question.stem,
+          options: question.options,
+          answer: question.answer,
+          analysis: getFilePracticeAnalysis(question),
+          knowledge: question.knowledge,
+        })),
+      }),
     );
+    navigate({ to: "/training/result/$id", params: { id: resultId } });
   };
 
   const returnToFile = () =>
@@ -439,7 +467,7 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
                   className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
-                    打开
+                  打开
                 </button>
               </div>
 

@@ -43,28 +43,25 @@ interface MenuItem {
 
 const MENU: MenuItem[] = [
   { label: "首页工作台", to: "/" },
-  { label: "资料检索", to: "/search" },
+  { label: "智能对话", to: "/chat" },
   {
     label: "知识库",
     to: "/knowledge",
     children: [
       { label: "知识总览", to: "/knowledge" },
-      // { label: "全库资料", to: "/knowledge/all" },
       { label: "我的空间", to: "/knowledge/mine" },
-      { label: "文件比对", to: "/file-compare" },
       { label: "知识管理", to: "/knowledge/admin" },
     ],
   },
-  { label: "智能对话", to: "/chat" },
   {
     label: "能力提升",
     to: "/learn",
     children: [
       { label: "学习首页", to: "/learn", group: "我的学习" },
       { label: "知识学习", to: "/learn", search: { tab: "topic" }, group: "我的学习" },
-      { label: "题目提交记录", to: "/learn/submissions", group: "我的学习" },
       { label: "最近更新", to: "/learn/updates", group: "我的学习" },
-      { label: "个人学习成果", to: "/assets", group: "我的学习" },
+      { label: "提交记录", to: "/learn/submissions", group: "我的学习" },
+      { label: "个人沉淀", to: "/assets", group: "我的学习" },
       { label: "训练中心", to: "/training", group: "训练与测评" },
       { label: "专项练习", to: "/training/practice", group: "训练与测评" },
       { label: "自主组卷", to: "/training/custom-exam", group: "训练与测评" },
@@ -79,7 +76,6 @@ const MENU: MenuItem[] = [
     ],
   },
   { label: "场景训练", to: "/scenario" },
-  { label: "知识治理", to: "/governance" },
 ];
 
 const DEMO_ROLE_OPTIONS: KnowledgeUserRole[] = ["employee", "knowledgeAdmin", "superAdmin"];

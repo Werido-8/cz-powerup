@@ -25,7 +25,7 @@ export function AdminPageFrame({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("mx-auto w-full max-w-[1600px] space-y-5", className)}>{children}</div>;
+  return <div className={cn("w-full space-y-5", className)}>{children}</div>;
 }
 
 const EXAM_ADMIN_NAV = [

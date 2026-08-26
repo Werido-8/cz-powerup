@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   BookOpenCheck,
@@ -21,6 +21,7 @@ import {
   gradeExamAnswer,
   isExamAnswerFilled,
   resolveExamSessionPaper,
+  scoreExamAnswers,
 } from "@/lib/mock/exam-session";
 import { getQuestionIdsForDoc } from "@/lib/mock/learning-progress";
 import { filterPracticeQuestions, type PracticeDifficulty } from "@/lib/mock/practice-filter";
@@ -32,6 +33,7 @@ import {
   saveTopicPracticeDraft,
   type TopicQuestionItem,
 } from "@/lib/mock/topic-practice";
+import { trainingResultStorageKey } from "@/lib/training/result";
 
 const searchSchema = z.object({
   mode: z.enum(["practice", "exam", "review"]).default("practice"),
@@ -143,6 +145,7 @@ function SessionPage() {
   const [elapsed, setElapsed] = useState(0);
   const [confirmExit, setConfirmExit] = useState(false);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  const autoAdvanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const examFlat = useMemo(
     () => (examPaper ? flattenExamQuestions(examPaper.groups) : []),
@@ -181,6 +184,23 @@ function SessionPage() {
     setAnswers((a) => ({ ...a, [q.id]: val }));
   };
 
+  const shouldAutoAdvance = (type: QuestionType) => type !== "multiple" && type !== "text";
+
+  const scheduleAutoAdvance = (type: QuestionType) => {
+    if (!shouldAutoAdvance(type) || idx >= questions.length - 1) return;
+    if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+    autoAdvanceTimerRef.current = setTimeout(() => {
+      setIdx((currentIndex) => Math.min(questions.length - 1, currentIndex + 1));
+      autoAdvanceTimerRef.current = null;
+    }, 150);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (autoAdvanceTimerRef.current) clearTimeout(autoAdvanceTimerRef.current);
+    };
+  }, [idx]);
+
   const setExamAns = (questionId: string, val: string | string[]) => {
     setExamAnswers((a) => ({ ...a, [questionId]: val }));
   };
@@ -207,8 +227,10 @@ function SessionPage() {
           addWrong(question.id);
         }
       });
+      const resultKind = id.startsWith("正式考试-") ? "formal" : "custom";
+      const scoreMode = examPaper.scoreMode;
       sessionStorage.setItem(
-        `result-${id}`,
+        trainingResultStorageKey(id),
         JSON.stringify({
           wrongIds,
           total: examFlat.length,
@@ -216,7 +238,31 @@ function SessionPage() {
           qids: examFlat.map((item) => item.question.id),
           elapsed,
           mode,
+          kind: resultKind,
+          title: examPaper.title,
+          sourceLabel: resultKind === "formal" ? "正式考试" : "自主组卷",
+          submittedAt: new Date().toISOString(),
+          passScore: examPaper.passLine,
+          durationLimit: examPaper.duration,
           paperId: examPaper.employeePaperId,
+          scoreMode,
+          totalScore: examPaper.totalScore,
+          score:
+            scoreMode === "unscored"
+              ? undefined
+              : scoreExamAnswers(examFlat, examAnswers, wrongIds),
+          questions: examFlat.map(({ groupType, question }) => ({
+            id: question.id,
+            type: groupType,
+            stem: question.stem,
+            options: question.options?.map((option) => ({
+              key: option.key,
+              label: option.text,
+            })),
+            answer: question.answer ?? "",
+            knowledge: question.knowledge,
+            score: question.score,
+          })),
         }),
       );
       navigate({ to: "/training/result/$id", params: { id } });
@@ -239,7 +285,7 @@ function SessionPage() {
       }
     });
     sessionStorage.setItem(
-      `result-${id}`,
+      trainingResultStorageKey(id),
       JSON.stringify({
         wrongIds,
         total: questions.length,
@@ -247,7 +293,28 @@ function SessionPage() {
         qids: questions.map((qq) => qq.id),
         elapsed,
         mode,
+        kind: mode === "review" ? "review" : "practice",
+        title: title ?? topic?.title ?? doc?.title ?? decodeURIComponent(id),
+        sourceLabel: isTopicPractice ? "专题练习" : docId ? "资料内练习" : "专项练习",
+        submittedAt: new Date().toISOString(),
+        passScore: null,
+        durationLimit: limit,
         topicId,
+        docId,
+        questions: questions.map((question) => ({
+          id: question.id,
+          type: {
+            single: "单选题",
+            multiple: "多选题",
+            judge: "判断题",
+            text: "简答题",
+          }[question.type],
+          stem: question.stem,
+          options: question.options,
+          answer: question.answer,
+          analysis: question.analysis,
+          knowledge: question.knowledgePoints.join(" / "),
+        })),
       }),
     );
     if (isTopicPractice && topicId) {
@@ -427,7 +494,10 @@ function SessionPage() {
                         <button
                           key={key}
                           type="button"
-                          onClick={() => setAns(key)}
+                          onClick={() => {
+                            setAns(key);
+                            scheduleAutoAdvance(q.type);
+                          }}
                           aria-pressed={checked}
                           className={`grid min-h-[58px] grid-cols-[34px_1fr] items-center gap-3 rounded-[10px] border px-4 text-left transition-colors ${
                             checked
@@ -477,6 +547,7 @@ function SessionPage() {
                               );
                             } else {
                               setAns(option.key);
+                              scheduleAutoAdvance(q.type);
                             }
                           }}
                           aria-pressed={checked}

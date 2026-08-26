@@ -89,17 +89,12 @@ const SCENARIO_MAP: Record<string, TopicScenario> = {
   "t-agc": "专项提升",
 };
 
-/** 专题补充知识点（mock 演示分页；接真实接口后由后端返回完整列表） */
-const TOPIC_EXTRA_KNOWLEDGE: Record<string, string[]> = {
-  "t-newbie": ["主责尽责", "厂站巡检", "定期检修", "扩停设备", "隐患治理"],
-};
-
+/** 专题知识点：严格来自本专题资料关联题目，保证列表与编辑页一致 */
 function buildKnowledgePoints(topicId: string, docIds: string[]): TopicKnowledgePoint[] {
   const kpSet = new Set<string>();
   QUESTIONS.filter((q) => docIds.some((id) => q.relatedDocId === id)).forEach((q) =>
     q.knowledgePoints.forEach((k) => kpSet.add(k)),
   );
-  (TOPIC_EXTRA_KNOWLEDGE[topicId] ?? []).forEach((k) => kpSet.add(k));
   return Array.from(kpSet).map((title, i) => ({
     id: `${topicId}-kp-${i}`,
     title,
@@ -142,12 +137,6 @@ function buildQuestionEdits(docIds: string[]): Record<string, EditableTopicQuest
 
 function topicToAdminRecord(topic: Topic, status: TopicPublishStatus): TopicAdminRecord {
   const docQuestions = buildDocQuestions(topic.docIds);
-  if (status === "草稿" && docQuestions.length > 0) {
-    docQuestions[docQuestions.length - 1] = {
-      ...docQuestions[docQuestions.length - 1],
-      confirmed: false,
-    };
-  }
   const questionCount = docQuestions.reduce((n, d) => n + d.questionIds.length, 0);
 
   return {
@@ -158,7 +147,7 @@ function topicToAdminRecord(topic: Topic, status: TopicPublishStatus): TopicAdmi
     learningGoal: `学完后能独立完成${topic.title}相关现场判断与操作。`,
     scenario: SCENARIO_MAP[topic.id] ?? "专项提升",
     intro: topic.desc,
-    docIds: topic.docIds,
+    docIds: [...topic.docIds],
     knowledgePoints: buildKnowledgePoints(topic.id, topic.docIds),
     docQuestions,
     questionEdits: buildQuestionEdits(topic.docIds),
@@ -169,9 +158,9 @@ function topicToAdminRecord(topic: Topic, status: TopicPublishStatus): TopicAdmi
     maintainer: "李老师",
     aiHints:
       status === "草稿"
-        ? ["有一组练习题等待人工确认，确认前不可发布"]
-        : questionCount < 5
-          ? ["题目覆盖不足，建议为每份资料生成 3–5 道题"]
+        ? ["请继续完善资料与练习后发布"]
+        : questionCount < 3
+          ? ["题目覆盖不足，建议为每份资料至少关联 2 道题"]
           : undefined,
   };
 }
@@ -286,3 +275,108 @@ export const EMPTY_TOPIC_DRAFT: Omit<
   docQuestions: [],
   status: "草稿",
 };
+
+export const AI_TOPIC_TEMPLATES: { label: string; prompt: string }[] = [
+  {
+    label: "新员工入门",
+    prompt:
+      "面向新入职运行值班人员，围绕交接班、巡检和常见异常判断，组织一套入门专题。",
+  },
+  {
+    label: "主变停投操作",
+    prompt: "围绕 500kV 主变停投标准化操作，覆盖负荷转移、保护压板和中性点接地。",
+  },
+  {
+    label: "AGC 考核专项",
+    prompt: "针对运行人员，梳理两细则 AGC 考核要点、死区整定与异常处置。",
+  },
+];
+
+export function buildAiGeneratedTopicDraft(prompt: string): Omit<
+  TopicAdminRecord,
+  "id" | "updatedAt" | "maintainer" | "learnerCount"
+> {
+  const text = prompt.toLowerCase();
+  const isAgc = /agc|两细则|调频/.test(text);
+  const isTransformer = /主变|停投|倒闸/.test(text);
+  const isFault = /故障|复盘|事故/.test(text);
+
+  let title = "新员工运行专业入门";
+  let specialty: TopicSpecialty = "运行值班";
+  let scenario: TopicScenario = "入职培训";
+  let positions: TopicPosition[] = ["新员工", "运行人员"];
+  let learningGoal = "掌握值班巡检基本流程与常见异常初步判断。";
+  let intro = "面向首次上岗运行人员，围绕岗位能力与真实业务场景组织学习。";
+
+  if (isAgc) {
+    title = "AGC 与两细则考核专项";
+    specialty = "运行值班";
+    scenario = "专项提升";
+    positions = ["运行人员", "班组长"];
+    learningGoal = "能对照两细则理解 AGC 考核口径，并完成死区、速率相关现场判断。";
+    intro = "围绕 AGC 调节性能考核与现场参数整定，帮助值班员把规则落到当班操作。";
+  } else if (isTransformer) {
+    title = "主变停投标准化操作";
+    specialty = "电气";
+    scenario = "标准操作";
+    positions = ["运行人员", "班组长"];
+    learningGoal = "能按标准流程完成主变停投前核对、保护压板与中性点接地配合。";
+    intro = "覆盖负荷转移、保护连接片和中性点接地等关键卡控点。";
+  } else if (isFault) {
+    title = "典型故障复盘专项";
+    specialty = "电气";
+    scenario = "故障复盘";
+    positions = ["运行人员", "检修人员"];
+    learningGoal = "能按固定思路完成差动动作后的范围判断与复电前核对。";
+    intro = "从典型事故通报提炼判断顺序与易错点，服务班组复盘培训。";
+  }
+
+  const pool = getLearnablePoolDocs();
+  const preferred = pool.filter((doc) => {
+    if (isAgc) return /agc|细则|调频/i.test(doc.title);
+    if (isTransformer) return /主变|操作/i.test(doc.title);
+    if (isFault) return /故障|事故|复盘|差动/i.test(doc.title);
+    return true;
+  });
+  const docIds = (preferred.length >= 3 ? preferred : pool).slice(0, 4).map((doc) => doc.id);
+
+  const kpSet = new Set<string>();
+  docIds.forEach((docId) => {
+    const doc = DOCS.find((item) => item.id === docId);
+    doc?.highlight.slice(0, 2).forEach((item) => kpSet.add(item));
+    QUESTIONS.filter((question) => question.relatedDocId === docId)
+      .flatMap((question) => question.knowledgePoints)
+      .forEach((item) => kpSet.add(item));
+  });
+
+  const knowledgePoints: TopicKnowledgePoint[] = Array.from(kpSet)
+    .slice(0, 6)
+    .map((pointTitle, index) => ({
+      id: `kp-ai-${index}`,
+      title: pointTitle,
+      summary: `基于所选资料提炼：${pointTitle} 的核心概念与现场要点。`,
+      source: "ai" as const,
+      confirmed: false,
+    }));
+
+  const docQuestions = buildDocQuestions(docIds).map((item) => ({ ...item, confirmed: false }));
+  const questionEdits = buildQuestionEdits(docIds);
+  Object.values(questionEdits).forEach((question) => {
+    question.confirmed = false;
+  });
+
+  return {
+    title,
+    specialty,
+    positions,
+    learningGoal,
+    scenario,
+    intro,
+    docIds,
+    knowledgePoints,
+    docQuestions,
+    questionEdits,
+    status: "草稿",
+    aiHints: [`AI 起草 · 依据需求：${prompt.slice(0, 40)}${prompt.length > 40 ? "…" : ""}`],
+  };
+}

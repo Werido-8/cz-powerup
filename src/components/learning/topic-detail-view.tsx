@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import {
   BookOpen,
   Briefcase,
@@ -36,11 +36,10 @@ import {
 import {
   clearTopicPracticeDraft,
   countDraftAnswers,
+  getTopicPracticeSessionId,
   getTopicQuestions,
-  hasTopicPracticeDraft,
   loadTopicPracticeDraft,
 } from "@/lib/mock/topic-practice";
-import { TopicPracticeSheet } from "@/components/learning/topic-practice-sheet";
 import { MaterialList } from "@/components/learning/topic-material-list";
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
@@ -79,27 +78,23 @@ export function TopicDetailView({
   onToggleFavorite: () => void;
   isFavorite: boolean;
 }) {
-  const [practiceOpen, setPracticeOpen] = useState(false);
-  const [practiceTick, setPracticeTick] = useState(0);
   const [showRestartConfirm, setShowRestartConfirm] = useState(false);
   const [kpPage, setKpPage] = useState(1);
+  const navigate = useNavigate();
 
   const meta = getTopicAdminById(topic.id);
   const docsWithProgress = getTopicDocsWithProgress(topic.id, state);
   const topicProgress = getTopicProgress(topic.id, state);
-
-  const learnedCount = docsWithProgress.filter((d) => d.status === "已学").length;
-  const recommendedDocId = docsWithProgress.find((d) => d.status === "未学")?.doc.id;
 
   const topicQuestions = useMemo(() => getTopicQuestions(topic), [topic]);
   const questionIds = useMemo(() => topicQuestions.map((q) => q.question.id), [topicQuestions]);
 
   const practiceDraft = useMemo(
     () => loadTopicPracticeDraft(topic.id),
-    [topic.id, practiceTick],
+    [topic.id],
   );
   const practiceAnswered = countDraftAnswers(practiceDraft, questionIds);
-  const hasDraft = hasTopicPracticeDraft(topic.id);
+  const hasDraft = practiceAnswered > 0;
   const practicePercent =
     questionIds.length > 0 ? Math.round((practiceAnswered / questionIds.length) * 100) : 0;
 
@@ -123,7 +118,20 @@ export function TopicDetailView({
   const isLearning = topicProgress > 0 && topicProgress < 100;
   const isDone = topicProgress >= 100;
 
-  const refreshPractice = () => setPracticeTick((n) => n + 1);
+  const openTopicPractice = () => {
+    navigate({
+      to: "/training/session/$id",
+      params: { id: getTopicPracticeSessionId(topic.id) },
+      search: {
+        mode: "practice",
+        filter: "",
+        count: questionIds.length,
+        limit: 0,
+        topicId: topic.id,
+        title: topic.title,
+      },
+    });
+  };
 
   // 专业/科目 fallback
   const specialty = meta?.specialty ?? topic.role ?? "—";
@@ -170,14 +178,7 @@ export function TopicDetailView({
                       {isDone ? "已完成" : "学习中"}
                     </span>
                   )}
-                  {isPublished && (
-                    <span
-                      className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[12px] font-medium"
-                      style={{ background: C.primarySoft, color: C.primary }}
-                    >
-                      已发布
-                    </span>
-                  )}
+
                   {!isPublished && meta?.status && (
                     <span
                       className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-[12px]"
@@ -195,22 +196,7 @@ export function TopicDetailView({
                   >
                     {topic.title}
                   </h1>
-                  <button
-                    type="button"
-                    onClick={onToggleFavorite}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[12.5px] font-medium transition-colors"
-                    style={{
-                      color: isFavorite ? C.primary : C.textMuted,
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = C.primary; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = isFavorite ? C.primary : C.textMuted; }}
-                  >
-                    <Star
-                      className={cn("h-3.5 w-3.5")}
-                      style={{ fill: isFavorite ? C.primary : "none", stroke: "currentColor" }}
-                    />
-                    {isFavorite ? "已收藏" : "收藏"}
-                  </button>
+
                 </div>
               </div>
             </div>
@@ -238,7 +224,6 @@ export function TopicDetailView({
             <div className="flex min-h-0 flex-1 items-center">
               <div
                 className="min-w-0 flex-1 overflow-hidden rounded-xl"
-                style={{ border: `1px solid ${C.border}` }}
               >
                 <MetaGrid
                   specialty={specialty}
@@ -281,16 +266,13 @@ export function TopicDetailView({
           {/* 列表内容（固定高度可滚动） */}
           <div
             className="scrollbar-thin flex-1 overflow-y-auto"
-            style={{ maxHeight: "calc(5 * 86px + 0.5rem)" }}
+            style={{ maxHeight: "calc(5 * 76px + 0.5rem)" }}
           >
-            <MaterialList
-              items={docsWithProgress}
-              recommendedDocId={recommendedDocId}
-            />
+            <MaterialList items={docsWithProgress} />
           </div>
         </section>
 
-        {/* 右：重点知识点 + 学习概况/关联练习 */}
+        {/* 右：重点知识点 + 关联练习 */}
         <aside className="flex h-full min-h-0 flex-col gap-3">
           {/* 重点知识点 */}
           {knowledgePoints.length > 0 && (
@@ -367,42 +349,11 @@ export function TopicDetailView({
             </section>
           )}
 
-          {/* 学习概况 + 关联练习（并列，撑满右侧剩余高度与左侧底对齐） */}
-          <div
-            className={cn(
-              "grid min-h-0 flex-1 items-stretch gap-3",
-              questionIds.length > 0 ? "grid-cols-2" : "grid-cols-1",
-            )}
-          >
-            <section className={cn(cardBase, "flex h-full min-h-[156px] flex-col")} style={cardStyle}>
-              <div
-                className="flex items-center gap-2 px-4 py-3"
-                style={{ borderBottom: `1px solid ${C.divider}` }}
-              >
-                <span
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-lg"
-                  style={{ background: C.primarySoft, color: C.primary }}
-                >
-                  <GraduationCap className="h-4 w-4" />
-                </span>
-                <h2 className="text-[14px] font-semibold" style={{ color: C.textSub }}>
-                  学习概况
-                </h2>
-              </div>
-              <div className="flex min-h-0 flex-1 items-center px-4 py-3.5">
-                <LearningProgressSummary
-                  percent={topicProgress}
-                  learnedCount={learnedCount}
-                  docCount={docsWithProgress.length}
-                  practiceAnswered={practiceAnswered}
-                  questionCount={questionIds.length}
-                  compact
-                />
-              </div>
-            </section>
-
-            {questionIds.length > 0 && (
-            <section className={cn(cardBase, "flex h-full min-h-[156px] flex-col")} style={cardStyle}>
+          {questionIds.length > 0 && (
+            <section
+              className={cn(cardBase, "flex min-h-0 flex-1 flex-col")}
+              style={cardStyle}
+            >
               <div
                 className="flex items-center gap-2 px-4 py-3"
                 style={{ borderBottom: `1px solid ${C.divider}` }}
@@ -413,36 +364,64 @@ export function TopicDetailView({
                 >
                   <ClipboardList className="h-4 w-4" />
                 </span>
-                <h2 className="text-[14px] font-semibold" style={{ color: C.textSub }}>
+                <h2 className="text-[15px] font-semibold" style={{ color: C.textSub }}>
                   关联练习
                 </h2>
+                <span
+                  className="ml-auto inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-medium"
+                  style={{ background: C.primarySoft, color: C.primary }}
+                >
+                  {questionIds.length} 题
+                </span>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col justify-between gap-3 px-4 py-3.5">
-                <p className="line-clamp-2 text-[13px] leading-relaxed" style={{ color: C.textMuted }}>
-                  汇总本专题 {questionIds.length} 道关联题，检验掌握程度。
+              <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4">
+                <p className="text-[13px] leading-relaxed" style={{ color: C.textMuted }}>
+                  学完资料后，用本专题关联题检验掌握程度。
                   {hasDraft && practiceDraft?.savedAt && (
-                    <span className="ml-1 text-[11px] text-[#91A3AA]">
-                      （暂存：
+                    <span className="mt-1 block text-[11.5px] text-[#91A3AA]">
+                      上次暂存于{" "}
                       {new Date(practiceDraft.savedAt).toLocaleString("zh-CN", {
                         month: "numeric",
                         day: "numeric",
                         hour: "2-digit",
                         minute: "2-digit",
-                      })}）
+                      })}
                     </span>
                   )}
                 </p>
 
-                <div>
-                  <div className="mb-1.5 flex items-center justify-between text-[12px]">
-                    <span style={{ color: C.textMuted }}>练习完成度</span>
-                    <span className="font-semibold tabular-nums" style={{ color: C.primary }}>
-                      {practicePercent}%
-                    </span>
-                  </div>
+                <div
+                  className="grid grid-cols-2 overflow-hidden rounded-xl"
+                  style={{ border: `1px solid ${C.border}` }}
+                >
                   <div
-                    className="h-1 overflow-hidden rounded-full"
+                    className="px-3.5 py-3"
+                    style={{ borderRight: `1px solid ${C.divider}` }}
+                  >
+                    <div className="text-[11px]" style={{ color: C.textWeak }}>
+                      已作答
+                    </div>
+                    <div className="mt-1 text-[18px] font-semibold tabular-nums" style={{ color: C.text }}>
+                      {practiceAnswered}
+                      <span className="text-[12px] font-medium text-[#91A3AA]">
+                        {" "}/ {questionIds.length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="px-3.5 py-3">
+                    <div className="text-[11px]" style={{ color: C.textWeak }}>
+                      完成度
+                    </div>
+                    <div className="mt-1 text-[18px] font-semibold tabular-nums" style={{ color: C.primary }}>
+                      {practicePercent}%
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    className="h-1.5 overflow-hidden rounded-full"
                     style={{ background: "#EDF3F5" }}
                   >
                     <div
@@ -455,8 +434,8 @@ export function TopicDetailView({
                 <div className="mt-auto space-y-2">
                   <button
                     type="button"
-                    onClick={() => setPracticeOpen(true)}
-                    className="flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-[13px] font-medium text-white shadow-sm transition-colors"
+                    onClick={openTopicPractice}
+                    className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-full py-2.5 text-[13px] font-medium text-white shadow-sm transition-colors"
                     style={{ background: C.primary }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = C.primaryDark; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = C.primary; }}
@@ -466,7 +445,7 @@ export function TopicDetailView({
                         <span className="grid h-5 w-5 place-items-center rounded-full bg-white/20">
                           <Target className="h-3.5 w-3.5" />
                         </span>
-                        继续练习（{practiceAnswered}/{questionIds.length}）
+                        继续练习
                       </>
                     ) : (
                       <>
@@ -482,7 +461,7 @@ export function TopicDetailView({
                     <button
                       type="button"
                       onClick={() => setShowRestartConfirm(true)}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-full border py-2 text-[12px] transition-colors"
+                      className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-full border py-2 text-[12px] transition-colors"
                       style={{ borderColor: C.border, color: C.textMuted, background: "transparent" }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = C.primarySoft; }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "transparent"; }}
@@ -494,18 +473,9 @@ export function TopicDetailView({
                 </div>
               </div>
             </section>
-            )}
-          </div>
+          )}
         </aside>
       </div>
-
-      {/* ── 弹窗 ── */}
-      <TopicPracticeSheet
-        topic={topic}
-        open={practiceOpen}
-        onOpenChange={setPracticeOpen}
-        onSaved={refreshPractice}
-      />
 
       <AlertDialog open={showRestartConfirm} onOpenChange={setShowRestartConfirm}>
         <AlertDialogContent>
@@ -520,9 +490,8 @@ export function TopicDetailView({
             <AlertDialogAction
               onClick={() => {
                 clearTopicPracticeDraft(topic.id);
-                refreshPractice();
                 setShowRestartConfirm(false);
-                setPracticeOpen(true);
+                openTopicPractice();
               }}
             >
               确认清空并开始
@@ -618,94 +587,6 @@ function TopicHeroCardDecor() {
         />
       </svg>
     </>
-  );
-}
-
-// ─── 学习进度摘要（进度环 + 统计） ─────────────────────────────────────────
-function LearningProgressSummary({
-  percent,
-  learnedCount,
-  docCount,
-  practiceAnswered,
-  questionCount,
-  compact = false,
-}: {
-  percent: number;
-  learnedCount: number;
-  docCount: number;
-  practiceAnswered: number;
-  questionCount: number;
-  compact?: boolean;
-}) {
-  return (
-    <div className={cn("flex w-full items-center", compact ? "gap-3" : "gap-4")}>
-      <ProgressRing percent={percent} size={compact ? "sm" : "md"} />
-      <div className={cn("min-w-0 flex-1", compact ? "space-y-1.5" : "space-y-2")}>
-        <p className={cn(compact ? "text-[13px] leading-snug" : "text-[14px]")} style={{ color: C.textMuted }}>
-          已学{" "}
-          <span className="font-semibold tabular-nums" style={{ color: C.primary }}>
-            {learnedCount}
-          </span>
-          <span className="tabular-nums text-[#91A3AA]"> / {docCount}</span>
-        </p>
-        {questionCount > 0 && (
-          <p className={cn(compact ? "text-[13px] leading-snug" : "text-[14px]")} style={{ color: C.textMuted }}>
-            共{questionCount}题{" "}
-            <span className="font-semibold tabular-nums" style={{ color: C.primary }}>
-              {practiceAnswered}
-            </span>
-            <span className="tabular-nums text-[#91A3AA]"> / {questionCount}</span>
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── 进度环 ────────────────────────────────────────────────────────────────
-function ProgressRing({ percent, size = "md" }: { percent: number; size?: "md" | "sm" | "xs" }) {
-  const dim = size === "xs" ? 68 : size === "sm" ? 76 : 104;
-  const stroke = size === "xs" ? 6 : size === "sm" ? 6.5 : 9;
-  const r = (dim - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const offset = c - (percent / 100) * c;
-
-  return (
-    <div className="relative shrink-0" style={{ width: dim, height: dim }}>
-      <svg width={dim} height={dim} className="-rotate-90" aria-hidden>
-        <circle
-          cx={dim / 2}
-          cy={dim / 2}
-          r={r}
-          fill="none"
-          stroke="#EDF3F5"
-          strokeWidth={stroke}
-        />
-        <circle
-          cx={dim / 2}
-          cy={dim / 2}
-          r={r}
-          fill="none"
-          stroke="#1498A8"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          className="transition-[stroke-dashoffset] duration-500"
-        />
-      </svg>
-      <div className="absolute inset-0 grid place-items-center">
-        <span
-          className={cn(
-            "font-bold tabular-nums",
-            size === "xs" ? "text-[17px]" : size === "sm" ? "text-[18px]" : "text-[26px]",
-          )}
-          style={{ color: "#1498A8" }}
-        >
-          {percent}%
-        </span>
-      </div>
-    </div>
   );
 }
 

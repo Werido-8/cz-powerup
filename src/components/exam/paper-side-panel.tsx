@@ -295,10 +295,10 @@ export function PaperBasicInfoPanel({
             </select>
           </div>
           <div>
-            <FieldLabel>适用岗位</FieldLabel>
+            <FieldLabel>适用专业</FieldLabel>
             <Input
-              value={basicInfo.position}
-              onChange={(e) => onChange("position", e.target.value)}
+              value={basicInfo.specialty}
+              onChange={(e) => onChange("specialty", e.target.value)}
               className="h-8 text-[12px]"
             />
           </div>

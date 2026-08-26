@@ -285,7 +285,6 @@ export function MyQuestionContributionsPanel({
   };
 
   const handleAiGenerate = () => {
-    toast.success("已根据资料内容生成题目草稿（演示）");
   };
 
   if (contributions.length === 0) {

@@ -1,18 +1,23 @@
 import { useMemo, useState } from "react";
 import {
   BookOpen,
-  ChevronRight,
-  FileText,
-  LayoutGrid,
-  List,
-  Loader2,
+  CheckSquare,
+  ChevronDown,
+  ClipboardList,
   Pencil,
   Plus,
-  Sparkles,
+  Square,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -20,12 +25,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { cn } from "@/lib/utils";
 import { DOCS, QUESTIONS, type Question } from "@/lib/mock/data";
 import type { EditableTopicQuestion, TopicDocQuestion } from "@/lib/mock/topicAdmin";
-import { listActionClass } from "@/components/learning/ui";
-
-type ViewMode = "list" | "paper";
 
 const TYPE_LABEL: Record<EditableTopicQuestion["type"], string> = {
   single: "单选",
@@ -111,16 +114,40 @@ export function resolveTopicQuestion(
   return createMockQuestion(qid, docId, index);
 }
 
+function candidateQuestionIds(
+  docId: string,
+  selectedIds: string[],
+  edits: Record<string, EditableTopicQuestion> | undefined,
+) {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const push = (id: string) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    ids.push(id);
+  };
+  QUESTIONS.filter((question) => question.relatedDocId === docId).forEach((question) =>
+    push(question.id),
+  );
+  selectedIds.forEach(push);
+  Object.values(edits ?? {}).forEach((question) => {
+    if (question.relatedDocId === docId) push(question.id);
+  });
+  if (ids.length === 0) {
+    push(`mock-q-${docId}-1`);
+    push(`mock-q-${docId}-2`);
+    push(`mock-q-${docId}-3`);
+  }
+  return ids;
+}
+
 function QuestionEditForm({
   question,
   onChange,
-  variant = "dialog",
 }: {
   question: EditableTopicQuestion;
   onChange: (q: EditableTopicQuestion) => void;
-  variant?: "dialog" | "paper";
 }) {
-  const paper = variant === "paper";
   const hasOptions = question.type === "single" || question.type === "multiple";
   const isJudge = question.type === "judge";
   const isMulti = question.type === "multiple";
@@ -176,25 +203,14 @@ function QuestionEditForm({
       : [];
 
   return (
-    <div className={cn("space-y-4", paper && "space-y-5")}>
+    <div className="space-y-4">
       <div>
-        <label
-          className={cn(
-            "mb-1.5 block text-[12px] font-medium text-muted-foreground",
-            paper && "text-[11px] tracking-wide",
-          )}
-        >
-          题干
-        </label>
+        <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">题干</label>
         <textarea
           value={question.stem}
           onChange={(e) => onChange({ ...question, stem: e.target.value })}
-          rows={paper ? 2 : 3}
-          className={cn(
-            "w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            paper &&
-              "min-h-[68px] border-kb-border bg-[#fbfcfc] px-4 py-3 text-[14px] font-medium leading-6 text-kb-heading focus-visible:border-primary focus-visible:ring-primary/15",
-          )}
+          rows={3}
+          className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
 
@@ -215,7 +231,7 @@ function QuestionEditForm({
               </button>
             )}
           </div>
-          <ul className={cn("space-y-2", paper && "space-y-1.5")}>
+          <ul className="space-y-2">
             {options.map((opt) => {
               const isAnswer = answerKeys.includes(opt.key);
               return (
@@ -237,11 +253,7 @@ function QuestionEditForm({
                   <Input
                     value={opt.label}
                     onChange={(e) => updateOption(opt.key, e.target.value)}
-                    className={cn(
-                      "h-8 flex-1 text-[12.5px]",
-                      paper &&
-                        "h-10 border-transparent bg-[#f4f8f9] px-3 text-[13px] shadow-none hover:border-primary/20 focus-visible:border-primary/35 focus-visible:bg-white",
-                    )}
+                    className="h-8 flex-1 text-[12.5px]"
                     placeholder={`选项 ${opt.key}`}
                   />
                   {isMulti && options.length > 2 && (
@@ -260,84 +272,16 @@ function QuestionEditForm({
         </div>
       )}
 
-      <div className={cn(paper && "border-t border-dashed border-divider pt-4")}>
+      <div>
         <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">解析</label>
         <textarea
           value={question.analysis}
           onChange={(e) => onChange({ ...question, analysis: e.target.value })}
           rows={2}
-          className={cn(
-            "w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[12.5px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            paper &&
-              "min-h-[56px] border-transparent bg-primary-soft/20 px-4 py-2.5 leading-5 focus-visible:border-primary/25 focus-visible:bg-white focus-visible:ring-primary/10",
-          )}
+          className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-[12.5px] text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
       </div>
     </div>
-  );
-}
-
-function QuestionListRow({
-  index,
-  question,
-  onClick,
-}: {
-  index: number;
-  question: EditableTopicQuestion;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex w-full items-start gap-3 rounded-lg border border-divider bg-muted/15 px-3 py-2.5 text-left transition-colors hover:border-primary/30 hover:bg-primary-soft/20"
-    >
-      <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md bg-muted text-[11px] font-semibold tabular-nums text-muted-foreground group-hover:bg-primary-soft group-hover:text-primary">
-        {index}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="mb-1 flex flex-wrap items-center gap-2">
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {TYPE_LABEL[question.type]}
-          </span>
-          {question.confirmed && <span className="text-[10px] text-success">已确认</span>}
-        </div>
-        <p className="line-clamp-2 text-[13px] leading-snug text-foreground">{question.stem}</p>
-      </div>
-      <Pencil className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-    </button>
-  );
-}
-
-function PaperQuestionBlock({
-  index,
-  question,
-  onChange,
-}: {
-  index: number;
-  question: EditableTopicQuestion;
-  onChange: (q: EditableTopicQuestion) => void;
-}) {
-  return (
-    <article className="px-5 py-5 sm:px-6">
-      <div className="mb-4 flex items-center gap-2.5">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-[11px] font-semibold tabular-nums text-white">
-          {String(index).padStart(2, "0")}
-        </span>
-        <span className="rounded-[4px] bg-kb-surface px-2 py-1 text-[10.5px] font-medium text-kb-muted">
-          {TYPE_LABEL[question.type]}
-        </span>
-        <span
-          className={cn(
-            "ml-auto text-[10.5px]",
-            question.confirmed ? "text-success" : "text-kb-muted",
-          )}
-        >
-          {question.confirmed ? "已确认" : "待确认"}
-        </span>
-      </div>
-      <QuestionEditForm question={question} onChange={onChange} variant="paper" />
-    </article>
   );
 }
 
@@ -345,47 +289,119 @@ export function TopicQuestionEditorPanel({
   docIds,
   docQuestions,
   questionEdits = {},
-  aiLoading,
   onUpdate,
-  onGenerate,
 }: {
   docIds: string[];
   docQuestions: TopicDocQuestion[];
   questionEdits?: Record<string, EditableTopicQuestion>;
-  aiLoading: boolean;
   onUpdate: (patch: {
     docQuestions?: TopicDocQuestion[];
     questionEdits?: Record<string, EditableTopicQuestion>;
   }) => void;
-  onGenerate: (docId: string) => void;
 }) {
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dialogDraft, setDialogDraft] = useState<EditableTopicQuestion | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickDraftByDoc, setPickDraftByDoc] = useState<Record<string, string[]>>({});
+  const [activePickDocId, setActivePickDocId] = useState<string>("");
 
-  const allQuestions = useMemo(() => {
-    const items: {
+  const docs = useMemo(
+    () =>
+      docIds.map((docId) => {
+        const doc = DOCS.find((item) => item.id === docId);
+        const dq = docQuestions.find((item) => item.docId === docId);
+        const selectedIds = dq?.questionIds ?? [];
+        const candidateIds = candidateQuestionIds(docId, selectedIds, questionEdits);
+        const candidates = candidateIds.map((qid, index) =>
+          resolveTopicQuestion(qid, questionEdits, docId, index),
+        );
+        return {
+          docId,
+          title: doc?.title ?? docId,
+          selectedIds,
+          candidates,
+        };
+      }),
+    [docIds, docQuestions, questionEdits],
+  );
+
+  const flatSelected = useMemo(() => {
+    const rows: {
       docId: string;
       docTitle: string;
       question: EditableTopicQuestion;
-      globalIndex: number;
+      index: number;
     }[] = [];
-    let n = 0;
-    docIds.forEach((docId) => {
-      const doc = DOCS.find((d) => d.id === docId);
-      const dq = docQuestions.find((d) => d.docId === docId);
-      (dq?.questionIds ?? []).forEach((qid, i) => {
-        n += 1;
-        items.push({
-          docId,
-          docTitle: doc?.title ?? docId,
-          question: resolveTopicQuestion(qid, questionEdits, docId, i),
-          globalIndex: n,
+    let index = 0;
+    docs.forEach((doc) => {
+      doc.selectedIds.forEach((qid, qIndex) => {
+        index += 1;
+        rows.push({
+          docId: doc.docId,
+          docTitle: doc.title,
+          question: resolveTopicQuestion(qid, questionEdits, doc.docId, qIndex),
+          index,
         });
       });
     });
-    return items;
-  }, [docIds, docQuestions, questionEdits]);
+    return rows;
+  }, [docs, questionEdits]);
+
+  const pickSelectedCount = Object.values(pickDraftByDoc).reduce(
+    (sum, ids) => sum + ids.length,
+    0,
+  );
+  const activePickDoc =
+    docs.find((doc) => doc.docId === activePickDocId) ?? docs[0] ?? null;
+  const activePickSelectedIds = activePickDoc
+    ? (pickDraftByDoc[activePickDoc.docId] ?? [])
+    : [];
+
+  const openQuestionPicker = () => {
+    const next: Record<string, string[]> = {};
+    docs.forEach((doc) => {
+      next[doc.docId] = [...doc.selectedIds];
+    });
+    setPickDraftByDoc(next);
+    setActivePickDocId(docs[0]?.docId ?? "");
+    setPickerOpen(true);
+  };
+
+  const togglePickId = (docId: string, questionId: string) => {
+    setPickDraftByDoc((current) => {
+      const list = current[docId] ?? [];
+      return {
+        ...current,
+        [docId]: list.includes(questionId)
+          ? list.filter((id) => id !== questionId)
+          : [...list, questionId],
+      };
+    });
+  };
+
+  const applyQuestionSelection = () => {
+    const nextDocQuestions = docIds.map((docId) => {
+      const existing = docQuestions.find((item) => item.docId === docId);
+      return {
+        docId,
+        questionIds: pickDraftByDoc[docId] ?? [],
+        generated: existing?.generated ?? false,
+        confirmed: false,
+      };
+    });
+    onUpdate({ docQuestions: nextDocQuestions });
+    setPickerOpen(false);
+    toast.success(`已关联 ${pickSelectedCount} 道题`);
+  };
+
+  const removeQuestion = (docId: string, questionId: string) => {
+    const nextDocQuestions = docQuestions.map((item) =>
+      item.docId === docId
+        ? { ...item, questionIds: item.questionIds.filter((id) => id !== questionId) }
+        : item,
+    );
+    onUpdate({ docQuestions: nextDocQuestions });
+  };
 
   const openEditDialog = (question: EditableTopicQuestion) => {
     setEditingId(question.id);
@@ -398,197 +414,201 @@ export function TopicQuestionEditorPanel({
     });
   };
 
-  const confirmDocQuestions = (docId: string) => {
-    const dq = docQuestions.find((d) => d.docId === docId);
-    if (!dq?.questionIds.length) return;
-    const nextEdits = { ...questionEdits };
-    dq.questionIds.forEach((qid, i) => {
-      const q = resolveTopicQuestion(qid, questionEdits, docId, i);
-      nextEdits[qid] = { ...q, confirmed: true };
-    });
-    onUpdate({
-      docQuestions: docQuestions.map((d) => (d.docId === docId ? { ...d, confirmed: true } : d)),
-      questionEdits: nextEdits,
-    });
-    toast.success("该资料下题目已全部确认");
-  };
-
-  const totalCount = allQuestions.length;
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[13px] text-muted-foreground">
-          题目绑定到文档级，共 <strong className="text-foreground">{totalCount}</strong> 道题
+          已关联 <strong className="text-foreground">{flatSelected.length}</strong> 道题
         </p>
-        <div className="flex items-center gap-1 rounded-md border border-border bg-card p-0.5">
-          <button
-            type="button"
-            onClick={() => setViewMode("list")}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-[3px] px-2.5 py-1 text-[11.5px] transition-colors",
-              viewMode === "list"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            <List className="h-3.5 w-3.5" />
-            列表模式
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("paper")}
-            className={cn(
-              "inline-flex items-center gap-1 rounded-[3px] px-2.5 py-1 text-[11.5px] transition-colors",
-              viewMode === "paper"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:bg-muted",
-            )}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            卷面模式
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={openQuestionPicker}
+          disabled={docIds.length === 0}
+          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/40 px-3 text-[12px] font-medium text-primary hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          选择题目
+        </button>
       </div>
 
       {docIds.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border py-10 text-center text-[13px] text-muted-foreground">
           请先在「选择资料」步骤中添加学习资料
         </div>
-      ) : viewMode === "list" ? (
-        <div className="space-y-4">
-          {docIds.map((docId) => {
-            const doc = DOCS.find((d) => d.id === docId);
-            const dq = docQuestions.find((d) => d.docId === docId);
-            const docItems = allQuestions.filter((item) => item.docId === docId);
-
-            return (
-              <section key={docId} className="rounded-lg border border-divider p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <BookOpen className="h-4 w-4 shrink-0 text-primary" />
-                    <span className="truncate text-[13.5px] font-medium">
-                      {doc?.title ?? docId}
-                    </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
-                      {docItems.length} 道题
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onGenerate(docId)}
-                      disabled={aiLoading}
-                      className="inline-flex items-center gap-1 rounded-md border border-primary/30 px-2.5 py-1 text-[11.5px] text-primary"
-                    >
-                      {aiLoading ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-3 w-3" />
-                      )}
-                      {dq?.generated ? "重新生成" : "AI 生成题目"}
-                    </button>
-                    {docItems.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => confirmDocQuestions(docId)}
-                        className={cn(
-                          "rounded-md px-2.5 py-1 text-[11.5px]",
-                          dq?.confirmed
-                            ? "bg-success-soft text-success"
-                            : "border border-border hover:bg-muted",
-                        )}
-                      >
-                        {dq?.confirmed ? "已确认" : "确认全部"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {docItems.length === 0 ? (
-                  <p className="text-[12px] text-muted-foreground">
-                    尚未生成题目，点击「AI 生成题目」或从其他资料复用
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {docItems.map((item) => (
-                      <li key={item.question.id}>
-                        <QuestionListRow
-                          index={item.globalIndex}
-                          question={item.question}
-                          onClick={() => openEditDialog(item.question)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            );
-          })}
+      ) : flatSelected.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border py-10 text-center text-[13px] text-muted-foreground">
+          尚未选择题目，点击「选择题目」按资料勾选
         </div>
       ) : (
-        <div className="space-y-5">
-          {docIds.map((docId) => {
-            const doc = DOCS.find((d) => d.id === docId);
-            const dq = docQuestions.find((d) => d.docId === docId);
-            const docItems = allQuestions.filter((item) => item.docId === docId);
-
-            return (
-              <section
-                key={docId}
-                className="overflow-hidden rounded-[12px] border border-kb-border bg-white shadow-[0_12px_30px_rgba(22,74,84,0.04)]"
+        <div className="overflow-x-auto rounded-lg border border-divider">
+          <div className="min-w-[720px]">
+          <div className="grid grid-cols-[56px_72px_minmax(0,1.4fr)_minmax(140px,0.9fr)_88px] gap-3 border-b border-divider bg-muted/25 px-3 py-2 text-[11px] font-medium text-muted-foreground">
+            <span>序号</span>
+            <span>题型</span>
+            <span>题干</span>
+            <span>来源文件</span>
+            <span className="text-right">操作</span>
+          </div>
+          <ul className="divide-y divide-divider">
+            {flatSelected.map((row) => (
+              <li
+                key={`${row.docId}-${row.question.id}`}
+                className="grid grid-cols-[56px_72px_minmax(0,1.4fr)_minmax(140px,0.9fr)_88px] items-start gap-3 px-3 py-3"
               >
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-kb-border bg-[#f8fafb] px-5 py-3.5 sm:px-6">
-                  <div className="flex items-center gap-2">
-                    <span className="h-5 w-1 rounded-full bg-primary" aria-hidden="true" />
-                    <FileText className="h-4 w-4 text-primary" />
-                    <h3 className="text-[14px] font-semibold text-kb-heading">
-                      {doc?.title ?? docId}
-                    </h3>
-                    <span className="text-[11px] text-kb-muted">共 {docItems.length} 题</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onGenerate(docId)}
-                      disabled={aiLoading}
-                      className={listActionClass("outline")}
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      {dq?.generated ? "重新生成" : "AI 生成"}
-                    </button>
-                    {docItems.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => confirmDocQuestions(docId)}
-                        className={listActionClass(dq?.confirmed ? "soft" : "outline")}
-                      >
-                        {dq?.confirmed ? "已确认" : "确认全部"}
-                        <ChevronRight className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
+                <span className="pt-0.5 text-[12px] tabular-nums text-muted-foreground">
+                  {row.index}
+                </span>
+                <span className="pt-0.5">
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                    {TYPE_LABEL[row.question.type]}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => openEditDialog(row.question)}
+                  className="min-w-0 text-left"
+                >
+                  <p className="line-clamp-2 text-[13px] leading-snug text-foreground">
+                    {row.question.stem}
+                  </p>
+                </button>
+                <p className="line-clamp-2 pt-0.5 text-[12px] text-muted-foreground" title={row.docTitle}>
+                  {row.docTitle}
+                </p>
+                <div className="flex justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => openEditDialog(row.question)}
+                    aria-label="编辑题目"
+                    className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-primary"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeQuestion(row.docId, row.question.id)}
+                    aria-label="移除题目"
+                    className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
-
-                {docItems.length === 0 ? (
-                  <p className="py-6 text-center text-[12px] text-muted-foreground">暂无题目</p>
-                ) : (
-                  <div className="divide-y divide-divider">
-                    {docItems.map((item) => (
-                      <PaperQuestionBlock
-                        key={item.question.id}
-                        index={item.globalIndex}
-                        question={item.question}
-                        onChange={(q) => saveQuestionEdit(q)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            );
-          })}
+              </li>
+            ))}
+          </ul>
+          </div>
         </div>
       )}
+
+      <AppFormDialog
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        title="选择题目"
+        titleIcon={ClipboardList}
+        size="large"
+        fillHeight
+        footer={
+          <>
+            <AppDialogButton onClick={() => setPickerOpen(false)}>取消</AppDialogButton>
+            <AppDialogButton variant="primary" onClick={applyQuestionSelection}>
+              确定
+            </AppDialogButton>
+          </>
+        }
+      >
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={activePickDoc?.docId ?? ""} onValueChange={setActivePickDocId}>
+              <SelectTrigger className="h-9 w-[360px] max-w-full rounded-md border-kb-border bg-white text-[12.5px]">
+                <SelectValue placeholder="选择资料文件" />
+              </SelectTrigger>
+              <SelectContent>
+                {docs.map((doc) => (
+                  <SelectItem key={doc.docId} value={doc.docId} className="text-[12.5px]">
+                    {doc.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {activePickDoc ? (
+              <span className="text-[12.5px] text-muted-foreground">
+                {activePickDoc.title} 已选{" "}
+                <strong className="text-foreground">{activePickSelectedIds.length}</strong> /{" "}
+                {activePickDoc.candidates.length} 道
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[12.5px] text-muted-foreground">
+            本阶段共已勾选 <strong className="text-foreground">{pickSelectedCount}</strong> 道题
+          </p>
+          {activePickDoc ? (
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() =>
+                  setPickDraftByDoc((current) => ({
+                    ...current,
+                    [activePickDoc.docId]:
+                      activePickSelectedIds.length === activePickDoc.candidates.length
+                        ? []
+                        : activePickDoc.candidates.map((question) => question.id),
+                  }))
+                }
+                className="rounded-md px-2.5 py-1.5 text-[11.5px] text-primary hover:bg-primary-soft"
+              >
+                {activePickSelectedIds.length === activePickDoc.candidates.length
+                  ? "取消全选"
+                  : "批量选择"}
+              </button>
+            </div>
+          ) : null}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+            {activePickDoc ? (
+              <div className="space-y-2">
+                {activePickDoc.candidates.map((question, index) => {
+                  const selected = activePickSelectedIds.includes(question.id);
+                  return (
+                    <button
+                      key={question.id}
+                      type="button"
+                      onClick={() => togglePickId(activePickDoc.docId, question.id)}
+                      className={cn(
+                        "flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                        selected
+                          ? "border-primary/40 bg-primary-soft/25"
+                          : "border-divider hover:bg-muted/30",
+                      )}
+                    >
+                      {selected ? (
+                        <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      ) : (
+                        <Square className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-2">
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {index + 1}
+                          </span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {TYPE_LABEL[question.type]}
+                          </span>
+                        </div>
+                        <p className="text-[13px] leading-snug text-foreground">
+                          {question.stem}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid min-h-40 place-items-center text-[13px] text-muted-foreground">
+                暂无可选资料
+              </div>
+            )}
+          </div>
+        </div>
+      </AppFormDialog>
 
       <Dialog
         open={!!editingId && !!dialogDraft}
@@ -605,7 +625,6 @@ export function TopicQuestionEditorPanel({
             {dialogDraft && (
               <p className="text-left text-[12px] text-muted-foreground">
                 {TYPE_LABEL[dialogDraft.type]}
-                {dialogDraft.confirmed ? " · 已确认" : " · 待确认"}
               </p>
             )}
           </DialogHeader>
@@ -629,7 +648,7 @@ export function TopicQuestionEditorPanel({
               type="button"
               onClick={() => {
                 if (dialogDraft) {
-                  saveQuestionEdit({ ...dialogDraft, confirmed: true });
+                  saveQuestionEdit(dialogDraft);
                   toast.success("题目已保存");
                 }
                 setEditingId(null);

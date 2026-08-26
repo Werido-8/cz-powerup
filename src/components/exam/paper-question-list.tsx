@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  Check,
   ChevronDown,
   ChevronUp,
   GripVertical,
@@ -21,6 +22,7 @@ import {
   createMockAiAppendQuestions,
   defaultOptionsForType,
   editorQuestionFromBank,
+  parseAnswerKeys,
   type Difficulty,
   type EditorGroup,
   type EditorQuestion,
@@ -57,11 +59,11 @@ export function QuestionStudentPreview({
 
   if (type === "单选题" || type === "多选题" || type === "判断题") {
     const isMulti = type === "多选题";
-    const correctKeys = question.answer ? question.answer.split("") : [];
+    const correctKeys = parseAnswerKeys(question.answer ?? "", type);
     return (
       <div className="mt-3 space-y-1.5" aria-readonly>
         {options?.map((o) => {
-          const isCorrect = correctKeys.includes(o.key);
+          const isCorrect = correctKeys.has(o.key);
           return (
             <div
               key={o.key}
@@ -72,12 +74,20 @@ export function QuestionStudentPreview({
             >
               <span
                 className={cn(
-                  "mt-0.5 grid h-[16px] w-[16px] shrink-0 place-items-center border",
+                  "mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center border",
                   isMulti ? "rounded-[3px]" : "rounded-full",
-                  isCorrect ? "border-primary/50 bg-primary-soft" : "border-[#C8DADD] bg-white",
+                  isCorrect ? "border-primary bg-primary" : "border-[#C8DADD] bg-white",
                 )}
                 aria-hidden
-              />
+              >
+                {isCorrect ? (
+                  isMulti ? (
+                    <Check className="h-3 w-3 text-primary-foreground stroke-[2.4]" />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-primary-foreground" />
+                  )
+                ) : null}
+              </span>
               <span className="text-[13px] leading-snug text-[#1F3440]/90">
                 <span
                   className={cn(
@@ -226,6 +236,45 @@ export function usePaperQuestionGroups(initialGroups: EditorGroup[] = EDITOR_GRO
     );
   }, []);
 
+  const appendFromBankAuto = useCallback((bankIds: string[]) => {
+    if (bankIds.length === 0) return;
+    const requestedIds = new Set(bankIds);
+    const picked = BANK_QUESTIONS.filter(
+      (question) => requestedIds.has(question.id) && question.status === "启用",
+    );
+    if (picked.length === 0) return;
+
+    const pickedTypes = new Set(picked.map((question) => question.type));
+    setGroups((prev) => {
+      const next = prev.map((group) => ({ ...group, questions: [...group.questions] }));
+      const existingQuestionIds = new Set(
+        prev.flatMap((group) => group.questions.map((question) => question.id)),
+      );
+
+      picked.forEach((bankQuestion) => {
+        if (existingQuestionIds.has(bankQuestion.id)) return;
+        let targetGroup = next.find((group) => group.type === bankQuestion.type);
+        if (!targetGroup) {
+          targetGroup = {
+            type: bankQuestion.type,
+            perScore: TYPE_PER_SCORE[bankQuestion.type] ?? 2,
+            questions: [],
+          };
+          next.push(targetGroup);
+        }
+        targetGroup.questions.push(editorQuestionFromBank(bankQuestion, targetGroup.perScore));
+        existingQuestionIds.add(bankQuestion.id);
+      });
+
+      return next;
+    });
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      pickedTypes.forEach((type) => next.delete(type));
+      return next;
+    });
+  }, []);
+
   const aiAppend = (type: QuestionType, context: { knowledge: string; difficulty: Difficulty }) => {
     const group = groups.find((item) => item.type === type);
     if (!group) return 0;
@@ -265,6 +314,7 @@ export function usePaperQuestionGroups(initialGroups: EditorGroup[] = EDITOR_GRO
     addGroup,
     updateGroupScore,
     appendFromBank,
+    appendFromBankAuto,
     aiAppend,
     resetGroups,
     collapseAll,
@@ -315,9 +365,11 @@ export function PaperQuestionSummary({
 export function PaperTypeToolbar({
   groups,
   onAddGroup,
+  onAddQuestions,
 }: {
   groups: EditorGroup[];
   onAddGroup: (type: QuestionType) => void;
+  onAddQuestions?: () => void;
 }) {
   const existing = new Set(groups.map((g) => g.type));
   const available = PAPER_QUESTION_TYPES.filter((t) => !existing.has(t));
@@ -329,6 +381,18 @@ export function PaperTypeToolbar({
         <span className="text-[15px] font-bold text-[#1F3440]">题目配置</span>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {onAddQuestions && (
+          <>
+            <button
+              type="button"
+              onClick={onAddQuestions}
+              className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-[8px] border border-primary/30 bg-primary-soft px-3 text-[12px] font-medium text-primary transition-colors hover:border-primary/45 hover:bg-primary/15"
+            >
+              <LayoutList className="h-3.5 w-3.5" /> 直接添加题目
+            </button>
+            <span className="hidden h-5 w-px bg-[#DCE8EA] sm:block" aria-hidden />
+          </>
+        )}
         {available.length === 0 ? (
           <span className="text-[12px] text-muted-foreground">所有题型已全部添加</span>
         ) : (
@@ -396,7 +460,7 @@ export function PaperQuestionList({
         </div>
         <p className="text-[14px] font-medium text-[#1F3440]/70">暂无题型模块</p>
         <p className="mt-1 text-[12px] text-muted-foreground">
-          请在上方添加题型，再为各模块添加题目
+          可添加题型模块，或直接从题库选题后自动分组
         </p>
       </div>
     );

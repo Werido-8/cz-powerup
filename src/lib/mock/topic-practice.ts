@@ -63,7 +63,7 @@ function isAnswered(value: string | string[] | undefined): boolean {
   return value !== "";
 }
 
-/** 统计暂存卷面中已作答题数；传入 questionIds 时仅统计专题内题目 */
+/** 统计暂存进度中已作答题数；传入 questionIds 时仅统计专题内题目 */
 export function countDraftAnswers(
   draft: TopicPracticeDraft | null,
   questionIds?: string[],

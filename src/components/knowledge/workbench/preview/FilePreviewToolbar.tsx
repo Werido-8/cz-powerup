@@ -8,6 +8,7 @@ export function FilePreviewToolbar({
   currentFile,
   versions,
   currentVersionId,
+  baseName,
   onBack,
   onVersionChange,
 }: {
@@ -15,6 +16,7 @@ export function FilePreviewToolbar({
   currentFile: KnowledgeFile;
   versions: KnowledgeFileVersion[];
   currentVersionId?: string;
+  baseName?: string;
   onBack: () => void;
   onVersionChange: (versionId: string) => void;
 }) {
@@ -34,7 +36,7 @@ export function FilePreviewToolbar({
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[8px] bg-primary text-primary-foreground">
           <Library className="h-4 w-4 stroke-[1.8]" />
         </span>
-        <span className="min-w-0 truncate">{currentBase.name}</span>
+        <span className="min-w-0 truncate">{baseName ?? currentBase.name}</span>
       </span>
       <span className="mx-1 text-kb-muted">/</span>
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -43,11 +45,7 @@ export function FilePreviewToolbar({
           {currentFile.name}
         </h1>
       </div>
-      <KbVersionSelect
-        versions={versions}
-        value={currentVersionId}
-        onChange={onVersionChange}
-      />
+      <KbVersionSelect versions={versions} value={currentVersionId} onChange={onVersionChange} />
       <KbIconButton icon={Download} label="下载" onClick={() => toast.message("开始下载文件")} />
       <KbIconButton
         icon={Star}
