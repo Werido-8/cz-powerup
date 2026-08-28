@@ -14,6 +14,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { FileListCheckbox } from "./FileListCheckbox";
+import { SimilarFileHintBadge, shouldShowSimilarFileHint } from "./SimilarFileHintBadge";
 import { Tag } from "@/components/learning/ui";
 import { KbFileTypeIcon } from "@/components/knowledge/ui";
 import { fileListParseStatus, publishStatusLabel, publishStatusTone } from "@/lib/knowledge/status";
@@ -30,6 +31,7 @@ export function KnowledgeOverviewFileCard({
   onMove,
   onTogglePin,
   onViewHistory,
+  onSimilarity,
 }: {
   file: KnowledgeFile;
   onOpen: (file: KnowledgeFile) => void;
@@ -38,6 +40,7 @@ export function KnowledgeOverviewFileCard({
   onMove?: (file: KnowledgeFile) => void;
   onTogglePin?: (file: KnowledgeFile) => void;
   onViewHistory?: (file: KnowledgeFile) => void;
+  onSimilarity?: (file: KnowledgeFile) => void;
 }) {
   const statusTone = publishStatusTone(file.status);
   const disabled = !isFileEnabled(file);
@@ -130,6 +133,9 @@ export function KnowledgeOverviewFileCard({
               <History className="h-2.5 w-2.5 stroke-[2]" />
               {versionCount} 个版本
             </Tag>
+          )}
+          {onSimilarity && shouldShowSimilarFileHint(file) && (
+            <SimilarFileHintBadge nested onClick={() => onSimilarity(file)} />
           )}
           <Tag
             variant="outline"
@@ -318,6 +324,7 @@ export function KnowledgeFileCardGrid({
   onMove,
   onTogglePin,
   onViewHistory,
+  onSimilarity,
 }: {
   files: KnowledgeFile[];
   onOpen: (file: KnowledgeFile) => void;
@@ -331,6 +338,7 @@ export function KnowledgeFileCardGrid({
   onMove?: (file: KnowledgeFile) => void;
   onTogglePin?: (file: KnowledgeFile) => void;
   onViewHistory?: (file: KnowledgeFile) => void;
+  onSimilarity?: (file: KnowledgeFile) => void;
 }) {
   if (files.length === 0) return <>{empty}</>;
 
@@ -357,6 +365,7 @@ export function KnowledgeFileCardGrid({
           onMove={onMove}
           onTogglePin={onTogglePin}
           onViewHistory={onViewHistory}
+          onSimilarity={onSimilarity}
         />
       ))}
     </div>

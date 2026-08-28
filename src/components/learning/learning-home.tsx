@@ -10,7 +10,6 @@ import {
   FileText,
   FolderOpen,
   Grid2X2,
-  History,
   Layers3,
   MessageSquareText,
   Play,
@@ -27,6 +26,7 @@ import {
   CONTRIBUTION_STATUS_STYLE,
   QUESTION_CONTRIBUTIONS,
 } from "@/lib/mock/my-question-contributions";
+import { loadTopicPracticeLastScore } from "@/lib/mock/topic-practice";
 import { useMockStore } from "@/lib/mock/store";
 import { cn } from "@/lib/utils";
 
@@ -96,14 +96,6 @@ const learningMetrics = [
     delta: "12",
     icon: FileText,
     tone: "blue" as const,
-  },
-  {
-    label: "本周学习时长",
-    value: "2.6",
-    suffix: "h",
-    delta: "0.6h",
-    icon: History,
-    tone: "violet" as const,
   },
 ] as const;
 
@@ -281,7 +273,7 @@ function LearningOverview() {
     <section className="relative flex h-full min-h-[260px] flex-col overflow-hidden rounded-[16px] border border-kb-border bg-white p-4 shadow-[0_8px_24px_rgba(24,76,86,0.035)] xl:min-h-0">
       <CardHeading icon={Grid2X2} title="学习总览" />
 
-      <div className="relative mt-2.5 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="relative mt-2.5 grid gap-2.5 sm:grid-cols-2">
         {learningMetrics.map((metric) => {
           const Icon = metric.icon;
           return (
@@ -305,11 +297,6 @@ function LearningOverview() {
                 <p className="truncate text-[11.5px] text-kb-muted">{metric.label}</p>
                 <p className="mt-1 flex items-baseline gap-1 text-[26px] font-bold leading-none tracking-[-0.04em] text-kb-heading">
                   <span>{metric.value}</span>
-                  {"suffix" in metric && metric.suffix ? (
-                    <span className="text-[12px] font-medium tracking-normal text-kb-muted">
-                      {metric.suffix}
-                    </span>
-                  ) : null}
                 </p>
                 {metric.delta ? (
                   <p className="mt-2 flex items-center gap-1 text-[10.5px] text-kb-muted">
@@ -376,13 +363,7 @@ function HeaderActions() {
           {PENDING_REVIEW_COUNT} 条题目待审核
         </Link>
       ) : null}
-      <Link
-        to="/training/records"
-        className="inline-flex min-h-11 items-center gap-2 rounded-full border border-kb-border bg-white px-4 text-[13px] font-medium text-kb-body shadow-[0_4px_16px_rgba(22,65,74,.04)] transition hover:border-primary/35 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-      >
-        <History className="h-4 w-4" aria-hidden />
-        学习记录
-      </Link>
+      
     </div>
   );
 }
@@ -408,6 +389,7 @@ function TopicRecommendations() {
         {topicCards.map((card) => {
           const topic = ENRICHED_TOPICS.find((item) => item.id === card.id);
           if (!topic) return null;
+          const lastScore = loadTopicPracticeLastScore(topic.id);
           return (
             <Link
               key={topic.id}
@@ -442,9 +424,15 @@ function TopicRecommendations() {
                     练习 {topic.questionCount}
                   </span>
                 </span>
-                <span className="inline-flex shrink-0 items-center gap-1 font-medium text-primary">
-                  查看专题 <ChevronRight className="h-3.5 w-3.5" />
-                </span>
+                {lastScore ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-[5px] bg-[#EAF7F9] px-2 py-0.5 font-medium text-primary">
+                    最近练习 {lastScore.accuracy}%
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center gap-1 font-medium text-primary">
+                    查看专题 <ChevronRight className="h-3.5 w-3.5" />
+                  </span>
+                )}
               </div>
             </Link>
           );

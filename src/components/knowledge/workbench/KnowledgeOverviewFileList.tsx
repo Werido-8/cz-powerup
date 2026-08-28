@@ -44,6 +44,7 @@ import { kbFileTypeConfig } from "@/lib/knowledge/tokens";
 import type { KnowledgeFile, KnowledgeParseStatus, KnowledgeSortBy } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
 import { FileListCheckbox } from "./FileListCheckbox";
+import { SimilarFileHintBadge, shouldShowSimilarFileHint } from "./SimilarFileHintBadge";
 
 /** 文件名占主份，时间/上传人等共享剩余宽度，避免文件名过宽、右侧列挤在一起 */
 const GRID_OVERVIEW_MANAGE =
@@ -284,9 +285,7 @@ export function FileListToolbarActions({
 }) {
   return (
     <>
-      {showViewModeToggle && (
-        <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />
-      )}
+      {showViewModeToggle && <FileViewModeToggle value={viewMode} onChange={onViewModeChange} />}
       {onUpload && <FileListUploadButton onClick={onUpload} disabled={uploadDisabled} />}
       <FileListSortButton value={sortBy} onChange={onSortChange} />
       <FileListRefreshButton onClick={onRefresh} />
@@ -352,6 +351,7 @@ export function KnowledgeFileTable({
   onMove,
   onTogglePin,
   onViewHistory,
+  onSimilarity,
   empty,
   className,
 }: {
@@ -366,6 +366,7 @@ export function KnowledgeFileTable({
   onMove?: (file: KnowledgeFile) => void;
   onTogglePin?: (file: KnowledgeFile) => void;
   onViewHistory?: (file: KnowledgeFile) => void;
+  onSimilarity?: (file: KnowledgeFile) => void;
   empty?: ReactNode;
   className?: string;
 }) {
@@ -403,7 +404,11 @@ export function KnowledgeFileTable({
   );
 
   return (
-    <KbDataTable className={cn("border-0 shadow-none", className)} minWidth={grid} header={header}>
+    <KbDataTable
+      className={cn("border-0 shadow-none !overflow-x-auto", className)}
+      minWidth={grid}
+      header={header}
+    >
       {files.map((file) => (
         <FileDataRow
           key={file.id}
@@ -417,6 +422,7 @@ export function KnowledgeFileTable({
           onMove={onMove}
           onTogglePin={onTogglePin}
           onViewHistory={onViewHistory}
+          onSimilarity={onSimilarity}
         />
       ))}
     </KbDataTable>
@@ -455,6 +461,7 @@ function FileDataRow({
   onMove,
   onTogglePin,
   onViewHistory,
+  onSimilarity,
 }: {
   file: KnowledgeFile;
   grid: string;
@@ -466,6 +473,7 @@ function FileDataRow({
   onMove?: (file: KnowledgeFile) => void;
   onTogglePin?: (file: KnowledgeFile) => void;
   onViewHistory?: (file: KnowledgeFile) => void;
+  onSimilarity?: (file: KnowledgeFile) => void;
 }) {
   const type = kbFileTypeConfig[file.type ?? "other"];
   const employee = isEmployee();
@@ -486,14 +494,21 @@ function FileDataRow({
         type={file.type ?? "other"}
         size="sm"
         nameWeight="normal"
-          badge={
+        badge={
           <>
-            <FileParseInlineIcon fileStatus={file.status} parseStatus={file.parseStatus} parseError={file.parseError} />
+            <FileParseInlineIcon
+              fileStatus={file.status}
+              parseStatus={file.parseStatus}
+              parseError={file.parseError}
+            />
             {(file.versions?.length ?? 0) > 1 && fileListParseStatus(file) === "success" ? (
               <FileHistoryBadge
                 count={file.versions?.length ?? 0}
                 onClick={onViewHistory ? () => onViewHistory(file) : undefined}
               />
+            ) : null}
+            {onSimilarity && shouldShowSimilarFileHint(file) ? (
+              <SimilarFileHintBadge onClick={() => onSimilarity(file)} />
             ) : null}
           </>
         }
@@ -705,12 +720,7 @@ function FileActions({
       onClick={(e) => e.stopPropagation()}
     >
       {parseFailed && (
-        <FileLinkAction
-          icon={RefreshCw}
-          label="重试"
-          tone="primary"
-          onClick={handleRetryParse}
-        />
+        <FileLinkAction icon={RefreshCw} label="重试" tone="primary" onClick={handleRetryParse} />
       )}
       <FileLinkAction icon={Eye} label="预览" onClick={() => onOpen(file)} />
       {file.canDownload !== false && (
@@ -740,7 +750,9 @@ function FileActions({
           {canEditParse && (
             <DropdownMenuItem
               className="text-[12.5px]"
-              onClick={() => navigate({ to: "/knowledge/edit/$fileId", params: { fileId: file.id } })}
+              onClick={() =>
+                navigate({ to: "/knowledge/edit/$fileId", params: { fileId: file.id } })
+              }
             >
               <FileEdit className="h-3.5 w-3.5 stroke-[1.8]" />
               编辑解析结果

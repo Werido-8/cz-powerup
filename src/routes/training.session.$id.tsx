@@ -30,7 +30,9 @@ import {
   clearTopicPracticeDraft,
   getTopicQuestions,
   loadTopicPracticeDraft,
+  saveDocLastPracticeScore,
   saveTopicPracticeDraft,
+  saveTopicPracticeLastScore,
   type TopicQuestionItem,
 } from "@/lib/mock/topic-practice";
 import { trainingResultStorageKey } from "@/lib/training/result";
@@ -329,6 +331,14 @@ function SessionPage() {
       byDoc.forEach(({ answeredIds, correctIds: docCorrectIds }, did) =>
         recordDocAnswers(did, answeredIds, docCorrectIds),
       );
+      const gradableTotal = questions.filter((item) => item.type !== "text").length;
+      saveTopicPracticeLastScore({
+        topicId,
+        accuracy: gradableTotal ? Math.round((correctIds.length / gradableTotal) * 100) : 0,
+        correct: correctIds.length,
+        total: gradableTotal,
+        submittedAt: new Date().toISOString(),
+      });
       clearTopicPracticeDraft(topicId);
       navigate({
         to: "/training/result/$id",
@@ -343,6 +353,12 @@ function SessionPage() {
         questions.map((qq) => qq.id),
         correctIds,
       );
+      const gradableTotal = questions.filter((item) => item.type !== "text").length;
+      saveDocLastPracticeScore(docId, {
+        accuracy: gradableTotal ? Math.round((correctIds.length / gradableTotal) * 100) : 0,
+        correct: correctIds.length,
+        total: gradableTotal,
+      });
     }
     navigate({ to: "/training/result/$id", params: { id }, search: docId ? { docId } : undefined });
   };

@@ -9,11 +9,7 @@ import {
   Tag,
 } from "@/components/learning/ui";
 import { toast } from "sonner";
-import {
-  KbEmptyState,
-  KbFileSearchInput,
-  KbFilterCombo,
-} from "@/components/knowledge/ui";
+import { KbEmptyState, KbFileSearchInput, KbFilterCombo } from "@/components/knowledge/ui";
 import { KNOWLEDGE_BASES, KNOWLEDGE_CATEGORIES } from "@/lib/knowledge/data";
 import {
   canManageFileList,
@@ -129,7 +125,12 @@ export function AllKnowledgeFilesPage() {
     toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
   };
 
-  const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string) => {
+  const handleConfirmMove = (
+    movingFiles: KnowledgeFile[],
+    targetBaseId: string,
+    targetDirectoryId: string | undefined,
+    keepSource: boolean,
+  ) => {
     const targetBase = getBaseById(targetBaseId);
     if (!targetBase) {
       toast.error("目标知识库不存在");
@@ -143,12 +144,13 @@ export function AllKnowledgeFilesPage() {
     );
     setMoveLoading(true);
     for (const file of toSubmit) {
-      submitStoreFileMove(file, targetBase);
+      submitStoreFileMove(file, targetBase, keepSource, targetDirectoryId);
     }
     for (const file of movable) {
       updateStoreFile(file.id, {
         knowledgeBaseId: targetBaseId,
         knowledgeBaseName: targetBase.name,
+        directoryId: targetDirectoryId,
       });
     }
     window.setTimeout(() => {
@@ -282,9 +284,10 @@ export function AllKnowledgeFilesPage() {
               placeholder="全部知识库"
               options={[
                 { value: "all", label: "全部知识库" },
-                ...KNOWLEDGE_BASES.filter(
-                  (base) => base.permission.canView,
-                ).map((base) => ({ value: base.id, label: base.name })),
+                ...KNOWLEDGE_BASES.filter((base) => base.permission.canView).map((base) => ({
+                  value: base.id,
+                  label: base.name,
+                })),
               ]}
             />
           </>

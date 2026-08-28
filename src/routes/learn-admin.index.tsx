@@ -17,10 +17,10 @@ export const Route = createFileRoute("/learn-admin/")({
 function LearnAdminIndexPage() {
   const navigate = useNavigate();
 
-  const handleNew = (mode: "standard" | "ai" = "standard") => {
+  const handleNew = () => {
     navigate({
       to: "/learn-admin/topic/new",
-      search: { preview: undefined, source: mode === "ai" ? "ai" : undefined },
+      search: { preview: undefined },
     });
   };
 
@@ -39,7 +39,7 @@ function LearnAdminIndexPage() {
     }
     navigate({
       to: "/learn-admin/topic/new",
-      search: { preview: record.id, source: undefined },
+      search: { preview: record.id },
     });
   };
 

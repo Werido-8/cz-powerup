@@ -42,9 +42,12 @@ import {
   POSITION_OPTIONS,
   SCENARIO_OPTIONS,
   SPECIALTY_OPTIONS,
-  buildAiGeneratedTopicDraft,
+  buildAiTopicBasicInfo,
+  generateAiKnowledgePoints,
   getLearnablePoolDocs,
   getTopicAdminById,
+  recommendAiTopicDocs,
+  summarizeAiTopicQuestions,
   type TopicAdminRecord,
   type TopicKnowledgePoint,
   type TopicPosition,
@@ -62,46 +65,11 @@ const CONTENT_STEP_HINTS = [
   "核对并发布",
 ];
 
-type StageKey = "basic" | "materials" | "knowledge" | "questions";
-type StageConfirmState = Record<StageKey, boolean>;
-
-const EMPTY_STAGE_CONFIRM: StageConfirmState = {
-  basic: false,
-  materials: false,
-  knowledge: false,
-  questions: false,
-};
-
-function stageOfContentStep(contentStep: number): StageKey | null {
-  if (contentStep === 1) return "basic";
-  if (contentStep === 2) return "materials";
-  if (contentStep === 3) return "knowledge";
-  if (contentStep === 4) return "questions";
-  return null;
-}
-
 const TOPIC_DRAFT_KEY = "topic-admin-draft";
 
 export type TopicEditorMode = "create" | "edit";
 
 type DraftState = Omit<TopicAdminRecord, "learnerCount" | "maintainer">;
-
-function stageOfPatch(patch: Partial<DraftState>): StageKey | null {
-  if (
-    "title" in patch ||
-    "specialty" in patch ||
-    "positions" in patch ||
-    "learningGoal" in patch ||
-    "scenario" in patch ||
-    "intro" in patch
-  ) {
-    return "basic";
-  }
-  if ("docIds" in patch) return "materials";
-  if ("knowledgePoints" in patch) return "knowledge";
-  if ("docQuestions" in patch || "questionEdits" in patch) return "questions";
-  return null;
-}
 
 function loadDraft(topicId?: string): DraftState | null {
   try {
@@ -215,32 +183,96 @@ function SectionTitle({
   );
 }
 
+function StepAiBar({
+  title,
+  hint,
+  prompt,
+  onPromptChange,
+  templates,
+  loading,
+  actionLabel,
+  onGenerate,
+}: {
+  title: string;
+  hint: string;
+  prompt?: string;
+  onPromptChange?: (value: string) => void;
+  templates?: { label: string; prompt: string }[];
+  loading: boolean;
+  actionLabel: string;
+  onGenerate: () => void;
+}) {
+  return (
+    <div className="mb-3 shrink-0 rounded-[10px] border border-primary/18 bg-primary-soft/30 px-3 py-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
+            <Sparkles className="h-3.5 w-3.5 shrink-0" />
+            {title}
+          </div>
+          <p className="mt-0.5 text-[11px] leading-4 text-[#6B7F88]">{hint}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={loading}
+          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] bg-primary px-3 text-[12px] font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+          {actionLabel}
+        </button>
+      </div>
+      {onPromptChange ? (
+        <>
+          <textarea
+            value={prompt}
+            onChange={(event) => onPromptChange(event.target.value)}
+            placeholder="示例：面向新入职运行值班人员，围绕交接班、巡检和常见异常判断，组织一套入门专题。"
+            rows={2}
+            className="mt-2 w-full resize-none rounded-md border border-input bg-white px-3 py-2 text-[12.5px] leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          {templates?.length ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {templates.map((tpl) => (
+                <button
+                  key={tpl.label}
+                  type="button"
+                  onClick={() => onPromptChange(tpl.prompt)}
+                  className="rounded-full border border-border bg-white px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary"
+                >
+                  {tpl.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 export function TopicEditorWizard({
   mode,
   topicId,
-  assist = "standard",
   initialStep = 1,
   onBack,
   onPreview,
 }: {
   mode: TopicEditorMode;
   topicId?: string;
-  assist?: "standard" | "ai";
   initialStep?: number;
   onBack: () => void;
   onPreview: (draft: DraftState) => void;
 }) {
   const existing = topicId ? getTopicAdminById(topicId) : undefined;
-  const isAiMode = assist === "ai";
-  const STEPS = isAiMode ? (["AI 起草", ...CONTENT_STEPS] as const) : CONTENT_STEPS;
-  const STEP_HINTS = isAiMode ? ["描述专题需求", ...CONTENT_STEP_HINTS] : CONTENT_STEP_HINTS;
+  const STEPS = CONTENT_STEPS;
+  const STEP_HINTS = CONTENT_STEP_HINTS;
   const lastStep = STEPS.length;
 
   const [step, setStep] = useState(() => Math.min(Math.max(initialStep, 1), lastStep));
-  const [reachedContentStep, setReachedContentStep] = useState(() => {
-    const initial = Math.min(Math.max(initialStep, 1), lastStep);
-    return isAiMode ? initial - 1 : initial;
-  });
+  const [reachedContentStep, setReachedContentStep] = useState(() =>
+    Math.min(Math.max(initialStep, 1), lastStep),
+  );
   const [draft, setDraft] = useState<DraftState>(() => {
     // 编辑态始终以专题维护 mock 为准，避免 sessionStorage 旧草稿与列表不一致
     if (mode === "edit" && existing) {
@@ -258,8 +290,6 @@ export function TopicEditorWizard({
   });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
-  const [aiDraftDone, setAiDraftDone] = useState(false);
-  const [stageConfirmed, setStageConfirmed] = useState<StageConfirmState>(EMPTY_STAGE_CONFIRM);
   const [dirty, setDirty] = useState(false);
   const [docPickerOpen, setDocPickerOpen] = useState(false);
   const [docPickerIds, setDocPickerIds] = useState<string[]>([]);
@@ -268,9 +298,10 @@ export function TopicEditorWizard({
   const [docSearch, setDocSearch] = useState("");
   const [docTypeFilter, setDocTypeFilter] = useState("all");
 
-  const contentStep = isAiMode ? step - 1 : step;
-  const currentStage = stageOfContentStep(contentStep);
-  const stageNeedsConfirm = Boolean(isAiMode && currentStage && !stageConfirmed[currentStage]);
+  const contentStep = step;
+  const topicContextPrompt = [draft.title, draft.learningGoal, draft.intro, aiPrompt]
+    .filter((item) => item.trim())
+    .join("；");
 
   useEffect(() => {
     setStep(Math.min(Math.max(initialStep, 1), lastStep));
@@ -304,12 +335,6 @@ export function TopicEditorWizard({
 
   const updateDraft = (patch: Partial<DraftState>) => {
     setDirty(true);
-    if (isAiMode) {
-      const stage = stageOfPatch(patch);
-      if (stage && stageConfirmed[stage]) {
-        setStageConfirmed((prev) => ({ ...prev, [stage]: false }));
-      }
-    }
     setDraft((prev) => {
       const next = { ...prev, ...patch, updatedAt: new Date().toISOString().slice(0, 10) };
       saveDraft(next, topicId);
@@ -379,26 +404,62 @@ export function TopicEditorWizard({
     });
   };
 
-  const handleAiGenerateDraft = () => {
+  const runAiTask = (task: () => void, success: string) => {
+    setAiLoading(true);
+    window.setTimeout(() => {
+      task();
+      setAiLoading(false);
+      toast.success(success);
+    }, 900);
+  };
+
+  const handleAiDraftBasic = () => {
     if (!aiPrompt.trim()) {
-      toast.error("请先描述专题目标");
+      toast.error("请先描述专题对象、场景或学习目标");
       return;
     }
-    setAiLoading(true);
-    setTimeout(() => {
-      const generated = buildAiGeneratedTopicDraft(aiPrompt.trim());
-      updateDraft(generated);
-      setStageConfirmed(EMPTY_STAGE_CONFIRM);
-      setReachedContentStep(1);
-      setAiDraftDone(true);
-      setAiLoading(false);
-      setStep(2);
-      toast.success("专题草稿已生成，请按阶段核对后确认");
-    }, 1400);
+    runAiTask(() => {
+      updateDraft(buildAiTopicBasicInfo(aiPrompt.trim()));
+    }, "已起草基本信息，可继续核对后进入下一步");
+  };
+
+  const handleAiRecommendDocs = () => {
+    const prompt = topicContextPrompt || aiPrompt;
+    if (!prompt.trim()) {
+      toast.error("请先填写专题名称或学习目标，便于推荐资料");
+      return;
+    }
+    runAiTask(() => {
+      const docIds = recommendAiTopicDocs(prompt);
+      const docQuestions = docIds.map((id) => {
+        const existingQuestion = draft.docQuestions.find((item) => item.docId === id);
+        return existingQuestion ?? { docId: id, questionIds: [], generated: false, confirmed: false };
+      });
+      updateDraft({ docIds, docQuestions });
+    }, "已推荐相关资料，可增删后进入下一步");
+  };
+
+  const handleAiGenerateKnowledge = () => {
+    if (draft.docIds.length === 0) {
+      toast.error("请先选择资料，再生成知识点");
+      return;
+    }
+    runAiTask(() => {
+      updateDraft({ knowledgePoints: generateAiKnowledgePoints(draft.docIds) });
+    }, "已根据资料生成知识点，可继续调整");
+  };
+
+  const handleAiSummarizeQuestions = () => {
+    if (draft.docIds.length === 0) {
+      toast.error("请先选择资料，再汇总关联题目");
+      return;
+    }
+    runAiTask(() => {
+      updateDraft(summarizeAiTopicQuestions(draft.docIds));
+    }, "已按资料汇总关联题目，可核对后发布");
   };
 
   const canNext = () => {
-    if (contentStep === 0) return aiDraftDone;
     if (contentStep === 1)
       return Boolean(draft.title.trim() && draft.learningGoal.trim() && draft.positions.length > 0);
     if (contentStep === 2) return draft.docIds.length > 0;
@@ -413,17 +474,8 @@ export function TopicEditorWizard({
 
   const handleNext = () => {
     if (!canNext()) {
-      toast.error(
-        contentStep === 0
-          ? "请先生成专题草稿"
-          : contentStep === 3
-            ? "请先补全知识点名称和说明"
-            : "请完成当前步骤必填项",
-      );
+      toast.error(contentStep === 3 ? "请先补全知识点名称和说明" : "请完成当前步骤必填项");
       return;
-    }
-    if (isAiMode && currentStage && !stageConfirmed[currentStage]) {
-      setStageConfirmed((prev) => ({ ...prev, [currentStage]: true }));
     }
     setStep((s) => Math.min(s + 1, lastStep));
   };
@@ -435,10 +487,6 @@ export function TopicEditorWizard({
   };
 
   const handlePublish = () => {
-    if (isAiMode && Object.values(stageConfirmed).some((value) => !value)) {
-      toast.error("请先完成各阶段确认后再发布");
-      return;
-    }
     const publishedDraft: DraftState = {
       ...draft,
       status: "已发布",
@@ -455,14 +503,14 @@ export function TopicEditorWizard({
   };
 
   const goContentStep = (nextContentStep: number) => {
-    setStep(isAiMode ? nextContentStep + 1 : nextContentStep);
+    setStep(nextContentStep);
   };
 
   const questionCount = draft.docQuestions.reduce((total, item) => {
     return total + item.questionIds.length;
   }, 0);
   const pageTitle = mode === "edit" ? "编辑专题" : "新建专题";
-  const modeLabel = mode === "edit" ? "专题编辑" : isAiMode ? "AI 辅助创建" : "人工创建";
+  const modeLabel = mode === "edit" ? "专题编辑" : "逐步确认后发布";
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#F5FAFB] px-4 pt-3 sm:px-6 lg:px-8">
@@ -476,11 +524,7 @@ export function TopicEditorWizard({
             <ChevronLeft className="h-3.5 w-3.5" /> 返回专题维护
           </button>
           <span aria-hidden className="h-4 w-px shrink-0 bg-[#DCE8EA]" />
-          {isAiMode ? (
-            <Sparkles className="h-4 w-4 shrink-0 text-primary" />
-          ) : (
-            <FileText className="h-4 w-4 shrink-0 text-primary" />
-          )}
+          <Sparkles className="h-4 w-4 shrink-0 text-primary" />
           <h1 className="text-[18px] font-semibold leading-none text-[#1F3440]">{pageTitle}</h1>
           <span className="text-[12.5px] text-[#607681]">{modeLabel}</span>
         </div>
@@ -521,8 +565,6 @@ export function TopicEditorWizard({
                     >
                       {done ? (
                         <Check className="h-3.5 w-3.5 stroke-[2.5]" />
-                      ) : n === 1 && isAiMode ? (
-                        <Sparkles className="h-3.5 w-3.5" />
                       ) : (
                         n
                       )}
@@ -559,45 +601,19 @@ export function TopicEditorWizard({
         <div className="grid min-h-0 flex-1 gap-3 overflow-hidden max-lg:overflow-y-auto lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
           <main className="flex min-h-0 min-w-0 flex-col">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] bg-white p-5 shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]">
-            {contentStep === 0 && (
-              <div className="flex h-full min-h-0 flex-col">
-                <SectionTitle>AI 起草</SectionTitle>
-                <p className="-mt-1 mb-3 text-[12.5px] text-[#6B7F88]">
-                  描述对象、场景和学习目标。生成后会回填基本信息、资料、知识点和练习题。
-                </p>
-                {aiDraftDone && (
-                  <div className="mb-3 flex items-center gap-2 rounded-lg bg-primary-soft/40 px-3 py-2 text-[12.5px] text-primary">
-                    <Check className="h-3.5 w-3.5 shrink-0" />
-                    草稿已生成。可修改需求后重新生成，新草稿将覆盖当前内容。
-                  </div>
-                )}
-                <textarea
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="示例：面向新入职运行值班人员，围绕交接班、巡检和常见异常判断，组织一套入门专题。"
-                  className="min-h-0 w-full flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-[13px] leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-                <div className="mt-3 shrink-0">
-                  <p className="mb-2 text-[12px] text-muted-foreground">快捷模板</p>
-                  <div className="flex flex-wrap gap-2">
-                    {AI_TOPIC_TEMPLATES.map((tpl) => (
-                      <button
-                        key={tpl.label}
-                        type="button"
-                        onClick={() => setAiPrompt(tpl.prompt)}
-                        className="rounded-full border border-border px-3 py-1 text-[12px] text-muted-foreground hover:border-primary hover:text-primary"
-                      >
-                        {tpl.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {contentStep === 1 && (
               <div className="flex h-full min-h-0 flex-col">
                 <SectionTitle>基本信息</SectionTitle>
+                <StepAiBar
+                  title="AI 辅助起草信息"
+                  hint="描述对象、场景和学习目标，AI 会填入名称、岗位和简介，你再核对。"
+                  prompt={aiPrompt}
+                  onPromptChange={setAiPrompt}
+                  templates={AI_TOPIC_TEMPLATES}
+                  loading={aiLoading}
+                  actionLabel="起草信息"
+                  onGenerate={handleAiDraftBasic}
+                />
                 <div className="grid shrink-0 gap-x-5 gap-y-3 sm:grid-cols-2">
                   <div>
                     <FieldLabel required>专题名称</FieldLabel>
@@ -727,6 +743,13 @@ export function TopicEditorWizard({
             {contentStep === 2 && (
               <div className="flex h-full min-h-0 flex-col">
                 <SectionTitle>选择资料</SectionTitle>
+                <StepAiBar
+                  title="AI 辅助推荐资料"
+                  hint="根据专题名称和学习目标，从资料池推荐相关文件，可再增删。"
+                  loading={aiLoading}
+                  actionLabel="推荐资料"
+                  onGenerate={handleAiRecommendDocs}
+                />
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-[12.5px] text-muted-foreground">
@@ -912,6 +935,13 @@ export function TopicEditorWizard({
 
             {contentStep === 3 && (
               <div className="flex h-full min-h-0 flex-col">
+                <StepAiBar
+                  title="AI 辅助生成知识点"
+                  hint="从已选资料提炼学员必须掌握的要点，生成后仍可增删改。"
+                  loading={aiLoading}
+                  actionLabel="生成知识点"
+                  onGenerate={handleAiGenerateKnowledge}
+                />
                 <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
                   <SectionTitle className="mb-0">维护知识点</SectionTitle>
                   <button
@@ -1002,6 +1032,13 @@ export function TopicEditorWizard({
             {contentStep === 4 && (
               <div className="flex h-full min-h-0 flex-col">
                 <SectionTitle>关联题目</SectionTitle>
+                <StepAiBar
+                  title="AI 辅助汇总题目"
+                  hint="按已选资料汇总可关联的练习题，不另走一套造题流程。"
+                  loading={aiLoading}
+                  actionLabel="汇总题目"
+                  onGenerate={handleAiSummarizeQuestions}
+                />
                 <div className="min-h-0 flex-1 overflow-y-auto">
                 <TopicQuestionEditorPanel
                   docIds={draft.docIds}
@@ -1160,8 +1197,7 @@ export function TopicEditorWizard({
           questionCount={questionCount}
           contentStep={contentStep}
           reachedContentStep={reachedContentStep}
-          isAiMode={isAiMode}
-          onEditBasic={() => setStep(isAiMode ? 2 : 1)}
+          onEditBasic={() => setStep(1)}
         />
       </div>
       </div>
@@ -1211,38 +1247,7 @@ export function TopicEditorWizard({
               <ChevronLeft className="h-4 w-4" />
               上一步
             </button>
-            {contentStep === 0 ? (
-              <>
-                {aiDraftDone && (
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-[8px] border border-[#DCE8EA] bg-white px-4 text-[13px] font-medium text-[#1F3440] transition-colors hover:bg-[#F5FAFB]"
-                  >
-                    下一步
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleAiGenerateDraft}
-                  disabled={aiLoading}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-[8px] bg-primary px-5 text-[13px] font-medium text-white transition-colors hover:bg-[#2F8D9D] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {aiLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      正在生成...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      {aiDraftDone ? "重新生成草稿" : "生成专题草稿"}
-                    </>
-                  )}
-                </button>
-              </>
-            ) : step < lastStep ? (
+            {step < lastStep ? (
               <button
                 type="button"
                 onClick={handleNext}
@@ -1253,7 +1258,7 @@ export function TopicEditorWizard({
                   !canNext() && "cursor-not-allowed opacity-60 hover:bg-primary",
                 )}
               >
-                {stageNeedsConfirm ? "确认本阶段" : "下一步"}
+                下一步
                 <ChevronRight className="h-4 w-4" />
               </button>
             ) : (
@@ -1278,14 +1283,12 @@ function TopicCreationSidebar({
   questionCount,
   contentStep,
   reachedContentStep,
-  isAiMode,
   onEditBasic,
 }: {
   draft: DraftState;
   questionCount: number;
   contentStep: number;
   reachedContentStep: number;
-  isAiMode: boolean;
   onEditBasic: () => void;
 }) {
   const readiness = [
@@ -1355,7 +1358,7 @@ function TopicCreationSidebar({
         </dl>
 
         <div className="mt-3 rounded-lg bg-primary-soft/35 px-3 py-2 text-[11.5px] text-kb-body">
-          <span className="font-medium text-primary">{isAiMode ? "AI 辅助" : "人工创建"}</span>
+          <span className="font-medium text-primary">逐步确认</span>
           <span className="mx-1.5 text-kb-border">·</span>
           {draft.scenario}
         </div>

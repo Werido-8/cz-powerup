@@ -26,6 +26,7 @@ import {
   getQuestionIdsForDoc,
   isDocLearned,
 } from "@/lib/mock/learning-progress";
+import { loadDocLastPracticeScore } from "@/lib/mock/topic-practice";
 import { toast } from "sonner";
 import { RichMindMap } from "@/components/learn/RichMindMap";
 // 本期暂不开放：复习计划
@@ -179,6 +180,8 @@ function DocPage() {
     autoGradableQuestionIds.every((questionId) =>
       (docProgress.correctIds ?? []).includes(questionId),
     );
+  const lastPracticeScore = loadDocLastPracticeScore(doc.id);
+  const practiceAnswered = docProgress.answeredIds.length;
   const saveNote = (alsoCollection = false) => {
     if (!noteText.trim()) {
       toast.error("请填写笔记内容");
@@ -227,26 +230,43 @@ function DocPage() {
             {/* Action bar */}
             <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
               {related.length > 0 ? (
-                <Link
-                  to="/training/session/$id"
-                  params={{ id: getDocPracticeSessionId(doc.id) }}
-                  search={{
-                    mode: "practice",
-                    docId: doc.id,
-                    filter: "",
-                    count: related.length,
-                    limit: 0,
-                  }}
-                  onClick={() => startDocPractice(doc.id)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  <Target className="h-3.5 w-3.5" />
-                  {practiceComplete
-                    ? "已完成练习"
-                    : docStatus === "学习中"
-                      ? "继续练习"
-                      : "开始关联练习"}
-                </Link>
+                <>
+                  <Link
+                    to="/training/session/$id"
+                    params={{ id: getDocPracticeSessionId(doc.id) }}
+                    search={{
+                      mode: "practice",
+                      docId: doc.id,
+                      filter: "",
+                      count: related.length,
+                      limit: 0,
+                    }}
+                    onClick={() => startDocPractice(doc.id)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
+                  >
+                    <Target className="h-3.5 w-3.5" />
+                    {practiceComplete
+                      ? "再练一次"
+                      : practiceAnswered > 0
+                        ? "继续练习"
+                        : "开始关联练习"}
+                  </Link>
+                  {(lastPracticeScore || practiceAnswered > 0) && (
+                    <span className="inline-flex items-center gap-2 text-[12px] text-muted-foreground">
+                      {lastPracticeScore && (
+                        <span className="inline-flex items-center gap-1 font-medium text-primary">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          最近 {lastPracticeScore.accuracy}%
+                        </span>
+                      )}
+                      {practiceAnswered > 0 && (
+                        <span>
+                          进度 {practiceAnswered}/{related.length}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </>
               ) : (
                 <span className="text-[12px] text-muted-foreground">暂无关联题目</span>
               )}
@@ -399,8 +419,15 @@ function DocPage() {
           {/* Related questions — 已发布关联题 */}
           {related.length > 0 && (
             <div className="rounded-lg border border-border bg-card p-5">
-              <div className="mb-3 flex items-center gap-1.5 text-[13px] font-semibold">
-                <ClipboardList className="h-4 w-4 text-primary" /> 已发布关联题
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-[13px] font-semibold">
+                  <ClipboardList className="h-4 w-4 text-primary" /> 已发布关联题
+                </div>
+                {lastPracticeScore && (
+                  <span className="text-[11.5px] font-medium text-primary">
+                    最近练习 {lastPracticeScore.accuracy}%
+                  </span>
+                )}
               </div>
               <div className="space-y-2">
                 {related.map((q) => (
@@ -429,10 +456,20 @@ function DocPage() {
                 ))}
               </div>
               <Link
-                to="/training/practice"
+                to="/training/session/$id"
+                params={{ id: getDocPracticeSessionId(doc.id) }}
+                search={{
+                  mode: "practice",
+                  docId: doc.id,
+                  filter: "",
+                  count: related.length,
+                  limit: 0,
+                }}
+                onClick={() => startDocPractice(doc.id)}
                 className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg bg-primary px-3 py-2 text-[12.5px] font-medium text-primary-foreground hover:bg-primary/90"
               >
-                去练习 <ChevronRight className="h-3.5 w-3.5" />
+                {practiceAnswered > 0 ? "继续练习" : lastPracticeScore ? "再练一次" : "去练习"}{" "}
+                <ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           )}

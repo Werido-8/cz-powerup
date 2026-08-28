@@ -22,7 +22,6 @@ import {
   PencilLine,
   Plus,
   Search,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { KbFileTypeIcon } from "@/components/knowledge/ui";
@@ -60,7 +59,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type TopicAdminSplitViewProps = {
-  onNew: (mode?: "standard" | "ai") => void;
+  onNew: () => void;
   onEdit: (record: TopicAdminRecord, step?: number) => void;
   onPreview: (record: TopicAdminRecord) => void;
 };
@@ -153,22 +152,13 @@ export function TopicAdminSplitView({ onNew, onEdit, onPreview }: TopicAdminSpli
                 {filtered.length} 个专题 · 最近更新优先
               </p>
             </div>
-            <div className="flex shrink-0 gap-1.5">
-              <button
-                type="button"
-                onClick={() => onNew("standard")}
-                className="inline-flex min-h-9 items-center gap-1 rounded-[9px] border border-primary/25 bg-white px-2.5 text-[12px] font-semibold text-primary transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              >
-                <Plus className="h-3.5 w-3.5" /> 新建
-              </button>
-              <button
-                type="button"
-                onClick={() => onNew("ai")}
-                className="inline-flex min-h-9 items-center gap-1 rounded-[9px] bg-primary px-2.5 text-[12px] font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              >
-                <Sparkles className="h-3.5 w-3.5" /> 智能创建
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onNew}
+              className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-[9px] bg-primary px-3 text-[12px] font-semibold text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+            >
+              <Plus className="h-3.5 w-3.5" /> 新建
+            </button>
           </div>
 
           <label className="relative mt-3 block">

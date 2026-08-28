@@ -504,7 +504,11 @@ function UploadTrackingRow({
       className={VIEW_GRIDS[view]}
       onClick={() => onOpenFile(record)}
     >
-      <KbTableCellFile name={record.fileName} type={file?.type ?? "pdf"} size="sm" nameWeight="normal" />
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+        <span className="min-w-0 flex-1 overflow-hidden">
+          <KbTableCellFile name={record.fileName} type={file?.type ?? "pdf"} size="sm" nameWeight="normal" />
+        </span>
+      </span>
       <span className="truncate text-kb-muted">{record.targetKnowledgeBaseName}</span>
 
       {view === "all" && <AllViewCells record={record} />}

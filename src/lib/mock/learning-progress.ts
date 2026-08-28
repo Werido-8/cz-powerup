@@ -94,12 +94,16 @@ export function getTopicDocsWithProgress(topicId: string, state: MockState) {
   return topic.docIds
     .map((id) => DOCS.find((d) => d.id === id))
     .filter(Boolean)
-    .map((doc) => ({
-      doc: doc!,
-      status: getEffectiveDocStatus(doc!.id, state),
-      questionCount: getQuestionIdsForDoc(doc!.id).length,
-      answeredCount: getDocProgress(doc!.id, state).answeredIds.length,
-    }));
+    .map((doc) => {
+      const progress = getDocProgress(doc!.id, state);
+      return {
+        doc: doc!,
+        status: getEffectiveDocStatus(doc!.id, state),
+        questionCount: getQuestionIdsForDoc(doc!.id).length,
+        answeredCount: progress.answeredIds.length,
+        correctCount: progress.correctIds?.length ?? 0,
+      };
+    });
 }
 
 export function getDocPracticeSessionId(docId: string): string {

@@ -148,3 +148,41 @@ export function isPracticeAnswerCorrect(
   }
   return value === answer;
 }
+
+function rewriteByInstruction(text: string, instruction: string, kind: "stem" | "option" | "analysis") {
+  const hint = instruction.trim().replace(/\s+/g, " ");
+  const shortHint = hint.slice(0, 18);
+  if (kind === "stem") {
+    const cleaned = text.replace(/（已按「[^」]+」调整）$/, "").trim();
+    return `${cleaned}（已按「${shortHint}」调整）`;
+  }
+  if (kind === "analysis") {
+    return `已按「${shortHint}」重新生成。${text.replace(/^已按「[^」]+」重新生成。/, "").trim()}`;
+  }
+  if (/现场|交接班|巡检/.test(hint)) {
+    return text.replace(/操作/g, "现场核对").replace(/记录/g, "值班记录");
+  }
+  if (/干扰|易错|迷惑/.test(hint)) {
+    return `${text}（易与现场习惯混淆）`;
+  }
+  return text;
+}
+
+export function regenerateFilePracticeQuestion(
+  question: FilePracticeQuestion,
+  instruction: string,
+): FilePracticeQuestion {
+  const hint = instruction.trim() || "更贴近现场执行场景";
+  return {
+    ...question,
+    stem: rewriteByInstruction(question.stem, hint, "stem"),
+    options: question.options.map((option, index) => ({
+      ...option,
+      label:
+        index === 0
+          ? option.label
+          : rewriteByInstruction(option.label, hint, "option"),
+    })),
+    analysis: rewriteByInstruction(getFilePracticeAnalysis(question), hint, "analysis"),
+  };
+}

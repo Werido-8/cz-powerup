@@ -4,7 +4,6 @@ import { PageShell } from "@/components/workbench/PageShell";
 import { TopicEditorWizard } from "@/components/learning/topic-admin/topic-editor-wizard";
 
 const searchSchema = z.object({
-  source: z.enum(["ai"]).optional(),
   preview: z.string().optional(),
 });
 
@@ -16,13 +15,11 @@ export const Route = createFileRoute("/learn-admin/topic/new")({
 
 function NewTopicPage() {
   const navigate = useNavigate();
-  const { source } = Route.useSearch();
 
   return (
     <PageShell compact mainClassName="flex flex-col p-0">
       <TopicEditorWizard
         mode="create"
-        assist={source === "ai" ? "ai" : "standard"}
         onBack={() => navigate({ to: "/learn-admin" })}
         onPreview={() => {
           navigate({ to: "/learn-admin" });

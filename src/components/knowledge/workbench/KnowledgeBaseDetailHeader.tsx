@@ -1,11 +1,7 @@
-import { Clock, Library, UserRound } from "lucide-react";
+import { Clock, UserRound } from "lucide-react";
 import type { ReactNode } from "react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { KnowledgeBaseIcon } from "@/components/knowledge/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { scopeSectionLabel } from "@/lib/knowledge/labels";
 import type { KnowledgeBase } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -57,9 +53,7 @@ export function KnowledgeBaseDetailHeader({
 
       <div className="flex min-w-0 items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-start gap-3.5">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-primary-soft text-primary">
-            <Library className="h-5 w-5 stroke-[1.8]" />
-          </div>
+          <KnowledgeBaseIcon size="md" />
 
           <div className="min-w-0 flex-1 pt-0.5">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">

@@ -25,6 +25,10 @@ import {
   type FilePracticeQuestionType,
 } from "@/lib/knowledge/filePractice";
 import { getBaseById, getFileById } from "@/lib/knowledge/model";
+import {
+  filePracticeDraftKey,
+  saveFileLastPracticeScore,
+} from "@/lib/knowledge/filePracticeProgress";
 import { trainingResultStorageKey } from "@/lib/training/result";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +37,7 @@ type PracticeAnswers = Record<string, string | string[]>;
 const typeOrder: FilePracticeQuestionType[] = ["single", "multiple", "judge"];
 
 function draftKey(fileId: string) {
-  return `knowledge-file-practice-draft:${fileId}`;
+  return filePracticeDraftKey(fileId);
 }
 
 function QuestionOptions({
@@ -251,6 +255,16 @@ export function FileSelfPracticePage({ fileId }: { fileId: string }) {
     setSubmitted(true);
     window.localStorage.removeItem(draftKey(file.id));
     setSavedAt(undefined);
+    const scored = questions.filter((question) =>
+      isPracticeAnswerCorrect(answers[question.id], question.answer),
+    ).length;
+    saveFileLastPracticeScore({
+      fileId: file.id,
+      accuracy: questions.length ? Math.round((scored / questions.length) * 100) : 0,
+      correct: scored,
+      total: questions.length,
+      submittedAt: new Date().toISOString(),
+    });
     const resultId = `资料练习-${file.id}-${Date.now()}`;
     const wrongIds = questions
       .filter((question) => !isPracticeAnswerCorrect(answers[question.id], question.answer))

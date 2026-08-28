@@ -81,6 +81,7 @@ import {
   getKnowledgeStoreServerSnapshot,
   getKnowledgeStoreVersion,
   getStoreBases,
+  createStorePersonalFile,
   removeStoreBase,
   removeStoreFiles,
   removeStorePersonalDirectory,
@@ -92,10 +93,7 @@ import {
 } from "@/lib/knowledge/store";
 import { isPinnedId, loadPinnedIds, savePinnedIds, togglePinnedId } from "@/lib/knowledge/pinned";
 import { kbFileTypeConfig, kbMainPanel } from "@/lib/knowledge/tokens";
-import {
-  openFileDetailInNewTab,
-  type FileDetailSearchScope,
-} from "@/lib/knowledge/searchNav";
+import { openFileDetailInNewTab, type FileDetailSearchScope } from "@/lib/knowledge/searchNav";
 import type {
   KnowledgeBase,
   KnowledgeFile,
@@ -113,6 +111,7 @@ import {
 } from "./KnowledgeFileTable";
 import { FileMoveDialog } from "./FileMoveDialog";
 import { FileVersionHistoryDialog } from "./FileVersionHistoryDialog";
+import { SimilarityReviewDialog } from "./UploadSimilarityFlowDialog";
 import { FullTextSearchResultPanel } from "./FullTextSearchResultPanel";
 import { DirectoryMoveDialog, type DirectoryMoveTarget } from "./DirectoryMoveDialog";
 import { KnowledgeBaseDeleteDialog } from "./KnowledgeBaseDeleteDialog";
@@ -190,6 +189,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   const [moveFiles, setMoveFiles] = useState<KnowledgeFile[]>([]);
   const [moveLoading, setMoveLoading] = useState(false);
   const [historyFile, setHistoryFile] = useState<KnowledgeFile | null>(null);
+  const [similarityFile, setSimilarityFile] = useState<KnowledgeFile | null>(null);
   const [directoryMoveTarget, setDirectoryMoveTarget] = useState<DirectoryMoveTarget | null>(null);
   const [directoryMoveLoading, setDirectoryMoveLoading] = useState(false);
   const [renameBase, setRenameBase] = useState<KnowledgeBase | null>(null);
@@ -279,7 +279,25 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
   }, [query, searchMode, metadataFilters]);
 
   const handleUploadFiles = (files: FileList) => {
-    toast.success(`已选择 ${files.length} 个文件，上传面板即将打开`);
+    if (!selectedBase) {
+      toast.message("请先选择一个个人知识库再上传");
+      return;
+    }
+    Array.from(files).forEach((file, index) => {
+      createStorePersonalFile({
+        fileName: file.name,
+        knowledgeBaseId: selectedBase.id,
+        knowledgeBaseName: selectedBase.name,
+        fileSize:
+          file.size < 1024 * 1024
+            ? `${Math.max(1, Math.round(file.size / 1024))} KB`
+            : `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+        idNonce: index,
+      });
+    });
+    toast.success(
+      files.length > 1 ? `已上传 ${files.length} 个文件，正在解析` : "文件已加入列表，正在解析",
+    );
   };
 
   const openFile = (
@@ -347,7 +365,12 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
   };
 
-  const handleConfirmMove = (movingFiles: KnowledgeFile[], targetBaseId: string, keepSource: boolean) => {
+  const handleConfirmMove = (
+    movingFiles: KnowledgeFile[],
+    targetBaseId: string,
+    targetDirectoryId: string | undefined,
+    keepSource: boolean,
+  ) => {
     const targetBase = getBaseById(targetBaseId);
     if (!targetBase) {
       toast.error("目标知识库不存在");
@@ -361,7 +384,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     );
     setMoveLoading(true);
     for (const file of toSubmit) {
-      submitStoreFileMove(file, targetBase, keepSource);
+      submitStoreFileMove(file, targetBase, keepSource, targetDirectoryId);
     }
     for (const file of movable) {
       if (keepSource) {
@@ -372,6 +395,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
         updateStoreFile(file.id, {
           knowledgeBaseId: targetBaseId,
           knowledgeBaseName: targetBase.name,
+          directoryId: targetDirectoryId,
         });
       }
     }
@@ -403,6 +427,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
     ...(showManageActions ? { onMove: (file: KnowledgeFile) => setMoveFiles([file]) } : {}),
     onTogglePin: handleToggleFilePin,
     onViewHistory: (file: KnowledgeFile) => setHistoryFile(file),
+    onSimilarity: (file: KnowledgeFile) => setSimilarityFile(file),
   };
 
   const handleBatchDownload = () => {
@@ -491,11 +516,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
 
   return (
     <>
-      <KbSidebar
-        width="browse"
-        withDecor
-        header={<MySpaceTitleBanner />}
-      >
+      <KbSidebar width="browse" withDecor header={<MySpaceTitleBanner />}>
         <PinnedQuickAccessSection
           pinnedBases={pinnedBases}
           pinnedFiles={pinnedFiles}
@@ -602,11 +623,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
 
       <main className={cn("scrollbar-thin", kbMainPanel)}>
         {selection.kind === "recent" && (
-          <RecentAccessPanel
-            files={recentFiles}
-            refreshSeed={refreshSeed}
-            onOpen={openFile}
-          />
+          <RecentAccessPanel files={recentFiles} refreshSeed={refreshSeed} onOpen={openFile} />
         )}
 
         {selection.kind === "uploads" && (
@@ -682,9 +699,7 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
             onRefresh={handleRefresh}
-            onOpen={(file) =>
-              openFile(file, { query, searchMode, resultFiles: personalFiles })
-            }
+            onOpen={(file) => openFile(file, { query, searchMode, resultFiles: personalFiles })}
             onUploadFiles={handleUploadFiles}
             onSelectBase={(baseId) => setSelection({ kind: "personalBase", baseId })}
             onToggleEnabled={handleToggleEnabled}
@@ -707,9 +722,14 @@ export function MySpacePage({ search = {} }: { search?: MySpacePageSearch }) {
         currentBaseId={selectedBase?.id}
         loading={moveLoading}
         onClose={() => setMoveFiles([])}
-        onConfirm={(files, targetBaseId, keepSource) => handleConfirmMove(files, targetBaseId, keepSource)}
+        onConfirm={handleConfirmMove}
       />
       <FileVersionHistoryDialog file={historyFile} onClose={() => setHistoryFile(null)} />
+      <SimilarityReviewDialog
+        open={Boolean(similarityFile)}
+        fileName={similarityFile?.name ?? ""}
+        onClose={() => setSimilarityFile(null)}
+      />
       <DirectoryMoveDialog
         target={directoryMoveTarget}
         loading={directoryMoveLoading}
@@ -827,7 +847,9 @@ function RecentAccessPanel({
   const sorted = useMemo(
     () =>
       [...files].sort((a, b) =>
-        (b.lastAccessedAt ?? b.updatedAt ?? "").localeCompare(a.lastAccessedAt ?? a.updatedAt ?? ""),
+        (b.lastAccessedAt ?? b.updatedAt ?? "").localeCompare(
+          a.lastAccessedAt ?? a.updatedAt ?? "",
+        ),
       ),
     [files],
   );
@@ -1122,10 +1144,7 @@ function FavoriteKnowledgePanel({
     onOpen(file, { query, searchMode, resultFiles: filteredFiles });
 
   const empty = (
-    <KbEmptyState
-      title="暂无收藏文件"
-      description="在文件详情页收藏后，文件会显示在这里。"
-    />
+    <KbEmptyState title="暂无收藏文件" description="在文件详情页收藏后，文件会显示在这里。" />
   );
   const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
@@ -1141,7 +1160,11 @@ function FavoriteKnowledgePanel({
               </p>
             </div>
             <div className="text-[12px] text-[#6B7F88]">
-              共 <span className="font-semibold tabular-nums text-[#102A33]">{filteredFiles.length}</span> 个文件
+              共{" "}
+              <span className="font-semibold tabular-nums text-[#102A33]">
+                {filteredFiles.length}
+              </span>{" "}
+              个文件
             </div>
           </div>
 
@@ -1254,8 +1277,18 @@ function FavoriteFilesTable({
       {files.map((file) => {
         const type = kbFileTypeConfig[file.type ?? "other"];
         return (
-          <KbDataTableRow key={file.id} variant="flat" className={FAVORITE_FILE_GRID} onClick={() => onOpen(file)}>
-            <KbTableCellFile name={file.name} type={file.type ?? "other"} size="sm" nameWeight="normal" />
+          <KbDataTableRow
+            key={file.id}
+            variant="flat"
+            className={FAVORITE_FILE_GRID}
+            onClick={() => onOpen(file)}
+          >
+            <KbTableCellFile
+              name={file.name}
+              type={file.type ?? "other"}
+              size="sm"
+              nameWeight="normal"
+            />
             <span className="text-kb-muted">{type.label}</span>
             <span className="truncate text-kb-muted">{file.knowledgeBaseName ?? "个人知识库"}</span>
             <span className="truncate tabular-nums text-kb-muted">{file.updatedAt ?? "-"}</span>
@@ -1498,6 +1531,7 @@ function PersonalAllPanel({
     onMove?: (file: KnowledgeFile) => void;
     onTogglePin: (file: KnowledgeFile) => void;
     onViewHistory: (file: KnowledgeFile) => void;
+    onSimilarity?: (file: KnowledgeFile) => void;
   };
 }) {
   const effectivePageSize = viewMode === "card" ? CARD_PAGE_SIZE : pageSize;
@@ -1683,8 +1717,10 @@ function PersonalBasePanel({
     onMove?: (file: KnowledgeFile) => void;
     onTogglePin: (file: KnowledgeFile) => void;
     onViewHistory: (file: KnowledgeFile) => void;
+    onSimilarity?: (file: KnowledgeFile) => void;
   };
 }) {
+  const uploadInputRef = useRef<HTMLInputElement>(null);
   const allFiles = getFilesForBase(base.id);
   const metadataFields = getMetadataFieldsForBase(base.id);
 
@@ -1747,9 +1783,19 @@ function PersonalBasePanel({
             onSortChange={onSortChange}
             onRefresh={onRefresh}
             showViewModeToggle={!isFullTextSearchActive}
-            onUpload={() => toast.message("打开上传面板")}
+            onUpload={() => uploadInputRef.current?.click()}
           />
         }
+      />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        multiple
+        className="sr-only"
+        onChange={(event) => {
+          if (event.target.files?.length) onUploadFiles(event.target.files);
+          event.target.value = "";
+        }}
       />
 
       {isFullTextSearchActive ? (

@@ -7,16 +7,20 @@ import {
   CircleCheck,
   Clock3,
   FileText,
+  Files,
+  GitCompareArrows,
   GitFork,
   GraduationCap,
   Hash,
   HardDrive,
   Library,
   ListChecks,
+  Loader2,
   Maximize2,
   Minus,
   Pencil,
   Plus,
+  Sparkles,
   Tag,
   Trash2,
   Upload,
@@ -50,7 +54,9 @@ import {
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import type { KnowledgeExercise, KnowledgeFile, UploadApproval } from "@/lib/knowledge/types";
 import { getFilesForBase, getMetadataFieldsForBase } from "@/lib/knowledge/model";
+import { fileHasSimilarCandidates } from "@/lib/knowledge/similarFiles";
 import { cn } from "@/lib/utils";
+import { SimilarityReviewDialog } from "../UploadSimilarityFlowDialog";
 
 const stamp = (value?: string) => (value ? value.replace("T", " ").slice(0, 16) : "-");
 const normalizeKeywords = (value: unknown) =>
@@ -454,6 +460,8 @@ function ExerciseDetailDialog({
   const [options, setOptions] = useState<KnowledgeExercise["options"]>([]);
   const [correctAnswers, setCorrectAnswers] = useState<string[]>([]);
   const [analysis, setAnalysis] = useState("");
+  const [regenPrompt, setRegenPrompt] = useState("");
+  const [regenLoading, setRegenLoading] = useState(false);
 
   useEffect(() => {
     if (!item) return;
@@ -461,6 +469,7 @@ function ExerciseDetailDialog({
     setOptions(item.options.map((option) => ({ ...option })));
     setCorrectAnswers([...item.correctAnswers]);
     setAnalysis(item.analysis ?? "");
+    setRegenPrompt("");
   }, [item]);
 
   if (!item) return null;
@@ -487,7 +496,30 @@ function ExerciseDetailDialog({
     setOptions(item.options.map((option) => ({ ...option })));
     setCorrectAnswers([...item.correctAnswers]);
     setAnalysis(item.analysis ?? "");
+    setRegenPrompt("");
     onEditingChange(false);
+  };
+
+  const regenerateByPrompt = () => {
+    if (!regenPrompt.trim()) {
+      toast.error("请先用自然语言说明希望怎么改这道题");
+      return;
+    }
+    const hint = regenPrompt.trim().slice(0, 18);
+    setRegenLoading(true);
+    window.setTimeout(() => {
+      setStem((current) => `${current.replace(/（已按「[^」]+」调整）$/, "").trim()}（已按「${hint}」调整）`);
+      setOptions((current) =>
+        current.map((option, index) =>
+          index === 0
+            ? option
+            : { ...option, content: `${option.content.replace(/（易与现场习惯混淆）$/, "")}（易与现场习惯混淆）` },
+        ),
+      );
+      setAnalysis((current) => `已按「${hint}」重新生成。${current.replace(/^已按「[^」]+」重新生成。/, "").trim()}`);
+      setRegenLoading(false);
+      toast.success("已按说明重新生成题目，请核对后保存");
+    }, 700);
   };
 
   const buildNext = (): KnowledgeExercise => ({
@@ -544,6 +576,35 @@ function ExerciseDetailDialog({
       }
     >
       <div className="space-y-1">
+        {editing ? (
+          <div className="mb-3 rounded-[8px] border border-primary/18 bg-primary-soft/30 px-3 py-2.5">
+            <div className="flex items-center gap-1.5 text-[12px] font-medium text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              自然语言重新生成
+            </div>
+            <p className="mt-0.5 text-[11px] text-kb-muted">
+              说明题干场景、干扰项或难度，系统会据此重写本题。
+            </p>
+            <div className="mt-2 flex items-end gap-2">
+              <textarea
+                value={regenPrompt}
+                onChange={(event) => setRegenPrompt(event.target.value)}
+                rows={2}
+                placeholder="例如：改成主变停投现场核对，选项更贴近误操作风险"
+                className="min-h-[64px] flex-1 resize-none rounded-[7px] border border-[#D6E1E9] bg-white px-3 py-2 text-[12.5px] leading-5 outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={regenerateByPrompt}
+                disabled={regenLoading}
+                className="inline-flex h-9 shrink-0 items-center gap-1 rounded-[7px] bg-primary px-3 text-[12px] font-medium text-white hover:bg-primary/90 disabled:opacity-60"
+              >
+                {regenLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                重新生成
+              </button>
+            </div>
+          </div>
+        ) : null}
         <KbFormField label="题干" icon={FileText} required={editing}>
           {editing ? (
             <AppFormTextarea
@@ -997,6 +1058,8 @@ export function FileApprovalPage({
     [approvals],
   );
   const queue = pending.length ? pending : approvals;
+  const hasSimilarFiles = current ? fileHasSimilarCandidates(current.fileName) : false;
+
   const [visible, setVisible] = useState(6),
     [metadataEditing, setMetadataEditing] = useState(false),
     [metadataExpanded, setMetadataExpanded] = useState(false),
@@ -1008,7 +1071,8 @@ export function FileApprovalPage({
     [exercises, setExercises] = useState<KnowledgeExercise[]>([]),
     [activeTab, setActiveTab] = useState<ApprovalTab>("reader"),
     [viewingExercise, setViewingExercise] = useState<KnowledgeExercise | null>(null),
-    [detailEditing, setDetailEditing] = useState(false);
+    [detailEditing, setDetailEditing] = useState(false),
+    [similarityOpen, setSimilarityOpen] = useState(false);
   useEffect(() => {
     if (!current) return;
     setKeywordText(normalizeKeywords(current.aiKeywords));
@@ -1192,6 +1256,29 @@ export function FileApprovalPage({
             <PanelSection title="文件基本信息" icon={FileText}>
               <BasicInfo item={current} />
             </PanelSection>
+            {hasSimilarFiles && (
+              <PanelSection title="相似资料识别" icon={Files}>
+                <div className="space-y-2.5">
+                  <div className="flex items-start gap-2 rounded-[8px] border border-[#F4DEC2] bg-[#FEF6EC] px-3 py-2.5">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#C0691A]" />
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-medium text-[#C0691A]">发现 5 份相似资料</p>
+                      <p className="mt-0.5 text-[11px] leading-4 text-[#8A6432]">
+                        解析完成后系统自动识别，建议确认是否已有同一资料或历史版本再审批。
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSimilarityOpen(true)}
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-[8px] border border-primary/25 bg-primary-soft/40 px-3 py-2 text-[12px] font-medium text-primary transition-colors hover:bg-primary-soft/70"
+                  >
+                    <GitCompareArrows className="h-3.5 w-3.5" />
+                    查看相似文件 / 比对
+                  </button>
+                </div>
+              </PanelSection>
+            )}
             <PanelSection
               title="关键词与摘要"
               icon={Hash}
@@ -1284,6 +1371,11 @@ export function FileApprovalPage({
           setDetailEditing(false);
           toast.success("已保存并提交至题库");
         }}
+      />
+      <SimilarityReviewDialog
+        open={similarityOpen}
+        fileName={current.fileName}
+        onClose={() => setSimilarityOpen(false)}
       />
     </main>
   );

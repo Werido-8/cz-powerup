@@ -6,6 +6,7 @@ import {
   getStoreBases,
   getStoreCategories,
   getStoreFiles,
+  getStoreInternalDirectories,
   getStorePersonalDirectories,
 } from "./store";
 import { publishStatusLabel } from "./status";
@@ -15,6 +16,7 @@ import type {
   KnowledgeBase,
   KnowledgeCategory,
   KnowledgeFile,
+  KnowledgeInternalDirectory,
   KnowledgeMetadataField,
   KnowledgePermissionGroup,
   KnowledgeSortBy,
@@ -356,6 +358,67 @@ export function getDefaultOverviewBaseId(user: KnowledgeUser = getCurrentKnowled
 export function getPinnedFiles(user: KnowledgeUser = getCurrentKnowledgeUser()) {
   return getStoreFiles().filter(
     (file) => file.pinned && file.isCurrentVersion !== false && isFileVisibleToUser(file, user),
+  );
+}
+
+export function getInternalDirectoriesForBase(baseId: string) {
+  return getStoreInternalDirectories().filter((directory) => directory.knowledgeBaseId === baseId);
+}
+
+export function getInternalDirectoryById(directoryId?: string) {
+  if (!directoryId) return undefined;
+  return getStoreInternalDirectories().find((directory) => directory.id === directoryId);
+}
+
+export function getInternalDirectoryChildren(baseId: string, parentId?: string) {
+  return getStoreInternalDirectories().filter(
+    (directory) =>
+      directory.knowledgeBaseId === baseId &&
+      (parentId ? directory.parentId === parentId : !directory.parentId),
+  );
+}
+
+export function getInternalDirectoryChain(directoryId?: string) {
+  const chain: KnowledgeInternalDirectory[] = [];
+  let current = getInternalDirectoryById(directoryId);
+  while (current) {
+    chain.unshift(current);
+    current = getInternalDirectoryById(current.parentId);
+  }
+  return chain;
+}
+
+export function getInternalDirectoryPathLabel(directoryId?: string, rootLabel = "根目录") {
+  const names = getInternalDirectoryChain(directoryId).map((directory) => directory.name);
+  return names.length ? names.join(" / ") : rootLabel;
+}
+
+export function getInternalDirectoryDescendantIds(baseId: string, directoryId: string) {
+  const ids = new Set<string>([directoryId]);
+  let changed = true;
+  const directories = getInternalDirectoriesForBase(baseId);
+  while (changed) {
+    changed = false;
+    for (const directory of directories) {
+      if (directory.parentId && ids.has(directory.parentId) && !ids.has(directory.id)) {
+        ids.add(directory.id);
+        changed = true;
+      }
+    }
+  }
+  return ids;
+}
+
+/** 同一父级下是否已有同名库内目录（去空格后精确匹配） */
+export function hasSiblingInternalDirectoryName(
+  baseId: string,
+  parentId: string | undefined,
+  name: string,
+  excludeId?: string,
+) {
+  const normalized = name.trim();
+  return getInternalDirectoryChildren(baseId, parentId).some(
+    (directory) => directory.id !== excludeId && directory.name === normalized,
   );
 }
 

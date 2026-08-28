@@ -1,5 +1,6 @@
 import { FolderInput } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { KnowledgeBaseIcon } from "@/components/knowledge/ui";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { getMoveTargetBases } from "@/lib/knowledge/model";
 import { pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
@@ -10,7 +11,6 @@ import {
 } from "@/lib/knowledge/store";
 import type { KnowledgeBase } from "@/lib/knowledge/types";
 import { useSyncExternalStore } from "react";
-import { BaseTreeSelect } from "./FileMoveDialog";
 
 export function UploadBasePickerDialog({
   open,
@@ -29,7 +29,6 @@ export function UploadBasePickerDialog({
     getKnowledgeStoreServerSnapshot,
   );
   const [target, setTarget] = useState("");
-  const [treeOpen, setTreeOpen] = useState(false);
 
   useEffect(() => {
     if (open) setTarget("");
@@ -70,17 +69,28 @@ export function UploadBasePickerDialog({
         </p>
         <div className="space-y-1.5">
           <span className="block text-[12px] font-medium text-kb-body">目标知识库</span>
-          <BaseTreeSelect
-            value={target}
-            selectedBase={selectedBase}
-            targets={targets}
-            open={treeOpen}
-            onOpenChange={setTreeOpen}
-            onChange={(id) => {
-              setTarget(id);
-              setTreeOpen(false);
-            }}
-          />
+          <div className="scrollbar-thin max-h-[300px] overflow-y-auto rounded-[8px] border border-kb-border bg-white p-1.5">
+            {targets.map((base) => (
+              <button
+                key={base.id}
+                type="button"
+                onClick={() => setTarget(base.id)}
+                className={
+                  target === base.id
+                    ? "flex h-10 w-full items-center gap-2 rounded-[7px] bg-primary-soft px-2.5 text-left text-primary"
+                    : "flex h-10 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-kb-body hover:bg-kb-surface-hover"
+                }
+              >
+                <KnowledgeBaseIcon size="sm" />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium">
+                  {base.name}
+                </span>
+                <span className="text-[10.5px] text-kb-muted">
+                  {base.scope === "personal" ? "个人知识库" : "公共知识库"}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </AppFormDialog>

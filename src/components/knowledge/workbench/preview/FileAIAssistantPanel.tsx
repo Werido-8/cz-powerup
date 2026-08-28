@@ -10,12 +10,14 @@ import {
   GraduationCap,
   Hash,
   ListChecks,
+  Loader2,
   Maximize2,
   Minus,
   Pencil,
   Plus,
   SearchCheck,
   Send,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -33,8 +35,13 @@ import {
 import {
   getFilePracticeAnalysis,
   getFilePracticeQuestions,
+  regenerateFilePracticeQuestion,
   type FilePracticeQuestion,
 } from "@/lib/knowledge/filePractice";
+import {
+  countFilePracticeDraftAnswers,
+  loadFileLastPracticeScore,
+} from "@/lib/knowledge/filePracticeProgress";
 import { getFileMatchChunks } from "@/lib/knowledge/fulltextSearch";
 import type { KnowledgeBase, KnowledgeFile } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
@@ -438,6 +445,11 @@ export function FileAIAssistantPanel({
   const questions = useMemo(() => getFilePracticeQuestions(file), [file]);
   const keywords = file.aiKeywords ?? file.tags ?? [];
   const enabled = file.parseStatus === "success" && file.status === "published";
+  const fileLastScore = loadFileLastPracticeScore(file.id);
+  const filePracticeDraftCount = countFilePracticeDraftAnswers(
+    file.id,
+    questions.map((item) => item.id),
+  );
   const role = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const isAdmin = role !== "employee";
   const [displayedQuestions, setDisplayedQuestions] = useState<FilePracticeQuestion[]>(questions);
@@ -703,7 +715,11 @@ export function FileAIAssistantPanel({
                   className="inline-flex h-8 items-center gap-1 rounded-[6px] border border-primary/25 bg-primary-soft/25 px-2.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary-soft/55"
                 >
                   <ListChecks className="h-3.5 w-3.5 stroke-[1.8]" />
-                  开始练习
+                  {filePracticeDraftCount > 0
+                    ? "继续练习"
+                    : fileLastScore
+                      ? "再练一次"
+                      : "开始练习"}
                 </button>
                 <button
                   type="button"
@@ -719,7 +735,26 @@ export function FileAIAssistantPanel({
           }
         >
           {enabled ? (
-            <div className="scrollbar-neutral max-h-[280px] overflow-y-auto pr-0.5">
+            <>
+              {(fileLastScore || filePracticeDraftCount > 0) && (
+                <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-[7px] border border-[#E8F2F4] bg-[#F7FBFC] px-2.5 py-2 text-[11px] text-kb-muted">
+                  {fileLastScore && (
+                    <span className="inline-flex items-center gap-1 font-medium text-primary">
+                      <CircleCheck className="h-3 w-3" />
+                      最近练习 {fileLastScore.accuracy}%
+                      <span className="font-normal text-kb-muted">
+                        （{fileLastScore.correct}/{fileLastScore.total}）
+                      </span>
+                    </span>
+                  )}
+                  {filePracticeDraftCount > 0 && (
+                    <span>
+                      本次已作答 {filePracticeDraftCount}/{questions.length}
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="scrollbar-neutral max-h-[280px] overflow-y-auto pr-0.5">
               {displayedQuestions.map((question) => {
                 const selected = selectedIds.includes(question.id);
                 return (
@@ -790,6 +825,7 @@ export function FileAIAssistantPanel({
                 </p>
               ) : null}
             </div>
+            </>
           ) : (
             <p className="text-[12px] text-kb-muted">解析完成后可选择练习题并提交。</p>
           )}
@@ -882,6 +918,8 @@ function QuestionDetailDialog({
   const [options, setOptions] = useState<FilePracticeQuestion["options"]>([]);
   const [answers, setAnswers] = useState<string[]>([]);
   const [analysis, setAnalysis] = useState("");
+  const [regenPrompt, setRegenPrompt] = useState("");
+  const [regenLoading, setRegenLoading] = useState(false);
 
   useEffect(() => {
     if (!question) return;
@@ -889,6 +927,7 @@ function QuestionDetailDialog({
     setOptions(question.options.map((option) => ({ ...option })));
     setAnswers(Array.isArray(question.answer) ? [...question.answer] : [question.answer]);
     setAnalysis(getFilePracticeAnalysis(question));
+    setRegenPrompt("");
   }, [question]);
 
   if (!question) return null;
@@ -915,7 +954,34 @@ function QuestionDetailDialog({
     setOptions(question.options.map((option) => ({ ...option })));
     setAnswers(Array.isArray(question.answer) ? [...question.answer] : [question.answer]);
     setAnalysis(getFilePracticeAnalysis(question));
+    setRegenPrompt("");
     onEditingChange(false);
+  };
+
+  const regenerateByPrompt = () => {
+    if (!regenPrompt.trim()) {
+      toast.error("请先用自然语言说明希望怎么改这道题");
+      return;
+    }
+    setRegenLoading(true);
+    window.setTimeout(() => {
+      const next = regenerateFilePracticeQuestion(
+        {
+          ...question,
+          stem,
+          options,
+          answer: multiple ? answers : answers[0] ?? "",
+          analysis,
+        },
+        regenPrompt.trim(),
+      );
+      setStem(next.stem);
+      setOptions(next.options);
+      setAnswers(Array.isArray(next.answer) ? [...next.answer] : [next.answer]);
+      setAnalysis(getFilePracticeAnalysis(next));
+      setRegenLoading(false);
+      toast.success("已按说明重新生成题目，请核对后保存");
+    }, 700);
   };
 
   const buildNext = (): FilePracticeQuestion => ({
@@ -972,6 +1038,35 @@ function QuestionDetailDialog({
       }
     >
       <div className="space-y-1">
+        {editing ? (
+          <div className="mb-3 rounded-[8px] border border-primary/18 bg-primary-soft/30 px-3 py-2.5">
+            <div className="flex items-center gap-1.5 text-[12px] font-medium text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              自然语言重新生成
+            </div>
+            <p className="mt-0.5 text-[11px] text-kb-muted">
+              说明题干场景、干扰项或难度，系统会据此重写本题，不覆盖未保存前可取消。
+            </p>
+            <div className="mt-2 flex items-end gap-2">
+              <textarea
+                value={regenPrompt}
+                onChange={(event) => setRegenPrompt(event.target.value)}
+                rows={2}
+                placeholder="例如：改成交接班现场场景，增加一个容易和习惯做法混淆的干扰项"
+                className="min-h-[64px] flex-1 resize-none rounded-[7px] border border-[#D6E1E9] bg-white px-3 py-2 text-[12.5px] leading-5 outline-none focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={regenerateByPrompt}
+                disabled={regenLoading}
+                className="inline-flex h-9 shrink-0 items-center gap-1 rounded-[7px] bg-primary px-3 text-[12px] font-medium text-white hover:bg-primary/90 disabled:opacity-60"
+              >
+                {regenLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                重新生成
+              </button>
+            </div>
+          </div>
+        ) : null}
         <KbFormField label="题干" icon={FileText} required={editing}>
           {editing ? (
             <AppFormTextarea

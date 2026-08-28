@@ -4,16 +4,21 @@ import {
   KNOWLEDGE_BASES,
   KNOWLEDGE_CATEGORIES,
   KNOWLEDGE_FILES,
+  KNOWLEDGE_INTERNAL_DIRECTORIES,
   PERMISSION_REQUESTS,
   PERSONAL_DIRECTORIES,
   UPLOAD_APPROVALS,
   UPLOAD_RECORDS,
 } from "./data";
+import { getCurrentKnowledgeUser } from "./demoRole";
+import { fileHasSimilarCandidates } from "./similarFiles";
 import type {
   FileMoveApproval,
   KnowledgeBase,
   KnowledgeCategory,
   KnowledgeFile,
+  KnowledgeFileType,
+  KnowledgeInternalDirectory,
   PermissionRequest,
   PersonalDirectory,
   UploadApproval,
@@ -26,10 +31,35 @@ export const PROFESSIONAL_CATEGORY_ROOT_ID = "__professional_category_root__";
 let categories: KnowledgeCategory[] = KNOWLEDGE_CATEGORIES.map((item) => ({ ...item }));
 let personalDirectories: PersonalDirectory[] = PERSONAL_DIRECTORIES.map((item) => ({ ...item }));
 let bases: KnowledgeBase[] = KNOWLEDGE_BASES.map((item) => ({ ...item }));
+
+function seedFileDirectory(file: KnowledgeFile) {
+  if (file.directoryId) return file.directoryId;
+  if (file.knowledgeBaseId === "kb-grid-operation") {
+    if (/应急|异常|故障|处置/.test(file.name)) return "dir-grid-emergency";
+    if (/事故|复盘|案例/.test(file.name)) return "dir-grid-cases";
+    if (/培训|教材|学习/.test(file.name)) return "dir-grid-training";
+    if (/操作票|操作规程/.test(file.name)) return "dir-grid-rules-operation";
+    if (/调度|运行规程|管理规定|制度/.test(file.name)) return "dir-grid-rules-manage";
+  }
+  if (file.knowledgeBaseId === "kb-agc") {
+    return /案例|通报|结果/.test(file.name) ? "dir-agc-cases" : "dir-agc-rules";
+  }
+  if (file.knowledgeBaseId === "kb-personal-work") {
+    return /异常|复盘/.test(file.name) ? "dir-personal-review" : "dir-personal-notes";
+  }
+  return undefined;
+}
+
 let files: KnowledgeFile[] = KNOWLEDGE_FILES.map((item) => ({
   ...item,
   enabled: item.enabled ?? true,
+  directoryId: seedFileDirectory(item),
 }));
+let internalDirectories: KnowledgeInternalDirectory[] = KNOWLEDGE_INTERNAL_DIRECTORIES.map(
+  (item) => ({
+    ...item,
+  }),
+);
 let uploadRecords: UploadRecord[] = UPLOAD_RECORDS.map((item) => ({ ...item }));
 let uploadApprovals: UploadApproval[] = UPLOAD_APPROVALS.map((item) => ({
   ...item,
@@ -43,7 +73,7 @@ let uploadApprovals: UploadApproval[] = UPLOAD_APPROVALS.map((item) => ({
     correctAnswers: [...exercise.correctAnswers],
   })),
 }));
-let fileMoveApprovals: FileMoveApproval[] = FILE_MOVE_APPROVALS.map((item) => ({ ...item }));
+const fileMoveApprovals: FileMoveApproval[] = FILE_MOVE_APPROVALS.map((item) => ({ ...item }));
 let permissionRequests: PermissionRequest[] = PERMISSION_REQUESTS.map((item) => ({ ...item }));
 let fileConfirms: UploadApproval[] = FILE_CONFIRMS.map((item) => ({
   ...item,
@@ -65,6 +95,18 @@ function emit() {
 
 function nowStamp() {
   return new Date().toISOString().replace("T", " ").slice(0, 16);
+}
+
+function fileTypeFromName(name: string): KnowledgeFileType {
+  const ext = name.split(".").pop()?.toLowerCase();
+  if (ext === "pdf") return "pdf";
+  if (ext === "doc" || ext === "docx") return "docx";
+  if (ext === "xls" || ext === "xlsx") return "xlsx";
+  if (ext === "ppt" || ext === "pptx") return "pptx";
+  if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "gif" || ext === "webp") {
+    return "image";
+  }
+  return "other";
 }
 
 export function subscribeKnowledgeStore(listener: () => void) {
@@ -96,6 +138,10 @@ export function getStoreBases() {
 
 export function getStoreFiles() {
   return files;
+}
+
+export function getStoreInternalDirectories() {
+  return internalDirectories;
 }
 
 export function getStoreUploadApprovals() {
@@ -172,34 +218,62 @@ export function saveStoreFileEditedContent(
     metadata?: Record<string, string | string[]>;
   },
 ) {
-  files = files.map((item) => (item.id === fileId ? { ...item, ...patch, updatedAt: nowStamp() } : item));
+  files = files.map((item) =>
+    item.id === fileId ? { ...item, ...patch, updatedAt: nowStamp() } : item,
+  );
   emit();
 }
+
+type LibraryUploadOpts = {
+  fileName: string;
+  knowledgeBaseId: string;
+  knowledgeBaseName: string;
+  fileSize?: string;
+  directoryId?: string;
+  idNonce?: number;
+};
 
 /**
  * 个人库上传：立即创建文件记录（uploading 态）并触发解析状态流转。
  * 解析完成后文件直接置为 published，无需二次确认。
  */
-export function createStorePersonalFile(opts: {
-  fileName: string;
-  knowledgeBaseId: string;
-  knowledgeBaseName: string;
-  fileSize?: string;
-}): KnowledgeFile {
+export function createStorePersonalFile(opts: LibraryUploadOpts): KnowledgeFile {
+  return createLibraryUpload(opts, "personal");
+}
+
+/**
+ * 专业库/公共库上传：解析完成后进入审批台，由管理员审核。
+ * 相似资料识别不在上传时打断，审核侧根据文件名给出入口。
+ */
+export function createStoreProfessionalUpload(opts: LibraryUploadOpts): KnowledgeFile {
+  return createLibraryUpload(opts, "professional");
+}
+
+export function createStoreLibraryUpload(
+  opts: LibraryUploadOpts & { personal?: boolean },
+): KnowledgeFile {
+  return createLibraryUpload(opts, opts.personal ? "personal" : "professional");
+}
+
+function createLibraryUpload(opts: LibraryUploadOpts, kind: "personal" | "professional") {
   const stamp = nowStamp();
-  const fileId = `file-upload-${Date.now()}`;
-  const recordId = `upload-personal-${Date.now()}`;
+  const user = getCurrentKnowledgeUser();
+  const nonce = opts.idNonce != null ? `-${opts.idNonce}` : "";
+  const fileId = `file-upload-${Date.now()}${nonce}`;
+  const recordId = `upload-${kind}-${Date.now()}${nonce}`;
 
   const newFile: KnowledgeFile = {
     id: fileId,
     name: opts.fileName,
+    type: fileTypeFromName(opts.fileName),
     knowledgeBaseId: opts.knowledgeBaseId,
     knowledgeBaseName: opts.knowledgeBaseName,
+    directoryId: opts.directoryId,
     status: "uploading",
     parseStatus: "waiting",
     size: opts.fileSize,
-    uploaderName: "当前用户",
-    uploaderId: "u-current",
+    uploaderName: user.name,
+    uploaderId: user.id,
     createdAt: stamp,
     updatedAt: stamp,
     canPreview: false,
@@ -222,7 +296,6 @@ export function createStorePersonalFile(opts: {
   uploadRecords = [newRecord, ...uploadRecords];
   emit();
 
-  // 模拟上传完成 → 解析中
   window.setTimeout(() => {
     const s = nowStamp();
     files = files.map((f) =>
@@ -233,14 +306,48 @@ export function createStorePersonalFile(opts: {
     );
     emit();
 
-    // 模拟解析完成 → 直接 published
     window.setTimeout(() => {
       const s2 = nowStamp();
+      if (kind === "personal") {
+        files = files.map((f) =>
+          f.id === fileId
+            ? {
+                ...f,
+                status: "published",
+                parseStatus: "success",
+                docParseStatus: "success",
+                aiParseStatus: "success",
+                canPreview: true,
+                summary: `${opts.fileName}的 AI 摘要（自动生成）`,
+                aiKeywords: ["运行", "规程", "自动解析"],
+                updatedAt: s2,
+              }
+            : f,
+        );
+        uploadRecords = uploadRecords.map((r) =>
+          r.id === recordId
+            ? {
+                ...r,
+                status: "published",
+                parseStatus: "success",
+                docParseStatus: "success",
+                aiParseStatus: "success",
+                updatedAt: s2,
+                publishedAt: s2,
+                publisherName: "系统自动发布",
+              }
+            : r,
+        );
+        emit();
+        return;
+      }
+
+      const similar = fileHasSimilarCandidates(opts.fileName);
       files = files.map((f) =>
         f.id === fileId
           ? {
               ...f,
-              status: "published",
+              status: "pendingApproval",
               parseStatus: "success",
               docParseStatus: "success",
               aiParseStatus: "success",
@@ -255,16 +362,36 @@ export function createStorePersonalFile(opts: {
         r.id === recordId
           ? {
               ...r,
-              status: "published",
+              status: "pendingApproval",
               parseStatus: "success",
               docParseStatus: "success",
               aiParseStatus: "success",
               updatedAt: s2,
-              publishedAt: s2,
-              publisherName: "系统自动发布",
+              reviewNote: similar
+                ? "解析已完成，发现相似资料，等待管理员审核"
+                : "解析已完成，等待管理员审核",
             }
           : r,
       );
+      const approval: UploadApproval = {
+        id: `approval-upload-${fileId}`,
+        fileId,
+        fileName: opts.fileName,
+        knowledgeBaseId: opts.knowledgeBaseId,
+        knowledgeBaseName: opts.knowledgeBaseName,
+        submitterName: user.name,
+        submittedAt: stamp,
+        fileSize: opts.fileSize,
+        uploadNote: "文件直传",
+        riskHint: similar ? "发现相似资料，建议比对后决定是否作为新版本或覆盖。" : undefined,
+        status: "pendingApproval",
+        parseStatus: "success",
+        uploadType: "direct",
+        contentConfirmStatus: "unconfirmed",
+        summary: `${opts.fileName}的 AI 摘要（自动生成）`,
+        aiKeywords: ["运行", "规程", "自动解析"],
+      };
+      uploadApprovals = [approval, ...uploadApprovals];
       emit();
     }, 3000);
   }, 1500);
@@ -478,6 +605,7 @@ export function submitStoreFileMove(
   file: KnowledgeFile,
   targetBase: KnowledgeBase,
   keepSource = false,
+  targetDirectoryId?: string,
 ) {
   const sourceBase = bases.find((base) => base.id === file.knowledgeBaseId);
   const stamp = nowStamp();
@@ -492,6 +620,7 @@ export function submitStoreFileMove(
       id: newFileId,
       knowledgeBaseId: targetBase.id,
       knowledgeBaseName: targetBase.name,
+      directoryId: targetDirectoryId,
       status: "parsing",
       parseStatus: "parsing",
       docParseStatus: "parsing",
@@ -510,6 +639,7 @@ export function submitStoreFileMove(
             parseStatus: "parsing" as const,
             docParseStatus: "parsing" as const,
             aiParseStatus: "parsing" as const,
+            directoryId: targetDirectoryId,
             updatedAt: stamp,
           }
         : f,
@@ -629,10 +759,7 @@ export function withdrawStoreUpload(recordId: string) {
   );
   fileConfirms = fileConfirms.filter(
     (item) =>
-      !(
-        item.fileName === record.fileName &&
-        item.knowledgeBaseId === record.targetKnowledgeBaseId
-      ),
+      !(item.fileName === record.fileName && item.knowledgeBaseId === record.targetKnowledgeBaseId),
   );
   files = files.filter((item) => item.id !== record.fileId);
   emit();
@@ -658,6 +785,48 @@ export function removeStoreUploadRecord(recordId: string) {
 
 export function updateStoreFile(fileId: string, patch: Partial<KnowledgeFile>) {
   files = files.map((item) => (item.id === fileId ? { ...item, ...patch } : item));
+  emit();
+}
+
+export function addStoreInternalDirectory(directory: KnowledgeInternalDirectory) {
+  internalDirectories = [...internalDirectories, directory];
+  emit();
+  return directory;
+}
+
+export function updateStoreInternalDirectory(
+  id: string,
+  patch: Partial<Pick<KnowledgeInternalDirectory, "name" | "parentId">>,
+) {
+  internalDirectories = internalDirectories.map((item) =>
+    item.id === id ? { ...item, ...patch } : item,
+  );
+  emit();
+}
+
+/** 删除库内目录及子目录，目录中的文件回到知识库根目录。 */
+export function removeStoreInternalDirectoryCascade(id: string) {
+  const removedIds = new Set<string>([id]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const directory of internalDirectories) {
+      if (
+        directory.parentId &&
+        removedIds.has(directory.parentId) &&
+        !removedIds.has(directory.id)
+      ) {
+        removedIds.add(directory.id);
+        changed = true;
+      }
+    }
+  }
+  internalDirectories = internalDirectories.filter((item) => !removedIds.has(item.id));
+  files = files.map((file) =>
+    file.directoryId && removedIds.has(file.directoryId)
+      ? { ...file, directoryId: undefined }
+      : file,
+  );
   emit();
 }
 
@@ -722,6 +891,7 @@ export function updateStoreBase(base: KnowledgeBase) {
 export function removeStoreBase(id: string) {
   bases = bases.filter((item) => item.id !== id);
   files = files.filter((file) => file.knowledgeBaseId !== id);
+  internalDirectories = internalDirectories.filter((directory) => directory.knowledgeBaseId !== id);
   emit();
 }
 

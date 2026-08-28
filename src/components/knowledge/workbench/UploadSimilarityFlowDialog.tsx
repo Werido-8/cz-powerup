@@ -7,13 +7,11 @@ import {
   Eye,
   FileSearch,
   FileText,
+  FolderOpen,
   GitCompareArrows,
   History,
-  Library,
-  Loader2,
   Replace,
   RotateCcw,
-  ShieldAlert,
   UploadCloud,
   XCircle,
 } from "lucide-react";
@@ -24,14 +22,19 @@ import { DiffConnectionRail } from "@/components/file-compare/DiffMatchBar";
 import { useAnchoredSync } from "@/components/file-compare/useAnchoredSync";
 import { DIFF_TONE_CLASSES, DIFF_TYPE_META } from "@/lib/file-compare/meta";
 import type { DiffType } from "@/lib/file-compare/types";
-import { KbUploadCard } from "@/components/knowledge/ui";
-import { createStorePersonalFile } from "@/lib/knowledge/store";
+import { KbUploadCard, KnowledgeBaseIcon } from "@/components/knowledge/ui";
+import {
+  getInternalDirectoriesForBase,
+  getInternalDirectoryPathLabel,
+} from "@/lib/knowledge/model";
+import { createStoreLibraryUpload } from "@/lib/knowledge/store";
 import { pushRecentUploadBaseId } from "@/lib/knowledge/recentUpload";
 import type { KnowledgeBase } from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
+import { KnowledgeInternalDirectoryTree } from "./KnowledgeInternalDirectoryTree";
 
 type UploadFile = { name: string; size: number; type: string };
-type FlowStep = "select" | "scanning" | "results" | "preview" | "confirm";
+type FlowStep = "results" | "preview" | "confirm";
 type Decision = "new" | "version" | "replace";
 
 type SimilarCandidate = {
@@ -43,6 +46,7 @@ type SimilarCandidate = {
   size: string;
   similarity: number;
   recommendation: string;
+  summary: string;
   canCompare: boolean;
   compareReason?: string;
   compareFailsOnce?: boolean;
@@ -58,6 +62,8 @@ const PDF_CANDIDATES: SimilarCandidate[] = [
     size: "7.4 MB",
     similarity: 96,
     recommendation: "标题与资料主体高度一致，建议设为新版本",
+    summary:
+      "2025 版涉网运行管理规定，覆盖值班监视、参数记录频次、告警确认时限与归档要求。正文已按新版调度口径调整运行记录周期，并补充异常期间提高记录频次的条款。",
     canCompare: true,
   },
   {
@@ -69,6 +75,8 @@ const PDF_CANDIDATES: SimilarCandidate[] = [
     size: "6.8 MB",
     similarity: 88,
     recommendation: "可能为同一资料的历史版本",
+    summary:
+      "2023 版规定沿用旧记录周期与纸质日志补录口径，未单列告警确认时限。若本次上传为制度换版，更宜作为新版本而非覆盖。",
     canCompare: true,
     compareFailsOnce: true,
   },
@@ -81,6 +89,8 @@ const PDF_CANDIDATES: SimilarCandidate[] = [
     size: "428 KB",
     similarity: 73,
     recommendation: "标题关键词相近，可能是配套台账",
+    summary:
+      "制度文件台账表，登记文件名称、版本、生效日期与责任部门，不含正文条款。适合对照“是否已有同一资料”，一般不应直接覆盖。",
     canCompare: false,
     compareReason: "Excel 文件暂不支持正文差异对比",
   },
@@ -93,6 +103,8 @@ const PDF_CANDIDATES: SimilarCandidate[] = [
     size: "5.9 MB",
     similarity: 81,
     recommendation: "标题结构相近，可能为试行稿",
+    summary:
+      "试行稿结构与现行规定相近，但条款颗粒度更粗，部分岗位职责仍为过渡表述。若正文已按正式稿重写，建议作为历史版本保留。",
     canCompare: true,
   },
   {
@@ -104,6 +116,8 @@ const PDF_CANDIDATES: SimilarCandidate[] = [
     size: "1.2 MB",
     similarity: 69,
     recommendation: "标题关键词相近，可能为配套细则",
+    summary:
+      "实施细则侧重现场执行步骤、记录表单和班组检查清单，与管理规定正文互补。更可能是配套新资料，而不是同一文件的新版本。",
     canCompare: true,
   },
 ];
@@ -127,7 +141,8 @@ const COMPARE_BLOCKS: DiffBlock[] = [
     id: "d-mod-1",
     type: "modified",
     left: "3.2.2 正常运行期间，应按照运行记录要求，每 60 分钟记录一次主要运行参数。",
-    right: "3.2.2 正常运行期间，应按照运行记录要求，每 45 分钟记录一次主要运行参数；异常期间应提高记录频次。",
+    right:
+      "3.2.2 正常运行期间，应按照运行记录要求，每 45 分钟记录一次主要运行参数；异常期间应提高记录频次。",
   },
   {
     id: "d-mod-2",
@@ -199,58 +214,35 @@ export function UploadSimilarityFlowDialog({
   onClose,
   onChangeBase,
   initialFiles,
+  defaultDirectoryId,
 }: {
   base: KnowledgeBase | null;
   onClose: () => void;
   onChangeBase?: () => void;
   initialFiles?: File[];
+  defaultDirectoryId?: string;
 }) {
-  const [step, setStep] = useState<FlowStep>("select");
   const [files, setFiles] = useState<UploadFile[]>([]);
-  const [candidates, setCandidates] = useState<SimilarCandidate[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [decision, setDecision] = useState<Decision | null>(null);
-  const [failedCandidateIds, setFailedCandidateIds] = useState<string[]>(["archive"]);
-  const [retrying, setRetrying] = useState(false);
-  const [compareOpen, setCompareOpen] = useState(false);
+  const [targetDirectoryId, setTargetDirectoryId] = useState<string | undefined>();
+  const [directoryPickerOpen, setDirectoryPickerOpen] = useState(false);
 
   const currentFile = files[0] ?? null;
-  const selected = candidates.find((item) => item.id === selectedId) ?? null;
-  const highSimilarityCount = candidates.filter((item) => item.similarity >= 85).length;
 
   useEffect(() => {
     if (!base) {
-      setStep("select");
       setFiles([]);
-      setCandidates([]);
-      setSelectedId(null);
-      setDecision(null);
-      setFailedCandidateIds(["archive"]);
-      setCompareOpen(false);
+      setTargetDirectoryId(undefined);
+      setDirectoryPickerOpen(false);
       return;
     }
-    if (initialFiles?.length) {
-      setFiles(initialFiles.map((file) => ({ name: file.name, size: file.size, type: file.type })));
-      setStep("scanning");
-    }
-  }, [base, initialFiles]);
-
-  useEffect(() => {
-    if (step !== "scanning" || !currentFile) return;
-    const timer = window.setTimeout(() => {
-      const next = mockCandidates(currentFile);
-      setCandidates(next);
-      setSelectedId(next[0]?.id ?? null);
-      setStep("results");
-    }, 900);
-    return () => window.clearTimeout(timer);
-  }, [currentFile, step]);
-
-  const title = useMemo(() => {
-    if (step === "preview") return "资料预览";
-    if (step === "confirm") return "确认上传方式";
-    return "上传文件";
-  }, [step]);
+    setTargetDirectoryId(defaultDirectoryId);
+    setDirectoryPickerOpen(false);
+    setFiles(
+      initialFiles?.length
+        ? initialFiles.map((file) => ({ name: file.name, size: file.size, type: file.type }))
+        : [],
+    );
+  }, [base, defaultDirectoryId, initialFiles]);
 
   const chooseFiles = (fileList: FileList) => {
     const next = Array.from(fileList).map((file) => ({
@@ -260,7 +252,6 @@ export function UploadSimilarityFlowDialog({
     }));
     if (!next.length) return;
     setFiles(next);
-    setStep("scanning");
   };
 
   const cancelUpload = () => {
@@ -268,237 +259,166 @@ export function UploadSimilarityFlowDialog({
     onClose();
   };
 
-  const openDecision = (next: Decision, candidate?: SimilarCandidate) => {
-    if (candidate) setSelectedId(candidate.id);
-    setDecision(next);
-    setStep("confirm");
-  };
-
-  const finish = () => {
-    if (!base || !currentFile || !decision) return;
-
-    pushRecentUploadBaseId(base.id);
-    if (base.scope === "personal") {
-      createStorePersonalFile({
-        fileName: currentFile.name,
-        knowledgeBaseId: base.id,
-        knowledgeBaseName: base.name,
-        fileSize: fileSize(currentFile.size),
-      });
+  const submitUpload = () => {
+    if (!base) return;
+    if (!targetDirectoryId) {
+      toast.error("请选择上传目录");
+      return;
+    }
+    if (!files.length) {
+      toast.error("请选择需要上传的文件");
+      return;
     }
 
-    const messages: Record<Decision, string> = {
-      new: "已作为新资料提交，后续进入正常审批流程",
-      version: `已作为 ${selected?.name ?? "所选资料"} 的新版本提交，并保存对比记录`,
-      replace: `已提交覆盖 ${selected?.name ?? "所选资料"} 的申请，并保存对比记录`,
-    };
-    toast.success(messages[decision]);
+    pushRecentUploadBaseId(base.id);
+    const personal = base.scope === "personal";
+    files.forEach((file, index) => {
+      createStoreLibraryUpload({
+        fileName: file.name,
+        knowledgeBaseId: base.id,
+        knowledgeBaseName: base.name,
+        fileSize: fileSize(file.size),
+        directoryId: targetDirectoryId,
+        personal,
+        idNonce: index,
+      });
+    });
+    toast.success(
+      personal
+        ? files.length > 1
+          ? `已上传 ${files.length} 个文件，正在解析`
+          : "文件已加入列表，正在解析"
+        : files.length > 1
+          ? `已提交 ${files.length} 个文件，解析完成后进入审批台`
+          : "文件已提交，解析完成后进入审批台",
+    );
     onClose();
-  };
-
-  const returnToResults = () => {
-    setDecision(null);
-    setStep("results");
   };
 
   if (!base) return null;
 
-  const closeCompare = () => setCompareOpen(false);
-  const compareCandidate = selected;
-  const showingCompare = Boolean(compareOpen && compareCandidate && currentFile);
-
   return (
     <AppFormDialog
       open
-      size={showingCompare || step === "preview" ? "full" : step === "select" || step === "scanning" ? "medium" : "xlarge"}
-      fillHeight={showingCompare || step === "preview"}
-      title={showingCompare ? "文件差异对比" : title}
-      titleIcon={showingCompare ? GitCompareArrows : UploadCloud}
-      onClose={showingCompare ? closeCompare : cancelUpload}
+      size="medium"
+      title="上传文件"
+      titleIcon={UploadCloud}
+      onClose={cancelUpload}
       className="upload-similarity-dialog"
-      headerRight={
-        showingCompare ? (
-          <button
-            type="button"
-            onClick={closeCompare}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] px-2.5 text-[12.5px] font-medium text-primary transition-colors hover:bg-primary-soft"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            返回文件上传
-          </button>
-        ) : step === "preview" ? (
-          <button
-            type="button"
-            onClick={returnToResults}
-            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] px-2.5 text-[12.5px] font-medium text-primary transition-colors hover:bg-primary-soft"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            返回文件列表
-          </button>
-        ) : undefined
-      }
       footer={
-        showingCompare && compareCandidate ? (
-          failedCandidateIds.includes(compareCandidate.id) ? (
-            <AppDialogButton variant="outline" onClick={closeCompare}>
-              返回文件上传
-            </AppDialogButton>
-          ) : (
-            <>
-              <AppDialogButton
-                variant="outline"
-                onClick={() => {
-                  closeCompare();
-                  openDecision("replace", compareCandidate);
-                }}
-              >
-                <Replace className="h-3.5 w-3.5" />
-                覆盖已有
-              </AppDialogButton>
-              <AppDialogButton
-                variant="primary"
-                onClick={() => {
-                  closeCompare();
-                  openDecision("version", compareCandidate);
-                }}
-              >
-                <History className="h-3.5 w-3.5" />
-                设为新版
-              </AppDialogButton>
-            </>
-          )
-        ) : step === "results" ? (
-          <>
-            <AppDialogButton variant="outline" onClick={cancelUpload}>
-              取消
-            </AppDialogButton>
-            <AppDialogButton variant="primary" onClick={() => openDecision("new")}>
-              作为新资料
-            </AppDialogButton>
-          </>
-        ) : step === "confirm" ? (
-          <>
-            <AppDialogButton variant="outline" onClick={returnToResults}>
-              返回
-            </AppDialogButton>
-            <AppDialogButton
-              variant="primary"
-              onClick={finish}
-              className={
-                decision === "replace"
-                  ? "border-[#C94747] bg-[#C94747] hover:border-[#B23C3C] hover:bg-[#B23C3C]"
-                  : undefined
-              }
-            >
-              {decision === "replace" ? "确认覆盖" : "确认提交"}
-            </AppDialogButton>
-          </>
-        ) : undefined
+        <>
+          <AppDialogButton variant="outline" onClick={cancelUpload}>
+            取消
+          </AppDialogButton>
+          <AppDialogButton
+            variant="primary"
+            disabled={!targetDirectoryId || files.length === 0}
+            onClick={submitUpload}
+          >
+            确认上传
+          </AppDialogButton>
+        </>
       }
     >
-      {showingCompare && compareCandidate && currentFile ? (
-        <CompareView
-          candidate={compareCandidate}
-          candidates={candidates.filter((item) => item.canCompare)}
-          currentFile={currentFile}
-          failed={failedCandidateIds.includes(compareCandidate.id)}
-          retrying={retrying}
-          onCandidateChange={(id) => setSelectedId(id)}
-          onRetry={() => {
-            setRetrying(true);
-            window.setTimeout(() => {
-              setFailedCandidateIds((ids) => ids.filter((id) => id !== compareCandidate.id));
-              setRetrying(false);
-              toast.success("对比已重新生成");
-            }, 700);
+      <div className="space-y-4">
+        <UploadTargetLocation
+          base={base}
+          directoryId={targetDirectoryId}
+          pickerOpen={directoryPickerOpen}
+          onPickerOpenChange={setDirectoryPickerOpen}
+          onDirectoryChange={(directoryId) => {
+            if (!directoryId) return;
+            setTargetDirectoryId(directoryId);
+            setDirectoryPickerOpen(false);
           }}
+          onChangeBase={onChangeBase}
         />
-      ) : (
-        <>
-          {step === "select" && (
-            <div className="space-y-4">
-              <BaseBar base={base} onChangeBase={onChangeBase} />
-              <KbUploadCard
-                title="拖入文件或选择上传"
-                hint="支持 PDF、Word、Excel、PPT；选择后先进行基础校验与相似资料识别"
-                onUpload={chooseFiles}
-                className="min-h-[172px]"
-              />
-              <div className="flex items-start gap-2 rounded-[8px] bg-[#F5F9FA] px-3 py-2.5 text-[11.5px] leading-5 text-kb-muted">
-                <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-                相似识别只用于辅助判断，最终上传方式由你确认。识别过程中不会正式入库。
-              </div>
-            </div>
-          )}
-
-          {step === "scanning" && currentFile && (
-            <div className="flex min-h-[350px] flex-col items-center justify-center px-8 text-center">
-              <div className="relative grid h-16 w-16 place-items-center rounded-[16px] bg-primary-soft text-primary">
-                <FileSearch className="h-7 w-7 stroke-[1.7]" />
-                <Loader2 className="absolute -right-1 -top-1 h-5 w-5 animate-spin rounded-full bg-white p-0.5" />
-              </div>
-              <h3 className="mt-5 text-[17px] font-semibold text-kb-heading">正在识别库内相似资料</h3>
-              <p className="mt-1.5 max-w-[430px] text-[12.5px] leading-5 text-kb-muted">
-                已完成格式与文件名校验，正在根据标题、版本信息和资料元数据检索候选项。
-              </p>
-              <FileStrip file={currentFile} className="mt-6 w-full max-w-[520px]" />
-              <div className="mt-5 h-1.5 w-full max-w-[360px] overflow-hidden rounded-full bg-[#E8F0F2]">
-                <div className="h-full w-2/3 animate-pulse rounded-full bg-primary" />
-              </div>
-            </div>
-          )}
-
-          {step === "results" && currentFile && (
-            <ResultsView
-              file={currentFile}
-              filesCount={files.length}
-              candidates={candidates}
-              selectedId={selectedId}
-              onSelect={setSelectedId}
-              onPreview={(item) => {
-                setSelectedId(item.id);
-                setStep("preview");
-              }}
-              onCompare={(item) => {
-                setSelectedId(item.id);
-                setCompareOpen(true);
-              }}
-              onDecision={openDecision}
-            />
-          )}
-
-          {step === "preview" && selected && currentFile && <PreviewView candidate={selected} />}
-
-          {step === "confirm" && decision && (
-            <ConfirmView
-              decision={decision}
-              file={currentFile}
-              candidate={selected}
-              highSimilarityCount={highSimilarityCount}
-            />
-          )}
-        </>
-      )}
+        <KbUploadCard
+          title={files.length ? "重新选择上传文件" : "拖入文件或选择上传"}
+          hint={
+            files.length
+              ? "重新选择将替换当前待上传文件"
+              : base.scope === "personal"
+                ? "支持 PDF、Word、Excel、PPT；上传后直接进入列表并开始解析"
+                : "支持 PDF、Word、Excel、PPT；提交后先解析，完成后进入审批台审核"
+          }
+          onUpload={chooseFiles}
+          className={files.length ? "min-h-[116px]" : "min-h-[172px]"}
+        />
+        {currentFile && <FileStrip file={currentFile} />}
+        {files.length > 1 && (
+          <p className="-mt-2 text-[11px] text-kb-muted">本次共选择 {files.length} 个文件，将一并提交。</p>
+        )}
+      </div>
     </AppFormDialog>
   );
 }
 
-function BaseBar({ base, onChangeBase }: { base: KnowledgeBase; onChangeBase?: () => void }) {
+function UploadTargetLocation({
+  base,
+  directoryId,
+  pickerOpen,
+  onPickerOpenChange,
+  onDirectoryChange,
+  onChangeBase,
+}: {
+  base: KnowledgeBase;
+  directoryId?: string;
+  pickerOpen: boolean;
+  onPickerOpenChange: (open: boolean) => void;
+  onDirectoryChange: (directoryId?: string) => void;
+  onChangeBase?: () => void;
+}) {
+  const directories = getInternalDirectoriesForBase(base.id);
+  const hasDirectory = Boolean(directoryId);
   return (
-    <div className="flex items-center gap-2 rounded-[8px] border border-[#DCEBED] bg-[#F8FAFB] px-3 py-2.5">
-      <Library className="h-4 w-4 shrink-0 text-primary stroke-[1.8]" />
-      <div className="min-w-0">
-        <div className="text-[11px] text-kb-muted">目标知识库</div>
-        <div className="truncate text-[13px] font-medium text-kb-heading">{base.name}</div>
-      </div>
-      {onChangeBase && (
+    <div
+      className={cn(
+        "overflow-hidden rounded-[9px] border bg-[#F8FAFB]",
+        hasDirectory ? "border-[#DCEBED]" : "border-[#E4A94F]",
+      )}
+    >
+      <div className="flex items-center gap-2.5 px-3 py-2.5">
+        <KnowledgeBaseIcon size="sm" />
+        <div className="min-w-0 flex-1">
+          <div className="text-[10.5px] text-kb-muted">
+            上传目录 <span className="text-[#C94747]">*</span>
+          </div>
+          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12.5px] font-medium text-kb-heading">
+            <span className="shrink-0">{base.name}</span>
+            <span className="text-kb-muted">/</span>
+            <span className={cn("truncate", hasDirectory ? "text-primary" : "text-[#B47518]")}>
+              {hasDirectory ? getInternalDirectoryPathLabel(directoryId) : "请选择上传目录"}
+            </span>
+          </div>
+        </div>
         <button
           type="button"
-          onClick={onChangeBase}
-          className="ml-auto shrink-0 text-[11.5px] text-primary hover:underline"
+          onClick={() => onPickerOpenChange(!pickerOpen)}
+          className="shrink-0 rounded-[6px] px-2 py-1 text-[11.5px] font-medium text-primary transition-colors hover:bg-primary-soft"
         >
-          更换
+          {pickerOpen ? "收起" : hasDirectory ? "编辑" : "选择"}
         </button>
+        {onChangeBase && (
+          <button
+            type="button"
+            onClick={onChangeBase}
+            className="shrink-0 rounded-[6px] px-2 py-1 text-[11.5px] text-kb-muted transition-colors hover:bg-[#EEF4F5] hover:text-primary"
+          >
+            更换知识库
+          </button>
+        )}
+      </div>
+      {pickerOpen && (
+        <div className="max-h-[210px] overflow-y-auto border-t border-[#DCEBED] bg-white p-2">
+          <KnowledgeInternalDirectoryTree
+            baseId={base.id}
+            directories={directories}
+            selectedId={directoryId}
+            compact
+            onSelect={onDirectoryChange}
+          />
+        </div>
       )}
     </div>
   );
@@ -581,11 +501,7 @@ function ResultsView({
                     {candidate.name}
                   </div>
                   <div className="flex shrink-0 items-center gap-0.5">
-                    <IconAction
-                      icon={Eye}
-                      label="查看"
-                      onClick={() => onPreview(candidate)}
-                    />
+                    <IconAction icon={Eye} label="查看" onClick={() => onPreview(candidate)} />
                     <IconAction
                       icon={GitCompareArrows}
                       label="对比"
@@ -599,7 +515,7 @@ function ResultsView({
             </div>
           </div>
 
-          <div className="flex min-w-0 flex-col bg-white p-4">
+          <div className="flex min-w-0 flex-col overflow-y-auto bg-white p-4">
             {selected ? (
               <>
                 <div className="text-[11.5px] font-medium text-kb-muted">已选资料</div>
@@ -612,6 +528,13 @@ function ResultsView({
                   <InfoItem label="上传时间" value={selected.uploadedAt} />
                   <InfoItem label="文件类型" value={selected.fileType} />
                 </dl>
+                <div className="mt-4 rounded-[8px] bg-[#F7FAFB] px-3 py-2.5">
+                  <div className="text-[10.5px] font-medium text-kb-muted">文件摘要</div>
+                  <p className="mt-1 text-[12px] leading-5 text-kb-body">{selected.summary}</p>
+                  <p className="mt-1.5 text-[11px] leading-4 text-primary">
+                    {selected.recommendation}
+                  </p>
+                </div>
                 {!selected.canCompare && (
                   <p className="mt-3 text-[10.5px] leading-4 text-[#C0691A]">
                     {selected.compareReason}
@@ -712,7 +635,10 @@ function CompareView({
 
   const activeDiff = diffs[activeIndex];
   const activeBlockIndex = activeDiff
-    ? Math.max(0, COMPARE_BLOCKS.findIndex((block) => block.id === activeDiff.id))
+    ? Math.max(
+        0,
+        COMPARE_BLOCKS.findIndex((block) => block.id === activeDiff.id),
+      )
     : 0;
   const totalPages = COMPARE_BLOCKS.length;
   const currentPage = Math.min(totalPages, activeBlockIndex + 1);
@@ -779,7 +705,8 @@ function CompareView({
         <div className="min-w-[220px] flex-1 px-1 py-0.5">
           <div className="text-[10.5px] text-kb-muted">差异摘要</div>
           <div className="mt-0.5 text-[12px] font-medium text-kb-heading">
-            共 {DIFF_STATS.added + DIFF_STATS.removed + DIFF_STATS.modified} 处，集中在运行记录与归档要求
+            共 {DIFF_STATS.added + DIFF_STATS.removed + DIFF_STATS.modified}{" "}
+            处，集中在运行记录与归档要求
           </div>
         </div>
         <div className="ml-auto flex items-center gap-1.5">
@@ -984,7 +911,9 @@ function DocumentComparePane({
               )}
             >
               {block.heading && (
-                <div className="mb-1 text-[12.5px] font-semibold text-[#334E59]">{block.heading}</div>
+                <div className="mb-1 text-[12.5px] font-semibold text-[#334E59]">
+                  {block.heading}
+                </div>
               )}
               {text || (isDiff ? "此处无对应内容" : null)}
             </div>
@@ -1001,11 +930,13 @@ function ConfirmView({
   file,
   candidate,
   highSimilarityCount,
+  targetLocation,
 }: {
   decision: Decision;
   file: UploadFile | null;
   candidate: SimilarCandidate | null;
   highSimilarityCount: number;
+  targetLocation?: string;
 }) {
   const config = {
     new: {
@@ -1045,6 +976,7 @@ function ConfirmView({
       </div>
       <div className="mt-7 overflow-hidden rounded-[10px] border border-[#DCEBED]">
         {file && <ConfirmRow label="本次上传文件" value={file.name} icon={UploadCloud} />}
+        {targetLocation && <ConfirmRow label="上传位置" value={targetLocation} icon={FolderOpen} />}
         {(decision === "version" || decision === "replace") && candidate && (
           <>
             <ConfirmRow label="目标资料" value={candidate.name} icon={FileText} />
@@ -1133,5 +1065,214 @@ function IconAction({
       <Icon className="h-3.5 w-3.5 stroke-[1.8]" />
       {label}
     </button>
+  );
+}
+
+/**
+ * 解析完成后触发的相似资料识别弹窗（不含文件上传步骤）。
+ * 专业库：从审核侧边栏入口打开；个人库：从文件列表行标识入口打开。
+ */
+export function SimilarityReviewDialog({
+  open,
+  fileName,
+  onClose,
+}: {
+  open: boolean;
+  fileName: string;
+  onClose: () => void;
+}) {
+  const [step, setStep] = useState<FlowStep>("results");
+  const [candidates, setCandidates] = useState<SimilarCandidate[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [decision, setDecision] = useState<Decision | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [failedCandidateIds, setFailedCandidateIds] = useState<string[]>(["archive"]);
+  const [retrying, setRetrying] = useState(false);
+
+  const currentFile = useMemo<UploadFile>(
+    () => ({ name: fileName, size: 0, type: "application/pdf" }),
+    [fileName],
+  );
+
+  useEffect(() => {
+    if (!open) {
+      setStep("results");
+      setCandidates([]);
+      setSelectedId(null);
+      setDecision(null);
+      setCompareOpen(false);
+      setFailedCandidateIds(["archive"]);
+      return;
+    }
+    const next = mockCandidates(currentFile);
+    setCandidates(next);
+    setSelectedId(next[0]?.id ?? null);
+    setDecision(null);
+    setCompareOpen(false);
+    setStep("results");
+  }, [open, currentFile]);
+
+  const selected = candidates.find((c) => c.id === selectedId) ?? null;
+  const highSimilarityCount = candidates.filter((c) => c.similarity >= 85).length;
+  const showingCompare = Boolean(compareOpen && selected);
+
+  const openDecision = (next: Decision, candidate?: SimilarCandidate) => {
+    if (candidate) setSelectedId(candidate.id);
+    setDecision(next);
+    setStep("confirm");
+  };
+
+  const returnToResults = () => {
+    setDecision(null);
+    setStep("results");
+    setCompareOpen(false);
+  };
+
+  const finish = () => {
+    const messages: Record<Decision, string> = {
+      new: "已标记忽略重复，作为独立资料保留",
+      version: `已设为 ${selected?.name ?? "所选资料"} 的新版本`,
+      replace: `已提交覆盖 ${selected?.name ?? "所选资料"} 的申请`,
+    };
+    if (decision) toast.success(messages[decision]);
+    onClose();
+  };
+
+  const title = showingCompare ? "文件差异对比" : step === "confirm" ? "确认处理方式" : "相似资料识别";
+
+  return (
+    <AppFormDialog
+      open={open}
+      size={showingCompare || step === "preview" ? "full" : "xlarge"}
+      fillHeight={showingCompare || step === "preview"}
+      title={title}
+      titleIcon={showingCompare ? GitCompareArrows : FileSearch}
+      onClose={showingCompare ? () => setCompareOpen(false) : onClose}
+      className="similarity-review-dialog"
+      headerRight={
+        showingCompare ? (
+          <button
+            type="button"
+            onClick={() => setCompareOpen(false)}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] px-2.5 text-[12.5px] font-medium text-primary transition-colors hover:bg-primary-soft"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            返回相似列表
+          </button>
+        ) : step === "preview" ? (
+          <button
+            type="button"
+            onClick={returnToResults}
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] px-2.5 text-[12.5px] font-medium text-primary transition-colors hover:bg-primary-soft"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            返回文件列表
+          </button>
+        ) : undefined
+      }
+      footer={
+        showingCompare && selected ? (
+          failedCandidateIds.includes(selected.id) ? (
+            <AppDialogButton variant="outline" onClick={() => setCompareOpen(false)}>
+              返回相似列表
+            </AppDialogButton>
+          ) : (
+            <>
+              <AppDialogButton
+                variant="outline"
+                onClick={() => {
+                  setCompareOpen(false);
+                  openDecision("replace", selected);
+                }}
+              >
+                <Replace className="h-3.5 w-3.5" />
+                覆盖已有
+              </AppDialogButton>
+              <AppDialogButton
+                variant="primary"
+                onClick={() => {
+                  setCompareOpen(false);
+                  openDecision("version", selected);
+                }}
+              >
+                <History className="h-3.5 w-3.5" />
+                设为新版
+              </AppDialogButton>
+            </>
+          )
+        ) : step === "results" ? (
+          <>
+            <AppDialogButton variant="outline" onClick={onClose}>
+              关闭
+            </AppDialogButton>
+            <AppDialogButton variant="primary" onClick={() => openDecision("new")}>
+              忽略，保留为独立资料
+            </AppDialogButton>
+          </>
+        ) : step === "confirm" ? (
+          <>
+            <AppDialogButton variant="outline" onClick={returnToResults}>
+              返回
+            </AppDialogButton>
+            <AppDialogButton
+              variant="primary"
+              onClick={finish}
+              className={
+                decision === "replace"
+                  ? "border-[#C94747] bg-[#C94747] hover:border-[#B23C3C] hover:bg-[#B23C3C]"
+                  : undefined
+              }
+            >
+              {decision === "replace" ? "确认覆盖" : "确认提交"}
+            </AppDialogButton>
+          </>
+        ) : undefined
+      }
+    >
+      {showingCompare && selected ? (
+        <CompareView
+          candidate={selected}
+          candidates={candidates.filter((c) => c.canCompare)}
+          currentFile={currentFile}
+          failed={failedCandidateIds.includes(selected.id)}
+          retrying={retrying}
+          onCandidateChange={setSelectedId}
+          onRetry={() => {
+            setRetrying(true);
+            window.setTimeout(() => {
+              setFailedCandidateIds((ids) => ids.filter((id) => id !== selected.id));
+              setRetrying(false);
+              toast.success("对比已重新生成");
+            }, 700);
+          }}
+        />
+      ) : step === "results" ? (
+        <ResultsView
+          file={currentFile}
+          filesCount={1}
+          candidates={candidates}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onPreview={(item) => {
+            setSelectedId(item.id);
+            setStep("preview");
+          }}
+          onCompare={(item) => {
+            setSelectedId(item.id);
+            setCompareOpen(true);
+          }}
+          onDecision={openDecision}
+        />
+      ) : step === "preview" && selected ? (
+        <PreviewView candidate={selected} />
+      ) : step === "confirm" && decision ? (
+        <ConfirmView
+          decision={decision}
+          file={currentFile}
+          candidate={selected}
+          highSimilarityCount={highSimilarityCount}
+        />
+      ) : null}
+    </AppFormDialog>
   );
 }

@@ -4,8 +4,10 @@ import {
   CheckSquare,
   ChevronDown,
   ClipboardList,
+  Loader2,
   Pencil,
   Plus,
+  Sparkles,
   Square,
   Trash2,
 } from "lucide-react";
@@ -148,6 +150,8 @@ function QuestionEditForm({
   question: EditableTopicQuestion;
   onChange: (q: EditableTopicQuestion) => void;
 }) {
+  const [regenPrompt, setRegenPrompt] = useState("");
+  const [regenLoading, setRegenLoading] = useState(false);
   const hasOptions = question.type === "single" || question.type === "multiple";
   const isJudge = question.type === "judge";
   const isMulti = question.type === "multiple";
@@ -202,8 +206,58 @@ function QuestionEditForm({
       ? question.answer.split("")
       : [];
 
+  const regenerateByPrompt = () => {
+    if (!regenPrompt.trim()) {
+      toast.error("请先用自然语言说明希望怎么改这道题");
+      return;
+    }
+    const hint = regenPrompt.trim().slice(0, 18);
+    setRegenLoading(true);
+    window.setTimeout(() => {
+      onChange({
+        ...question,
+        stem: `${question.stem.replace(/（已按「[^」]+」调整）$/, "").trim()}（已按「${hint}」调整）`,
+        options: question.options?.map((option, index) =>
+          index === 0
+            ? option
+            : { ...option, label: `${option.label.replace(/（易与现场习惯混淆）$/, "")}（易与现场习惯混淆）` },
+        ),
+        analysis: `已按「${hint}」重新生成。${(question.analysis ?? "").replace(/^已按「[^」]+」重新生成。/, "").trim()}`,
+      });
+      setRegenLoading(false);
+      toast.success("已按说明重新生成题目，请核对后保存");
+    }, 700);
+  };
+
   return (
     <div className="space-y-4">
+      <div className="rounded-[8px] border border-primary/18 bg-primary-soft/30 px-3 py-2.5">
+        <div className="flex items-center gap-1.5 text-[12px] font-medium text-primary">
+          <Sparkles className="h-3.5 w-3.5" />
+          自然语言重新生成
+        </div>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          说明场景、干扰项或难度，系统据此重写本题。
+        </p>
+        <div className="mt-2 flex items-end gap-2">
+          <textarea
+            value={regenPrompt}
+            onChange={(event) => setRegenPrompt(event.target.value)}
+            rows={2}
+            placeholder="例如：改成现场交接班判断，增加一个干扰项"
+            className="min-h-[56px] flex-1 resize-none rounded-md border border-input bg-white px-3 py-2 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <button
+            type="button"
+            onClick={regenerateByPrompt}
+            disabled={regenLoading}
+            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md bg-primary px-3 text-[12px] font-medium text-white hover:bg-primary/90 disabled:opacity-60"
+          >
+            {regenLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            重新生成
+          </button>
+        </div>
+      </div>
       <div>
         <label className="mb-1.5 block text-[12px] font-medium text-muted-foreground">题干</label>
         <textarea

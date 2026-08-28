@@ -1,24 +1,28 @@
-import { Check, ChevronDown, Clock3, FolderInput, Library, Lock, Search, UserRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { Check, Folder, FolderInput, Info, Search } from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
+import { KnowledgeBaseIcon } from "@/components/knowledge/ui";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  getCategoryChain,
-  getCategoryChildren,
-  getCategoryPathLabel,
+  getBaseById,
+  getInternalDirectoriesForBase,
+  getInternalDirectoryPathLabel,
   getMoveTargetBases,
   isSubmitToPublicMove,
 } from "@/lib/knowledge/model";
-import { loadRecentMoveIds, pushRecentMoveId } from "@/lib/knowledge/recentMove";
+import { pushRecentMoveId } from "@/lib/knowledge/recentMove";
 import {
   getKnowledgeStoreServerSnapshot,
   getKnowledgeStoreVersion,
   subscribeKnowledgeStore,
 } from "@/lib/knowledge/store";
-import type { KnowledgeBase, KnowledgeCategory, KnowledgeFile } from "@/lib/knowledge/types";
+import type {
+  KnowledgeBase,
+  KnowledgeFile,
+  KnowledgeInternalDirectory,
+} from "@/lib/knowledge/types";
 import { cn } from "@/lib/utils";
-import { useSyncExternalStore } from "react";
+import { KnowledgeInternalDirectoryTree } from "./KnowledgeInternalDirectoryTree";
 
 export function FileMoveDialog({
   files,
@@ -31,67 +35,102 @@ export function FileMoveDialog({
   currentBaseId?: string;
   loading?: boolean;
   onClose: () => void;
-  onConfirm: (files: KnowledgeFile[], targetBaseId: string, keepSource: boolean) => void;
+  onConfirm: (
+    files: KnowledgeFile[],
+    targetBaseId: string,
+    targetDirectoryId: string | undefined,
+    keepSource: boolean,
+  ) => void;
 }) {
   const open = files.length === 1;
   const rejectedBatch = files.length > 1;
-
-  useEffect(() => {
-    if (!rejectedBatch) return;
-    toast.error("移动仅支持单个文件，不做批量移动");
-    onClose();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在误传批量时关闭一次
-  }, [rejectedBatch]);
-
   const storeVersion = useSyncExternalStore(
     subscribeKnowledgeStore,
     getKnowledgeStoreVersion,
     getKnowledgeStoreServerSnapshot,
   );
-  const [target, setTarget] = useState("");
-  const [treeOpen, setTreeOpen] = useState(false);
+  const effectiveBaseId = currentBaseId ?? files[0]?.knowledgeBaseId;
+  const sourceBase = effectiveBaseId ? getBaseById(effectiveBaseId) : undefined;
+  const sourceDirectoryId = files[0]?.directoryId;
+  const [targetBaseId, setTargetBaseId] = useState("");
+  const [targetDirectoryId, setTargetDirectoryId] = useState<string | undefined>();
   const [keepSource, setKeepSource] = useState(false);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
-    if (open) {
-      setTarget("");
-      setKeepSource(false);
-    }
-  }, [open, files]);
+    if (!rejectedBatch) return;
+    toast.error("移动仅支持单个文件，不做批量移动");
+    onClose();
+  }, [onClose, rejectedBatch]);
 
-  // 未显式传入当前库时（如全库页面），以文件所属库推断源作用域
-  const effectiveBaseId = currentBaseId ?? files[0]?.knowledgeBaseId;
-  const targets = useMemo(
-    () => getMoveTargetBases(effectiveBaseId),
-    [effectiveBaseId, open, storeVersion],
+  const targets = useMemo(() => {
+    void storeVersion;
+    const otherTargets = getMoveTargetBases(effectiveBaseId);
+    return sourceBase ? [sourceBase, ...otherTargets] : otherTargets;
+  }, [effectiveBaseId, sourceBase, storeVersion]);
+
+  useEffect(() => {
+    if (!open) return;
+    setTargetBaseId(sourceBase?.id ?? targets[0]?.id ?? "");
+    setTargetDirectoryId(undefined);
+    setKeepSource(false);
+    setQuery("");
+  }, [files, open, sourceBase?.id, targets]);
+
+  const selectedBase = targets.find((base) => base.id === targetBaseId);
+  const selectedDirectories = useMemo(() => {
+    void storeVersion;
+    return targetBaseId ? getInternalDirectoriesForBase(targetBaseId) : [];
+  }, [storeVersion, targetBaseId]);
+  const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
+  const filteredBases = useMemo(() => {
+    if (!normalizedQuery) return targets;
+    return targets.filter((base) => {
+      if (base.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery)) return true;
+      return getInternalDirectoriesForBase(base.id).some((directory) =>
+        directory.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
+      );
+    });
+  }, [normalizedQuery, targets]);
+  const filteredDirectories = useMemo(
+    () =>
+      normalizedQuery
+        ? selectedDirectories.filter((directory) =>
+            directory.name.toLocaleLowerCase("zh-CN").includes(normalizedQuery),
+          )
+        : selectedDirectories,
+    [normalizedQuery, selectedDirectories],
   );
-  const targetById = useMemo(() => new Map(targets.map((b) => [b.id, b])), [targets]);
 
-  const recentBases = useMemo(() => {
-    if (!open) return [];
-    return loadRecentMoveIds()
-      .map((id) => targetById.get(id))
-      .filter((base): base is KnowledgeBase => Boolean(base))
-      .slice(0, 4);
-  }, [open, targetById]);
-
-  const selectedBase = target ? targetById.get(target) : undefined;
-  const isSubmitApproval = isSubmitToPublicMove(effectiveBaseId, target);
+  const currentLocation = sourceBase
+    ? `${sourceBase.name} / ${getInternalDirectoryPathLabel(sourceDirectoryId)}`
+    : "未知位置";
+  const targetLocation =
+    selectedBase && targetDirectoryId
+      ? `${selectedBase.name} / ${getInternalDirectoryPathLabel(targetDirectoryId)}`
+      : "请选择目标位置";
+  const sameLocation =
+    selectedBase?.id === sourceBase?.id && targetDirectoryId === sourceDirectoryId;
+  const isSubmitApproval = isSubmitToPublicMove(effectiveBaseId, targetBaseId);
   const isCopy = keepSource;
+  const confirmDisabled = !selectedBase || !targetDirectoryId || (!keepSource && sameLocation);
 
   const handleConfirm = () => {
-    if (!target || files.length !== 1) return;
-    pushRecentMoveId(target);
-    onConfirm(files, target, keepSource);
+    if (!selectedBase || !targetDirectoryId || files.length !== 1 || confirmDisabled) return;
+    pushRecentMoveId(selectedBase.id);
+    onConfirm(files, selectedBase.id, targetDirectoryId, keepSource);
   };
+
+  if (!open) return null;
 
   return (
     <AppFormDialog
-      open={open}
-      size="small"
+      open
+      size="medium"
       title={isCopy ? "复制文件" : isSubmitApproval ? "提交到专业/公共知识库" : "移动文件"}
       titleIcon={FolderInput}
       onClose={onClose}
+      className="file-move-dialog w-[720px]"
       footer={
         <>
           <AppDialogButton variant="outline" onClick={onClose} disabled={loading}>
@@ -100,7 +139,7 @@ export function FileMoveDialog({
           <AppDialogButton
             variant="primary"
             loading={loading}
-            disabled={!target}
+            disabled={confirmDisabled}
             onClick={handleConfirm}
           >
             {isCopy ? "确认复制" : isSubmitApproval ? "提交移入申请" : "确认移动"}
@@ -109,374 +148,187 @@ export function FileMoveDialog({
       }
     >
       <div className="space-y-3.5">
-        <p className="text-[13px] leading-relaxed text-[#526670]">
-          {isCopy ? (
-            <>
-              将
-              <strong className="mx-1 font-semibold text-foreground">{files[0]?.name}</strong>
-              复制到目标知识库，原库文件保留不变。
-              {isSubmitApproval && "需管理员审批后生效。"}
-            </>
-          ) : isSubmitApproval ? (
-            <>
-              将
-              <strong className="mx-1 font-semibold text-foreground">{files[0]?.name}</strong>
-              申请移入专业/公共知识库。批准后文件进入目标库并重新解析；若不保留源文件，原库文件在目标库发布后移除。
-            </>
-          ) : (
-            <>
-              将
-              <strong className="mx-1 font-semibold text-foreground">{files[0]?.name}</strong>
-              移动到目标知识库。
-            </>
-          )}
+        <p className="text-[12.5px] leading-5 text-kb-body">
+          将「<strong className="font-semibold text-primary">{files[0]?.name}</strong>」
+          {isCopy ? "复制" : "移动"}到目标位置。
         </p>
 
-        <div className="space-y-1.5">
-          <span className="block text-[12px] font-medium text-kb-body">目标知识库</span>
-          <BaseTreeSelect
-            value={target}
-            selectedBase={selectedBase}
-            targets={targets}
-            open={treeOpen}
-            onOpenChange={setTreeOpen}
-            onChange={(id) => {
-              setTarget(id);
-              setTreeOpen(false);
-            }}
-          />
+        <LocationBlock label="当前位置" value={currentLocation} trailing="当前位置" />
+
+        <section>
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-kb-body">
+            目标位置
+            <span className="font-normal text-kb-muted">（选择目标知识库和目录）</span>
+          </div>
+          <div className="overflow-hidden rounded-[9px] border border-[#DCEBED] bg-white">
+            <div className="border-b border-[#E4EEF0] p-2.5">
+              <label className="flex h-8 items-center gap-2 rounded-[7px] border border-[#DCEBED] bg-white px-2.5 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10">
+                <Search className="h-3.5 w-3.5 shrink-0 text-kb-muted stroke-[1.8]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索知识库或目录"
+                  className="min-w-0 flex-1 bg-transparent text-[12px] text-kb-heading outline-none placeholder:text-kb-muted"
+                />
+              </label>
+            </div>
+
+            <div className="grid h-[246px] grid-cols-[220px_minmax(0,1fr)] max-[640px]:h-auto max-[640px]:grid-cols-1">
+              <div className="scrollbar-thin overflow-y-auto border-r border-[#E4EEF0] p-1.5 max-[640px]:max-h-[170px] max-[640px]:border-b max-[640px]:border-r-0">
+                {filteredBases.length ? (
+                  filteredBases.map((base) => (
+                    <KnowledgeBaseRow
+                      key={base.id}
+                      base={base}
+                      selected={base.id === targetBaseId}
+                      onSelect={() => {
+                        setTargetBaseId(base.id);
+                        setTargetDirectoryId(undefined);
+                      }}
+                    />
+                  ))
+                ) : (
+                  <EmptySearch label="未找到匹配的知识库" />
+                )}
+              </div>
+
+              <div className="scrollbar-thin overflow-y-auto p-1.5">
+                {selectedBase ? (
+                  normalizedQuery && filteredDirectories.length === 0 ? (
+                    <EmptySearch label="当前知识库内没有匹配目录" />
+                  ) : normalizedQuery ? (
+                    <FlatDirectoryResults
+                      directories={filteredDirectories}
+                      selectedId={targetDirectoryId}
+                      onSelect={setTargetDirectoryId}
+                    />
+                  ) : (
+                    <KnowledgeInternalDirectoryTree
+                      baseId={selectedBase.id}
+                      directories={selectedDirectories}
+                      selectedId={targetDirectoryId}
+                      compact
+                      onSelect={setTargetDirectoryId}
+                    />
+                  )
+                ) : (
+                  <EmptySearch label="请先选择目标知识库" />
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="flex items-start gap-2 rounded-[8px] bg-primary-soft/65 px-3 py-2.5 text-[11.5px] leading-5 text-[#54717B]">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary stroke-[1.9]" />
+          <div>
+            <div className="font-medium text-primary">跨知识库移动</div>
+            <div>文件将进入目标知识库所选目录，并按目标库规则处理。</div>
+          </div>
         </div>
 
-        <label className="flex cursor-pointer items-start gap-2.5 rounded-[8px] border border-[#E0EAED] bg-[#F8FBFC] px-3.5 py-2.5 transition-colors hover:border-primary/30 hover:bg-[#F2F8FA]">
+        <label className="flex cursor-pointer items-center gap-2 text-[12px] text-kb-body">
           <input
             type="checkbox"
             checked={keepSource}
-            onChange={(e) => setKeepSource(e.target.checked)}
-            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+            onChange={(event) => setKeepSource(event.target.checked)}
+            className="h-4 w-4 rounded border-kb-border accent-primary"
           />
-          <div className="min-w-0">
-            <p className="text-[12.5px] font-medium text-[#334E59]">保留源文件</p>
-            <p className="mt-0.5 text-[11.5px] text-[#6B7F88]">
-              {keepSource
-                ? "目标库发布后，原库文件保留（复制效果）"
-                : "目标库发布后，原库文件将移除（移动效果）"}
-            </p>
-          </div>
+          同时保留一份在原位置
+          <Info className="h-3.5 w-3.5 text-kb-muted stroke-[1.7]" />
         </label>
 
-        {recentBases.length > 0 && (
-          <div className="space-y-1.5">
-            <span className="flex items-center gap-1 text-[11.5px] font-medium text-kb-muted">
-              <Clock3 className="h-3 w-3 stroke-[1.8]" />
-              最近移动
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {recentBases.map((base) => (
-                <button
-                  key={base.id}
-                  type="button"
-                  onClick={() => setTarget(base.id)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] transition-colors",
-                    target === base.id
-                      ? "border-primary/40 bg-primary-soft/40 text-accent-foreground"
-                      : "border-kb-border bg-card text-kb-body hover:border-primary/30 hover:bg-kb-surface-hover",
-                  )}
-                >
-                  {base.scope === "personal" ? (
-                    <UserRound className="h-3 w-3 shrink-0 stroke-[1.8]" />
-                  ) : (
-                    <Library className="h-3 w-3 shrink-0 stroke-[1.8]" />
-                  )}
-                  <span className="max-w-[140px] truncate">{base.name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <LocationBlock label={isCopy ? "复制后位置" : "移动后位置"} value={targetLocation} />
       </div>
     </AppFormDialog>
   );
 }
 
-export function BaseTreeSelect({
+function LocationBlock({
+  label,
   value,
-  selectedBase,
-  targets,
-  open,
-  onOpenChange,
-  onChange,
+  trailing,
 }: {
+  label: string;
   value: string;
-  selectedBase?: KnowledgeBase;
-  targets: KnowledgeBase[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onChange: (id: string) => void;
+  trailing?: string;
 }) {
-  const [query, setQuery] = useState("");
-
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
-
-  const personalTargets = useMemo(
-    () => targets.filter((base) => base.scope === "personal"),
-    [targets],
-  );
-  const professionalTargets = useMemo(
-    () => targets.filter((base) => base.scope !== "personal"),
-    [targets],
-  );
-  const rootProfessional = useMemo(
-    () => professionalTargets.filter((base) => !base.categoryId),
-    [professionalTargets],
-  );
-
-  const categoriesWithTargets = useMemo(() => {
-    const set = new Set<string>();
-    for (const base of professionalTargets) {
-      if (base.categoryId) {
-        for (const category of getCategoryChain(base.categoryId)) set.add(category.id);
-      }
-    }
-    return set;
-  }, [professionalTargets]);
-
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) return [];
-    return targets.filter((base) => base.name.toLowerCase().includes(normalized));
-  }, [query, targets]);
-
-  const hasTargets = targets.length > 0;
-
-  return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          disabled={!hasTargets}
-          className={cn(
-            "flex h-9 w-full items-center gap-2 rounded-[8px] border border-kb-border bg-card px-3 text-left text-[13px] transition-colors",
-            "hover:border-primary/30 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/20",
-            selectedBase ? "text-kb-body" : "text-kb-muted",
-            !hasTargets && "cursor-not-allowed opacity-60",
-          )}
-        >
-          {selectedBase ? (
-            selectedBase.scope === "personal" ? (
-              <UserRound className="h-4 w-4 shrink-0 text-primary stroke-[1.8]" />
-            ) : (
-              <Library className="h-4 w-4 shrink-0 text-primary stroke-[1.8]" />
-            )
-          ) : (
-            <FolderInput className="h-4 w-4 shrink-0 text-kb-muted stroke-[1.8]" />
-          )}
-          <span className="min-w-0 flex-1 truncate">
-            {selectedBase?.name ?? (hasTargets ? "请选择目标知识库" : "暂无可移动到的知识库")}
-          </span>
-          <ChevronDown
-            className={cn(
-              "h-3.5 w-3.5 shrink-0 text-kb-muted transition-transform",
-              open && "rotate-180",
-            )}
-            strokeWidth={1.8}
-          />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="z-[70] w-[var(--radix-popover-trigger-width)] min-w-[300px] p-0"
-        align="start"
-        sideOffset={4}
-      >
-        <div className="border-b border-divider px-2.5 py-2">
-          <div className="flex h-8 items-center gap-2 rounded-[6px] border border-kb-border bg-card px-2.5">
-            <Search className="h-3.5 w-3.5 shrink-0 text-kb-muted" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索知识库"
-              className="min-w-0 flex-1 bg-transparent text-[12.5px] text-kb-body outline-none placeholder:text-kb-muted"
-            />
-          </div>
-        </div>
-        <div className="scrollbar-thin max-h-[280px] overflow-y-auto p-1">
-          {!hasTargets ? (
-            <EmptyHint />
-          ) : query.trim() ? (
-            filtered.length === 0 ? (
-              <p className="py-6 text-center text-[12px] text-kb-muted">无匹配知识库</p>
-            ) : (
-              filtered.map((base) => (
-                <BaseRow
-                  key={base.id}
-                  base={base}
-                  selected={value === base.id}
-                  onSelect={() => onChange(base.id)}
-                  showPath
-                />
-              ))
-            )
-          ) : (
-            <>
-              {personalTargets.length > 0 && (
-                <GroupLabel label="个人知识库" />
-              )}
-              {personalTargets.map((base) => (
-                <BaseRow
-                  key={base.id}
-                  base={base}
-                  selected={value === base.id}
-                  onSelect={() => onChange(base.id)}
-                />
-              ))}
-
-              {professionalTargets.length > 0 && <GroupLabel label="公共知识库" />}
-              {rootProfessional.map((base) => (
-                <BaseRow
-                  key={base.id}
-                  base={base}
-                  selected={value === base.id}
-                  onSelect={() => onChange(base.id)}
-                />
-              ))}
-              {getCategoryChildren().map((category) => (
-                <CategoryBranch
-                  key={category.id}
-                  category={category}
-                  depth={0}
-                  value={value}
-                  professionalTargets={professionalTargets}
-                  categoriesWithTargets={categoriesWithTargets}
-                  onSelect={onChange}
-                />
-              ))}
-            </>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function CategoryBranch({
-  category,
-  depth,
-  value,
-  professionalTargets,
-  categoriesWithTargets,
-  onSelect,
-}: {
-  category: KnowledgeCategory;
-  depth: number;
-  value: string;
-  professionalTargets: KnowledgeBase[];
-  categoriesWithTargets: Set<string>;
-  onSelect: (id: string) => void;
-}) {
-  if (!categoriesWithTargets.has(category.id)) return null;
-  const directBases = professionalTargets.filter((base) => base.categoryId === category.id);
-  const children = getCategoryChildren(category.id);
-
   return (
     <div>
-      <div
-        className="flex items-center gap-1.5 py-1.5 pr-2 text-[11.5px] font-medium text-kb-muted"
-        style={{ paddingLeft: 8 + depth * 14 }}
-      >
-        <Library className="h-3.5 w-3.5 shrink-0 text-kb-muted/70 stroke-[1.8]" />
-        <span className="min-w-0 flex-1 truncate">{category.name}</span>
+      <div className="mb-1.5 text-[12px] font-medium text-kb-body">{label}</div>
+      <div className="flex min-h-9 items-center gap-2 rounded-[7px] bg-[#F2F6F7] px-3 text-[12px] text-kb-body">
+        <span className="min-w-0 flex-1 truncate">{value}</span>
+        {trailing && (
+          <span className="shrink-0 rounded-[5px] bg-primary-soft px-2 py-1 text-[10.5px] font-medium text-primary">
+            {trailing}
+          </span>
+        )}
       </div>
-      {directBases.map((base) => (
-        <BaseRow
-          key={base.id}
-          base={base}
-          selected={value === base.id}
-          depth={depth + 1}
-          onSelect={() => onSelect(base.id)}
-        />
-      ))}
-      {children.map((child) => (
-        <CategoryBranch
-          key={child.id}
-          category={child}
-          depth={depth + 1}
-          value={value}
-          professionalTargets={professionalTargets}
-          categoriesWithTargets={categoriesWithTargets}
-          onSelect={onSelect}
-        />
-      ))}
     </div>
   );
 }
 
-function BaseRow({
+function KnowledgeBaseRow({
   base,
   selected,
-  depth = 0,
-  showPath = false,
   onSelect,
 }: {
   base: KnowledgeBase;
   selected: boolean;
-  depth?: number;
-  showPath?: boolean;
   onSelect: () => void;
 }) {
-  const Icon = base.scope === "personal" ? UserRound : Library;
-  const path =
-    showPath && base.categoryId
-      ? getCategoryPathLabel(base.categoryId)
-      : base.scope === "personal"
-        ? "个人知识库"
-        : undefined;
-
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        "flex w-full items-center gap-2 rounded-[6px] py-1.5 pr-2 text-left transition-colors",
-        selected ? "bg-primary-soft text-accent-foreground" : "text-kb-body hover:bg-kb-surface-hover",
+        "flex h-9 w-full items-center gap-2 rounded-[7px] px-2 text-left transition-colors",
+        selected ? "bg-primary-soft text-primary" : "text-kb-body hover:bg-kb-surface-hover",
       )}
-      style={{ paddingLeft: 8 + depth * 14 }}
     >
-      <Icon
-        className={cn(
-          "h-3.5 w-3.5 shrink-0 stroke-[1.8]",
-          selected ? "text-primary" : "text-kb-muted",
-        )}
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12.5px] font-medium">{base.name}</span>
-        {path && (
-          <span className="block truncate text-[11px] text-kb-muted">{path}</span>
-        )}
-      </span>
-      <Check
-        className={cn("h-3.5 w-3.5 shrink-0 text-primary", selected ? "opacity-100" : "opacity-0")}
-      />
+      <KnowledgeBaseIcon size="sm" className={cn(!selected && "bg-[#EEF4F5] text-[#7F969F]")} />
+      <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{base.name}</span>
+      {selected && <Check className="h-3.5 w-3.5 shrink-0 stroke-[2]" />}
     </button>
   );
 }
 
-function GroupLabel({ label }: { label: string }) {
+function FlatDirectoryResults({
+  directories,
+  selectedId,
+  onSelect,
+}: {
+  directories: KnowledgeInternalDirectory[];
+  selectedId?: string;
+  onSelect: (id: string) => void;
+}) {
   return (
-    <div className="px-2 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-kb-muted/80">
-      {label}
+    <div className="space-y-px">
+      {directories.map((directory) => (
+        <button
+          key={directory.id}
+          type="button"
+          onClick={() => onSelect(directory.id)}
+          className={cn(
+            "flex h-8 w-full items-center gap-2 rounded-[7px] px-2.5 text-left text-[12px] transition-colors",
+            selectedId === directory.id
+              ? "bg-primary-soft font-medium text-primary"
+              : "text-kb-body hover:bg-kb-surface-hover",
+          )}
+        >
+          <Folder className="h-4 w-4 shrink-0 stroke-[1.8]" />
+          <span className="min-w-0 flex-1 truncate">{directory.name}</span>
+          {selectedId === directory.id && <Check className="h-3.5 w-3.5" />}
+        </button>
+      ))}
     </div>
   );
 }
 
-function EmptyHint() {
+function EmptySearch({ label }: { label: string }) {
   return (
-    <div className="flex flex-col items-center gap-2 py-8 text-center">
-      <Lock className="h-5 w-5 text-kb-muted" strokeWidth={1.6} />
-      <p className="px-4 text-[12.5px] text-kb-muted">
-        没有可移动到的知识库，你需要对目标库有管理或上传权限。
-      </p>
+    <div className="grid h-full min-h-24 place-items-center px-4 text-center text-[11.5px] text-kb-muted">
+      {label}
     </div>
   );
 }

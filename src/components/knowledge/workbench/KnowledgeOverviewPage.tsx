@@ -1,9 +1,5 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import {
-  MessageSquareText,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
+import { MessageSquareText, ShieldCheck, Users } from "lucide-react";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ComponentProps } from "react";
 import { toast } from "sonner";
 import knowledgeNoPermissionIllustration from "@/assets/knowledge-no-permission.png";
@@ -32,6 +28,8 @@ import {
   getFilesForBase,
   getFilesForPersonalTree,
   getFilesForProfessionalTree,
+  getInternalDirectoriesForBase,
+  getInternalDirectoryDescendantIds,
   getMetadataFieldsForBase,
   getPersonalDirectoryChildren,
   getPinnedFiles,
@@ -48,12 +46,7 @@ import {
   getCurrentKnowledgeUser,
   subscribeDemoRole,
 } from "@/lib/knowledge/demoRole";
-import {
-  isPinnedId,
-  loadPinnedIds,
-  savePinnedIds,
-  togglePinnedId,
-} from "@/lib/knowledge/pinned";
+import { isPinnedId, loadPinnedIds, savePinnedIds, togglePinnedId } from "@/lib/knowledge/pinned";
 import {
   addStoreBase,
   getKnowledgeStoreVersion,
@@ -81,7 +74,12 @@ import type {
 } from "@/lib/knowledge/types";
 import { kbMainPanel } from "@/lib/knowledge/tokens";
 import { openFileDetailInNewTab, type FileDetailSearchScope } from "@/lib/knowledge/searchNav";
-import { TableListPager, CardBatchPager, PillSelect, TABLE_PAGE_SIZE_DEFAULT } from "@/components/learning/ui";
+import {
+  TableListPager,
+  CardBatchPager,
+  PillSelect,
+  TABLE_PAGE_SIZE_DEFAULT,
+} from "@/components/learning/ui";
 import { cn } from "@/lib/utils";
 import {
   FileListToolbarActions,
@@ -115,6 +113,8 @@ import { useFileSelection } from "./useFileSelection";
 import { useFileViewMode } from "./useFileViewMode";
 import { MyPendingReviewWidget } from "./MyPendingReviewWidget";
 import { UploadSimilarityFlowDialog } from "./UploadSimilarityFlowDialog";
+import { KnowledgeBaseDirectorySidebar } from "./KnowledgeBaseDirectorySidebar";
+import { KNOWLEDGE_DIRECTORY_ALL_ID } from "./KnowledgeInternalDirectoryTree";
 
 const CARD_PAGE_SIZE = 8;
 const HIGHLIGHT_MS = 2400;
@@ -143,11 +143,7 @@ function collectExpandIds(categoryId?: string) {
 export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: string }) {
   const navigate = useNavigate();
   const router = useRouter();
-  const role = useSyncExternalStore(
-    subscribeDemoRole,
-    getDemoRoleKey,
-    getDemoRoleServerSnapshot,
-  );
+  const role = useSyncExternalStore(subscribeDemoRole, getDemoRoleKey, getDemoRoleServerSnapshot);
   const employee = role === "employee";
   const storeVersion = useKnowledgeStoreVersion();
   const [pinnedIds, setPinnedIds] = useState<string[]>(() => loadPinnedIds());
@@ -158,6 +154,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     }
     return getDefaultOverviewBaseId();
   });
+  const [selectedDirectoryId, setSelectedDirectoryId] = useState(KNOWLEDGE_DIRECTORY_ALL_ID);
   const [query, setQuery] = useState("");
   const [searchMode, setSearchMode] = useState<FileSearchMode>("filename");
   const [metadataFilters, setMetadataFilters] = useState<Record<string, string>>({});
@@ -201,6 +198,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const [uploadFlow, setUploadFlow] = useState<{
     base: KnowledgeBase;
     files?: File[];
+    directoryId?: string;
   } | null>(null);
 
   const showCategoryManageActions = canSeeCategoryManager();
@@ -238,8 +236,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const isProfessionalAll = selectedBaseId === PROFESSIONAL_TREE_ALL_ID;
   const isAggregate = isPersonalAll || isProfessionalAll;
 
-  const selectedBase =
-    selectedBaseId && !isAggregate ? getBaseById(selectedBaseId) : undefined;
+  const selectedBase = selectedBaseId && !isAggregate ? getBaseById(selectedBaseId) : undefined;
 
   const allCurrentBaseFiles = useMemo(() => {
     if (isPersonalAll) return getFilesForPersonalTree();
@@ -248,33 +245,55 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     return [];
   }, [isPersonalAll, isProfessionalAll, selectedBase, storeVersion]);
 
+  const internalDirectories = useMemo(
+    () => (selectedBase ? getInternalDirectoriesForBase(selectedBase.id) : []),
+    [selectedBase, storeVersion],
+  );
+
+  const directoryScopedFiles = useMemo(() => {
+    if (!selectedBase || !selectedDirectoryId || selectedDirectoryId === KNOWLEDGE_DIRECTORY_ALL_ID) {
+      return allCurrentBaseFiles;
+    }
+    const directoryIds = getInternalDirectoryDescendantIds(selectedBase.id, selectedDirectoryId);
+    return allCurrentBaseFiles.filter(
+      (file) => file.directoryId && directoryIds.has(file.directoryId),
+    );
+  }, [allCurrentBaseFiles, selectedBase, selectedDirectoryId, storeVersion]);
+
   const selectedFiles = useMemo(() => {
     if (isAggregate) {
-      return sortKnowledgeFiles(
-        filterFiles(allCurrentBaseFiles, { query, searchMode }),
-        sortBy,
-      );
+      return sortKnowledgeFiles(filterFiles(allCurrentBaseFiles, { query, searchMode }), sortBy);
     }
     if (!selectedBase || !canViewBaseFiles(selectedBase)) return [];
     return sortKnowledgeFiles(
-      filterFiles(allCurrentBaseFiles, {
+      filterFiles(directoryScopedFiles, {
         query,
         searchMode,
         metadataFilters,
       }),
       sortBy,
     );
-  }, [allCurrentBaseFiles, isAggregate, metadataFilters, query, searchMode, selectedBase, sortBy]);
+  }, [
+    allCurrentBaseFiles,
+    directoryScopedFiles,
+    isAggregate,
+    metadataFilters,
+    query,
+    searchMode,
+    selectedBase,
+    sortBy,
+  ]);
 
   const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
   useEffect(() => {
     setPage(1);
-  }, [selectedBaseId, query, searchMode, metadataFilters, sortBy, viewMode]);
+  }, [selectedBaseId, selectedDirectoryId, query, searchMode, metadataFilters, sortBy, viewMode]);
 
   useEffect(() => {
     setMetadataFilters({});
     fileSelection.clear();
+    setSelectedDirectoryId(KNOWLEDGE_DIRECTORY_ALL_ID);
   }, [selectedBaseId]);
 
   useEffect(() => {
@@ -317,7 +336,12 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     toast.message(nextPinned ? "文件已置顶" : "已取消置顶");
   };
 
-  const handleConfirmMove = (files: KnowledgeFile[], targetBaseId: string, keepSource: boolean) => {
+  const handleConfirmMove = (
+    files: KnowledgeFile[],
+    targetBaseId: string,
+    targetDirectoryId: string | undefined,
+    keepSource: boolean,
+  ) => {
     const targetBase = getBaseById(targetBaseId);
     if (!targetBase) {
       toast.error("目标知识库不存在");
@@ -331,7 +355,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
     );
     setMoveLoading(true);
     for (const file of toSubmit) {
-      submitStoreFileMove(file, targetBase, keepSource);
+      submitStoreFileMove(file, targetBase, keepSource, targetDirectoryId);
     }
     for (const file of movable) {
       if (keepSource) {
@@ -340,6 +364,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
         updateStoreFile(file.id, {
           knowledgeBaseId: targetBaseId,
           knowledgeBaseName: targetBase.name,
+          directoryId: targetDirectoryId,
         });
       }
     }
@@ -370,9 +395,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   };
 
   const fileRowActions = {
-    ...(showManageColumn
-      ? { onMove: (file: KnowledgeFile) => setMoveFiles([file]) }
-      : {}),
+    ...(showManageColumn ? { onMove: (file: KnowledgeFile) => setMoveFiles([file]) } : {}),
     onTogglePin: handleToggleFilePin,
     onViewHistory: (file: KnowledgeFile) => setHistoryFile(file),
   };
@@ -511,12 +534,25 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
 
   const handleUploadFiles = (files: FileList) => {
     if (!selectedBase) return;
-    setUploadFlow({ base: selectedBase, files: Array.from(files) });
+    setUploadFlow({
+      base: selectedBase,
+      files: Array.from(files),
+      directoryId:
+        selectedDirectoryId && selectedDirectoryId !== KNOWLEDGE_DIRECTORY_ALL_ID
+          ? selectedDirectoryId
+          : undefined,
+    });
   };
 
   const openUploadFlow = () => {
     if (!selectedBase) return;
-    setUploadFlow({ base: selectedBase });
+    setUploadFlow({
+      base: selectedBase,
+      directoryId:
+        selectedDirectoryId && selectedDirectoryId !== KNOWLEDGE_DIRECTORY_ALL_ID
+          ? selectedDirectoryId
+          : undefined,
+    });
   };
 
   const handleRefresh = () => {
@@ -529,26 +565,15 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
   const emptyFiles = isBaseTrulyEmpty ? (
     <KnowledgeEmptyFilesState
       canUpload={selectedBase ? canUploadToBase(selectedBase) : false}
-      onUpload={
-        selectedBase && canUploadToBase(selectedBase)
-          ? openUploadFlow
-          : undefined
-      }
+      onUpload={selectedBase && canUploadToBase(selectedBase) ? openUploadFlow : undefined}
     />
   ) : (
-    <KbEmptyState
-      title="当前筛选下暂无文件"
-      description="调整搜索关键词或元数据筛选后再试。"
-    />
+    <KbEmptyState title="当前筛选下暂无文件" description="调整搜索关键词或元数据筛选后再试。" />
   );
 
   return (
     <>
-      <KbSidebar
-        width="browse"
-        withDecor
-        header={<KnowledgeOverviewTitleBanner />}
-      >
+      <KbSidebar width="browse" withDecor header={<KnowledgeOverviewTitleBanner />}>
         <PinnedQuickAccessSection
           pinnedBases={pinnedBases}
           pinnedFiles={pinnedFiles}
@@ -583,9 +608,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             onSelectAll={() => handleSelectTreeId(PROFESSIONAL_TREE_ALL_ID)}
             onTogglePin={handleTogglePin}
             onCreateDirectory={
-              showCategoryManageActions
-                ? (category) => openDirectoryForm(category.id)
-                : undefined
+              showCategoryManageActions ? (category) => openDirectoryForm(category.id) : undefined
             }
             onCreateKnowledgeBase={
               showCategoryManageActions
@@ -603,9 +626,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
             onDeleteDirectory={
               showCategoryManageActions ? (category) => setDeleteCategory(category) : undefined
             }
-            onDisableDirectory={
-              showCategoryManageActions ? handleDisableDirectory : undefined
-            }
+            onDisableDirectory={showCategoryManageActions ? handleDisableDirectory : undefined}
             onRenameBase={(base) => setRenameBase(base)}
             onMoveBase={(base) => setMoveBase(base)}
             onDeleteBase={(base) => setDeleteBase(base)}
@@ -732,119 +753,128 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
           <div className="relative flex min-h-0 flex-1 flex-col">
             <KnowledgeBaseDetailHeader
               base={selectedBase}
-              fileCount={selectedBase.fileCount ?? selectedFiles.length}
+              fileCount={allCurrentBaseFiles.length}
               onSelectBase={handleSelectTreeId}
             />
 
-            <KbDragUploadOverlay
-              onFiles={canUploadToBase(selectedBase) ? handleUploadFiles : undefined}
-              disabled={!canUploadToBase(selectedBase)}
-              className="flex min-h-0 flex-1 flex-col"
-            >
-              <FileListToolbar
-                {...batchToolbarProps(pageFileIds, selectedFiles.length)}
-                left={
-                  <>
-                    <KbFileSearchInput
-                      value={query}
-                      onChange={setQuery}
-                      mode={searchMode}
-                      onModeChange={setSearchMode}
-                    />
-                    <KbMetadataFilter
-                      fields={metadataFields}
-                      files={allCurrentBaseFiles}
-                      value={metadataFilters}
-                      onChange={setMetadataFilters}
-                    />
-                  </>
-                }
-                right={
-                  <FileListToolbarActions
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                    sortBy={sortBy}
-                    onSortChange={setSortBy}
-                    onRefresh={handleRefresh}
-                    showViewModeToggle={!isFullTextSearchActive}
-                    onUpload={
-                      canUploadToBase(selectedBase)
-                        ? openUploadFlow
-                        : undefined
-                    }
-                  />
-                }
+            <div className="flex min-h-0 flex-1 max-[900px]:flex-col">
+              <KnowledgeBaseDirectorySidebar
+                baseId={selectedBase.id}
+                directories={internalDirectories}
+                files={allCurrentBaseFiles}
+                selectedId={selectedDirectoryId}
+                canManage={showManageColumn}
+                canUpload={canUploadToBase(selectedBase)}
+                onSelect={setSelectedDirectoryId}
+                onUpload={openUploadFlow}
               />
 
-              {isFullTextSearchActive ? (
-                <FullTextSearchResultPanel
-                  files={selectedFiles}
-                  query={query}
-                  showLibrary={false}
-                  onToggleEnabled={handleToggleEnabled}
+              <KbDragUploadOverlay
+                onFiles={canUploadToBase(selectedBase) ? handleUploadFiles : undefined}
+                disabled={!canUploadToBase(selectedBase)}
+                className="flex min-h-0 min-w-0 flex-1 flex-col"
+              >
+                <FileListToolbar
+                  {...batchToolbarProps(pageFileIds, selectedFiles.length)}
+                  left={
+                    <>
+                      <KbFileSearchInput
+                        value={query}
+                        onChange={setQuery}
+                        mode={searchMode}
+                        onModeChange={setSearchMode}
+                      />
+                      <KbMetadataFilter
+                        fields={metadataFields}
+                        files={allCurrentBaseFiles}
+                        value={metadataFilters}
+                        onChange={setMetadataFilters}
+                      />
+                    </>
+                  }
+                  right={
+                    <FileListToolbarActions
+                      viewMode={viewMode}
+                      onViewModeChange={setViewMode}
+                      sortBy={sortBy}
+                      onSortChange={setSortBy}
+                      onRefresh={handleRefresh}
+                      showViewModeToggle={!isFullTextSearchActive}
+                      onUpload={canUploadToBase(selectedBase) ? openUploadFlow : undefined}
+                    />
+                  }
                 />
-              ) : (
-                <>
-                  <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
-                    {viewMode === "list" ? (
-                      <KnowledgeFileTable
-                        files={pagedFiles}
-                        showLibrary={false}
-                        overviewMode
-                        showManageColumn={showManageColumn}
-                        selection={listSelection}
-                        onToggleEnabled={handleToggleEnabled}
-                        onOpen={handleOpenFile}
-                        empty={emptyFiles}
-                        {...fileRowActions}
-                      />
-                    ) : (
-                      <KnowledgeFileCardGrid
-                        files={pagedFiles}
-                        selection={cardSelection}
-                        onOpen={handleOpenFile}
-                        empty={emptyFiles}
-                        {...fileRowActions}
-                      />
-                    )}
-                  </div>
 
-                  {selectedFiles.length > 0 ? (
-                    viewMode === "list" ? (
-                      <TableListPager
-                        page={safePage}
-                        totalPages={totalPages}
-                        totalItems={selectedFiles.length}
-                        pageSize={pageSize}
-                        onPageChange={setPage}
-                        onPageSizeChange={(size) => {
-                          setPageSize(size);
-                          setPage(1);
-                        }}
-                        leading={<MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />}
-                      />
-                    ) : (
-                      <div className="border-t border-divider px-4 py-2">
-                        <CardBatchPager
+                {isFullTextSearchActive ? (
+                  <FullTextSearchResultPanel
+                    files={selectedFiles}
+                    query={query}
+                    showLibrary={false}
+                    onToggleEnabled={handleToggleEnabled}
+                  />
+                ) : (
+                  <>
+                    <div key={refreshSeed} className="min-h-0 flex-1 overflow-y-auto">
+                      {viewMode === "list" ? (
+                        <KnowledgeFileTable
+                          files={pagedFiles}
+                          showLibrary={false}
+                          overviewMode
+                          showManageColumn={showManageColumn}
+                          selection={listSelection}
+                          onToggleEnabled={handleToggleEnabled}
+                          onOpen={handleOpenFile}
+                          empty={emptyFiles}
+                          {...fileRowActions}
+                        />
+                      ) : (
+                        <KnowledgeFileCardGrid
+                          files={pagedFiles}
+                          selection={cardSelection}
+                          onOpen={handleOpenFile}
+                          empty={emptyFiles}
+                          {...fileRowActions}
+                        />
+                      )}
+                    </div>
+
+                    {selectedFiles.length > 0 ? (
+                      viewMode === "list" ? (
+                        <TableListPager
                           page={safePage}
                           totalPages={totalPages}
                           totalItems={selectedFiles.length}
-                          pageSize={CARD_PAGE_SIZE}
-                          unitLabel="个文件"
+                          pageSize={pageSize}
                           onPageChange={setPage}
-                          compact
+                          onPageSizeChange={(size) => {
+                            setPageSize(size);
+                            setPage(1);
+                          }}
                           leading={<MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />}
                         />
+                      ) : (
+                        <div className="border-t border-divider px-4 py-2">
+                          <CardBatchPager
+                            page={safePage}
+                            totalPages={totalPages}
+                            totalItems={selectedFiles.length}
+                            pageSize={CARD_PAGE_SIZE}
+                            unitLabel="个文件"
+                            onPageChange={setPage}
+                            compact
+                            leading={<MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />}
+                          />
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex items-center border-t border-divider px-5 py-2.5 empty:hidden">
+                        <MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />
                       </div>
-                    )
-                  ) : (
-                    <div className="flex items-center border-t border-divider px-5 py-2.5 empty:hidden">
-                      <MyPendingReviewWidget knowledgeBaseId={selectedBase.id} />
-                    </div>
-                  )}
-                </>
-              )}
-            </KbDragUploadOverlay>
+                    )}
+                  </>
+                )}
+              </KbDragUploadOverlay>
+            </div>
           </div>
         )}
       </main>
@@ -856,6 +886,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
       <UploadSimilarityFlowDialog
         base={uploadFlow?.base ?? null}
         initialFiles={uploadFlow?.files}
+        defaultDirectoryId={uploadFlow?.directoryId}
         onClose={() => setUploadFlow(null)}
       />
 
@@ -891,10 +922,7 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
         onConfirm={handleConfirmMove}
       />
 
-      <FileVersionHistoryDialog
-        file={historyFile}
-        onClose={() => setHistoryFile(null)}
-      />
+      <FileVersionHistoryDialog file={historyFile} onClose={() => setHistoryFile(null)} />
       <DirectoryMoveDialog
         target={directoryMoveTarget}
         loading={directoryMoveLoading}
@@ -914,7 +942,9 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
               toast.success(`目录「${moving.item.name}」已移动`);
             } else if (moving?.kind === "personal") {
               const resolvedParentId =
-                targetParentId === PERSONAL_DIRECTORY_ROOT_ID ? PERSONAL_DIRECTORY_ROOT_ID : targetParentId;
+                targetParentId === PERSONAL_DIRECTORY_ROOT_ID
+                  ? PERSONAL_DIRECTORY_ROOT_ID
+                  : targetParentId;
               updateStorePersonalDirectory(moving.item.id, {
                 parentId:
                   resolvedParentId === PERSONAL_DIRECTORY_ROOT_ID
@@ -992,12 +1022,10 @@ export function KnowledgeOverviewPage({ initialBaseId }: { initialBaseId?: strin
           setMoveBaseLoading(true);
           window.setTimeout(() => {
             if (target.scope === "personal") {
-              const directoryId =
-                targetId === PERSONAL_DIRECTORY_ROOT_ID ? undefined : targetId;
+              const directoryId = targetId === PERSONAL_DIRECTORY_ROOT_ID ? undefined : targetId;
               updateStoreBase({ ...target, personalDirectoryId: directoryId });
             } else {
-              const categoryId =
-                targetId === PROFESSIONAL_CATEGORY_ROOT_ID ? undefined : targetId;
+              const categoryId = targetId === PROFESSIONAL_CATEGORY_ROOT_ID ? undefined : targetId;
               updateStoreBase({ ...target, categoryId });
               if (categoryId) {
                 setForceExpandIds(collectExpandIds(categoryId));
@@ -1114,7 +1142,10 @@ function TreeAggregatePanel({
     isSelected: (id: string) => boolean;
     onToggle: (id: string) => void;
   };
-  batchToolbarProps: (pageIds: string[], totalCount: number) => ComponentProps<typeof FileListToolbar>;
+  batchToolbarProps: (
+    pageIds: string[],
+    totalCount: number,
+  ) => ComponentProps<typeof FileListToolbar>;
   fileRowActions: {
     onMove?: (file: KnowledgeFile) => void;
     onTogglePin: (file: KnowledgeFile) => void;
@@ -1132,12 +1163,7 @@ function TreeAggregatePanel({
   const aggregatePageIds = pagedFiles.map((file) => file.id);
   const isFullTextSearchActive = searchMode === "fulltext" && query.trim().length > 0;
 
-  const empty = (
-    <KbEmptyState
-      title="当前筛选下暂无文件"
-      description="调整搜索关键词后再试。"
-    />
-  );
+  const empty = <KbEmptyState title="当前筛选下暂无文件" description="调整搜索关键词后再试。" />;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1255,10 +1281,7 @@ function NoPermissionState({ onApply }: { onApply: () => void }) {
           className="pointer-events-none h-auto w-full select-none"
         />
         <div className="absolute left-1/2 top-[92%] -translate-x-1/2 -translate-y-1/2">
-          <KbButton
-            onClick={onApply}
-            className="shadow-[0_8px_20px_rgba(52,155,172,0.28)]"
-          >
+          <KbButton onClick={onApply} className="shadow-[0_8px_20px_rgba(52,155,172,0.28)]">
             <ShieldCheck className="h-4 w-4 stroke-[1.8]" />
             申请权限
           </KbButton>

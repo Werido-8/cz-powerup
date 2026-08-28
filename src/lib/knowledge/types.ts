@@ -48,6 +48,14 @@ export interface KnowledgeCategory {
   parentId?: string;
 }
 
+/** 知识库内部用于归档文件的虚拟目录。 */
+export interface KnowledgeInternalDirectory {
+  id: string;
+  knowledgeBaseId: string;
+  name: string;
+  parentId?: string;
+}
+
 export interface KnowledgeBasePermission {
   canView: boolean;
   canUpload: boolean;
@@ -91,6 +99,8 @@ export interface KnowledgeFile {
   type?: KnowledgeFileType;
   knowledgeBaseId: string;
   knowledgeBaseName?: string;
+  /** 文件在知识库内部所属的虚拟目录；为空表示位于库根目录。 */
+  directoryId?: string;
   categoryPath?: string[];
   professionalType?: string;
   tags?: string[];

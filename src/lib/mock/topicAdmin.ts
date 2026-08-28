@@ -292,45 +292,75 @@ export const AI_TOPIC_TEMPLATES: { label: string; prompt: string }[] = [
   },
 ];
 
-export function buildAiGeneratedTopicDraft(prompt: string): Omit<
-  TopicAdminRecord,
-  "id" | "updatedAt" | "maintainer" | "learnerCount"
-> {
-  const text = prompt.toLowerCase();
-  const isAgc = /agc|两细则|调频/.test(text);
-  const isTransformer = /主变|停投|倒闸/.test(text);
-  const isFault = /故障|复盘|事故/.test(text);
+export type AiTopicBasicInfo = {
+  title: string;
+  specialty: TopicSpecialty;
+  scenario: TopicScenario;
+  positions: TopicPosition[];
+  learningGoal: string;
+  intro: string;
+  aiHints: string[];
+};
 
-  let title = "新员工运行专业入门";
-  let specialty: TopicSpecialty = "运行值班";
-  let scenario: TopicScenario = "入职培训";
-  let positions: TopicPosition[] = ["新员工", "运行人员"];
-  let learningGoal = "掌握值班巡检基本流程与常见异常初步判断。";
-  let intro = "面向首次上岗运行人员，围绕岗位能力与真实业务场景组织学习。";
+function detectTopicIntent(prompt: string) {
+  const text = prompt.toLowerCase();
+  return {
+    isAgc: /agc|两细则|调频/.test(text),
+    isTransformer: /主变|停投|倒闸/.test(text),
+    isFault: /故障|复盘|事故/.test(text),
+  };
+}
+
+export function buildAiTopicBasicInfo(prompt: string): AiTopicBasicInfo {
+  const { isAgc, isTransformer, isFault } = detectTopicIntent(prompt);
+  const hint = `AI 起草 · 依据需求：${prompt.slice(0, 40)}${prompt.length > 40 ? "…" : ""}`;
 
   if (isAgc) {
-    title = "AGC 与两细则考核专项";
-    specialty = "运行值班";
-    scenario = "专项提升";
-    positions = ["运行人员", "班组长"];
-    learningGoal = "能对照两细则理解 AGC 考核口径，并完成死区、速率相关现场判断。";
-    intro = "围绕 AGC 调节性能考核与现场参数整定，帮助值班员把规则落到当班操作。";
-  } else if (isTransformer) {
-    title = "主变停投标准化操作";
-    specialty = "电气";
-    scenario = "标准操作";
-    positions = ["运行人员", "班组长"];
-    learningGoal = "能按标准流程完成主变停投前核对、保护压板与中性点接地配合。";
-    intro = "覆盖负荷转移、保护连接片和中性点接地等关键卡控点。";
-  } else if (isFault) {
-    title = "典型故障复盘专项";
-    specialty = "电气";
-    scenario = "故障复盘";
-    positions = ["运行人员", "检修人员"];
-    learningGoal = "能按固定思路完成差动动作后的范围判断与复电前核对。";
-    intro = "从典型事故通报提炼判断顺序与易错点，服务班组复盘培训。";
+    return {
+      title: "AGC 与两细则考核专项",
+      specialty: "运行值班",
+      scenario: "专项提升",
+      positions: ["运行人员", "班组长"],
+      learningGoal: "能对照两细则理解 AGC 考核口径，并完成死区、速率相关现场判断。",
+      intro: "围绕 AGC 调节性能考核与现场参数整定，帮助值班员把规则落到当班操作。",
+      aiHints: [hint],
+    };
   }
+  if (isTransformer) {
+    return {
+      title: "主变停投标准化操作",
+      specialty: "电气",
+      scenario: "标准操作",
+      positions: ["运行人员", "班组长"],
+      learningGoal: "能按标准流程完成主变停投前核对、保护压板与中性点接地配合。",
+      intro: "覆盖负荷转移、保护连接片和中性点接地等关键卡控点。",
+      aiHints: [hint],
+    };
+  }
+  if (isFault) {
+    return {
+      title: "典型故障复盘专项",
+      specialty: "电气",
+      scenario: "故障复盘",
+      positions: ["运行人员", "检修人员"],
+      learningGoal: "能按固定思路完成差动动作后的范围判断与复电前核对。",
+      intro: "从典型事故通报提炼判断顺序与易错点，服务班组复盘培训。",
+      aiHints: [hint],
+    };
+  }
+  return {
+    title: "新员工运行专业入门",
+    specialty: "运行值班",
+    scenario: "入职培训",
+    positions: ["新员工", "运行人员"],
+    learningGoal: "掌握值班巡检基本流程与常见异常初步判断。",
+    intro: "面向首次上岗运行人员，围绕岗位能力与真实业务场景组织学习。",
+    aiHints: [hint],
+  };
+}
 
+export function recommendAiTopicDocs(prompt: string, limit = 4): string[] {
+  const { isAgc, isTransformer, isFault } = detectTopicIntent(prompt);
   const pool = getLearnablePoolDocs();
   const preferred = pool.filter((doc) => {
     if (isAgc) return /agc|细则|调频/i.test(doc.title);
@@ -338,8 +368,10 @@ export function buildAiGeneratedTopicDraft(prompt: string): Omit<
     if (isFault) return /故障|事故|复盘|差动/i.test(doc.title);
     return true;
   });
-  const docIds = (preferred.length >= 3 ? preferred : pool).slice(0, 4).map((doc) => doc.id);
+  return (preferred.length >= 3 ? preferred : pool).slice(0, limit).map((doc) => doc.id);
+}
 
+export function generateAiKnowledgePoints(docIds: string[]): TopicKnowledgePoint[] {
   const kpSet = new Set<string>();
   docIds.forEach((docId) => {
     const doc = DOCS.find((item) => item.id === docId);
@@ -349,34 +381,40 @@ export function buildAiGeneratedTopicDraft(prompt: string): Omit<
       .forEach((item) => kpSet.add(item));
   });
 
-  const knowledgePoints: TopicKnowledgePoint[] = Array.from(kpSet)
+  return Array.from(kpSet)
     .slice(0, 6)
     .map((pointTitle, index) => ({
-      id: `kp-ai-${index}`,
+      id: `kp-ai-${Date.now()}-${index}`,
       title: pointTitle,
       summary: `基于所选资料提炼：${pointTitle} 的核心概念与现场要点。`,
       source: "ai" as const,
       confirmed: false,
     }));
+}
 
+export function summarizeAiTopicQuestions(docIds: string[]) {
   const docQuestions = buildDocQuestions(docIds).map((item) => ({ ...item, confirmed: false }));
   const questionEdits = buildQuestionEdits(docIds);
   Object.values(questionEdits).forEach((question) => {
     question.confirmed = false;
   });
+  return { docQuestions, questionEdits };
+}
+
+export function buildAiGeneratedTopicDraft(prompt: string): Omit<
+  TopicAdminRecord,
+  "id" | "updatedAt" | "maintainer" | "learnerCount"
+> {
+  const basic = buildAiTopicBasicInfo(prompt);
+  const docIds = recommendAiTopicDocs(prompt);
+  const { docQuestions, questionEdits } = summarizeAiTopicQuestions(docIds);
 
   return {
-    title,
-    specialty,
-    positions,
-    learningGoal,
-    scenario,
-    intro,
+    ...basic,
     docIds,
-    knowledgePoints,
+    knowledgePoints: generateAiKnowledgePoints(docIds),
     docQuestions,
     questionEdits,
     status: "草稿",
-    aiHints: [`AI 起草 · 依据需求：${prompt.slice(0, 40)}${prompt.length > 40 ? "…" : ""}`],
   };
 }

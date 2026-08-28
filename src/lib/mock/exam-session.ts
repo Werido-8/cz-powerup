@@ -83,7 +83,7 @@ export function resolveExamSessionPaper(sessionId: string): ExamSessionPaper | n
     scoreMode,
     totalScore:
       scoreMode === "fixed"
-        ? (EXAM_TASK_META[adminPaperId]?.totalScore ?? computedTotal || 100)
+        ? (EXAM_TASK_META[adminPaperId]?.totalScore ?? (computedTotal || 100))
         : null,
     goal: adminPaper?.goal ?? "取证复习",
     category: adminPaper?.category ?? "-",
