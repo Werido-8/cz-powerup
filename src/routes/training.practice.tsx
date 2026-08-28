@@ -57,6 +57,10 @@ function PracticePage() {
   );
   const canStart = selectedCats.size > 0 && selectedTypes.size > 0 && available > 0;
   const actualCount = Math.min(count, available);
+  const allCatsSelected =
+    KNOWLEDGE_CATEGORIES.length > 0 && selectedCats.size === KNOWLEDGE_CATEGORIES.length;
+  const allTypesSelected =
+    PRACTICE_TYPE_OPTIONS.length > 0 && selectedTypes.size === PRACTICE_TYPE_OPTIONS.length;
 
   const toggleCategory = (key: string) => {
     setSelectedCats((current) => {
@@ -74,6 +78,18 @@ function PracticePage() {
       else next.add(key);
       return next;
     });
+  };
+
+  const toggleAllCategories = () => {
+    setSelectedCats(
+      allCatsSelected ? new Set() : new Set(KNOWLEDGE_CATEGORIES.map((item) => item.key)),
+    );
+  };
+
+  const toggleAllTypes = () => {
+    setSelectedTypes(
+      allTypesSelected ? new Set() : new Set(PRACTICE_TYPE_OPTIONS.map((item) => item.key)),
+    );
   };
 
   const start = () => {
@@ -127,6 +143,23 @@ function PracticePage() {
                   description={`已选 ${selectedLabels.length} 个知识点，可抽取 ${available.toLocaleString()} 道题。`}
                 >
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <button
+                      type="button"
+                      onClick={toggleAllCategories}
+                      aria-pressed={allCatsSelected}
+                      className={cn(
+                        "flex min-h-12 items-center justify-between gap-3 rounded-[9px] border px-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
+                        allCatsSelected
+                          ? "border-primary/35 bg-primary-soft/60 text-primary"
+                          : "border-kb-border bg-white text-kb-body hover:border-primary/25",
+                      )}
+                    >
+                      <span className="truncate text-[12.5px] font-medium">全部</span>
+                      <span className="shrink-0 text-[10.5px] tabular-nums text-kb-muted">
+                        {KNOWLEDGE_CATEGORIES.reduce((sum, item) => sum + item.questionCount, 0).toLocaleString()}{" "}
+                        题
+                      </span>
+                    </button>
                     {KNOWLEDGE_CATEGORIES.map((category) => {
                       const active = selectedCats.has(category.key);
                       return (
@@ -165,6 +198,11 @@ function PracticePage() {
                         题型（可多选）
                       </div>
                       <div className="flex flex-wrap gap-2">
+                        <ChoiceButton
+                          active={allTypesSelected}
+                          onClick={toggleAllTypes}
+                          label="全部"
+                        />
                         {PRACTICE_TYPE_OPTIONS.map((item) => (
                           <ChoiceButton
                             key={item.key}

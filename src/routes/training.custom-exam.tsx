@@ -176,6 +176,10 @@ function CustomExamPage() {
   const countValid = count >= COUNT_MIN && count <= COUNT_MAX;
   const limitValid = limit >= DURATION_MIN && limit <= DURATION_MAX;
   const canCreate = selectedCats.size > 0 && types.length > 0 && countValid && limitValid;
+  const allCatsSelected =
+    KNOWLEDGE_CATEGORIES.length > 0 && selectedCats.size === KNOWLEDGE_CATEGORIES.length;
+  const allTypesSelected =
+    PRACTICE_TYPE_OPTIONS.length > 0 && selectedTypes.size === PRACTICE_TYPE_OPTIONS.length;
 
   const coverage = canCreate
     ? Math.min(96, 64 + selectedCats.size * 6 + (prefs.coverRules ? 6 : 0) + (prefs.recentWrong ? 4 : 0))
@@ -277,6 +281,20 @@ function CustomExamPage() {
       else next.add(key);
       return next;
     });
+  };
+
+  const toggleAllCategories = () => {
+    setAiReady(false);
+    setSelectedCats(
+      allCatsSelected ? new Set() : new Set(KNOWLEDGE_CATEGORIES.map((item) => item.key)),
+    );
+  };
+
+  const toggleAllTypes = () => {
+    setAiReady(false);
+    setSelectedTypes(
+      allTypesSelected ? new Set() : new Set(PRACTICE_TYPE_OPTIONS.map((item) => item.key)),
+    );
   };
 
   const togglePref = (key: keyof ExamPrefs) => {
@@ -421,6 +439,23 @@ function CustomExamPage() {
                 <div>
                   <div className="mb-1.5 text-[11px] font-medium text-kb-muted">知识范围</div>
                   <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                    <button
+                      type="button"
+                      onClick={toggleAllCategories}
+                      aria-pressed={allCatsSelected}
+                      className={cn(
+                        "flex h-10 items-center justify-between gap-2 rounded-[8px] border px-2.5 text-left transition-colors",
+                        allCatsSelected
+                          ? "border-primary/35 bg-primary-soft/60 text-primary"
+                          : "border-kb-border bg-white text-kb-body hover:border-primary/25",
+                      )}
+                    >
+                      <span className="truncate text-[12.5px] font-medium">全部</span>
+                      <span className="shrink-0 text-[10.5px] tabular-nums text-kb-muted">
+                        {KNOWLEDGE_CATEGORIES.reduce((sum, item) => sum + item.questionCount, 0).toLocaleString()}{" "}
+                        题
+                      </span>
+                    </button>
                     {KNOWLEDGE_CATEGORIES.map((category) => {
                       const active = selectedCats.has(category.key);
                       return (
@@ -448,6 +483,11 @@ function CustomExamPage() {
 
                 <div className="grid gap-3 lg:grid-cols-2">
                   <ConstraintRow label="题型">
+                    <ChoiceButton
+                      active={allTypesSelected}
+                      onClick={toggleAllTypes}
+                      label="全部"
+                    />
                     {PRACTICE_TYPE_OPTIONS.map((item) => (
                       <ChoiceButton
                         key={item.key}
