@@ -222,7 +222,7 @@ const AI_ASSIST_BY_STEP: Record<
     hint: "先说明对象、场景和学习目标。",
     placeholder:
       "示例：面向新入职运行值班人员，围绕交接班、巡检和常见异常判断，组织一套入门专题。",
-    templates: AI_TOPIC_TEMPLATES,
+    templates: [],
   },
   2: {
     hint: "可补充资料偏好或覆盖范围。",
@@ -230,7 +230,6 @@ const AI_ASSIST_BY_STEP: Record<
     templates: [
       { label: "偏现场操作", prompt: "优先推荐现场操作、巡检和交接班相关资料，少选纯理论材料。" },
       { label: "偏制度条款", prompt: "多推荐规程、两细则和考核口径类资料，便于对照条款学习。" },
-      { label: "覆盖交接班", prompt: "围绕交接班、巡检记录和当班异常判断来推荐资料。" },
     ],
   },
   3: {
@@ -238,16 +237,14 @@ const AI_ASSIST_BY_STEP: Record<
     placeholder: "示例：突出现场易错点和操作顺序，每个知识点写清要会判断什么。",
     templates: [
       { label: "突出易错点", prompt: "突出易错点和现场误操作风险，少写空泛概念。" },
-      { label: "按操作顺序", prompt: "按操作先后顺序组织知识点，方便学员对照执行。" },
       { label: "只要核心要点", prompt: "只保留最核心的 4 到 6 个知识点，每条都要能落到现场判断。" },
     ],
   },
   4: {
     hint: "可说明题型、难度或场景偏好。",
-    placeholder: "示例：多出判断题，贴近当班场景，题目不要偏理论。",
+    placeholder: "示例：多出判断题，题目不要偏理论。",
     templates: [
       { label: "多出判断题", prompt: "多汇总判断题，考查能不能当场分清对错。" },
-      { label: "贴近当班", prompt: "题目贴近当班巡检、交接班和异常判断，少出纯记忆题。" },
       { label: "控制题量", prompt: "控制在适量题目，覆盖资料关键点即可，不要堆砌。" },
     ],
   },
