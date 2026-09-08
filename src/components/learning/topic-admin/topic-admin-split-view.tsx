@@ -119,8 +119,8 @@ export function TopicAdminSplitView({ onNew, onEdit, onPreview }: TopicAdminSpli
       return [
         topic.title,
         topic.specialty,
-        topic.scenario,
         topic.maintainer,
+        ...topic.scenarios,
         ...topic.positions,
       ].some((value) => value.toLowerCase().includes(normalized));
     });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
@@ -11,6 +11,8 @@ import {
   FileText,
   Lightbulb,
   Loader2,
+  MessageSquareText,
+  PanelRightClose,
   PencilLine,
   Plus,
   Save,
@@ -20,6 +22,7 @@ import {
   Square,
   Target,
   Trash2,
+  Undo2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { KbFileTypeIcon } from "@/components/knowledge/ui";
@@ -33,6 +36,12 @@ import {
 } from "@/components/ui/select";
 import { AppDialogButton, AppFormDialog } from "@/components/ui/app-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { DOCS, QUESTIONS, type Doc, type QuestionType } from "@/lib/mock/data";
 import { getFileById } from "@/lib/knowledge/model";
@@ -48,7 +57,10 @@ import {
   getTopicAdminById,
   recommendAiTopicDocs,
   summarizeAiTopicQuestions,
+  type AiTopicBasicInfo,
+  type EditableTopicQuestion,
   type TopicAdminRecord,
+  type TopicDocQuestion,
   type TopicKnowledgePoint,
   type TopicPosition,
   type TopicScenario,
@@ -74,7 +86,18 @@ type DraftState = Omit<TopicAdminRecord, "learnerCount" | "maintainer">;
 function loadDraft(topicId?: string): DraftState | null {
   try {
     const raw = sessionStorage.getItem(`${TOPIC_DRAFT_KEY}:${topicId ?? "new"}`);
-    return raw ? (JSON.parse(raw) as DraftState) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as DraftState & { scenario?: TopicScenario | TopicScenario[] };
+    if (!Array.isArray(parsed.scenarios)) {
+      const legacy = parsed.scenario;
+      parsed.scenarios = Array.isArray(legacy)
+        ? legacy
+        : legacy
+          ? [legacy]
+          : [];
+    }
+    delete parsed.scenario;
+    return parsed;
   } catch {
     return null;
   }
@@ -183,71 +206,108 @@ function SectionTitle({
   );
 }
 
-function StepAiBar({
-  title,
-  hint,
-  prompt,
-  onPromptChange,
-  templates,
-  loading,
-  actionLabel,
-  onGenerate,
+const AI_GENERATE_LABEL = "生成建议";
+const AI_ASSIST_TRIGGER_LABEL = "AI 辅助";
+const AI_AUTO_PROMPT_LABEL = "自动生成";
+
+const AI_ASSIST_BY_STEP: Record<
+  number,
+  {
+    hint: string;
+    placeholder: string;
+    templates?: { label: string; prompt: string }[];
+  }
+> = {
+  1: {
+    hint: "先说明对象、场景和学习目标。",
+    placeholder:
+      "示例：面向新入职运行值班人员，围绕交接班、巡检和常见异常判断，组织一套入门专题。",
+    templates: AI_TOPIC_TEMPLATES,
+  },
+  2: {
+    hint: "可补充资料偏好或覆盖范围。",
+    placeholder: "示例：优先推荐交接班、巡检相关规程，少选纯理论材料。",
+    templates: [
+      { label: "偏现场操作", prompt: "优先推荐现场操作、巡检和交接班相关资料，少选纯理论材料。" },
+      { label: "偏制度条款", prompt: "多推荐规程、两细则和考核口径类资料，便于对照条款学习。" },
+      { label: "覆盖交接班", prompt: "围绕交接班、巡检记录和当班异常判断来推荐资料。" },
+    ],
+  },
+  3: {
+    hint: "可说明要突出的要点或易错点。",
+    placeholder: "示例：突出现场易错点和操作顺序，每个知识点写清要会判断什么。",
+    templates: [
+      { label: "突出易错点", prompt: "突出易错点和现场误操作风险，少写空泛概念。" },
+      { label: "按操作顺序", prompt: "按操作先后顺序组织知识点，方便学员对照执行。" },
+      { label: "只要核心要点", prompt: "只保留最核心的 4 到 6 个知识点，每条都要能落到现场判断。" },
+    ],
+  },
+  4: {
+    hint: "可说明题型、难度或场景偏好。",
+    placeholder: "示例：多出判断题，贴近当班场景，题目不要偏理论。",
+    templates: [
+      { label: "多出判断题", prompt: "多汇总判断题，考查能不能当场分清对错。" },
+      { label: "贴近当班", prompt: "题目贴近当班巡检、交接班和异常判断，少出纯记忆题。" },
+      { label: "控制题量", prompt: "控制在适量题目，覆盖资料关键点即可，不要堆砌。" },
+    ],
+  },
+};
+
+type AiStepProposal =
+  | {
+      kind: "basic";
+      applied?: boolean;
+      beforeApply?: Partial<DraftState>;
+      promptText?: string;
+      data: AiTopicBasicInfo;
+    }
+  | {
+      kind: "docs";
+      promptText?: string;
+      appliedIds: string[];
+      newlyAddedIds: string[];
+      docIds: string[];
+    }
+  | {
+      kind: "knowledge";
+      promptText?: string;
+      appliedIds: string[];
+      knowledgePoints: TopicKnowledgePoint[];
+    }
+  | {
+      kind: "questions";
+      promptText?: string;
+      appliedIds: string[];
+      docQuestions: TopicDocQuestion[];
+      questionEdits: Record<string, EditableTopicQuestion>;
+    };
+
+const actionBtnClass =
+  "inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/40 px-3 text-[12px] font-medium text-primary transition-colors hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-50";
+
+function AiAssistTrigger({
+  open,
+  onClick,
 }: {
-  title: string;
-  hint: string;
-  prompt?: string;
-  onPromptChange?: (value: string) => void;
-  templates?: { label: string; prompt: string }[];
-  loading: boolean;
-  actionLabel: string;
-  onGenerate: () => void;
+  open: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="mb-3 shrink-0 rounded-[10px] border border-primary/18 bg-primary-soft/30 px-3 py-2.5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[12.5px] font-medium text-primary">
-            <Sparkles className="h-3.5 w-3.5 shrink-0" />
-            {title}
-          </div>
-          <p className="mt-0.5 text-[11px] leading-4 text-[#6B7F88]">{hint}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={loading}
-          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-[8px] bg-primary px-3 text-[12px] font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          {actionLabel}
-        </button>
-      </div>
-      {onPromptChange ? (
-        <>
-          <textarea
-            value={prompt}
-            onChange={(event) => onPromptChange(event.target.value)}
-            placeholder="示例：面向新入职运行值班人员，围绕交接班、巡检和常见异常判断，组织一套入门专题。"
-            rows={2}
-            className="mt-2 w-full resize-none rounded-md border border-input bg-white px-3 py-2 text-[12.5px] leading-5 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          {templates?.length ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {templates.map((tpl) => (
-                <button
-                  key={tpl.label}
-                  type="button"
-                  onClick={() => onPromptChange(tpl.prompt)}
-                  className="rounded-full border border-border bg-white px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary"
-                >
-                  {tpl.label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      aria-controls="topic-ai-assist-panel"
+      className={cn(
+        "inline-flex min-h-9 items-center gap-1.5 rounded-md border px-3 text-[12px] font-medium transition-colors",
+        open
+          ? "border-primary bg-primary text-white hover:bg-primary/90"
+          : "border-primary/30 bg-primary-soft/40 text-primary hover:bg-primary-soft",
+      )}
+    >
+      <Sparkles className="h-3.5 w-3.5" />
+      {AI_ASSIST_TRIGGER_LABEL}
+    </button>
   );
 }
 
@@ -290,6 +350,9 @@ export function TopicEditorWizard({
   });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [aiProposals, setAiProposals] = useState<Partial<Record<number, AiStepProposal>>>({});
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const openQuestionPickerRef = useRef<() => void>(() => {});
   const [dirty, setDirty] = useState(false);
   const [docPickerOpen, setDocPickerOpen] = useState(false);
   const [docPickerIds, setDocPickerIds] = useState<string[]>([]);
@@ -299,9 +362,6 @@ export function TopicEditorWizard({
   const [docTypeFilter, setDocTypeFilter] = useState("all");
 
   const contentStep = step;
-  const topicContextPrompt = [draft.title, draft.learningGoal, draft.intro, aiPrompt]
-    .filter((item) => item.trim())
-    .join("；");
 
   useEffect(() => {
     setStep(Math.min(Math.max(initialStep, 1), lastStep));
@@ -310,6 +370,20 @@ export function TopicEditorWizard({
   useEffect(() => {
     setReachedContentStep((prev) => Math.max(prev, contentStep));
   }, [contentStep]);
+
+  useEffect(() => {
+    setAiPrompt("");
+    if (contentStep >= 5) setAiPanelOpen(false);
+  }, [contentStep]);
+
+  useEffect(() => {
+    if (!aiPanelOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAiPanelOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [aiPanelOpen]);
 
   const poolDocs = useMemo(() => getLearnablePoolDocs(), []);
   const filteredPool = useMemo(() => {
@@ -404,6 +478,15 @@ export function TopicEditorWizard({
     });
   };
 
+  const toggleScenario = (scenario: TopicScenario) => {
+    const has = draft.scenarios.includes(scenario);
+    updateDraft({
+      scenarios: has
+        ? draft.scenarios.filter((item) => item !== scenario)
+        : [...draft.scenarios, scenario],
+    });
+  };
+
   const runAiTask = (task: () => void, success: string) => {
     setAiLoading(true);
     window.setTimeout(() => {
@@ -413,55 +496,389 @@ export function TopicEditorWizard({
     }, 900);
   };
 
-  const handleAiDraftBasic = () => {
-    if (!aiPrompt.trim()) {
+  const finishAiGenerate = (step: number, proposal: AiStepProposal, success: string) => {
+    runAiTask(() => {
+      setAiPrompt("");
+      setAiProposals((prev) => ({ ...prev, [step]: proposal }));
+    }, success);
+  };
+
+  const handleAiDraftBasic = (step: number, prompt: string, options?: { auto?: boolean }) => {
+    const trimmed = prompt.trim();
+    if (!trimmed && !options?.auto) {
       toast.error("请先描述专题对象、场景或学习目标");
       return;
     }
-    runAiTask(() => {
-      updateDraft(buildAiTopicBasicInfo(aiPrompt.trim()));
-    }, "已起草基本信息，可继续核对后进入下一步");
+    const promptText = trimmed || AI_AUTO_PROMPT_LABEL;
+    finishAiGenerate(
+      step,
+      { kind: "basic", promptText, data: buildAiTopicBasicInfo(promptText) },
+      "已生成基本信息建议，确认使用后才会写入表单",
+    );
   };
 
-  const handleAiRecommendDocs = () => {
-    const prompt = topicContextPrompt || aiPrompt;
-    if (!prompt.trim()) {
-      toast.error("请先填写专题名称或学习目标，便于推荐资料");
+  const handleAiRecommendDocs = (step: number, prompt: string, options?: { auto?: boolean }) => {
+    const combined = [draft.title, draft.learningGoal, draft.intro, prompt]
+      .filter((item) => item.trim())
+      .join("；");
+    if (!combined.trim()) {
+      toast.error("请先填写专题名称、学习目标，或在此说明推荐思路");
       return;
     }
-    runAiTask(() => {
-      const docIds = recommendAiTopicDocs(prompt);
-      const docQuestions = docIds.map((id) => {
-        const existingQuestion = draft.docQuestions.find((item) => item.docId === id);
-        return existingQuestion ?? { docId: id, questionIds: [], generated: false, confirmed: false };
-      });
-      updateDraft({ docIds, docQuestions });
-    }, "已推荐相关资料，可增删后进入下一步");
+    const promptText = prompt.trim() || (options?.auto ? AI_AUTO_PROMPT_LABEL : "");
+    finishAiGenerate(
+      step,
+      {
+        kind: "docs",
+        promptText: promptText || combined,
+        appliedIds: [],
+        newlyAddedIds: [],
+        docIds: recommendAiTopicDocs(combined),
+      },
+      "已生成资料建议，可逐条确认采用",
+    );
   };
 
-  const handleAiGenerateKnowledge = () => {
+  const handleAiGenerateKnowledge = (
+    step: number,
+    prompt: string,
+    options?: { auto?: boolean },
+  ) => {
     if (draft.docIds.length === 0) {
       toast.error("请先选择资料，再生成知识点");
       return;
     }
-    runAiTask(() => {
-      updateDraft({ knowledgePoints: generateAiKnowledgePoints(draft.docIds) });
-    }, "已根据资料生成知识点，可继续调整");
+    const promptText = prompt.trim() || (options?.auto ? AI_AUTO_PROMPT_LABEL : prompt.trim());
+    finishAiGenerate(
+      step,
+      {
+        kind: "knowledge",
+        promptText: promptText || AI_AUTO_PROMPT_LABEL,
+        appliedIds: [],
+        knowledgePoints: generateAiKnowledgePoints(draft.docIds),
+      },
+      "已生成知识点建议，可逐条确认采用",
+    );
   };
 
-  const handleAiSummarizeQuestions = () => {
+  const handleAiSummarizeQuestions = (step: number, prompt = "", options?: { auto?: boolean }) => {
     if (draft.docIds.length === 0) {
       toast.error("请先选择资料，再汇总关联题目");
       return;
     }
-    runAiTask(() => {
-      updateDraft(summarizeAiTopicQuestions(draft.docIds));
-    }, "已按资料汇总关联题目，可核对后发布");
+    const promptText = prompt.trim() || (options?.auto ? AI_AUTO_PROMPT_LABEL : prompt.trim());
+    finishAiGenerate(
+      step,
+      {
+        kind: "questions",
+        promptText: promptText || AI_AUTO_PROMPT_LABEL,
+        appliedIds: [],
+        ...summarizeAiTopicQuestions(draft.docIds),
+      },
+      "已生成题目建议，可逐条确认采用",
+    );
+  };
+
+  const currentAiAssist = AI_ASSIST_BY_STEP[contentStep];
+  const currentAiProposal = aiProposals[contentStep];
+  const toggleAiPanel = () => {
+    setAiPanelOpen((open) => !open);
+  };
+  const handleAiGenerate = () => {
+    const step = contentStep;
+    const prompt = aiPrompt;
+    if (step === 1) handleAiDraftBasic(step, prompt);
+    else if (step === 2) handleAiRecommendDocs(step, prompt);
+    else if (step === 3) handleAiGenerateKnowledge(step, prompt);
+    else if (step === 4) handleAiSummarizeQuestions(step, prompt);
+  };
+  const handleAiApply = () => {
+    const proposal = aiProposals[contentStep];
+    if (!proposal) return;
+
+    if (proposal.kind === "basic") {
+      if (proposal.applied) return;
+      const beforeApply: Partial<DraftState> = {
+        title: draft.title,
+        specialty: draft.specialty,
+        scenarios: [...draft.scenarios],
+        positions: [...draft.positions],
+        learningGoal: draft.learningGoal,
+        intro: draft.intro,
+        aiHints: draft.aiHints ? [...draft.aiHints] : undefined,
+      };
+      updateDraft(proposal.data);
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: { ...proposal, applied: true, beforeApply },
+      }));
+      toast.success("已全部写入当前步骤");
+      return;
+    }
+
+    if (proposal.kind === "docs") {
+      const pendingIds = proposal.docIds.filter((id) => !proposal.appliedIds.includes(id));
+      if (pendingIds.length === 0) return;
+      const newlyAdded = pendingIds.filter((id) => !draft.docIds.includes(id));
+      if (newlyAdded.length > 0) {
+        applyDocSelection([...draft.docIds, ...newlyAdded]);
+      }
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: {
+          ...proposal,
+          appliedIds: [...proposal.docIds],
+          newlyAddedIds: [...new Set([...proposal.newlyAddedIds, ...newlyAdded])],
+        },
+      }));
+      toast.success("已全部采用推荐资料");
+      return;
+    }
+
+    if (proposal.kind === "knowledge") {
+      const pending = proposal.knowledgePoints.filter(
+        (point) => !proposal.appliedIds.includes(point.id),
+      );
+      if (pending.length === 0) return;
+      const existingIds = new Set(draft.knowledgePoints.map((item) => item.id));
+      updateDraft({
+        knowledgePoints: [
+          ...draft.knowledgePoints,
+          ...pending.filter((point) => !existingIds.has(point.id)),
+        ],
+      });
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: {
+          ...proposal,
+          appliedIds: proposal.knowledgePoints.map((point) => point.id),
+        },
+      }));
+      toast.success("已全部采用知识点");
+      return;
+    }
+
+    const pendingIds = proposal.docQuestions
+      .flatMap((item) => item.questionIds)
+      .filter((id) => !proposal.appliedIds.includes(id));
+    if (pendingIds.length === 0) return;
+
+    let nextDocQuestions = draft.docQuestions.map((item) => ({
+      ...item,
+      questionIds: [...item.questionIds],
+    }));
+    const nextEdits = { ...(draft.questionEdits ?? {}) };
+
+    pendingIds.forEach((questionId) => {
+      const sourceDoc = proposal.docQuestions.find((item) =>
+        item.questionIds.includes(questionId),
+      );
+      const edit = proposal.questionEdits[questionId];
+      if (!sourceDoc || !edit) return;
+      nextEdits[questionId] = edit;
+      const existing = nextDocQuestions.find((item) => item.docId === sourceDoc.docId);
+      if (existing) {
+        if (!existing.questionIds.includes(questionId)) {
+          existing.questionIds.push(questionId);
+        }
+      } else {
+        nextDocQuestions = [
+          ...nextDocQuestions,
+          {
+            docId: sourceDoc.docId,
+            questionIds: [questionId],
+            generated: false,
+            confirmed: false,
+          },
+        ];
+      }
+    });
+
+    updateDraft({ docQuestions: nextDocQuestions, questionEdits: nextEdits });
+    setAiProposals((prev) => ({
+      ...prev,
+      [contentStep]: {
+        ...proposal,
+        appliedIds: proposal.docQuestions.flatMap((item) => item.questionIds),
+      },
+    }));
+    toast.success("已全部采用题目");
+  };
+
+  const handleAiUndoApply = () => {
+    const proposal = aiProposals[contentStep];
+    if (!proposal) return;
+
+    if (proposal.kind === "basic") {
+      if (!proposal.applied || !proposal.beforeApply) return;
+      updateDraft(proposal.beforeApply);
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: { ...proposal, applied: false, beforeApply: undefined },
+      }));
+      toast.success("已撤回全部采用");
+      return;
+    }
+
+    if (proposal.appliedIds.length === 0) return;
+
+    if (proposal.kind === "docs") {
+      if (proposal.newlyAddedIds.length > 0) {
+        applyDocSelection(draft.docIds.filter((id) => !proposal.newlyAddedIds.includes(id)));
+      }
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: { ...proposal, appliedIds: [], newlyAddedIds: [] },
+      }));
+      toast.success("已撤回全部采用");
+      return;
+    }
+
+    if (proposal.kind === "knowledge") {
+      const appliedSet = new Set(proposal.appliedIds);
+      updateDraft({
+        knowledgePoints: draft.knowledgePoints.filter((item) => !appliedSet.has(item.id)),
+      });
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: { ...proposal, appliedIds: [] },
+      }));
+      toast.success("已撤回全部采用");
+      return;
+    }
+
+    const appliedSet = new Set(proposal.appliedIds);
+    updateDraft({
+      docQuestions: draft.docQuestions.map((item) => ({
+        ...item,
+        questionIds: item.questionIds.filter((id) => !appliedSet.has(id)),
+      })),
+    });
+    setAiProposals((prev) => ({
+      ...prev,
+      [contentStep]: { ...proposal, appliedIds: [] },
+    }));
+    toast.success("已撤回全部采用");
+  };
+
+  const handleAiApplyItem = (itemId: string) => {
+    const proposal = aiProposals[contentStep];
+    if (!proposal || proposal.kind === "basic") return;
+    if (proposal.appliedIds.includes(itemId)) return;
+
+    if (proposal.kind === "docs") {
+      const alreadyHad = draft.docIds.includes(itemId);
+      if (!alreadyHad) {
+        applyDocSelection([...draft.docIds, itemId]);
+      }
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: {
+          ...proposal,
+          appliedIds: [...proposal.appliedIds, itemId],
+          newlyAddedIds: alreadyHad
+            ? proposal.newlyAddedIds
+            : [...proposal.newlyAddedIds, itemId],
+        },
+      }));
+      toast.success("已采用该条建议");
+      return;
+    } else if (proposal.kind === "knowledge") {
+      const point = proposal.knowledgePoints.find((item) => item.id === itemId);
+      if (point && !draft.knowledgePoints.some((item) => item.id === itemId)) {
+        updateDraft({ knowledgePoints: [...draft.knowledgePoints, point] });
+      }
+    } else {
+      const sourceDoc = proposal.docQuestions.find((item) => item.questionIds.includes(itemId));
+      const edit = proposal.questionEdits[itemId];
+      if (!sourceDoc || !edit) return;
+      const existing = draft.docQuestions.find((item) => item.docId === sourceDoc.docId);
+      const nextDocQuestions = existing
+        ? draft.docQuestions.map((item) =>
+            item.docId === sourceDoc.docId
+              ? {
+                  ...item,
+                  questionIds: item.questionIds.includes(itemId)
+                    ? item.questionIds
+                    : [...item.questionIds, itemId],
+                }
+              : item,
+          )
+        : [
+            ...draft.docQuestions,
+            {
+              docId: sourceDoc.docId,
+              questionIds: [itemId],
+              generated: false,
+              confirmed: false,
+            },
+          ];
+      updateDraft({
+        docQuestions: nextDocQuestions,
+        questionEdits: { ...(draft.questionEdits ?? {}), [itemId]: edit },
+      });
+    }
+
+    setAiProposals((prev) => ({
+      ...prev,
+      [contentStep]: {
+        ...proposal,
+        appliedIds: [...proposal.appliedIds, itemId],
+      },
+    }));
+    toast.success("已采用该条建议");
+  };
+
+  const handleAiUndoItem = (itemId: string) => {
+    const proposal = aiProposals[contentStep];
+    if (!proposal || proposal.kind === "basic") return;
+    if (!proposal.appliedIds.includes(itemId)) return;
+
+    if (proposal.kind === "docs") {
+      if (proposal.newlyAddedIds.includes(itemId)) {
+        applyDocSelection(draft.docIds.filter((id) => id !== itemId));
+      }
+      setAiProposals((prev) => ({
+        ...prev,
+        [contentStep]: {
+          ...proposal,
+          appliedIds: proposal.appliedIds.filter((id) => id !== itemId),
+          newlyAddedIds: proposal.newlyAddedIds.filter((id) => id !== itemId),
+        },
+      }));
+      toast.success("已撤回该条采用");
+      return;
+    } else if (proposal.kind === "knowledge") {
+      updateDraft({
+        knowledgePoints: draft.knowledgePoints.filter((item) => item.id !== itemId),
+      });
+    } else {
+      updateDraft({
+        docQuestions: draft.docQuestions.map((item) => ({
+          ...item,
+          questionIds: item.questionIds.filter((id) => id !== itemId),
+        })),
+      });
+    }
+
+    setAiProposals((prev) => ({
+      ...prev,
+      [contentStep]: {
+        ...proposal,
+        appliedIds: proposal.appliedIds.filter((id) => id !== itemId),
+      },
+    }));
+    toast.success("已撤回该条采用");
   };
 
   const canNext = () => {
     if (contentStep === 1)
-      return Boolean(draft.title.trim() && draft.learningGoal.trim() && draft.positions.length > 0);
+      return Boolean(
+        draft.title.trim() &&
+          draft.learningGoal.trim() &&
+          draft.positions.length > 0 &&
+          draft.scenarios.length > 0,
+      );
     if (contentStep === 2) return draft.docIds.length > 0;
     if (contentStep === 3)
       return (
@@ -477,7 +894,18 @@ export function TopicEditorWizard({
       toast.error(contentStep === 3 ? "请先补全知识点名称和说明" : "请完成当前步骤必填项");
       return;
     }
-    setStep((s) => Math.min(s + 1, lastStep));
+    const next = Math.min(contentStep + 1, lastStep);
+    setStep(next);
+    if (next === 2) {
+      setAiPanelOpen(true);
+      handleAiRecommendDocs(2, "", { auto: true });
+    } else if (next === 3) {
+      setAiPanelOpen(true);
+      if (draft.docIds.length > 0) handleAiGenerateKnowledge(3, "", { auto: true });
+    } else if (next === 4) {
+      setAiPanelOpen(true);
+      if (draft.docIds.length > 0) handleAiSummarizeQuestions(4, "", { auto: true });
+    }
   };
 
   const handleSaveDraft = () => {
@@ -598,22 +1026,25 @@ export function TopicEditorWizard({
           </nav>
         </div>
 
-        <div className="grid min-h-0 flex-1 gap-3 overflow-hidden max-lg:overflow-y-auto lg:grid-cols-[minmax(0,1fr)_300px] lg:items-stretch">
-          <main className="flex min-h-0 min-w-0 flex-col">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden max-lg:flex-col max-lg:overflow-y-auto">
+          <div className="flex h-full min-h-0 w-full shrink-0 flex-col lg:w-[300px]">
+            <TopicCreationSidebar
+              draft={draft}
+              questionCount={questionCount}
+              contentStep={contentStep}
+              reachedContentStep={reachedContentStep}
+              onEditBasic={() => setStep(1)}
+            />
+          </div>
+
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col max-lg:order-first">
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[12px] bg-white p-5 shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]">
             {contentStep === 1 && (
               <div className="flex h-full min-h-0 flex-col">
-                <SectionTitle>基本信息</SectionTitle>
-                <StepAiBar
-                  title="AI 辅助起草信息"
-                  hint="描述对象、场景和学习目标，AI 会填入名称、岗位和简介，你再核对。"
-                  prompt={aiPrompt}
-                  onPromptChange={setAiPrompt}
-                  templates={AI_TOPIC_TEMPLATES}
-                  loading={aiLoading}
-                  actionLabel="起草信息"
-                  onGenerate={handleAiDraftBasic}
-                />
+                <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+                  <SectionTitle className="mb-0">基本信息</SectionTitle>
+                  <AiAssistTrigger open={aiPanelOpen} onClick={toggleAiPanel} />
+                </div>
                 <div className="grid shrink-0 gap-x-5 gap-y-3 sm:grid-cols-2">
                   <div>
                     <FieldLabel required>专题名称</FieldLabel>
@@ -646,23 +1077,51 @@ export function TopicEditorWizard({
                   </div>
                   <div>
                     <FieldLabel required>业务场景</FieldLabel>
-                    <Select
-                      value={draft.scenario}
-                      onValueChange={(value) =>
-                        updateDraft({ scenario: value as TopicScenario })
-                      }
-                    >
-                      <SelectTrigger className="h-9 w-full text-[13px]">
-                        <SelectValue placeholder="请选择场景" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SCENARIO_OPTIONS.map((s) => (
-                          <SelectItem key={s} value={s} className="text-[13px]">
-                            {s}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 text-[13px] shadow-sm outline-none transition-colors hover:bg-muted/40 focus-visible:ring-1 focus-visible:ring-ring"
+                        >
+                          <span
+                            className={cn(
+                              "truncate",
+                              draft.scenarios.length === 0 && "text-muted-foreground",
+                            )}
+                          >
+                            {draft.scenarios.length === 0
+                              ? "请选择场景"
+                              : draft.scenarios.join("、")}
+                          </span>
+                          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-1">
+                        {SCENARIO_OPTIONS.map((s) => {
+                          const checked = draft.scenarios.includes(s);
+                          return (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => toggleScenario(s)}
+                              className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-[13px] hover:bg-muted"
+                            >
+                              <span
+                                className={cn(
+                                  "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border",
+                                  checked
+                                    ? "border-primary bg-primary text-white"
+                                    : "border-input",
+                                )}
+                              >
+                                {checked && <Check className="h-3 w-3" />}
+                              </span>
+                              {s}
+                            </button>
+                          );
+                        })}
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div>
                     <FieldLabel required>适用岗位</FieldLabel>
@@ -742,28 +1201,20 @@ export function TopicEditorWizard({
 
             {contentStep === 2 && (
               <div className="flex h-full min-h-0 flex-col">
-                <SectionTitle>选择资料</SectionTitle>
-                <StepAiBar
-                  title="AI 辅助推荐资料"
-                  hint="根据专题名称和学习目标，从资料池推荐相关文件，可再增删。"
-                  loading={aiLoading}
-                  actionLabel="推荐资料"
-                  onGenerate={handleAiRecommendDocs}
-                />
-                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-[12.5px] text-muted-foreground">
-                    已选 <strong className="text-foreground">{draft.docIds.length}</strong> 份资料
-                  </p>
-                  <button
-                    type="button"
-                    onClick={openDocPicker}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/40 px-3 text-[12px] font-medium text-primary hover:bg-primary-soft"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    选择文件
-                  </button>
+                <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+                  <SectionTitle className="mb-0">选择资料</SectionTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AiAssistTrigger open={aiPanelOpen} onClick={toggleAiPanel} />
+                    <button type="button" onClick={openDocPicker} className={actionBtnClass}>
+                      <Plus className="h-3.5 w-3.5" />
+                      选择文件
+                    </button>
+                  </div>
                 </div>
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+                <p className="text-[12.5px] text-muted-foreground">
+                  已选 <strong className="text-foreground">{draft.docIds.length}</strong> 份资料
+                </p>
 
                 {selectedDocs.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border py-10 text-center text-[13px] text-muted-foreground">
@@ -935,37 +1386,33 @@ export function TopicEditorWizard({
 
             {contentStep === 3 && (
               <div className="flex h-full min-h-0 flex-col">
-                <StepAiBar
-                  title="AI 辅助生成知识点"
-                  hint="从已选资料提炼学员必须掌握的要点，生成后仍可增删改。"
-                  loading={aiLoading}
-                  actionLabel="生成知识点"
-                  onGenerate={handleAiGenerateKnowledge}
-                />
                 <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
                   <SectionTitle className="mb-0">维护知识点</SectionTitle>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const id = `kp-manual-${Date.now()}`;
-                      updateDraft({
-                        knowledgePoints: [
-                          {
-                            id,
-                            title: "",
-                            summary: "",
-                            source: "manual",
-                            confirmed: false,
-                          },
-                          ...draft.knowledgePoints,
-                        ],
-                      });
-                    }}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/40 px-3 text-[12px] font-medium text-primary hover:bg-primary-soft"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    添加知识点
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AiAssistTrigger open={aiPanelOpen} onClick={toggleAiPanel} />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = `kp-manual-${Date.now()}`;
+                        updateDraft({
+                          knowledgePoints: [
+                            {
+                              id,
+                              title: "",
+                              summary: "",
+                              source: "manual",
+                              confirmed: false,
+                            },
+                            ...draft.knowledgePoints,
+                          ],
+                        });
+                      }}
+                      className={actionBtnClass}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      添加知识点
+                    </button>
+                  </div>
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto">
@@ -1031,19 +1478,30 @@ export function TopicEditorWizard({
 
             {contentStep === 4 && (
               <div className="flex h-full min-h-0 flex-col">
-                <SectionTitle>关联题目</SectionTitle>
-                <StepAiBar
-                  title="AI 辅助汇总题目"
-                  hint="按已选资料汇总可关联的练习题，不另走一套造题流程。"
-                  loading={aiLoading}
-                  actionLabel="汇总题目"
-                  onGenerate={handleAiSummarizeQuestions}
-                />
+                <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3">
+                  <SectionTitle className="mb-0">关联题目</SectionTitle>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AiAssistTrigger open={aiPanelOpen} onClick={toggleAiPanel} />
+                    <button
+                      type="button"
+                      onClick={() => openQuestionPickerRef.current()}
+                      disabled={draft.docIds.length === 0}
+                      className={actionBtnClass}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      选择题目
+                    </button>
+                  </div>
+                </div>
                 <div className="min-h-0 flex-1 overflow-y-auto">
                 <TopicQuestionEditorPanel
                   docIds={draft.docIds}
                   docQuestions={draft.docQuestions}
                   questionEdits={draft.questionEdits}
+                  hideSelectButton
+                  onRegisterOpenPicker={(open) => {
+                    openQuestionPickerRef.current = open;
+                  }}
                   onUpdate={(patch) => updateDraft(patch)}
                 />
                 </div>
@@ -1192,13 +1650,55 @@ export function TopicEditorWizard({
           </div>
         </main>
 
-        <TopicCreationSidebar
-          draft={draft}
-          questionCount={questionCount}
-          contentStep={contentStep}
-          reachedContentStep={reachedContentStep}
-          onEditBasic={() => setStep(1)}
-        />
+          {aiPanelOpen && currentAiAssist ? (
+            <div className="flex h-full min-h-0 w-full shrink-0 flex-col max-lg:h-[min(52vh,520px)] lg:w-[400px]">
+              <TopicAiAssistPanel
+                hint={currentAiAssist.hint}
+                prompt={aiPrompt}
+                placeholder={currentAiAssist.placeholder}
+                onPromptChange={setAiPrompt}
+                templates={currentAiAssist.templates}
+                loading={aiLoading}
+                requirePrompt={contentStep === 1}
+                appliedStatus={
+                  !currentAiProposal
+                    ? null
+                    : currentAiProposal.kind === "basic"
+                      ? currentAiProposal.applied
+                        ? "applied"
+                        : "pending"
+                      : (() => {
+                          const total =
+                            currentAiProposal.kind === "docs"
+                              ? currentAiProposal.docIds.length
+                              : currentAiProposal.kind === "knowledge"
+                                ? currentAiProposal.knowledgePoints.length
+                                : currentAiProposal.docQuestions.reduce(
+                                    (sum, item) => sum + item.questionIds.length,
+                                    0,
+                                  );
+                          if (currentAiProposal.appliedIds.length === 0) return "pending";
+                          if (currentAiProposal.appliedIds.length >= total) return "applied";
+                          return "partial";
+                        })()
+                }
+                lastPrompt={currentAiProposal?.promptText}
+                onGenerate={handleAiGenerate}
+                onApply={handleAiApply}
+                onUndoApply={handleAiUndoApply}
+                onClose={() => setAiPanelOpen(false)}
+              >
+                {currentAiProposal ? (
+                  <AiProposalPreview
+                    proposal={currentAiProposal}
+                    draft={draft}
+                    onApplyItem={handleAiApplyItem}
+                    onUndoItem={handleAiUndoItem}
+                  />
+                ) : null}
+              </TopicAiAssistPanel>
+            </div>
+          ) : null}
       </div>
       </div>
 
@@ -1212,7 +1712,7 @@ export function TopicEditorWizard({
             {aiLoading ? (
               <span className="flex items-center gap-1.5 text-primary">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                正在生成草稿…
+                正在{AI_GENERATE_LABEL}…
               </span>
             ) : (
               <span className="text-muted-foreground">{STEPS[step - 1]}</span>
@@ -1278,6 +1778,451 @@ export function TopicEditorWizard({
   );
 }
 
+function TopicAiAssistPanel({
+  hint,
+  prompt,
+  placeholder,
+  onPromptChange,
+  templates,
+  loading,
+  requirePrompt,
+  appliedStatus,
+  lastPrompt,
+  onGenerate,
+  onApply,
+  onUndoApply,
+  onClose,
+  children,
+}: {
+  hint: string;
+  prompt: string;
+  placeholder: string;
+  onPromptChange: (value: string) => void;
+  templates?: { label: string; prompt: string }[];
+  loading: boolean;
+  requirePrompt: boolean;
+  appliedStatus: "pending" | "partial" | "applied" | null;
+  lastPrompt?: string;
+  onGenerate: () => void;
+  onApply: () => void;
+  onUndoApply: () => void;
+  onClose: () => void;
+  children?: React.ReactNode;
+}) {
+  const hasResult = Boolean(children);
+  const canSend = !loading && (requirePrompt ? Boolean(prompt.trim()) : true);
+
+  return (
+    <TooltipProvider delayDuration={200}>
+      <aside
+        id="topic-ai-assist-panel"
+        className="flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] bg-white shadow-[0px_0px_10px_0px_rgba(0,0,0,0.05)]"
+      >
+        <div className="flex shrink-0 items-start gap-2 border-b border-[#EDF3F5] px-4 py-2.5">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold leading-5 text-primary">AI 辅助</div>
+            <p className="mt-0.5 text-[11px] leading-4 text-[#9AAAB0]">{hint}</p>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="收起 AI 辅助"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-[6px] text-primary transition-colors hover:bg-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+              >
+                <PanelRightClose className="h-4 w-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="end">
+              收起
+            </TooltipContent>
+          </Tooltip>
+        </div>
+
+        <div className="flex min-h-0 flex-1 flex-col bg-white px-4 py-3">
+          {loading || hasResult ? (
+            <>
+              <div className="mb-2.5 flex shrink-0 items-center justify-between gap-2 border-b border-[#EDF3F5] pb-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="text-[12px] font-semibold text-[#1F3440]">生成结果</p>
+                  {appliedStatus ? (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10.5px] font-medium",
+                        appliedStatus === "applied"
+                          ? "bg-primary-soft text-primary"
+                          : appliedStatus === "partial"
+                            ? "bg-[#E8F4F7] text-primary"
+                            : "bg-[#FFF6E8] text-[#C48A2A]",
+                      )}
+                    >
+                      {appliedStatus === "applied"
+                        ? "已采用"
+                        : appliedStatus === "partial"
+                          ? "部分采用"
+                          : "待确认"}
+                    </span>
+                  ) : null}
+                  {hasResult && lastPrompt ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="查看生成时的输入"
+                          className="grid h-6 w-6 place-items-center rounded-md text-[#9AAAB0] transition-colors hover:bg-[#F5FAFB] hover:text-primary"
+                        >
+                          <MessageSquareText className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="bottom"
+                        align="start"
+                        className="max-w-[260px] whitespace-pre-wrap break-words bg-[#1F3440] text-[11px] leading-4 text-white"
+                      >
+                        {lastPrompt}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
+                </div>
+                {hasResult ? (
+                  appliedStatus === "applied" ? (
+                    <button
+                      type="button"
+                      onClick={onUndoApply}
+                      className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] font-medium text-[#607681] transition-colors hover:bg-[#F5FAFB] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      撤回全部
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={onApply}
+                      className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md bg-primary px-2.5 text-[12px] font-medium text-white transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                      全部采用
+                    </button>
+                  )
+                ) : null}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
+                {loading ? (
+                  <div className="space-y-3 py-1">
+                    <div className="h-4 w-[92%] animate-pulse rounded-md bg-[#EEF3F5]" />
+                    <div className="h-4 w-[68%] animate-pulse rounded-md bg-[#EEF3F5]" />
+                    <div className="h-4 w-[80%] animate-pulse rounded-md bg-[#EEF3F5]" />
+                  </div>
+                ) : (
+                  children
+                )}
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <div className="shrink-0 border-t border-[#EDF3F5] bg-white p-3">
+          {templates?.length ? (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {templates.map((tpl) => (
+                <button
+                  key={tpl.label}
+                  type="button"
+                  onClick={() => onPromptChange(tpl.prompt)}
+                  className="rounded-full border border-border bg-white px-2.5 py-0.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary"
+                >
+                  {tpl.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex items-end gap-1.5 rounded-[12px] border border-border bg-white px-2 py-2 transition-[border-color,box-shadow] focus-within:border-primary/50 focus-within:shadow-[0_8px_20px_rgba(52,155,172,0.10)]">
+            <textarea
+              value={prompt}
+              onChange={(event) => onPromptChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  if (canSend) onGenerate();
+                }
+              }}
+              placeholder={placeholder}
+              rows={3}
+              className="min-h-[72px] min-w-0 flex-1 resize-none border-0 bg-transparent px-1.5 py-1 text-[12.5px] leading-5 text-kb-heading outline-none placeholder:text-kb-muted"
+            />
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={!canSend}
+              aria-label={loading ? "正在生成" : "发送"}
+              title={loading ? "正在生成" : AI_GENERATE_LABEL}
+              className="mb-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-35"
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        </div>
+      </aside>
+    </TooltipProvider>
+  );
+}
+
+function AiItemAction({
+  applied,
+  onApply,
+  onUndo,
+}: {
+  applied: boolean;
+  onApply: () => void;
+  onUndo: () => void;
+}) {
+  return applied ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onUndo}
+          aria-label="撤回"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-transparent text-[#607681] transition-colors hover:bg-transparent hover:text-primary"
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="left">撤回</TooltipContent>
+    </Tooltip>
+  ) : (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onApply}
+          aria-label="采用"
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-transparent text-primary transition-colors hover:bg-transparent hover:text-primary/80"
+        >
+          <Check className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="left">采用</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function AiProposalPreview({
+  proposal,
+  draft,
+  onApplyItem,
+  onUndoItem,
+}: {
+  proposal: AiStepProposal;
+  draft: DraftState;
+  onApplyItem: (id: string) => void;
+  onUndoItem: (id: string) => void;
+}) {
+  if (proposal.kind === "basic") {
+    const { data } = proposal;
+    return (
+      <div className="overflow-hidden rounded-[10px] border border-[#E3EEF0] bg-white">
+        <div className="border-b border-[#EDF3F5] px-3.5 py-3">
+          <p className="text-[11px] text-[#9AAAB0]">专题名称</p>
+          <p className="mt-1 break-words text-[14px] font-semibold leading-5 text-[#1F3440]">
+            {data.title}
+          </p>
+        </div>
+        <div className="divide-y divide-[#EDF3F5] px-3.5">
+          <AiPreviewTagsField label="所属专业" values={data.specialty ? [data.specialty] : []} />
+          <AiPreviewTagsField label="业务场景" values={data.scenarios} />
+          <AiPreviewTagsField label="适用岗位" values={data.positions} />
+          <AiPreviewField label="学习目标" value={data.learningGoal} />
+          <AiPreviewField label="专题简介" value={data.intro} />
+        </div>
+      </div>
+    );
+  }
+
+  if (proposal.kind === "docs") {
+    const docs = proposal.docIds
+      .map((id) => DOCS.find((doc) => doc.id === id))
+      .filter((doc): doc is NonNullable<typeof doc> => Boolean(doc));
+    if (docs.length === 0) {
+      return <AiPreviewEmpty text="没有匹配到可推荐的资料。" />;
+    }
+    return (
+      <div className="overflow-hidden rounded-[10px] border border-[#E3EEF0] bg-white">
+        <div className="flex items-center justify-between border-b border-[#EDF3F5] px-3 py-2">
+          <span className="text-[11px] text-[#9AAAB0]">推荐资料</span>
+          <span className="text-[11px] font-medium tabular-nums text-[#607681]">{docs.length} 份</span>
+        </div>
+        <ul className="divide-y divide-[#EDF3F5]">
+          {docs.map((doc, index) => {
+            const fileIcon = inferDocFileType(doc);
+            const applied = proposal.appliedIds.includes(doc.id);
+            return (
+              <li key={doc.id} className="flex items-start gap-2.5 px-3 py-2.5">
+                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#F0F4F6] text-[10px] font-semibold tabular-nums text-[#607681]">
+                  {index + 1}
+                </span>
+                <KbFileTypeIcon
+                  type={fileIcon.type}
+                  fileName={fileIcon.fileName}
+                  size="sm"
+                  className="mt-0.5 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-[12.5px] font-medium leading-5 text-[#1F3440]">
+                    {doc.title}
+                  </p>
+                  <p className="mt-0.5 break-words text-[11px] text-[#9AAAB0]">
+                    {doc.docType} · {doc.source}
+                  </p>
+                </div>
+                <AiItemAction
+                  applied={applied}
+                  onApply={() => onApplyItem(doc.id)}
+                  onUndo={() => onUndoItem(doc.id)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
+  if (proposal.kind === "knowledge") {
+    if (proposal.knowledgePoints.length === 0) {
+      return <AiPreviewEmpty text="没有生成到知识点。" />;
+    }
+    return (
+      <div className="overflow-hidden rounded-[10px] border border-[#E3EEF0] bg-white">
+        <div className="flex items-center justify-between border-b border-[#EDF3F5] px-3 py-2">
+          <span className="text-[11px] text-[#9AAAB0]">知识点</span>
+          <span className="text-[11px] font-medium tabular-nums text-[#607681]">
+            {proposal.knowledgePoints.length} 个
+          </span>
+        </div>
+        <ul className="divide-y divide-[#EDF3F5]">
+          {proposal.knowledgePoints.map((point, index) => {
+            const applied = proposal.appliedIds.includes(point.id);
+            return (
+              <li key={point.id} className="flex items-start gap-2.5 px-3 py-2.5">
+                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-primary-soft text-[10px] font-semibold tabular-nums text-primary">
+                  {index + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-[12.5px] font-medium leading-5 text-[#1F3440]">
+                    {point.title}
+                  </p>
+                  <p className="mt-1 break-words text-[11.5px] leading-4 text-[#6B7F88]">
+                    {point.summary}
+                  </p>
+                </div>
+                <AiItemAction
+                  applied={applied}
+                  onApply={() => onApplyItem(point.id)}
+                  onUndo={() => onUndoItem(point.id)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
+  const questions = listDraftQuestions({
+    ...draft,
+    docQuestions: proposal.docQuestions,
+    questionEdits: proposal.questionEdits,
+  });
+  if (questions.length === 0) {
+    return <AiPreviewEmpty text="没有汇总到可关联的题目。" />;
+  }
+  return (
+    <div className="overflow-hidden rounded-[10px] border border-[#E3EEF0] bg-white">
+      <div className="flex items-center justify-between border-b border-[#EDF3F5] px-3 py-2">
+        <span className="text-[11px] text-[#9AAAB0]">关联题目</span>
+        <span className="text-[11px] font-medium tabular-nums text-[#607681]">
+          {questions.length} 道
+        </span>
+      </div>
+      <ul className="divide-y divide-[#EDF3F5]">
+        {questions.map((item, index) => {
+          const applied = proposal.appliedIds.includes(item.id);
+          return (
+            <li key={item.id} className="flex items-start gap-2.5 px-3 py-2.5">
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#F0F4F6] text-[10px] font-semibold tabular-nums text-[#607681]">
+                {index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="break-words text-[12.5px] font-medium leading-5 text-[#1F3440]">
+                  {item.title}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded bg-[#EEF2F4] px-1.5 py-0.5 text-[10px] text-kb-muted">
+                    {item.typeLabel}
+                  </span>
+                  {item.docTitle ? (
+                    <span className="break-words text-[10.5px] text-[#9AAAB0]">
+                      {stripBookMarks(item.docTitle)}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+              <AiItemAction
+                applied={applied}
+                onApply={() => onApplyItem(item.id)}
+                onUndo={() => onUndoItem(item.id)}
+              />
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function AiPreviewField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="py-2.5">
+      <p className="text-[11px] text-[#9AAAB0]">{label}</p>
+      <p className="mt-1 break-words text-[12.5px] leading-5 text-[#1F3440]">{value}</p>
+    </div>
+  );
+}
+
+function AiPreviewTagsField({ label, values }: { label: string; values: string[] }) {
+  return (
+    <div className="py-2.5">
+      <p className="text-[11px] text-[#9AAAB0]">{label}</p>
+      {values.length > 0 ? (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {values.map((item) => (
+            <span
+              key={item}
+              className="rounded-md bg-[#F0F4F6] px-2 py-0.5 text-[10.5px] text-[#5E737C]"
+            >
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1 text-[12.5px] leading-5 text-[#9AAAB0]">未填写</p>
+      )}
+    </div>
+  );
+}
+
+function AiPreviewEmpty({ text }: { text: string }) {
+  return (
+    <div className="rounded-[10px] border border-dashed border-[#DCE8EA] bg-white px-3 py-6 text-center text-[12px] text-[#9AAAB0]">
+      {text}
+    </div>
+  );
+}
+
 function TopicCreationSidebar({
   draft,
   questionCount,
@@ -1294,7 +2239,12 @@ function TopicCreationSidebar({
   const readiness = [
     {
       label: "基本信息",
-      filled: Boolean(draft.title.trim() && draft.learningGoal.trim() && draft.positions.length),
+      filled: Boolean(
+        draft.title.trim() &&
+          draft.learningGoal.trim() &&
+          draft.positions.length &&
+          draft.scenarios.length,
+      ),
       step: 1,
     },
     { label: "学习资料", filled: draft.docIds.length > 0, step: 2 },
@@ -1315,7 +2265,7 @@ function TopicCreationSidebar({
   const readinessPercent = Math.round((readyCount / readiness.length) * 100);
 
   return (
-    <aside className="flex h-full min-h-0 flex-col gap-3">
+    <aside className="flex h-full min-h-0 flex-col gap-3 max-lg:min-h-[240px]">
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] border border-[#E3EEF0] bg-white p-4 shadow-[0_8px_24px_rgba(31,52,64,0.05)]">
         <div className="mb-3 flex shrink-0 items-center justify-between gap-3">
           <h2 className="text-[15px] font-bold text-[#1F3440]">专题预览</h2>
@@ -1360,66 +2310,11 @@ function TopicCreationSidebar({
         <div className="mt-3 rounded-lg bg-primary-soft/35 px-3 py-2 text-[11.5px] text-kb-body">
           <span className="font-medium text-primary">逐步确认</span>
           <span className="mx-1.5 text-kb-border">·</span>
-          {draft.scenario}
+          {draft.scenarios.length > 0 ? draft.scenarios.join("、") : "未选择场景"}
         </div>
         </div>
       </section>
 
-      <section className="shrink-0 rounded-[10px] border border-[#E3EEF0] bg-white p-4 shadow-[0_8px_24px_rgba(31,52,64,0.05)]">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[15px] font-bold text-[#1F3440]">内容准备情况</h2>
-          <span className="text-[12px] font-semibold tabular-nums text-primary">
-            {readinessPercent}%
-          </span>
-        </div>
-        <div
-          role="progressbar"
-          aria-label="专题内容准备进度"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={readinessPercent}
-          className="mt-3 h-1.5 overflow-hidden rounded-full bg-kb-surface"
-        >
-          <div
-            className="h-full rounded-full bg-primary transition-[width] duration-300"
-            style={{ width: `${readinessPercent}%` }}
-          />
-        </div>
-        <p className="mt-2 text-[11px] text-kb-muted">
-          {readyCount} / {readiness.length} 项已准备
-        </p>
-
-        <ul className="mt-3 space-y-2">
-          {readiness.map((item) => {
-            const isCurrent = contentStep === item.step;
-            return (
-              <li
-                key={item.label}
-                className="flex items-center justify-between gap-3 text-[11.5px]"
-              >
-                <span className={cn("text-kb-body", isCurrent && "font-medium text-primary")}>
-                  {item.label}
-                </span>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1",
-                    item.complete ? "text-success" : isCurrent ? "text-primary" : "text-kb-muted",
-                  )}
-                >
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "h-1.5 w-1.5 rounded-full",
-                      item.complete ? "bg-success" : isCurrent ? "bg-primary" : "bg-kb-border",
-                    )}
-                  />
-                  {item.complete ? "已准备" : isCurrent ? "进行中" : "待完善"}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
     </aside>
   );
 }

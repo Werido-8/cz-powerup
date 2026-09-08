@@ -42,7 +42,7 @@ export type TopicAdminRecord = {
   specialty: TopicSpecialty;
   positions: TopicPosition[];
   learningGoal: string;
-  scenario: TopicScenario;
+  scenarios: TopicScenario[];
   intro: string;
   docIds: string[];
   knowledgePoints: TopicKnowledgePoint[];
@@ -145,7 +145,7 @@ function topicToAdminRecord(topic: Topic, status: TopicPublishStatus): TopicAdmi
     specialty: SPECIALTY_MAP[topic.id] ?? "通用",
     positions: POSITION_MAP[topic.role] ?? ["运行人员"],
     learningGoal: `学完后能独立完成${topic.title}相关现场判断与操作。`,
-    scenario: SCENARIO_MAP[topic.id] ?? "专项提升",
+    scenarios: [SCENARIO_MAP[topic.id] ?? "专项提升"],
     intro: topic.desc,
     docIds: [...topic.docIds],
     knowledgePoints: buildKnowledgePoints(topic.id, topic.docIds),
@@ -176,7 +176,7 @@ export const TOPIC_ADMIN_RECORDS: TopicAdminRecord[] = [
     specialty: "化学",
     positions: ["新员工", "运行人员"],
     learningGoal: "掌握循环水、补给水日常监测指标与异常判断方法。",
-    scenario: "入职培训",
+    scenarios: ["入职培训"],
     intro: "面向化学专业新员工，梳理水质监测基础与厂内化验流程。",
     docIds: [],
     knowledgePoints: [],
@@ -268,7 +268,7 @@ export const EMPTY_TOPIC_DRAFT: Omit<
   specialty: "运行值班",
   positions: ["运行人员"],
   learningGoal: "",
-  scenario: "入职培训",
+  scenarios: [],
   intro: "",
   docIds: [],
   knowledgePoints: [],
@@ -295,7 +295,7 @@ export const AI_TOPIC_TEMPLATES: { label: string; prompt: string }[] = [
 export type AiTopicBasicInfo = {
   title: string;
   specialty: TopicSpecialty;
-  scenario: TopicScenario;
+  scenarios: TopicScenario[];
   positions: TopicPosition[];
   learningGoal: string;
   intro: string;
@@ -319,7 +319,7 @@ export function buildAiTopicBasicInfo(prompt: string): AiTopicBasicInfo {
     return {
       title: "AGC 与两细则考核专项",
       specialty: "运行值班",
-      scenario: "专项提升",
+      scenarios: ["专项提升", "制度学习"],
       positions: ["运行人员", "班组长"],
       learningGoal: "能对照两细则理解 AGC 考核口径，并完成死区、速率相关现场判断。",
       intro: "围绕 AGC 调节性能考核与现场参数整定，帮助值班员把规则落到当班操作。",
@@ -330,7 +330,7 @@ export function buildAiTopicBasicInfo(prompt: string): AiTopicBasicInfo {
     return {
       title: "主变停投标准化操作",
       specialty: "电气",
-      scenario: "标准操作",
+      scenarios: ["标准操作"],
       positions: ["运行人员", "班组长"],
       learningGoal: "能按标准流程完成主变停投前核对、保护压板与中性点接地配合。",
       intro: "覆盖负荷转移、保护连接片和中性点接地等关键卡控点。",
@@ -341,7 +341,7 @@ export function buildAiTopicBasicInfo(prompt: string): AiTopicBasicInfo {
     return {
       title: "典型故障复盘专项",
       specialty: "电气",
-      scenario: "故障复盘",
+      scenarios: ["故障复盘"],
       positions: ["运行人员", "检修人员"],
       learningGoal: "能按固定思路完成差动动作后的范围判断与复电前核对。",
       intro: "从典型事故通报提炼判断顺序与易错点，服务班组复盘培训。",
@@ -351,7 +351,7 @@ export function buildAiTopicBasicInfo(prompt: string): AiTopicBasicInfo {
   return {
     title: "新员工运行专业入门",
     specialty: "运行值班",
-    scenario: "入职培训",
+    scenarios: ["入职培训"],
     positions: ["新员工", "运行人员"],
     learningGoal: "掌握值班巡检基本流程与常见异常初步判断。",
     intro: "面向首次上岗运行人员，围绕岗位能力与真实业务场景组织学习。",

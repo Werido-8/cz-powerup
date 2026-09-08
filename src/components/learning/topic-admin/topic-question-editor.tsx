@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   CheckSquare,
@@ -344,6 +344,8 @@ export function TopicQuestionEditorPanel({
   docQuestions,
   questionEdits = {},
   onUpdate,
+  hideSelectButton = false,
+  onRegisterOpenPicker,
 }: {
   docIds: string[];
   docQuestions: TopicDocQuestion[];
@@ -352,6 +354,8 @@ export function TopicQuestionEditorPanel({
     docQuestions?: TopicDocQuestion[];
     questionEdits?: Record<string, EditableTopicQuestion>;
   }) => void;
+  hideSelectButton?: boolean;
+  onRegisterOpenPicker?: (open: () => void) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dialogDraft, setDialogDraft] = useState<EditableTopicQuestion | null>(null);
@@ -421,6 +425,10 @@ export function TopicQuestionEditorPanel({
     setPickerOpen(true);
   };
 
+  useEffect(() => {
+    onRegisterOpenPicker?.(openQuestionPicker);
+  });
+
   const togglePickId = (docId: string, questionId: string) => {
     setPickDraftByDoc((current) => {
       const list = current[docId] ?? [];
@@ -474,15 +482,17 @@ export function TopicQuestionEditorPanel({
         <p className="text-[13px] text-muted-foreground">
           已关联 <strong className="text-foreground">{flatSelected.length}</strong> 道题
         </p>
-        <button
-          type="button"
-          onClick={openQuestionPicker}
-          disabled={docIds.length === 0}
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/40 px-3 text-[12px] font-medium text-primary hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          选择题目
-        </button>
+        {hideSelectButton ? null : (
+          <button
+            type="button"
+            onClick={openQuestionPicker}
+            disabled={docIds.length === 0}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-primary/30 bg-primary-soft/40 px-3 text-[12px] font-medium text-primary hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            选择题目
+          </button>
+        )}
       </div>
 
       {docIds.length === 0 ? (
